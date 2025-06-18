@@ -7,6 +7,7 @@ import { JwtAuthGuard } from './infrastructure/guards/auth.guard';
 import { RolePermissionModule } from './infrastructure/modules/role-permission.module';
 import { MenuModule } from './infrastructure/modules/menu.module';
 import { AuthModule } from './infrastructure/modules/auth.module';
+import { MasterUomModule } from './master-uom/master-uom.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuthModule } from './infrastructure/modules/auth.module';
     AuthModule,
     RolePermissionModule,
     MenuModule,
+    MasterUomModule,
   ],
   providers: [
     {
