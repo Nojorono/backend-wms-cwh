@@ -21,23 +21,23 @@ export class MasterUomRepository {
     return await this.repository.find();
   }
 
-  async findOne(id: number): Promise<MasterUom> {
+  async findOne(id: number): Promise<MasterUom | null> {
     const uom = await this.repository.findOne({ where: { id } });
     if (!uom) {
-      throw new NotFoundException('UOM not found');
+      return null;
     }
     return uom;
   }
 
-  async findByCode(code: string): Promise<MasterUom> {
+  async findByCode(code: string): Promise<MasterUom | null> {
     const uom = await this.repository.findOne({ where: { code } });
     if (!uom) {
-      throw new NotFoundException('UOM not found');
+      return null;
     }
     return uom;
   }
 
-  async update(id: number, updateMasterUomDto: UpdateMasterUomDto): Promise<MasterUom> {
+  async update(id: number, updateMasterUomDto: UpdateMasterUomDto): Promise<MasterUom | null> {
     const uom = await this.findOne(id);
     if (!uom) {
       throw new NotFoundException('UOM not found');
