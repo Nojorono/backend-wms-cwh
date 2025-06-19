@@ -8,6 +8,7 @@ import { RolePermissionModule } from './infrastructure/modules/role-permission.m
 import { MenuModule } from './infrastructure/modules/menu.module';
 import { AuthModule } from './infrastructure/modules/auth.module';
 import { MasterUomModule } from './master-uom/master-uom.module';
+import { MasterPalletModule } from './master-pallet/master-pallet.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { MasterUomModule } from './master-uom/master-uom.module';
     RolePermissionModule,
     MenuModule,
     MasterUomModule,
+    MasterPalletModule,
   ],
   providers: [
     {
