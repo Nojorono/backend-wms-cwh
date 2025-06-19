@@ -40,7 +40,11 @@ export class MasterSupplierService {
         throw new ConflictException(`Supplier with code ${updateMasterSupplierDto.organization_id} already exists`);
       }
     }
-    return await this.repository.update(id, updateMasterSupplierDto);
+    const updatedSupplier = await this.repository.update(id, updateMasterSupplierDto);
+    if (!updatedSupplier) {
+      throw new NotFoundException(`Supplier with ID ${id} not found`);
+    }
+    return updatedSupplier;
   }
 
   async remove(id: string): Promise<void> {

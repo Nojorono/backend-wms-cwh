@@ -36,7 +36,11 @@ export class MasterUomService {
         throw new ConflictException(`UOM with code ${updateMasterUomDto.code} already exists`);
       }
     }
-    return await this.repository.update(id, updateMasterUomDto);
+    const updatedUom = await this.repository.update(id, updateMasterUomDto);
+    if (!updatedUom) {
+      throw new NotFoundException(`UOM with ID ${id} not found`);
+    }
+    return updatedUom;
   }
 
   async remove(id: number): Promise<void> {

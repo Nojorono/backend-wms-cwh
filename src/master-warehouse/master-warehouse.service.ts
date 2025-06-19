@@ -40,7 +40,11 @@ export class MasterWarehouseService {
         throw new ConflictException(`Warehouse with organization ID ${updateMasterWarehouseDto.organization_id} already exists`);
       }
     }
-    return await this.repository.update(id, updateMasterWarehouseDto);
+    const updatedWarehouse = await this.repository.update(id, updateMasterWarehouseDto);
+    if (!updatedWarehouse) {
+      throw new NotFoundException(`Warehouse with ID ${id} not found`);
+    }
+    return updatedWarehouse;
   }
 
   async remove(id: string): Promise<void> {

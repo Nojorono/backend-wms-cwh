@@ -28,7 +28,7 @@ export class MasterPalletService {
     return pallet;
   }
 
-  async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet | null> {
+  async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet> {
     const pallet = await this.findOne(id);
     if (!pallet) {
       throw new NotFoundException('Pallet not found');
@@ -39,7 +39,11 @@ export class MasterPalletService {
         throw new ConflictException(`Pallet with pallet code ${updateMasterPalletDto.pallet_code} already exists`);
       }
     }
-    return await this.repository.update(id, updateMasterPalletDto);
+    const updatedPallet = await this.repository.update(id, updateMasterPalletDto);
+    if (!updatedPallet) {
+      throw new NotFoundException(`Pallet with ID ${id} not found`);
+    }
+    return updatedPallet;
   }
 
   async remove(id: number): Promise<void> {

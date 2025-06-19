@@ -40,7 +40,11 @@ export class MasterIOService {
         throw new ConflictException(`IO with code ${updateMasterIODto.organization_id} already exists`);
       }
     }
-    return await this.repository.update(id, updateMasterIODto);
+    const updatedIO = await this.repository.update(id, updateMasterIODto);
+    if (!updatedIO) {
+      throw new NotFoundException(`IO with ID ${id} not found`);
+    }
+    return updatedIO;
   }
 
   async remove(id: string): Promise<void> {
