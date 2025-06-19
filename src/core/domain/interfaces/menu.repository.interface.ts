@@ -4,6 +4,7 @@ export const MENU_REPOSITORY = 'MENU_REPOSITORY';
 
 export interface IMenuRepository {
   findAll(): Promise<Menu[]>;
+  findAllParent(): Promise<Menu[]>;
   findById(id: number): Promise<Menu>;
   findByPath(path: string): Promise<Menu>;
   create(menu: Partial<Menu>): Promise<Menu>;

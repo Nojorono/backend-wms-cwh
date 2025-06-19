@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Menu } from '../../core/domain/entities/menu.entity';
 import { IMenuRepository } from 'src/core/domain/interfaces/menu.repository.interface';
 
@@ -10,6 +10,14 @@ export class MenuRepository implements IMenuRepository {
     @InjectRepository(Menu)
     private readonly repository: Repository<Menu>,
   ) {}
+
+  async findAllParent(): Promise<Menu[]> {
+    return this.repository.find({
+      where: { parentId: IsNull() },
+      relations: ['children'],
+      order: { order: 'ASC' },
+    });
+  }
 
   async findAll(): Promise<Menu[]> {
     return this.repository.find({
