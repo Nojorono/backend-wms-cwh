@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { Menu } from '../../core/domain/entities/menu.entity';
 import { IMenuRepository } from 'src/core/domain/interfaces/menu.repository.interface';
 
@@ -14,14 +14,14 @@ export class MenuRepository implements IMenuRepository {
   async findAllParent(): Promise<Menu[]> {
     return this.repository.find({
       where: { parentId: IsNull() },
-      relations: ['children'],
       order: { order: 'ASC' },
     });
   }
 
   async findAll(): Promise<Menu[]> {
     return this.repository.find({
-      relations: ['parent', 'children'],
+      where: { parentId: IsNull() },
+      relations: ['children'],
       order: { order: 'ASC' },
     });
   }
@@ -29,7 +29,7 @@ export class MenuRepository implements IMenuRepository {
   async findById(id: number): Promise<Menu> {
     const menu = await this.repository.findOne({
       where: { id },
-      relations: ['parent', 'children'],
+      relations: ['children'],
     });
     if (!menu) {
       throw new Error(`Menu with ID ${id} not found`);
@@ -40,7 +40,7 @@ export class MenuRepository implements IMenuRepository {
   async findByPath(path: string): Promise<Menu> {
     const menu = await this.repository.findOne({
       where: { path },
-      relations: ['parent', 'children'],
+      relations: ['children'],
     });
     if (!menu) {
       throw new Error(`Menu with path ${path} not found`);
