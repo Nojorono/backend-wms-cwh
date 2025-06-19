@@ -11,6 +11,14 @@ import { Menu } from '../../core/domain/entities/menu.entity';
 @ApiBearerAuth('JWT-auth')
 export class MenuController {
   constructor(private readonly menuService: MenuService) {}
+
+  @Get('parent')
+  @Public()
+  @ApiOperation({ summary: 'Get all parent menu items' })
+  @ApiResponse({ status: 200, description: 'Return all parent menu items', type: [Menu] })
+  async findAllParent(): Promise<Menu[]> {
+    return this.menuService.findAllParent();
+  }
   
   @Get()
   @Public()
