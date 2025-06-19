@@ -21,23 +21,23 @@ export class MasterSupplierRepository {
     return await this.repository.find();
   }
 
-  async findOne(id: string): Promise<MasterSupplier> {
+  async findOne(id: string): Promise<MasterSupplier | null> {
     const supplier = await this.repository.findOne({ where: { id } });
     if (!supplier) {
-      throw new NotFoundException('Supplier not found');
+      return null;
     }
     return supplier;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterSupplier> {
+  async findByOrganizationId(organization_id: number): Promise<MasterSupplier | null> {
     const supplier = await this.repository.findOne({ where: { organization_id } });
     if (!supplier) {
-      throw new NotFoundException('Supplier not found');
+      return null;
     }
     return supplier;
   }
 
-  async update(id: string, updateMasterSupplierDto: UpdateMasterSupplierDto): Promise<MasterSupplier> {
+  async update(id: string, updateMasterSupplierDto: UpdateMasterSupplierDto): Promise<MasterSupplier | null> {
     const supplier = await this.findOne(id);
     if (!supplier) {
       throw new NotFoundException('Supplier not found');
