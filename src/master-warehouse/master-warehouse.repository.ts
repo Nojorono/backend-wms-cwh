@@ -21,23 +21,23 @@ export class MasterWarehouseRepository {
     return await this.repository.find();
   }
 
-  async findOne(id: string): Promise<MasterWarehouse> {
+  async findOne(id: string): Promise<MasterWarehouse | null> {
     const warehouse = await this.repository.findOne({ where: { id } });
     if (!warehouse) {
-      throw new NotFoundException('Warehouse not found');
+      return null;
     }
     return warehouse;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse> {
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse | null> {
     const warehouse = await this.repository.findOne({ where: { organization_id } });
     if (!warehouse) {
-      throw new NotFoundException('Warehouse not found');
+      return null;
     }
     return warehouse;
   }
 
-  async update(id: string, updateMasterWarehouseDto: UpdateMasterWarehouseDto): Promise<MasterWarehouse> {
+  async update(id: string, updateMasterWarehouseDto: UpdateMasterWarehouseDto): Promise<MasterWarehouse | null> {
     const warehouse = await this.findOne(id);
     if (!warehouse) {
       throw new NotFoundException('Warehouse not found');
