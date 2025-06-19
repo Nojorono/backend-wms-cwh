@@ -21,23 +21,23 @@ export class MasterIORepository {
     return await this.repository.find();
   }
 
-  async findOne(id: string): Promise<MasterIO> {
+  async findOne(id: string): Promise<MasterIO | null> {
     const io = await this.repository.findOne({ where: { id } });
     if (!io) {
-      throw new NotFoundException('IO not found');
+      return null;
     }
     return io;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterIO> {
+  async findByOrganizationId(organization_id: number): Promise<MasterIO | null> {
     const io = await this.repository.findOne({ where: { organization_id } });
     if (!io) {
-      throw new NotFoundException('IO not found');
+      return null;
     }
     return io;
   }
 
-  async update(id: string, updateMasterIODto: UpdateMasterIODto): Promise<MasterIO> {
+  async update(id: string, updateMasterIODto: UpdateMasterIODto): Promise<MasterIO | null> {
     const io = await this.findOne(id);
     if (!io) {
       throw new NotFoundException('IO not found');
