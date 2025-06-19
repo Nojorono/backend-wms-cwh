@@ -9,6 +9,8 @@ import { MenuModule } from './infrastructure/modules/menu.module';
 import { AuthModule } from './infrastructure/modules/auth.module';
 import { MasterUomModule } from './master-uom/master-uom.module';
 import { MasterPalletModule } from './master-pallet/master-pallet.module';
+import { MasterIOModule } from './master-io/master-io.module';
+import { MasterWarehouseModule } from './master-warehouse/master-warehouse.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { MasterPalletModule } from './master-pallet/master-pallet.module';
     MenuModule,
     MasterUomModule,
     MasterPalletModule,
+    MasterIOModule,
+    MasterWarehouseModule,  
   ],
   providers: [
     {
