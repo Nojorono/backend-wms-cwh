@@ -6,10 +6,10 @@ export class MasterPallet {
   id: number;
 
   @Column({ nullable: true })
-  client_id: string;
+  organization_id: number;
 
-  @Column({ unique: true })
-  code: string;
+  @Column({ nullable: true })
+  pallet_code: string;
 
   @Column()
   uom_name: string;

@@ -5,12 +5,12 @@ export class UpdateMasterPalletDto {
   @ApiProperty({ example: 'CLIENT001', required: false })
   @IsString()
   @IsOptional()
-  client_id?: string;
+  organization_id?: number;
 
   @ApiProperty({ example: 'PALLET001', required: false })
   @IsString()
   @IsOptional()
-  code?: string;
+  pallet_code?: string;
 
   @ApiProperty({ example: 'Standard Pallet', required: false })
   @IsString()

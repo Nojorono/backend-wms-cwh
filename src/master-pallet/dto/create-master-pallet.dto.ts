@@ -5,11 +5,11 @@ export class CreateMasterPalletDto {
   @ApiProperty({ example: 'CLIENT001', required: false })
   @IsString()
   @IsOptional()
-  client_id?: string;
+  organization_id?: number;
 
   @ApiProperty({ example: 'PALLET001' })
   @IsString()
-  code: string;
+  pallet_code: string;
 
   @ApiProperty({ example: 'Standard Pallet' })
   @IsString()

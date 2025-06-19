@@ -5,14 +5,13 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToMany,
-  JoinTable,
+  Index,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Permission } from './permission.entity';
-import { Menu } from './menu.entity';
 
 @Entity('roles')
+@Index(['name'], { unique: true })
 export class Role {
   @PrimaryGeneratedColumn()
   id: number;
@@ -26,23 +25,15 @@ export class Role {
   @Column({ default: true })
   isActive: boolean;
 
-  @ManyToMany(() => Menu)
-  @JoinTable({
-    name: 'role_menus',
-    joinColumn: { name: 'role_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'menu_id', referencedColumnName: 'id' },
-  })
-  menus: Menu[];
-
-  @OneToMany(() => Permission, (permission) => permission.role)
+  @OneToMany(() => Permission, (permission) => permission.role, { cascade: true })
   permissions: Permission[];
 
   @OneToMany(() => User, (user: User) => user.role, { lazy: true })
   users: Promise<User[]>;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

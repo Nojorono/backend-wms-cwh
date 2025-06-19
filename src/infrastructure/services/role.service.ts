@@ -14,27 +14,72 @@ export class RoleService {
     private readonly permissionRepository: IPermissionRepository,
   ) {}
 
-  async findAll(): Promise<Role[]> {
-    return this.roleRepository.findAll();
+  private mapRoleWithMenuActions(role: Role): any {
+    // Create a map of menus with their actions from permissions
+    const menuMap = new Map<number, any>();
+    
+    // Process permissions to build menus with actions
+    for (const permission of role.permissions || []) {
+      if (permission.menu) {
+        const menuId = permission.menu.id;
+        
+        if (!menuMap.has(menuId)) {
+          // Initialize menu if not exists
+          menuMap.set(menuId, { 
+            id: permission.menu.id,
+            name: permission.menu.name,
+            path: permission.menu.path,
+            icon: permission.menu.icon,
+            parentId: permission.menu.parentId,
+            order: permission.menu.order,
+            createdAt: permission.menu.createdAt,
+            updatedAt: permission.menu.updatedAt,
+            actions: [] 
+          });
+        }
+        
+        // Add action to the menu
+        menuMap.get(menuId).actions.push(permission.action);
+      }
+    }
+    
+    // Convert map to array
+    const menus = Array.from(menuMap.values());
+    
+    // Return role with mapped menus
+    return {
+      id: role.id,
+      name: role.name,
+      description: role.description,
+      isActive: role.isActive,
+      menus,
+      createdAt: role.createdAt,
+      updatedAt: role.updatedAt
+    };
   }
 
-  async findById(id: number): Promise<Role> {
+  async findAll(): Promise<any[]> {
+    const roles = await this.roleRepository.findAll();
+    return roles.map(role => this.mapRoleWithMenuActions(role));
+  }
+
+  async findById(id: number): Promise<any> {
     const role = await this.roleRepository.findById(id);
     if (!role) {
       throw new NotFoundException(`Role with ID ${id} not found`);
     }
-    return role;
+    return this.mapRoleWithMenuActions(role);
   }
 
-  async findByName(name: string): Promise<Role> {
+  async findByName(name: string): Promise<any> {
     const role = await this.roleRepository.findByName(name);
     if (!role) {
       throw new NotFoundException(`Role with name ${name} not found`);
     }
-    return role;
+    return this.mapRoleWithMenuActions(role);
   }
 
-  async create(createRoleDto: CreateRoleDto): Promise<Role> {
+  async create(createRoleDto: CreateRoleDto): Promise<any> {
     const existingRole = await this.roleRepository.findByName(createRoleDto.name);
     if (existingRole) {
       throw new ConflictException(`Role with name ${createRoleDto.name} already exists`);
@@ -63,7 +108,7 @@ export class RoleService {
     return this.findById(role.id);
   }
 
-  async update(id: number, updateRoleDto: UpdateRoleDto): Promise<Role> {
+  async update(id: number, updateRoleDto: UpdateRoleDto): Promise<any> {
     const role = await this.findById(id);
 
     // Update role basic info

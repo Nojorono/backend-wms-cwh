@@ -9,9 +9,9 @@ export class MasterPalletService {
   constructor(private readonly repository: MasterPalletRepository) {}
 
   async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
-    const existingPallet = await this.repository.findByCode(createMasterPalletDto.code);
+    const existingPallet = await this.repository.findByPalletCode(createMasterPalletDto.pallet_code);
     if (existingPallet) {
-      throw new ConflictException(`Pallet with code ${createMasterPalletDto.code} already exists`);
+      throw new ConflictException(`Pallet with pallet code ${createMasterPalletDto.pallet_code} already exists`);
     }
     return await this.repository.create(createMasterPalletDto);
   }
@@ -30,10 +30,10 @@ export class MasterPalletService {
 
   async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet> {
     const pallet = await this.findOne(id);
-    if (updateMasterPalletDto.code && updateMasterPalletDto.code !== pallet.code) {
-      const existingPallet = await this.repository.findByCode(updateMasterPalletDto.code);
+    if (updateMasterPalletDto.pallet_code && updateMasterPalletDto.pallet_code !== pallet.pallet_code) {
+      const existingPallet = await this.repository.findByPalletCode(updateMasterPalletDto.pallet_code);
       if (existingPallet) {
-        throw new ConflictException(`Pallet with code ${updateMasterPalletDto.code} already exists`);
+        throw new ConflictException(`Pallet with pallet code ${updateMasterPalletDto.pallet_code} already exists`);
       }
     }
     return await this.repository.update(id, updateMasterPalletDto);

@@ -1,32 +1,34 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index, Unique } from 'typeorm';
 import { Menu } from './menu.entity';
 import { Role } from './role.entity';
 
 @Entity('permissions')
+@Index(['roleId', 'menuId'])
+@Unique(['roleId', 'menuId', 'action'])
 export class Permission {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ length: 50 })
   action: string; // e.g., 'View', 'Create', 'Update', 'Delete'
 
   @ManyToOne(() => Menu, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'menu_id' })
   menu: Menu;
 
-  @Column()
+  @Column({ name: 'menu_id' })
   menuId: number;
 
   @ManyToOne(() => Role, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'role_id' })
   role: Role;
 
-  @Column()
+  @Column({ name: 'role_id' })
   roleId: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }

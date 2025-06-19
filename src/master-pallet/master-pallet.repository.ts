@@ -29,8 +29,8 @@ export class MasterPalletRepository {
     return pallet;
   }
 
-  async findByCode(code: string): Promise<MasterPallet> {
-    const pallet = await this.repository.findOne({ where: { code } });
+  async findByPalletCode(palletCode: string): Promise<MasterPallet> {
+    const pallet = await this.repository.findOne({ where: { pallet_code: palletCode } });
     if (!pallet) {
       throw new NotFoundException('Pallet not found');
     }

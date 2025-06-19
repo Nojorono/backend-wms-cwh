@@ -11,6 +11,7 @@ import { MasterUomModule } from './master-uom/master-uom.module';
 import { MasterPalletModule } from './master-pallet/master-pallet.module';
 import { MasterIOModule } from './master-io/master-io.module';
 import { MasterWarehouseModule } from './master-warehouse/master-warehouse.module';
+import { MasterSupplierModule } from './master-supplier/master-supplier.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MasterWarehouseModule } from './master-warehouse/master-warehouse.modul
     MasterPalletModule,
     MasterIOModule,
     MasterWarehouseModule,  
+    MasterSupplierModule,
   ],
   providers: [
     {
