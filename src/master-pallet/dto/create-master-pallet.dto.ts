@@ -2,8 +2,8 @@ import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateMasterPalletDto {
-  @ApiProperty({ example: 'CLIENT001', required: false })
-  @IsString()
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
   @IsOptional()
   organization_id?: number;
 

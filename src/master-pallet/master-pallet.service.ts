@@ -28,8 +28,11 @@ export class MasterPalletService {
     return pallet;
   }
 
-  async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet> {
+  async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet | null> {
     const pallet = await this.findOne(id);
+    if (!pallet) {
+      throw new NotFoundException('Pallet not found');
+    }
     if (updateMasterPalletDto.pallet_code && updateMasterPalletDto.pallet_code !== pallet.pallet_code) {
       const existingPallet = await this.repository.findByPalletCode(updateMasterPalletDto.pallet_code);
       if (existingPallet) {

@@ -21,23 +21,23 @@ export class MasterPalletRepository {
     return await this.repository.find();
   }
 
-  async findOne(id: number): Promise<MasterPallet> {
+  async findOne(id: number): Promise<MasterPallet | null> {
     const pallet = await this.repository.findOne({ where: { id } });
     if (!pallet) {
-      throw new NotFoundException('Pallet not found');
+      return null;
     }
     return pallet;
   }
 
-  async findByPalletCode(palletCode: string): Promise<MasterPallet> {
+  async findByPalletCode(palletCode: string): Promise<MasterPallet | null> {
     const pallet = await this.repository.findOne({ where: { pallet_code: palletCode } });
     if (!pallet) {
-      throw new NotFoundException('Pallet not found');
+      return null;
     }
     return pallet;
   }
 
-  async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet> {
+  async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet | null> {
     const pallet = await this.findOne(id);
     if (!pallet) {
       throw new NotFoundException('Pallet not found');
