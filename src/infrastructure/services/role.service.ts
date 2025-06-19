@@ -115,7 +115,6 @@ export class RoleService {
     const updatedRole = await this.roleRepository.update(id, {
       name: updateRoleDto.name,
       description: updateRoleDto.description,
-      isActive: updateRoleDto.isActive,
     });
 
     if (!updatedRole) {
@@ -126,8 +125,6 @@ export class RoleService {
     if (updateRoleDto.permissions?.length) {
       // Delete existing permissions
       await this.permissionRepository.deleteByRoleId(id);
-
-      const menuIds = updateRoleDto.permissions.map(p => p.menu_id);
 
       // Create new permissions
       for (const permission of updateRoleDto.permissions) {
