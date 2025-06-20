@@ -1,50 +1,50 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { MasterIORepository } from './master-item.repository';
-import { CreateMasterIODto } from './dto/create-master-item.dto';
-import { UpdateMasterIODto } from './dto/update-master-item.dto';
-import { MasterIO } from '../core/domain/entities/master-io.entity';
+import { MasterItemRepository } from './master-item.repository';
+import { CreateMasterItemDto } from './dto/create-master-item.dto';
+import { UpdateMasterItemDto } from './dto/update-master-item.dto';
+import { MasterItem } from '../core/domain/entities/master-item.entity';
 
 @Injectable()
-export class MasterIOService {
-  constructor(private readonly repository: MasterIORepository) {}
+export class MasterItemService {
+  constructor(private readonly repository: MasterItemRepository) {}
 
-  async create(createMasterIODto: CreateMasterIODto): Promise<MasterIO> {
-    const organizationId = createMasterIODto.organization_id;
-    if (!organizationId) {
-      throw new BadRequestException('Organization ID is required');
+  async create(createMasterItemDto: CreateMasterItemDto): Promise<MasterItem> {
+    const sku = createMasterItemDto.sku;
+    if (!sku) {
+      throw new BadRequestException('SKU is required');
     }
-    const existingIO = await this.repository.findByOrganizationId(organizationId);
-    if (existingIO) {
-      throw new ConflictException(`IO with code ${createMasterIODto.organization_id} already exists`);
+    const existingItem = await this.repository.findBySku(sku);
+    if (existingItem) {
+      throw new ConflictException(`Item with SKU ${createMasterItemDto.sku} already exists`);
     }
-    return await this.repository.create(createMasterIODto);
+    return await this.repository.create(createMasterItemDto);
   }
 
-  async findAll(): Promise<MasterIO[]> {
+  async findAll(): Promise<MasterItem[]> {
     return await this.repository.findAll();
   }
 
-  async findOne(id: string): Promise<MasterIO> {
-    const io = await this.repository.findOne(id);
-    if (!io) {
-      throw new NotFoundException(`IO with ID ${id} not found`);
+    async findOne(id: string): Promise<MasterItem> {
+    const item = await this.repository.findOne(id);
+    if (!item) {
+      throw new NotFoundException(`Item with ID ${id} not found`);
     }
-    return io;
+    return item;
   }
 
-  async update(id: string, updateMasterIODto: UpdateMasterIODto): Promise<MasterIO> {
-    const io = await this.findOne(id);
-    if (updateMasterIODto.organization_id && updateMasterIODto.organization_id !== io.organization_id) {
-      const existingIO = await this.repository.findByOrganizationId(updateMasterIODto.organization_id);
-      if (existingIO) {
-        throw new ConflictException(`IO with code ${updateMasterIODto.organization_id} already exists`);
+  async update(id: string, updateMasterItemDto: UpdateMasterItemDto): Promise<MasterItem> {
+    const item = await this.findOne(id);
+    if (updateMasterItemDto.sku && updateMasterItemDto.sku !== item.sku) {
+      const existingItem = await this.repository.findBySku(updateMasterItemDto.sku);
+      if (existingItem) {
+        throw new ConflictException(`Item with SKU ${updateMasterItemDto.sku} already exists`);
       }
     }
-    const updatedIO = await this.repository.update(id, updateMasterIODto);
-    if (!updatedIO) {
-      throw new NotFoundException(`IO with ID ${id} not found`);
+    const updatedItem = await this.repository.update(id, updateMasterItemDto);
+    if (!updatedItem) {
+      throw new NotFoundException(`Item with ID ${id} not found`);
     }
-    return updatedIO;
+    return updatedItem;
   }
 
   async remove(id: string): Promise<void> {
