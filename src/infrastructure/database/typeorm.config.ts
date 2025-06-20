@@ -11,6 +11,6 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
   database: configService.get('DB_DATABASE', 'wms_db'),
   entities: [join(__dirname, '..', '..', 'core', 'domain', 'entities', '*.entity.{ts,js}')],
   migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
-  synchronize: configService.get('NODE_ENV', 'development') === 'development',
-  logging: configService.get('NODE_ENV', 'development') === 'development',
+  synchronize: false,
+  logging: true,
 }); 

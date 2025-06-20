@@ -28,7 +28,7 @@ import { MasterSupplierModule } from './master-supplier/master-supplier.module';
         password: configService.get('DB_PASSWORD', 'postgres'),
         database: configService.get('DB_DATABASE', 'wms_db'),
         entities: [join(__dirname, 'core', 'domain', 'entities', '*.entity.{ts,js}')],
-        synchronize: configService.get('NODE_ENV', 'development') === 'development',
+        synchronize: false,
       }),
       inject: [ConfigService],
     }),
