@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MasterIO } from '../core/domain/entities/master-io.entity';
-import { MasterIOController } from './master-item.controller';
-import { MasterIOService } from './master-item.service';
-import { MasterIORepository } from './master-item.repository';
+import { MasterItem } from '../core/domain/entities/master-item.entity';
+import { MasterItemController } from './master-item.controller';
+import { MasterItemService } from './master-item.service';
+import { MasterItemRepository } from './master-item.repository';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterIO])],
-  controllers: [MasterIOController],
+  imports: [TypeOrmModule.forFeature([MasterItem])],
+  controllers: [MasterItemController],
   providers: [
-    MasterIOService,
-    MasterIORepository,
+    MasterItemService,
+    MasterItemRepository,
   ],
-  exports: [MasterIOService],
+  exports: [MasterItemService],
 })
-export class MasterIOModule {} 
+export class MasterItemModule {} 
