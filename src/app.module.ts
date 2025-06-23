@@ -13,6 +13,7 @@ import { MasterIOModule } from './master-io/master-io.module';
 import { MasterWarehouseModule } from './master-warehouse/master-warehouse.module';
 import { MasterSupplierModule } from './master-supplier/master-supplier.module';
 import { MasterItemModule } from './master-item/master-item.module';
+import { MasterClassificationItemModule } from './master-classification-item/master-classification-item.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { MasterItemModule } from './master-item/master-item.module';
     MasterWarehouseModule,  
     MasterSupplierModule,
     MasterItemModule,
+    MasterClassificationItemModule,
   ],
   providers: [
     {
