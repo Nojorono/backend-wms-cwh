@@ -20,7 +20,7 @@ export class InboundPlanService {
       throw new NotFoundException(`Organization with ID ${organizationId} not found`);
     }
     const lastInboundPlan = await this.repository.findLastInboundPlanningNo(organizationId);
-    const dateCreated = new Date().getFullYear().toString().slice(-2);
+    const dateCreated = new Date().getDate().toString().padStart(2, '0');
     const lastInboundPlanningNo = lastInboundPlan ? parseInt(lastInboundPlan.inbound_planning_no.split('-')[3]) + 1 : 1;
     return `${findOrganization.organization_name}-${findOrganization.organization_id}-${dateCreated}-${lastInboundPlanningNo.toString().padStart(4, '0')}`;
   }
