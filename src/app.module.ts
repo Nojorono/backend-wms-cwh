@@ -14,6 +14,7 @@ import { MasterWarehouseModule } from './master-warehouse/master-warehouse.modul
 import { MasterSupplierModule } from './master-supplier/master-supplier.module';
 import { MasterItemModule } from './master-item/master-item.module';
 import { MasterClassificationItemModule } from './master-classification-item/master-classification-item.module';
+import { InboundPlanModule } from './inbound-plan/inbound-plan.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { MasterClassificationItemModule } from './master-classification-item/mas
     MasterSupplierModule,
     MasterItemModule,
     MasterClassificationItemModule,
+    InboundPlanModule,
   ],
   providers: [
     {
