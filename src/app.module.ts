@@ -15,6 +15,7 @@ import { MasterSupplierModule } from './master-supplier/master-supplier.module';
 import { MasterItemModule } from './master-item/master-item.module';
 import { MasterClassificationItemModule } from './master-classification-item/master-classification-item.module';
 import { InboundPlanModule } from './inbound-plan/inbound-plan.module';
+import { CheckerAssignModule } from './checker-assign/master-checker-assign.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { InboundPlanModule } from './inbound-plan/inbound-plan.module';
     MasterItemModule,
     MasterClassificationItemModule,
     InboundPlanModule,
+    CheckerAssignModule,
   ],
   providers: [
     {
