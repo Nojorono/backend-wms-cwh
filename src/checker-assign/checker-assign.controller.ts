@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { CheckerAssignService } from './master-checker-assign.service';
+import { CheckerAssignService } from './checker-assign.service';
 import { CreateCheckerAssignDto } from './dto/create-checker-assign.dto';
 import { UpdateCheckerAssignDto } from './dto/update-checker-assign.dto';
 import { CheckerAssign } from '../core/domain/entities/checker-assign.entity';

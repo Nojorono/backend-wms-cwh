@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { CheckerAssignRepository } from './master-checker-assign.repository';
+import { CheckerAssignRepository } from './checker-assign.repository';
 import { CreateCheckerAssignDto } from './dto/create-checker-assign.dto';
 import { UpdateCheckerAssignDto } from './dto/update-checker-assign.dto';
 import { CheckerAssign } from '../core/domain/entities/checker-assign.entity';
