@@ -6,6 +6,7 @@ import { RegisterDto } from '../../core/application/dtos/auth/register.dto';
 import { IUserRepository } from '../../core/domain/interfaces/user.repository.interface';
 import { Public } from '../../core/decorators/public.decorator';
 import * as bcrypt from 'bcrypt';
+import { IPermissionRepository } from 'src/core/domain/interfaces/permission.repository.interface';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -14,6 +15,8 @@ export class AuthController {
     private readonly authService: AuthService,
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
+    @Inject('IPermissionRepository')
+    private readonly permissionRepository: IPermissionRepository,
   ) {}
 
   @Public()
@@ -26,8 +29,12 @@ export class AuthController {
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    const permissions = await this.permissionRepository.findMenuByRoleId(user.roleId);
+    if (permissions.menus.length === 0) {
+      throw new UnauthorizedException('User has no permissions');
+    }
     const token = await this.authService.generateToken(user);
-    return { token };
+    return { token, permissions: permissions.menus };
   }
 
   @Public()

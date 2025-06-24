@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Permission } from '../../core/domain/entities/permission.entity';
 import { IPermissionRepository } from '../../core/domain/interfaces/permission.repository.interface';
+import { Menu } from 'src/core/domain/entities/menu.entity';
 
 @Injectable()
 export class PermissionRepository implements IPermissionRepository {
@@ -21,6 +22,38 @@ export class PermissionRepository implements IPermissionRepository {
 
   async findByRoleId(roleId: number): Promise<Permission[]> {
     return this.repository.find({ where: { roleId }, relations: ['menu', 'role'] });
+  }
+
+  async findMenuByRoleId(roleId: number): Promise<{ menus: any[] }> {
+    const permissions = await this.repository.find({ where: { roleId }, relations: ['menu'] });
+    
+    // Group actions by menu
+    const menuMap = new Map<number, any>();
+    
+    for (const permission of permissions) {
+      const menuId = permission.menu.id;
+      
+      if (!menuMap.has(menuId)) {
+        // Initialize menu if not exists
+        menuMap.set(menuId, {
+          id: permission.menu.id,
+          name: permission.menu.name,
+          path: permission.menu.path,
+          icon: permission.menu.icon,
+          parentId: permission.menu.parentId,
+          order: permission.menu.order,
+          createdAt: permission.menu.createdAt,
+          updatedAt: permission.menu.updatedAt,
+          actions: []
+        });
+      }
+      
+      // Add action to the menu
+      menuMap.get(menuId).actions.push(permission.action);
+    }
+    
+    const menus = Array.from(menuMap.values());
+    return { menus };
   }
 
   async findByMenuId(menuId: number): Promise<Permission[]> {

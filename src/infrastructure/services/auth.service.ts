@@ -5,6 +5,7 @@ import { IAuthService } from '../../core/domain/interfaces/auth.service.interfac
 import { IUserRepository } from '../../core/domain/interfaces/user.repository.interface';
 import { User } from '../../core/domain/entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import { IPermissionRepository } from 'src/core/domain/interfaces/permission.repository.interface';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -12,10 +13,15 @@ export class AuthService implements IAuthService {
     private readonly jwtService: JwtService,
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
+    @Inject('IPermissionRepository')
+    private readonly permissionRepository: IPermissionRepository,
   ) {}
 
   async validateUser(username: string, password: string): Promise<User | null> {
     const user = await this.userRepository.findByUsername(username);
+    if (!user) {
+      return null;
+    }
     if (user && await bcrypt.compare(password, user.password)) {
       return user;
     }

@@ -8,10 +8,12 @@ import { AuthController } from 'src/presentation/controllers/auth.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../../core/domain/entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
+import { PermissionRepository } from '../repositories/permission.repository';
+import { Permission } from 'src/core/domain/entities/permission.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Permission]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -31,6 +33,10 @@ import { UserRepository } from '../repositories/user.repository';
     {
       provide: 'IUserRepository',
       useClass: UserRepository,
+    },
+    {
+      provide: 'IPermissionRepository',
+      useClass: PermissionRepository,
     },
   ],
   exports: [AuthService, JwtStrategy, PassportModule],
