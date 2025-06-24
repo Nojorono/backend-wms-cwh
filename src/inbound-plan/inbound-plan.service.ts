@@ -70,4 +70,16 @@ export class InboundPlanService {
     await this.findOne(id);
     await this.repository.remove(id);
   }
+
+  async updateInboundPlanStatusInProgress(id: string): Promise<InboundPlan> {
+    const inboundPlan = await this.findOne(id);
+    if (inboundPlan.plan_status !== PlanStatus.DRAFT) { 
+      throw new BadRequestException('Inbound Plan is not in draft');
+    }
+    const updatedInboundPlan = await this.repository.update(id, { plan_status: PlanStatus.IN_PROGRESS });
+    if (!updatedInboundPlan) {
+      throw new NotFoundException(`Inbound Plan with ID ${id} not found`);
+    }
+    return updatedInboundPlan;
+  }
 }

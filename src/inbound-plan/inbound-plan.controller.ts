@@ -53,4 +53,12 @@ export class InboundPlanController {
   remove(@Param('id') id: string) {
     return this.inboundPlanService.remove(id);
   }
+
+  @Get('update-inbound-plan-status-in-progress/:id')
+  @ApiOperation({ summary: 'Update Inbound Plan Status in Progress' })
+  @ApiResponse({ status: 200, description: 'Return the Inbound Plan status in progress.', type: InboundPlan })
+  @ApiResponse({ status: 404, description: 'Inbound Plan not found.' })
+  updateInboundPlanStatusInProgress(@Param('id') id: string) {
+    return this.inboundPlanService.updateInboundPlanStatusInProgress(id);
+  }
 } 
