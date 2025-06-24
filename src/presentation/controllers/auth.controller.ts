@@ -34,7 +34,7 @@ export class AuthController {
       throw new UnauthorizedException('User has no permissions');
     }
     const token = await this.authService.generateToken(user);
-    return { token, permissions: permissions.menus };
+    return { token, user, menus: permissions.menus };
   }
 
   @Public()
