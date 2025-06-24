@@ -26,12 +26,12 @@ export class CheckerAssignController {
     return this.checkerAssignService.findAll();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a Checker Assign by id' })
+  @Get(':inboundPlanId')
+  @ApiOperation({ summary: 'Get a Checker Assign by inbound plan ID' })
   @ApiResponse({ status: 200, description: 'Return the Checker Assign.', type: CheckerAssign })
   @ApiResponse({ status: 404, description: 'Checker Assign not found.' })
-  findOne(@Param('id') id: string) {
-    return this.checkerAssignService.findOne(id);
+  findByInboundPlanId(@Param('inboundPlanId') inboundPlanId: string) {
+    return this.checkerAssignService.findByInboundPlanId(inboundPlanId);
   }
 
   @Patch(':id')

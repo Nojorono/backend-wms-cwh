@@ -17,19 +17,28 @@ export class CheckerAssignRepository {
 
   async create(createCheckerAssignDto: CreateCheckerAssignDto): Promise<CheckerAssign> {
     const checkers = await this.userRepository.find({ where: { id: In(createCheckerAssignDto.checkers?.map(checker => checker.id) || []) } });
+    
+    let checkerLeader: User | undefined = undefined;
+    if (createCheckerAssignDto.checker_leader_id) {
+      checkerLeader = await this.userRepository.findOne({ where: { id: createCheckerAssignDto.checker_leader_id } }) || undefined;
+    }
+    
     const checkerAssign = this.repository.create({
-      ...createCheckerAssignDto,
+      inbound_plan_id: createCheckerAssignDto.inbound_plan_id,
+      checker_leader: checkerLeader,
       checkers,
+      status: createCheckerAssignDto.status,
+      assign_date_start: createCheckerAssignDto.assign_date_start,
+      assign_date_finish: createCheckerAssignDto.assign_date_finish,
     });
     return await this.repository.save(checkerAssign);
   }
 
   async findAll(): Promise<CheckerAssign[]> {
-    return await this.repository.find();
+    return await this.repository.find({ relations: ['checker_leader', 'checkers'] });
   }
-
   async findOne(id: string): Promise<CheckerAssign | null> {
-    const checkerAssign = await this.repository.findOne({ where: { id } });
+    const checkerAssign = await this.repository.findOne({ where: { id }, relations: ['checker_leader', 'checkers'] });
     if (!checkerAssign) {
       return null;
     }
@@ -37,7 +46,7 @@ export class CheckerAssignRepository {
   }
 
   async findByInboundPlanId(inboundPlanId: string): Promise<CheckerAssign | null> {
-    const checkerAssign = await this.repository.findOne({ where: { inbound_plan_id: inboundPlanId } });
+    const checkerAssign = await this.repository.findOne({ where: { inbound_plan_id: inboundPlanId }, relations: ['checker_leader', 'checkers'] });
     if (!checkerAssign) {
       return null;
     }
@@ -49,9 +58,19 @@ export class CheckerAssignRepository {
     if (!checkerAssign) {
       throw new NotFoundException('Checker Assign not found');
     }
+    
+    let checkerLeader: User | undefined = undefined;
+    if (updateCheckerAssignDto.checker_leader_id) {
+      checkerLeader = await this.userRepository.findOne({ where: { id: updateCheckerAssignDto.checker_leader_id } }) || undefined;
+    }
+    
     await this.repository.update(id, {
-      ...updateCheckerAssignDto,
+      inbound_plan_id: updateCheckerAssignDto.inbound_plan_id,
+      checker_leader: checkerLeader,
       checkers: updateCheckerAssignDto.checkers ? await this.userRepository.find({ where: { id: In(updateCheckerAssignDto.checkers?.map(checker => checker.id) || []) } }) : undefined,
+      status: updateCheckerAssignDto.status,
+      assign_date_start: updateCheckerAssignDto.assign_date_start,
+      assign_date_finish: updateCheckerAssignDto.assign_date_finish,
     });
     return await this.findOne(id);
   }

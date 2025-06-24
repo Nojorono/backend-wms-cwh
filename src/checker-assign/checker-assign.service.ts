@@ -31,6 +31,14 @@ export class CheckerAssignService {
     return checkerAssign;
   }
 
+  async findByInboundPlanId(inboundPlanId: string): Promise<CheckerAssign> {
+    const checkerAssign = await this.repository.findByInboundPlanId(inboundPlanId);
+    if (!checkerAssign) {
+      throw new NotFoundException(`Checker Assign with inbound plan ID ${inboundPlanId} not found`);
+    }
+    return checkerAssign;
+  }
+
   async update(id: string, updateCheckerAssignDto: UpdateCheckerAssignDto): Promise<CheckerAssign> {
     const checkerAssign = await this.findOne(id);
     if (updateCheckerAssignDto.inbound_plan_id && updateCheckerAssignDto.inbound_plan_id !== checkerAssign.inbound_plan_id) {
