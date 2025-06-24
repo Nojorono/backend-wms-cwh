@@ -58,4 +58,10 @@ export class CheckerAssignService {
     await this.findOne(id);
     await this.repository.remove(id);
   }
+
+  async findAllByUserId(userId: string): Promise<{ asLeader: CheckerAssign[], asChecker: CheckerAssign[] }> {
+    const leaderAssignments = await this.repository.findByCheckerLeaderId(userId);
+    const checkerAssignments = await this.repository.findByCheckerId(userId);
+    return { asLeader: leaderAssignments, asChecker: checkerAssignments };
+  }
 }

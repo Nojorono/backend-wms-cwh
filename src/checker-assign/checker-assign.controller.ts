@@ -34,6 +34,13 @@ export class CheckerAssignController {
     return this.checkerAssignService.findByInboundPlanId(inboundPlanId);
   }
 
+  @Get('user/:userId')
+  @ApiOperation({ summary: 'Get all Checker Assigns by user ID' })
+  @ApiResponse({ status: 200, description: 'Return all Checker Assigns by user ID.', type: [CheckerAssign] })
+  findAllByUserId(@Param('userId') userId: string) {
+    return this.checkerAssignService.findAllByUserId(userId);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a Checker Assign' })
   @ApiResponse({ status: 200, description: 'The Checker Assign has been successfully updated.', type: CheckerAssign })

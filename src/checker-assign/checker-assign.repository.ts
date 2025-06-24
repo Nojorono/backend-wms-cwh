@@ -82,4 +82,30 @@ export class CheckerAssignRepository {
     }
     await this.repository.delete(id);
   }
+
+  async findByCheckerLeaderId(checkerLeaderId: string): Promise<CheckerAssign[]> {
+    return await this.repository.find({ 
+      where: { checker_leader: { id: checkerLeaderId } }, 
+      relations: ['checker_leader', 'checkers'] 
+    });
+  }
+
+  async findByCheckerId(checkerId: string): Promise<CheckerAssign[]> {
+    return await this.repository
+      .createQueryBuilder('checkerAssign')
+      .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
+      .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .where('checkers.id = :checkerId', { checkerId })
+      .getMany();
+  }
+
+  async findByUserInvolved(userId: string): Promise<CheckerAssign[]> {
+    return await this.repository
+      .createQueryBuilder('checkerAssign')
+      .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
+      .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .where('checker_leader.id = :userId', { userId })
+      .orWhere('checkers.id = :userId', { userId })
+      .getMany();
+  }
 }
