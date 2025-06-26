@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable, OneToOne } from 'typeorm';
 import { User } from './user.entity';
+import { InboundPlan } from './inbound-plan.entity';
 
 @Entity('checker_assign')
 export class CheckerAssign {
@@ -8,6 +9,10 @@ export class CheckerAssign {
 
   @Column({ name: 'inbound_plan_id', nullable: true })
   inbound_plan_id: string;
+
+  @ManyToOne(() => InboundPlan)
+  @JoinColumn({ name: 'inbound_plan_id' })
+  inbound_plan: InboundPlan;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'checker_leader_id' })

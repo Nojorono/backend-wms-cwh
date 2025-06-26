@@ -35,10 +35,62 @@ export class CheckerAssignRepository {
   }
 
   async findAll(): Promise<CheckerAssign[]> {
-    return await this.repository.find({ relations: ['checker_leader', 'checkers'] });
+    return await this.repository
+      .createQueryBuilder('checkerAssign')
+      .leftJoinAndSelect('checkerAssign.inbound_plan', 'inbound_plan')
+      .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
+      .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .select([
+        'checkerAssign',
+        'inbound_plan',
+        'checker_leader.id',
+        'checker_leader.username',
+        'checker_leader.organizationId',
+        'checker_leader.firstName',
+        'checker_leader.lastName',
+        'checker_leader.isActive',
+        'checker_leader.createdAt',
+        'checker_leader.updatedAt',
+        'checkers.id',
+        'checkers.username',
+        'checkers.organizationId',
+        'checkers.firstName',
+        'checkers.lastName',
+        'checkers.isActive',
+        'checkers.createdAt',
+        'checkers.updatedAt'
+      ])
+      .getMany();
   }
   async findOne(id: string): Promise<CheckerAssign | null> {
-    const checkerAssign = await this.repository.findOne({ where: { id }, relations: ['checker_leader', 'checkers'] });
+    const checkerAssign = await this.repository
+      .createQueryBuilder('checkerAssign')
+      .leftJoinAndSelect('checkerAssign.inbound_plan', 'inbound_plan')
+      .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
+      .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .select([
+        'checkerAssign',
+        'inbound_plan',
+        'checker_leader.id',
+        'checker_leader.username',
+        'checker_leader.organizationId',
+        'checker_leader.firstName',
+        'checker_leader.lastName',
+        'checker_leader.isActive',
+        'checker_leader.createdAt',
+        'checker_leader.updatedAt',
+        'checkers.id',
+        'checkers.username',
+        'checkers.organizationId',
+        'checkers.firstName',
+        'checkers.lastName',
+        'checkers.isActive',
+        'checkers.createdAt',
+        'checkers.updatedAt'
+      ])
+      .where('checkerAssign.id = :id', { id })
+      .getOne();
+    
     if (!checkerAssign) {
       return null;
     }
@@ -46,7 +98,34 @@ export class CheckerAssignRepository {
   }
 
   async findByInboundPlanId(inboundPlanId: string): Promise<CheckerAssign | null> {
-    const checkerAssign = await this.repository.findOne({ where: { inbound_plan_id: inboundPlanId }, relations: ['checker_leader', 'checkers'] });
+    const checkerAssign = await this.repository
+      .createQueryBuilder('checkerAssign')
+      .leftJoinAndSelect('checkerAssign.inbound_plan', 'inbound_plan')
+      .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
+      .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .select([
+        'checkerAssign',
+        'inbound_plan',
+        'checker_leader.id',
+        'checker_leader.username',
+        'checker_leader.organizationId',
+        'checker_leader.firstName',
+        'checker_leader.lastName',
+        'checker_leader.isActive',
+        'checker_leader.createdAt',
+        'checker_leader.updatedAt',
+        'checkers.id',
+        'checkers.username',
+        'checkers.organizationId',
+        'checkers.firstName',
+        'checkers.lastName',
+        'checkers.isActive',
+        'checkers.createdAt',
+        'checkers.updatedAt'
+      ])
+      .where('checkerAssign.inbound_plan_id = :inboundPlanId', { inboundPlanId })
+      .getOne();
+    
     if (!checkerAssign) {
       return null;
     }
@@ -84,10 +163,33 @@ export class CheckerAssignRepository {
   }
 
   async findByCheckerLeaderId(checkerLeaderId: string): Promise<CheckerAssign[]> {
-    return await this.repository.find({ 
-      where: { checker_leader: { id: checkerLeaderId } }, 
-      relations: ['checker_leader', 'checkers'] 
-    });
+    return await this.repository
+      .createQueryBuilder('checkerAssign')
+      .leftJoinAndSelect('checkerAssign.inbound_plan', 'inbound_plan')
+      .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
+      .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .select([
+        'checkerAssign',
+        'inbound_plan',
+        'checker_leader.id',
+        'checker_leader.username',
+        'checker_leader.organizationId',
+        'checker_leader.firstName',
+        'checker_leader.lastName',
+        'checker_leader.isActive',
+        'checker_leader.createdAt',
+        'checker_leader.updatedAt',
+        'checkers.id',
+        'checkers.username',
+        'checkers.organizationId',
+        'checkers.firstName',
+        'checkers.lastName',
+        'checkers.isActive',
+        'checkers.createdAt',
+        'checkers.updatedAt'
+      ])
+      .where('checker_leader.id = :checkerLeaderId', { checkerLeaderId })
+      .getMany();
   }
 
   async findByCheckerId(checkerId: string): Promise<CheckerAssign[]> {
@@ -95,6 +197,27 @@ export class CheckerAssignRepository {
       .createQueryBuilder('checkerAssign')
       .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
       .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .leftJoinAndSelect('checkerAssign.inbound_plan', 'inbound_plan')
+      .select([
+        'checkerAssign',
+        'inbound_plan',
+        'checker_leader.id',
+        'checker_leader.username',
+        'checker_leader.organizationId',
+        'checker_leader.firstName',
+        'checker_leader.lastName',
+        'checker_leader.isActive',
+        'checker_leader.createdAt',
+        'checker_leader.updatedAt',
+        'checkers.id',
+        'checkers.username',
+        'checkers.organizationId',
+        'checkers.firstName',
+        'checkers.lastName',
+        'checkers.isActive',
+        'checkers.createdAt',
+        'checkers.updatedAt'
+      ])
       .where('checkers.id = :checkerId', { checkerId })
       .getMany();
   }
@@ -104,6 +227,27 @@ export class CheckerAssignRepository {
       .createQueryBuilder('checkerAssign')
       .leftJoinAndSelect('checkerAssign.checker_leader', 'checker_leader')
       .leftJoinAndSelect('checkerAssign.checkers', 'checkers')
+      .leftJoinAndSelect('checkerAssign.inbound_plan', 'inbound_plan')
+      .select([
+        'checkerAssign',
+        'inbound_plan',
+        'checker_leader.id',
+        'checker_leader.username',
+        'checker_leader.organizationId',
+        'checker_leader.firstName',
+        'checker_leader.lastName',
+        'checker_leader.isActive',
+        'checker_leader.createdAt',
+        'checker_leader.updatedAt',
+        'checkers.id',
+        'checkers.username',
+        'checkers.organizationId',
+        'checkers.firstName',
+        'checkers.lastName',
+        'checkers.isActive',
+        'checkers.createdAt',
+        'checkers.updatedAt'
+      ])
       .where('checker_leader.id = :userId', { userId })
       .orWhere('checkers.id = :userId', { userId })
       .getMany();
