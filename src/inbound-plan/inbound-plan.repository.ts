@@ -30,7 +30,7 @@ export class InboundPlanRepository {
   }
 
   async findOne(id: string): Promise<InboundPlan | null> {
-    const inboundPlan = await this.repository.findOne({ where: { id } });
+    const inboundPlan = await this.repository.findOne({ where: { id }, relations: ['items'] });
     if (!inboundPlan) {
       return null;
     }
