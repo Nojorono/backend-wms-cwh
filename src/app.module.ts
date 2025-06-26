@@ -17,6 +17,7 @@ import { MasterClassificationItemModule } from './master-classification-item/mas
 import { InboundPlanModule } from './inbound-plan/inbound-plan.module';
 import { CheckerAssignModule } from './checker-assign/checker-assign.module';
 import { UserModule } from './users/user.module';
+import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { UserModule } from './users/user.module';
     InboundPlanModule,
     CheckerAssignModule,
     UserModule,
+    MasterVehicleModule
   ],
   providers: [
     {
