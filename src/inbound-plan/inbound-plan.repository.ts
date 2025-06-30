@@ -26,11 +26,23 @@ export class InboundPlanRepository {
   }
 
   async findAll(): Promise<InboundPlan[]> {
-    return await this.repository.find();
+    return await this.repository
+      .createQueryBuilder('inboundPlan')
+      .leftJoinAndSelect('inboundPlan.items', 'items')
+      .leftJoinAndSelect('items.item', 'item')
+      .leftJoinAndSelect('items.classification_item', 'classification_item')
+      .getMany();
   }
 
   async findOne(id: string): Promise<InboundPlan | null> {
-    const inboundPlan = await this.repository.findOne({ where: { id }, relations: ['items'] });
+    const inboundPlan = await this.repository
+      .createQueryBuilder('inboundPlan')
+      .leftJoinAndSelect('inboundPlan.items', 'items')
+      .leftJoinAndSelect('items.item', 'item')
+      .leftJoinAndSelect('items.classification_item', 'classification_item')
+      .where('inboundPlan.id = :id', { id })
+      .getOne();
+    
     if (!inboundPlan) {
       return null;
     }
