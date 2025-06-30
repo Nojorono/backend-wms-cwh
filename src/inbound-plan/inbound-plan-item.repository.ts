@@ -18,10 +18,17 @@ export class InboundPlanItemRepository {
   }
 
   async createMany(inbound_plan_id: string, createInboundPlanItemDto: CreateInboundPlanItemDto[]): Promise<InboundPlanItem[]> {
-    const inboundPlanItems = createInboundPlanItemDto.map((item) => ({
-      ...item,
-      inbound_plan: { id: inbound_plan_id },
-    }));
+    const inboundPlanItems: InboundPlanItem[] = [];
+    for (const item of createInboundPlanItemDto) {
+      inboundPlanItems.push(this.repository.create({
+        item: { id: item.item_id },
+        expired_date: item.expired_date,
+        qty_plan: item.qty_plan,
+        uom: item.uom,
+        classification_item: { id: item.classification_item_id },
+        inbound_plan: { id: inbound_plan_id },
+      }));
+    }
     return await this.repository.save(inboundPlanItems);
   }
 
