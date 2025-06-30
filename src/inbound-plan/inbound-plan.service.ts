@@ -39,15 +39,13 @@ export class InboundPlanService {
       for (const item of createInboundPlanDto.items) {
         if (item.sku) {
           const findItem = await this.masterItemRepository.findBySku(item.sku);
-          console.log(findItem);
           if (!findItem) {
             throw new NotFoundException(`Item with SKU ${item.sku} not found`);
           }
           item.item_id = findItem.id;
         }
       }
-      console.log(createInboundPlanDto.items);
-      const inboundPlanItems = await this.inboundPlanItemRepository.createMany(inboundPlan.id, createInboundPlanDto.items);
+      await this.inboundPlanItemRepository.createMany(inboundPlan.id, createInboundPlanDto.items);
     }
     return inboundPlan;
   }
