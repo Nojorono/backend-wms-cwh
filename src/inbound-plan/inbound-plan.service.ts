@@ -5,6 +5,7 @@ import { CreateInboundPlanDto } from './dto/create-inbound-plan.dto';
 import { UpdateInboundPlanDto } from './dto/update-inbound-plan.dto';
 import { InboundPlan, PlanStatus } from '../core/domain/entities/inbound-plan.entity';
 import { InboundPlanItemRepository } from './inbound-plan-item.repository';
+import { MasterItemRepository } from '../master-item/master-item.repository';
 
 @Injectable()
 export class InboundPlanService {
@@ -12,6 +13,7 @@ export class InboundPlanService {
     private readonly repository: InboundPlanRepository,
     private readonly masterIORepository: MasterIORepository,
     private readonly inboundPlanItemRepository: InboundPlanItemRepository,
+    private readonly masterItemRepository: MasterItemRepository,
   ) {}
 
   async generateInboundPlanningNo(organizationId: number): Promise<string> {    
@@ -34,6 +36,15 @@ export class InboundPlanService {
     createInboundPlanDto.inbound_planning_no = await this.generateInboundPlanningNo(organizationId);
     const inboundPlan = await this.repository.create(createInboundPlanDto);
     if (createInboundPlanDto.items) {
+      for (const item of createInboundPlanDto.items) {
+        if (item.sku) {
+          const findItem = await this.masterItemRepository.findBySku(item.sku);
+          if (!findItem) {
+            throw new NotFoundException(`Item with SKU ${item.sku} not found`);
+          }
+          item.item_id = findItem.id;
+        }
+      }
       const inboundPlanItems = await this.inboundPlanItemRepository.createMany(inboundPlan.id, createInboundPlanDto.items);
     }
     return inboundPlan;

@@ -10,7 +10,7 @@ export class UpdateInboundPlanItemDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  item_id?: string;
+  sku?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

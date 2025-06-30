@@ -10,6 +10,11 @@ export class CreateInboundPlanItemDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  sku?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
   item_id?: string;
 
   @ApiProperty({ required: false })

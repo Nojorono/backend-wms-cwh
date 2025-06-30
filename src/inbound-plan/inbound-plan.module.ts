@@ -8,15 +8,18 @@ import { MasterIORepository } from '../master-io/master-io.repository';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
 import { InboundPlanItem } from '../core/domain/entities/inbound-plan-item.entity';
 import { InboundPlanItemRepository } from './inbound-plan-item.repository';
+import { MasterItemRepository } from '../master-item/master-item.repository';
+import { MasterItem } from '../core/domain/entities/master-item.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([InboundPlan, MasterIO, InboundPlanItem])],
+  imports: [TypeOrmModule.forFeature([InboundPlan, MasterIO, InboundPlanItem, MasterItem])],
   controllers: [InboundPlanController],
   providers: [
     InboundPlanService,
     InboundPlanRepository,
     MasterIORepository,
     InboundPlanItemRepository,
+    MasterItemRepository,
   ],
   exports: [InboundPlanService],
 })
