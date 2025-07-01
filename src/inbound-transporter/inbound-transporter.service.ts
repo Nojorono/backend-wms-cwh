@@ -9,10 +9,6 @@ export class InboundTransporterService {
   constructor(private readonly repository: InboundTransporterRepository) {}
 
   async create(createInboundTransporterDto: CreateInboundTransporterDto): Promise<InboundTransporter> {
-    const existingInboundTransporter = await this.repository.findByInboundPlanId(createInboundTransporterDto.inbound_plan_id);
-    if (existingInboundTransporter) {
-      throw new ConflictException(`Inbound Transporter with inbound plan code ${existingInboundTransporter.inbound_plan_id} already exists`);
-    }
     return await this.repository.create(createInboundTransporterDto);
   }
 
@@ -20,7 +16,7 @@ export class InboundTransporterService {
     return await this.repository.findAll();
   }
 
-  async findOne(inbound_plan_id: string): Promise<InboundTransporter> {
+  async findByInboundPlanId(inbound_plan_id: string): Promise<InboundTransporter[]> {
     const inboundTransporter = await this.repository.findByInboundPlanId(inbound_plan_id);
     if (!inboundTransporter) {
       throw new NotFoundException(`Inbound Transporter with inbound plan code ${inbound_plan_id} not found`);
@@ -29,7 +25,7 @@ export class InboundTransporterService {
   }
 
   async update(inbound_plan_id: string, updateInboundTransporterDto: UpdateInboundTransporterDto): Promise<InboundTransporter> {
-    const inboundTransporter = await this.repository.findByInboundPlanId(inbound_plan_id);
+    const inboundTransporter = await this.repository.findOne(inbound_plan_id);
     if (!inboundTransporter) {
       throw new NotFoundException(`Inbound Transporter with ID ${inbound_plan_id} not found`);
     }
@@ -41,7 +37,7 @@ export class InboundTransporterService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    await this.repository.findOne(id);
     await this.repository.remove(id);
   }
 }

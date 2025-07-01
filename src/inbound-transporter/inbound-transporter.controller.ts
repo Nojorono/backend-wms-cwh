@@ -31,7 +31,7 @@ export class InboundTransporterController {
   @ApiResponse({ status: 200, description: 'Return the Inbound Transporter.', type: InboundTransporter })
   @ApiResponse({ status: 404, description: 'Inbound Transporter not found.' })
   findOne(@Param('inbound_plan_id') inbound_plan_id: string) {
-    return this.inboundTransporterService.findOne(inbound_plan_id);
+    return this.inboundTransporterService.findByInboundPlanId(inbound_plan_id);
   }
 
   @Patch(':id')

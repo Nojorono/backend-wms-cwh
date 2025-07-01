@@ -39,10 +39,10 @@ export class InboundTransporterRepository {
     return inboundTransporter;
   }
 
-  async findByInboundPlanId(inbound_plan_id: string): Promise<InboundTransporter | null> {
-    const inboundTransporter = await this.repository.findOne({ where: { inbound_plan_id }, relations: ['vehicle'] });
+  async findByInboundPlanId(inbound_plan_id: string): Promise<InboundTransporter[]> {
+    const inboundTransporter = await this.repository.find({ where: { inbound_plan_id }, relations: ['vehicle'] });
     if (!inboundTransporter) {
-      return null;
+      return [];
     }
     return inboundTransporter;
   }

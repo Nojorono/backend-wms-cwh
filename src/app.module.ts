@@ -20,6 +20,7 @@ import { UserModule } from './users/user.module';
 import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { InboundTransporterModule } from './inbound-transporter/inbound-transporter.module';
 import { CheckerScanningModule } from './chceker-scanning/checker-scanning.module';
+import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { CheckerScanningModule } from './chceker-scanning/checker-scanning.modul
     MasterVehicleModule,
     InboundTransporterModule,
     CheckerScanningModule,
+    InboundAttachmentModule,
   ],
   providers: [
     {
