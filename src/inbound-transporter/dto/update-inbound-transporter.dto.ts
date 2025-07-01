@@ -33,9 +33,16 @@ export class UpdateInboundTransporterDto {
   transporter_phone?: string;
 
   @ApiProperty({ example: '1', required: false })
+  @IsDate()
+  @IsOptional()
+  unloading_start_time?: Date | string;
+
+  @ApiProperty({ example: '1', required: false })
+  @IsDate()
+  @IsOptional()
   @IsString()
   @IsOptional()
-  transporter_email?: string;
+  unloading_end_time?: Date | string;
 
   @ApiProperty({ example: '1', required: false })
   @IsString()
@@ -45,10 +52,10 @@ export class UpdateInboundTransporterDto {
   @ApiProperty({ example: '2021-01-01T00:00:00Z', required: false })
   @IsDate()
   @IsOptional()
-  arrival_date?: Date | string;
+  arrival_time?: Date | string;
 
   @ApiProperty({ example: '2021-01-01T00:00:00Z', required: false })
   @IsDate()
   @IsOptional()
-  departure_date?: Date | string; 
+  departure_time?: Date | string; 
 } 

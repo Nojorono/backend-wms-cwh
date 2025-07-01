@@ -25,14 +25,17 @@ export class InboundTransporter {
   @Column({ name: 'transporter_phone', nullable: true })
   transporter_phone: string;
 
-  @Column({ name: 'transporter_email', nullable: true })
-  transporter_email: string;
+  @Column({ name: 'arrival_time', nullable: true })
+  arrival_time: Date;
 
-  @Column({ name: 'arrival_date', nullable: true })
-  arrival_date: Date;
+  @Column({ name: 'unloading_start_time', nullable: true })
+  unloading_start_time: Date;
 
-  @Column({ name: 'departure_date', nullable: true })
-  departure_date: Date;
+  @Column({ name: 'unloading_end_time', nullable: true })
+  unloading_end_time: Date;
+
+  @Column({ name: 'departure_time', nullable: true })
+  departure_time: Date;
 
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
