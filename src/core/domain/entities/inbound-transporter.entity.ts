@@ -28,6 +28,12 @@ export class InboundTransporter {
   @Column({ name: 'transporter_email', nullable: true })
   transporter_email: string;
 
+  @Column({ name: 'arrival_date', nullable: true })
+  arrival_date: Date;
+
+  @Column({ name: 'departure_date', nullable: true })
+  departure_date: Date;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsNotEmpty, IsDate } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateInboundTransporterDto {
@@ -37,4 +37,12 @@ export class CreateInboundTransporterDto {
   @IsString()
   @IsNotEmpty()
   created_by: string;
-}   
+
+  @ApiProperty({ example: '2021-01-01T00:00:00Z' })
+  @IsDate()
+  arrival_date?: Date | string;
+
+  @ApiProperty({ example: '2021-01-01T00:00:00Z' })
+  @IsDate()
+  departure_date?: Date | string;
+  }   
