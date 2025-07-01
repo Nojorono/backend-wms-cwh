@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsDate } from 'class-validator';
+import { IsString, IsOptional, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateInboundTransporterDto {
@@ -38,12 +38,12 @@ export class UpdateInboundTransporterDto {
   transporter_phone?: string;
 
   @ApiProperty({ example: '1', required: false })
-  @IsDate()
+  @IsString()
   @IsOptional()
   unloading_start_time?: Date | string;
 
   @ApiProperty({ example: '1', required: false })
-  @IsDate()
+  @IsString()
   @IsOptional()
   @IsString()
   @IsOptional()
@@ -55,12 +55,12 @@ export class UpdateInboundTransporterDto {
   updated_by?: string;
 
   @ApiProperty({ example: '2021-01-01T00:00:00Z', required: false })
-  @IsDate()
+  @IsString()
   @IsOptional()
   arrival_time?: Date | string;
 
   @ApiProperty({ example: '2021-01-01T00:00:00Z', required: false })
-  @IsDate()
+  @IsString()
   @IsOptional()
   departure_time?: Date | string; 
 } 
