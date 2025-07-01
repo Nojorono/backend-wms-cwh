@@ -23,6 +23,10 @@ export class CreateInboundTransporterDto {
 
   @ApiProperty({ example: '1' })
   @IsString()
+  transporter_seal_number?: string;
+
+  @ApiProperty({ example: '1' })
+  @IsString()
   transporter_name?: string;
 
   @ApiProperty({ example: '1' })

@@ -19,6 +19,9 @@ export class InboundTransporter {
   @Column({ name: 'transporter_code_number', nullable: true })
   transporter_code_number: string;
 
+  @Column({ name: 'transporter_seal_number', nullable: true })
+  transporter_seal_number: string;
+
   @Column({ name: 'transporter_name', nullable: true })
   transporter_name: string;
 

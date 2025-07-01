@@ -25,6 +25,11 @@ export class UpdateInboundTransporterDto {
   @ApiProperty({ example: '1', required: false })
   @IsString()
   @IsOptional()
+  transporter_seal_number?: string;
+
+  @ApiProperty({ example: '1', required: false })
+  @IsString()
+  @IsOptional()
   transporter_name?: string;
 
   @ApiProperty({ example: '1', required: false })
