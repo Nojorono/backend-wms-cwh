@@ -19,6 +19,7 @@ import { CheckerAssignModule } from './checker-assign/checker-assign.module';
 import { UserModule } from './users/user.module';
 import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { InboundTransporterModule } from './inbound-transporter/inbound-transporter.module';
+import { CheckerScanningModule } from './chceker-scanning/checker-scanning.module';
 
 @Module({
   imports: [
@@ -53,7 +54,8 @@ import { InboundTransporterModule } from './inbound-transporter/inbound-transpor
     CheckerAssignModule,
     UserModule,
     MasterVehicleModule,
-    InboundTransporterModule
+    InboundTransporterModule,
+    CheckerScanningModule,
   ],
   providers: [
     {

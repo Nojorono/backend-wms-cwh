@@ -1,0 +1,52 @@
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { CheckerScanningRepository } from './checker-scanning.repository';
+import { CreateCheckerScanningDto } from './dto/create-checker-scanning.dto';
+import { UpdateCheckerScanningDto } from './dto/update-checker-scanning.dto';
+import { CheckerScanning } from '../core/domain/entities/checker-scanning.entity';
+
+@Injectable()
+export class CheckerScanningService {
+  constructor(private readonly repository: CheckerScanningRepository) {}
+  
+  async create(createCheckerScanningDto: CreateCheckerScanningDto): Promise<CheckerScanning> {
+    const existingCheckerScanning = await this.repository.findByInboundPlanItemId(createCheckerScanningDto.inbound_plan_item_id);
+    if (existingCheckerScanning) {
+      throw new ConflictException(`Checker scanning with inbound plan item ID ${createCheckerScanningDto.inbound_plan_item_id} already exists`);
+    }
+    return await this.repository.create(createCheckerScanningDto);
+  }
+
+  async findAll(): Promise<CheckerScanning[]> {
+    return await this.repository.findAll();
+  }
+
+  async findOne(id: string): Promise<CheckerScanning> {
+    const checkerScanning = await this.repository.findOne(id);
+    if (!checkerScanning) {
+      throw new NotFoundException(`Checker scanning with ID ${id} not found`);
+    }
+    return checkerScanning;
+  }
+
+  async findByInboundPlanId(inbound_plan_id: string): Promise<CheckerScanning[]> {
+    const checkerScanning = await this.repository.findByInboundPlanId(inbound_plan_id);
+    if (!checkerScanning) {
+      return [];
+    }
+    return checkerScanning;
+
+  }
+
+  async update(id: string, updateCheckerScanningDto: UpdateCheckerScanningDto): Promise<CheckerScanning> {
+    const updatedCheckerScanning = await this.repository.update(id, updateCheckerScanningDto);
+    if (!updatedCheckerScanning) {
+      throw new NotFoundException(`Checker scanning with ID ${id} not found`);
+    }
+    return updatedCheckerScanning;
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.findOne(id);
+    await this.repository.remove(id);
+  }
+}
