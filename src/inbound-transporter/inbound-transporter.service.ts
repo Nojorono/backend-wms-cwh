@@ -20,10 +20,10 @@ export class InboundTransporterService {
     return await this.repository.findAll();
   }
 
-  async findOne(id: string): Promise<InboundTransporter> {
-    const inboundTransporter = await this.repository.findOne(id);
+  async findOne(inbound_plan_id: string): Promise<InboundTransporter> {
+    const inboundTransporter = await this.repository.findByInboundPlanId(inbound_plan_id);
     if (!inboundTransporter) {
-      throw new NotFoundException(`Inbound Transporter with ID ${id} not found`);
+      throw new NotFoundException(`Inbound Transporter with inbound plan code ${inbound_plan_id} not found`);
     }
     return inboundTransporter;
   }
