@@ -7,6 +7,15 @@ export class CheckerScanning {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ name: 'inbound_transporter_id', nullable: true })
+  inbound_transporter_id: string;
+
+  @Column({ name: 'organization_id', nullable: true })
+  organization_id: number;
+
+  @Column({ name: 'inbound_plan_id', nullable: true })
+  inbound_plan_id: string;
+
   @ManyToOne(() => InboundPlanItem)
   @JoinColumn({ name: 'inbound_plan_item_id' })
   inbound_plan_item: InboundPlanItem;
@@ -24,8 +33,11 @@ export class CheckerScanning {
   @Column({ name: 'pallet_code', nullable: true })
   pallet_code: string;
 
-  @Column({ name: 'scanning_date', nullable: true })
-  scanning_date: Date;
+  @Column({ name: 'updated_by', nullable: true })
+  updated_by: string;
+
+  @Column({ name: 'created_by', nullable: true })
+  created_by: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
