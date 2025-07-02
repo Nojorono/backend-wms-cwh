@@ -1,24 +1,59 @@
-import { IsString, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateInboundAttachmentDto {
-  @ApiProperty({ example: '1', required: true })
-  @IsString()
-  @IsNotEmpty()
-  inbound_plan_id: string;
-
-  @ApiProperty({ example: 1, required: true })
-  @IsNumber()
-  @IsNotEmpty()
-  organization_id: number; 
-
-  @ApiProperty({ example: '1', required: false })
-  @IsString()
+  @ApiPropertyOptional({ description: 'Inbound plan ID' })
   @IsOptional()
+  @IsUUID()
+  inbound_plan_id?: string;
+
+  @ApiPropertyOptional({ description: 'Organization ID' })
+  @IsOptional()
+  @IsNumber()
+  organization_id?: number;
+
+  @ApiPropertyOptional({ description: 'File name' })
+  @IsOptional()
+  @IsString()
   name?: string;
 
-  @ApiProperty({ example: '1', required: false })
-  @IsString()
+  @ApiPropertyOptional({ description: 'File path (legacy)' })
   @IsOptional()
+  @IsString()
   path?: string;
+
+  @ApiPropertyOptional({ description: 'S3 bucket name' })
+  @IsOptional()
+  @IsString()
+  s3_bucket?: string;
+
+  @ApiPropertyOptional({ description: 'S3 object key' })
+  @IsOptional()
+  @IsString()
+  s3_key?: string;
+
+  @ApiPropertyOptional({ description: 'S3 URL' })
+  @IsOptional()
+  @IsString()
+  s3_url?: string;
+
+  @ApiPropertyOptional({ description: 'File size in bytes' })
+  @IsOptional()
+  @IsNumber()
+  file_size?: number;
+
+  @ApiPropertyOptional({ description: 'Content type' })
+  @IsOptional()
+  @IsString()
+  content_type?: string;
+
+  @ApiPropertyOptional({ description: 'ETag from S3' })
+  @IsOptional()
+  @IsString()
+  etag?: string;
+
+  @ApiPropertyOptional({ description: 'Is file public' })
+  @IsOptional()
+  @IsBoolean()
+  is_public?: boolean;
 } 

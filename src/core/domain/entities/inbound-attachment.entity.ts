@@ -17,6 +17,27 @@ export class InboundAttachment {
   @Column({ name: 'path', nullable: true })
   path: string;
 
+  @Column({ name: 's3_bucket', nullable: true })
+  s3_bucket: string;
+
+  @Column({ name: 's3_key', nullable: true })
+  s3_key: string;
+
+  @Column({ name: 's3_url', nullable: true })
+  s3_url: string;
+
+  @Column({ name: 'file_size', nullable: true })
+  file_size: number;
+
+  @Column({ name: 'content_type', nullable: true })
+  content_type: string;
+
+  @Column({ name: 'etag', nullable: true })
+  etag: string;
+
+  @Column({ name: 'is_public', default: false })
+  is_public: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -21,6 +21,7 @@ import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { InboundTransporterModule } from './inbound-transporter/inbound-transporter.module';
 import { CheckerScanningModule } from './chceker-scanning/checker-scanning.module';
 import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment.module';
+import { S3Module } from './infrastructure/modules/s3.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment
       inject: [ConfigService],
     }),
     AuthModule,
+    S3Module,
     RolePermissionModule,
     MenuModule,
     MasterUomModule,
