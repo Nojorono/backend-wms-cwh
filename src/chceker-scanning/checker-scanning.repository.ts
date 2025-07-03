@@ -49,6 +49,7 @@ export class CheckerScanningRepository {
 
   async findByInboundPlanItemId(inbound_plan_item_id: string): Promise<CheckerScanning | null> {
     const checkerScanning = await this.repository.findOne({ where: { inbound_plan_item: { id: inbound_plan_item_id } } });
+    console.log(checkerScanning);
     if (!checkerScanning) {
       return null;
     }

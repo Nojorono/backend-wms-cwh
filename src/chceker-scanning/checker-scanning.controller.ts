@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CheckerScanningService } from './checker-scanning.service';
-import { CreateCheckerScanningDto } from './dto/create-checker-scanning.dto';
+import { CreateItemCheckerScanningDto } from './dto/create-checker-scanning.dto';
+
 import { UpdateCheckerScanningDto } from './dto/update-checker-scanning.dto';
 import { CheckerScanning } from '../core/domain/entities/checker-scanning.entity';
 
@@ -15,7 +16,7 @@ export class CheckerScanningController {
   @ApiOperation({ summary: 'Create a new Checker Scanning' })
   @ApiResponse({ status: 201, description: 'The Checker Scanning has been successfully created.', type: CheckerScanning })
   @ApiResponse({ status: 409, description: 'Checker Scanning with this code already exists.' })
-  create(@Body() createCheckerScanningDto: CreateCheckerScanningDto) {
+  create(@Body() createCheckerScanningDto: CreateItemCheckerScanningDto) {
     return this.checkerScanningService.create(createCheckerScanningDto);
   }
 

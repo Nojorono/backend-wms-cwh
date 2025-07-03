@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { CheckerScanningRepository } from './checker-scanning.repository';
-import { CreateCheckerScanningDto } from './dto/create-checker-scanning.dto';
+import { CreateItemCheckerScanningDto } from './dto/create-checker-scanning.dto';
 import { UpdateCheckerScanningDto } from './dto/update-checker-scanning.dto';
 import { CheckerScanning } from '../core/domain/entities/checker-scanning.entity';
 
@@ -8,12 +8,20 @@ import { CheckerScanning } from '../core/domain/entities/checker-scanning.entity
 export class CheckerScanningService {
   constructor(private readonly repository: CheckerScanningRepository) {}
   
-  async create(createCheckerScanningDto: CreateCheckerScanningDto): Promise<CheckerScanning> {
-    const existingCheckerScanning = await this.repository.findByInboundPlanItemId(createCheckerScanningDto.inbound_plan_item_id);
+  async create(createItemCheckerScanningDto: CreateItemCheckerScanningDto): Promise<CreateItemCheckerScanningDto> {
+    const existingCheckerScanning = await this.repository.findByInboundPlanItemId(createItemCheckerScanningDto.inbound_plan_item_id);
+    console.log(existingCheckerScanning);
     if (existingCheckerScanning) {
-      throw new ConflictException(`Checker scanning with inbound plan item ID ${createCheckerScanningDto.inbound_plan_item_id} already exists`);
+      throw new ConflictException(`Checker scanning with inbound plan item ID ${createItemCheckerScanningDto.inbound_plan_item_id} already exists`);
     }
-    return await this.repository.create(createCheckerScanningDto);
+    return createItemCheckerScanningDto;
+    // for (const item of createItemCheckerScanningDto.items) {
+    //   await this.repository.create({
+    //     ...createItemCheckerScanningDto,
+    //     ...item,
+    //   });
+    // }
+    // return createItemCheckerScanningDto;
   }
 
   async findAll(): Promise<CheckerScanning[]> {
