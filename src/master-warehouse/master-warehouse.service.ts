@@ -24,6 +24,10 @@ export class MasterWarehouseService {
     return warehouse;
   }
 
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse[]> {
+    return await this.repository.findByOrganizationId(organization_id);
+  }
+
   async update(id: string, updateMasterWarehouseDto: UpdateMasterWarehouseDto): Promise<MasterWarehouse> {
     const updatedWarehouse = await this.repository.update(id, updateMasterWarehouseDto);
     if (!updatedWarehouse) {

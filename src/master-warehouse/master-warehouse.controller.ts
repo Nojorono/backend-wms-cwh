@@ -34,6 +34,14 @@ export class MasterWarehouseController {
     return this.masterWarehouseService.findOne(id);
   }
 
+  @Get('organization/:organization_id')
+  @ApiOperation({ summary: 'Get a Warehouse by organization ID' })
+  @ApiResponse({ status: 200, description: 'Return the Warehouse.', type: [MasterWarehouse] })
+  @ApiResponse({ status: 404, description: 'Warehouse not found.' })
+  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
+    return this.masterWarehouseService.findByOrganizationId(organization_id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a Warehouse' })
   @ApiResponse({ status: 200, description: 'The Warehouse has been successfully updated.', type: MasterWarehouse })

@@ -29,12 +29,8 @@ export class MasterWarehouseRepository {
     return warehouse;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse | null> {
-    const warehouse = await this.repository.findOne({ where: { organization_id } });
-    if (!warehouse) {
-      return null;
-    }
-    return warehouse;
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse[]> {
+    return await this.repository.find({ where: { organization_id } });
   }
 
   async update(id: string, updateMasterWarehouseDto: UpdateMasterWarehouseDto): Promise<MasterWarehouse | null> {
