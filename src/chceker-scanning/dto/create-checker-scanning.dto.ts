@@ -173,11 +173,11 @@ export class CreateItemCheckerScanningDto {
     isArray: true,
     example: [
       {
-        actual_qty: 100.50,
+        actual_qty: 100.00,
         pallet_code: 'PALLET-001'
       },
       {
-        actual_qty: 75.25,
+        actual_qty: 75.00,
         pallet_code: 'PALLET-002'
       }
     ]

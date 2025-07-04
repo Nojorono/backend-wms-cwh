@@ -16,4 +16,9 @@ export class UpdateMasterIODto {
   @IsString()
   @IsOptional()
   operating_unit?: string;
+
+  @ApiProperty({ example: 'Address', required: false })
+  @IsString()
+  @IsOptional()
+  address?: string;
 } 

@@ -14,9 +14,12 @@ export class MasterIO {
   @Column({ nullable: true })
   operating_unit: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ nullable: true })
+  address: string;
+
+  @CreateDateColumn({ name: 'created_at', nullable: true })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', nullable: true })
   updatedAt: Date;
 } 
