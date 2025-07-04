@@ -30,5 +30,5 @@ export class UpdateMasterWarehouseSubDto {
   @ApiProperty({ example: 100, required: false })
   @IsNumber()
   @IsOptional()
-  capacity?: number;
+  capacity_bin?: number;
 } 

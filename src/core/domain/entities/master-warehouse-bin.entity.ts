@@ -1,15 +1,15 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
-@Entity('m_warehouse_sub')
-export class MasterWarehouseSub {
+@Entity('m_warehouse_bin')
+export class MasterWarehouseBin {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ nullable: true, name: 'organization_id' })
   organization_id: number;
 
-  @Column({ nullable: true, name: 'warehouse_id' })
-  warehouse_id: string;
+  @Column({ nullable: true, name: 'warehouse_sub_id' })
+  warehouse_sub_id: string;
 
   @Column({ nullable: true, name: 'name' })
   name: string;
@@ -20,8 +20,8 @@ export class MasterWarehouseSub {
   @Column({ nullable: true, name: 'description' })
   description: string;
 
-  @Column({ nullable: true, name: 'capacity_bin' })
-  capacity_bin: number;
+  @Column({ nullable: true, name: 'capacity_pallet' })
+  capacity_pallet: number;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsNumber, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class CreateMasterWarehouseSubDto {
+export class UpdateMasterWarehouseBinDto {
   @ApiProperty({ example: 1, required: false })
   @IsNumber()
   @IsOptional()
@@ -10,12 +10,7 @@ export class CreateMasterWarehouseSubDto {
   @ApiProperty({ example: '1234567890', required: false })
   @IsUUID()
   @IsOptional()
-  warehouse_id?: string;
-
-  @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
-  @IsString()
-  @IsOptional()
-  name?: string;
+  warehouse_sub_id?: string;
 
   @ApiProperty({ example: 'WH001', required: false })
   @IsString()
@@ -25,10 +20,15 @@ export class CreateMasterWarehouseSubDto {
   @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
   @IsString()
   @IsOptional()
+  name?: string;
+
+  @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
+  @IsString()
+  @IsOptional()
   description?: string;
 
-  @ApiProperty({ example: 2, required: false })
+  @ApiProperty({ example: 3, required: false })
   @IsNumber()
   @IsOptional()
-  capacity_bin?: number;
+  capacity_pallet?: number;
 } 
