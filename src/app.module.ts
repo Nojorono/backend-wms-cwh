@@ -22,6 +22,7 @@ import { InboundTransporterModule } from './inbound-transporter/inbound-transpor
 import { CheckerScanningModule } from './chceker-scanning/checker-scanning.module';
 import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment.module';
 import { S3Module } from './infrastructure/modules/s3.module';
+import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { S3Module } from './infrastructure/modules/s3.module';
     MasterPalletModule,
     MasterIOModule,
     MasterWarehouseModule,  
+    MasterWarehouseSubModule,
     MasterSupplierModule,
     MasterItemModule,
     MasterClassificationItemModule,

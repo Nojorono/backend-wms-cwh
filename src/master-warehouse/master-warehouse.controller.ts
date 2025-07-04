@@ -20,7 +20,7 @@ export class MasterWarehouseController {
   }
 
   @Get()
-    @ApiOperation({ summary: 'Get all Warehouses' })
+  @ApiOperation({ summary: 'Get all Warehouses' })
   @ApiResponse({ status: 200, description: 'Return all Warehouses.', type: [MasterWarehouse] })
   findAll() {
     return this.masterWarehouseService.findAll();
