@@ -4,14 +4,17 @@ import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import { MasterPalletController } from './master-pallet.controller';
 import { MasterPalletService } from './master-pallet.service';
 import { MasterPalletRepository } from './master-pallet.repository';
-import { BarcodeModule } from 'src/infrastructure/modules/barcode.module';
+import { S3Service } from 'src/infrastructure/services/s3.service';
+import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterPallet]),BarcodeModule],
+  imports: [TypeOrmModule.forFeature([MasterPallet])],
   controllers: [MasterPalletController],
   providers: [
     MasterPalletService,
     MasterPalletRepository,
+    S3Service,
+    BarcodeService,
   ],
   exports: [MasterPalletService],
 })

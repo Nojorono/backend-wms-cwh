@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { BarcodeService } from '../services/barcode.service';
-import { S3Module } from './s3.module';
 import { BarcodeController } from '../../presentation/controllers/barcode.controller';
+import { S3Service } from '../services/s3.service';
 
 @Module({
-  imports: [S3Module],
+  imports: [],
   controllers: [BarcodeController],
-  providers: [BarcodeService],
+  providers: [BarcodeService, S3Service],
   exports: [BarcodeService],
 })
 export class BarcodeModule {}

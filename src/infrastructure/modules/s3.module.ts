@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { S3Service } from '../services/s3.service';
 import { S3Controller } from '../../presentation/controllers/s3.controller';
-import { IS3Service, S3_SERVICE_TOKEN } from '../../core/domain/interfaces/s3.service.interface';
+import { S3_SERVICE_TOKEN } from '../../core/domain/interfaces/s3.service.interface';
 
 @Module({
   imports: [ConfigModule],

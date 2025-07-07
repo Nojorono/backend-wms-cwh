@@ -4,14 +4,17 @@ import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub
 import { MasterWarehouseSubController } from './master-warehouse-sub.controller';
 import { MasterWarehouseSubService } from './master-warehouse-sub.service';
 import { MasterWarehouseSubRepository } from './master-warehouse-sub.repository';
-import { BarcodeModule } from 'src/infrastructure/modules/barcode.module';
+import { S3Service } from 'src/infrastructure/services/s3.service';
+import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterWarehouseSub]), BarcodeModule],
+  imports: [TypeOrmModule.forFeature([MasterWarehouseSub])],
   controllers: [MasterWarehouseSubController],
   providers: [
     MasterWarehouseSubService,
     MasterWarehouseSubRepository,
+    S3Service,
+    BarcodeService,
   ],
   exports: [MasterWarehouseSubService],
 })

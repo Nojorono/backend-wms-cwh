@@ -63,6 +63,25 @@ export class MasterPalletService {
         throw new ConflictException(`Pallet with pallet code ${updateMasterPalletDto.pallet_code} already exists`);
       }
     }
+    if (updateMasterPalletDto.capacity && updateMasterPalletDto.capacity !== pallet.capacity || updateMasterPalletDto.pallet_code && updateMasterPalletDto.pallet_code !== pallet.pallet_code) {
+      await this.barcodeService.deleteBarcodeImage(pallet.barcode_image_url);
+      const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
+        bcid: 'code128',
+        text: `${updateMasterPalletDto.pallet_code}`,
+        scale: 3,
+        height: 100,
+        width: 200,
+        bucket: 'wms',
+        prefix: 'pallet',
+        extension: 'png',
+        acl: 'public-read',
+        metadata: {
+          pallet_code: updateMasterPalletDto.pallet_code,
+          pallet_capacity: updateMasterPalletDto.capacity?.toString() || '0',
+        } as Record<string, string>
+      });
+      updateMasterPalletDto.barcode_image_url = barcodeImageUrl.url;
+    }
     const updatedPallet = await this.repository.update(id, updateMasterPalletDto);
     if (!updatedPallet) {
       throw new NotFoundException(`Pallet with ID ${id} not found`);

@@ -21,10 +21,8 @@ import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { InboundTransporterModule } from './inbound-transporter/inbound-transporter.module';
 import { CheckerScanningModule } from './chceker-scanning/checker-scanning.module';
 import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment.module';
-import { S3Module } from './infrastructure/modules/s3.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
-import { BarcodeModule } from './infrastructure/modules/barcode.module';
 
 @Module({
   imports: [
@@ -46,8 +44,6 @@ import { BarcodeModule } from './infrastructure/modules/barcode.module';
       inject: [ConfigService],
     }),
     AuthModule,
-    S3Module,
-    BarcodeModule,
     RolePermissionModule,
     MenuModule,
     MasterUomModule,

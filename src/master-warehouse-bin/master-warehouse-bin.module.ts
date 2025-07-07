@@ -4,14 +4,17 @@ import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin
 import { MasterWarehouseBinController } from './master-warehouse-bin.controller';
 import { MasterWarehouseBinService } from './master-warehouse-bin.service';
 import { MasterWarehouseBinRepository } from './master-warehouse-bin.repository';
-import { BarcodeModule } from 'src/infrastructure/modules/barcode.module';
+import { S3Service } from 'src/infrastructure/services/s3.service';
+import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 
 @Module({
-  imports: [BarcodeModule, TypeOrmModule.forFeature([MasterWarehouseBin])],
+  imports: [TypeOrmModule.forFeature([MasterWarehouseBin])],
   controllers: [MasterWarehouseBinController],
   providers: [
     MasterWarehouseBinService,
     MasterWarehouseBinRepository,
+    S3Service,
+    BarcodeService,
   ],
   exports: [MasterWarehouseBinService],
 })
