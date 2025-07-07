@@ -4,9 +4,10 @@ import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin
 import { MasterWarehouseBinController } from './master-warehouse-bin.controller';
 import { MasterWarehouseBinService } from './master-warehouse-bin.service';
 import { MasterWarehouseBinRepository } from './master-warehouse-bin.repository';
+import { BarcodeModule } from 'src/infrastructure/modules/barcode.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterWarehouseBin])],
+  imports: [BarcodeModule, TypeOrmModule.forFeature([MasterWarehouseBin])],
   controllers: [MasterWarehouseBinController],
   providers: [
     MasterWarehouseBinService,

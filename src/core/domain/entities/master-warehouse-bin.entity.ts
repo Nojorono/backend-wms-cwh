@@ -23,6 +23,9 @@ export class MasterWarehouseBin {
   @Column({ nullable: true, name: 'capacity_pallet' })
   capacity_pallet: number;
 
+  @Column({ nullable: true, name: 'barcode_image_url' })
+  barcode_image_url: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

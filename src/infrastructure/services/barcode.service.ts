@@ -10,6 +10,38 @@ export class BarcodeService {
     private readonly s3Service: S3Service,
   ) {}
 
+  private extractS3KeyFromUrl(url: string): string {
+    try {
+      if (url.includes('s3.amazonaws.com')) {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
+        
+        if (pathParts.length > 1) {
+          const key = pathParts.slice(1).join('/');
+          return key;
+        }
+        const key = pathParts[0] || '';
+        return key;
+      } else if (url.includes('/')) {
+        const urlParts = url.split('/');
+        const keyParts = urlParts.slice(3); // Skip protocol, domain, bucket
+        const key = keyParts.join('/');
+        return key;
+      }
+      
+      const lastSlashIndex = url.lastIndexOf('/');
+      if (lastSlashIndex !== -1) {
+        const key = url.substring(lastSlashIndex + 1);
+        return key;
+      }
+      
+      return url;
+    } catch (error) {
+      console.error('Error extracting S3 key from URL:', error);
+      return url;
+    }
+  }
+
   async uploadBarcodeImage(params: {
     file: Buffer;
     contentType?: string;
@@ -69,6 +101,41 @@ export class BarcodeService {
       metadata: options.metadata,
       acl: options.acl,
     });
+  }
+
+  async deleteBarcodeImage(barcodeImageUrl: string, bucket?: string): Promise<void> {
+    // Extract bucket name from URL if not provided
+    let s3Bucket = bucket;
+    if (!s3Bucket && barcodeImageUrl.includes('s3.amazonaws.com')) {
+      const urlObj = new URL(barcodeImageUrl);
+      const hostname = urlObj.hostname;
+      if (hostname.includes('.s3.')) {
+        s3Bucket = hostname.split('.s3.')[0];
+      } else {
+        console.log('No bucket provided and URL does not contain s3.amazonaws.com');
+      }
+    } else if (!s3Bucket) {
+      console.log('No bucket provided and URL does not contain s3.amazonaws.com');
+    }
+    
+    if (!s3Bucket) {
+      s3Bucket = this.configService.get<string>('AWS_S3_DEFAULT_BUCKET');
+    }
+    
+    if (!s3Bucket) throw new Error('S3 bucket is required');
+    
+    let key = this.extractS3KeyFromUrl(barcodeImageUrl);
+    
+    if (key.startsWith('wms/')) {
+      key = key.substring(4);
+    }
+    
+    if (key && key !== barcodeImageUrl) {
+      console.log('Proceeding with deletion of key:', key);
+      await this.s3Service.deleteFile(s3Bucket, key);
+    } else {
+      console.log('Skipping deletion - invalid key extracted');
+    }
   }
 }
     

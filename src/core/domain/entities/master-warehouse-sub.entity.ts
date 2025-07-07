@@ -23,6 +23,9 @@ export class MasterWarehouseSub {
   @Column({ nullable: true, name: 'capacity_bin' })
   capacity_bin: number;
 
+  @Column({ nullable: true, name: 'barcode_image_url' })
+  barcode_image_url: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
