@@ -16,6 +16,7 @@ export class BarcodeService {
         const urlObj = new URL(url);
         const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
         
+
         if (pathParts.length > 1) {
           const key = pathParts.slice(1).join('/');
           return key;
@@ -24,7 +25,7 @@ export class BarcodeService {
         return key;
       } else if (url.includes('/')) {
         const urlParts = url.split('/');
-        const keyParts = urlParts.slice(3); // Skip protocol, domain, bucket
+        const keyParts = urlParts.slice(3);
         const key = keyParts.join('/');
         return key;
       }
