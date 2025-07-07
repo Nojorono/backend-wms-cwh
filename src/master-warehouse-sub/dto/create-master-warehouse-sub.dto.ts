@@ -31,4 +31,9 @@ export class CreateMasterWarehouseSubDto {
   @IsNumber()
   @IsOptional()
   capacity_bin?: number;
+
+  @ApiProperty({ example: 'https://example.com/barcode.png', required: false })
+  @IsString()
+  @IsOptional()
+  barcode_image_url?: string;
 } 
