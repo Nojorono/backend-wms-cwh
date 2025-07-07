@@ -31,4 +31,9 @@ export class UpdateMasterPalletDto {
   @IsBoolean()
   @IsOptional()
   isEmpty?: boolean;
+
+  @ApiProperty({ example: 'https://example.com/pallet.png', required: false })
+  @IsString()
+  @IsOptional()
+  barcode_image_url?: string;
 } 

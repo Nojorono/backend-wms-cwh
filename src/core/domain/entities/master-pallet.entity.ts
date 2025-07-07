@@ -17,6 +17,9 @@ export class MasterPallet {
   @Column({ nullable: true })
   capacity: number;
 
+  @Column({ nullable: true })
+  barcode_image_url: string;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

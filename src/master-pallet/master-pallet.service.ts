@@ -3,17 +3,41 @@ import { MasterPalletRepository } from './master-pallet.repository';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
+import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 
 @Injectable()
 export class MasterPalletService {
-  constructor(private readonly repository: MasterPalletRepository) {}
+  constructor(
+    private readonly repository: MasterPalletRepository,
+    private readonly barcodeService: BarcodeService,
+  ) {}
 
   async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
     const existingPallet = await this.repository.findByPalletCode(createMasterPalletDto.pallet_code);
     if (existingPallet) {
       throw new ConflictException(`Pallet with pallet code ${createMasterPalletDto.pallet_code} already exists`);
     }
-    return await this.repository.create(createMasterPalletDto);
+
+    const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
+      bcid: 'code128',
+      text: `${createMasterPalletDto.pallet_code}`,
+      scale: 3,
+      height: 100,
+      width: 200,
+      bucket: 'wms',
+      prefix: 'pallet',
+      extension: 'png',
+      acl: 'public-read',
+      metadata: {
+        pallet_code: createMasterPalletDto.pallet_code,
+        pallet_capacity: createMasterPalletDto.capacity?.toString() || '0',
+      } as Record<string, string>
+    });
+   
+    const pallet = await this.repository.create({...createMasterPalletDto, barcode_image_url: barcodeImageUrl.url});
+    
+    
+    return pallet;
   }
 
   async findAll(): Promise<MasterPallet[]> {

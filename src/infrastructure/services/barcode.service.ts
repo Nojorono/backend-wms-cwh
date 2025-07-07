@@ -138,5 +138,118 @@ export class BarcodeService {
       console.log('Skipping deletion - invalid key extracted');
     }
   }
+
+  /**
+   * Scan barcode and return JSON data
+   * @param barcodeData - The scanned barcode data (string)
+   * @returns Parsed JSON data or null if invalid
+   */
+  async scanBarcodeAndReturnJson(barcodeData: string): Promise<Record<string, any> | null> {
+    try {
+      // Try to parse the barcode data as JSON
+      const jsonData = JSON.parse(barcodeData);
+      return jsonData;
+    } catch (error) {
+      console.error('Failed to parse barcode data as JSON:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate barcode with JSON data using Code128
+   * @param jsonData - The JSON data to encode in the barcode
+   * @param options - Barcode generation options
+   * @returns Barcode image metadata
+   */
+  async generateBarcodeWithJsonData(
+    jsonData: Record<string, any>,
+    options: {
+      bcid?: string;
+      scale?: number;
+      height?: number;
+      width?: number;
+      includetext?: boolean;
+      textxalign?: 'center' | 'offleft' | 'left' | 'right' | 'offright' | 'justify';
+      bucket?: string;
+      prefix?: string;
+      extension?: string;
+      acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
+      metadata?: Record<string, string>;
+    } = {}
+  ) {
+    // Convert JSON to string
+    const jsonString = JSON.stringify(jsonData);
+    
+    return this.generateAndStoreBarcode({
+      bcid: options.bcid || 'code128', // Use Code128 for JSON data
+      text: jsonString,
+      scale: options.scale || 3,
+      height: options.height || 10,
+      width: options.width,
+      includetext: options.includetext ?? true, // Show text for Code128
+      textxalign: options.textxalign || 'center',
+      bucket: options.bucket,
+      prefix: options.prefix || 'json-barcodes',
+      extension: options.extension || 'png',
+      acl: options.acl,
+      metadata: {
+        contentType: 'application/json',
+        dataType: 'json',
+        barcodeType: 'code128',
+      },
+    });
+  }
+
+  /**
+   * Validate if a string is valid JSON
+   * @param data - String to validate
+   * @returns True if valid JSON, false otherwise
+   */
+  private isValidJson(data: string): boolean {
+    try {
+      JSON.parse(data);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Extract and parse JSON from barcode data with error handling
+   * @param barcodeData - Raw barcode data
+   * @returns Parsed JSON object or error details
+   */
+  async scanBarcodeWithValidation(barcodeData: string): Promise<{
+    success: boolean;
+    data?: Record<string, any>;
+    error?: string;
+    rawData: string;
+  }> {
+    try {
+      // Check if the data looks like JSON
+      if (!this.isValidJson(barcodeData)) {
+        return {
+          success: false,
+          error: 'Barcode data is not valid JSON format',
+          rawData: barcodeData,
+        };
+      }
+
+      // Parse the JSON data
+      const jsonData = JSON.parse(barcodeData);
+      
+      return {
+        success: true,
+        data: jsonData,
+        rawData: barcodeData,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to parse JSON: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        rawData: barcodeData,
+      };
+    }
+  }
 }
     
