@@ -27,7 +27,7 @@ export class UpdateMasterWarehouseSubDto {
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ example: 100, required: false })
+  @ApiProperty({ example: 3, required: false })
   @IsNumber()
   @IsOptional()
   capacity_bin?: number;

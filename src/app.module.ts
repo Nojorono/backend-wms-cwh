@@ -24,6 +24,7 @@ import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment
 import { S3Module } from './infrastructure/modules/s3.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
+import { BarcodeModule } from './infrastructure/modules/barcode.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehous
     }),
     AuthModule,
     S3Module,
+    BarcodeModule,
     RolePermissionModule,
     MenuModule,
     MasterUomModule,
