@@ -16,6 +16,9 @@ export class CheckerScanning {
   @Column({ name: 'inbound_plan_id', nullable: true })
   inbound_plan_id: string;
 
+  @Column({ name: 'inbound_delivery_order_id', nullable: true })
+  inbound_delivery_order_id: string;
+
   @ManyToOne(() => InboundPlanItem)
   @JoinColumn({ name: 'inbound_plan_item_id' })
   inbound_plan_item: InboundPlanItem;
@@ -27,7 +30,7 @@ export class CheckerScanning {
   @JoinColumn({ name: 'checker_id' })
   checker: User;
 
-  @Column({ name: 'actual_qty', type: 'decimal', precision: 10, scale: 2 })
+  @Column({ name: 'actual_qty', nullable: true })
   actual_qty: number;
 
   @Column({ name: 'pallet_code', nullable: true })

@@ -19,7 +19,7 @@ export class InboundPlanItem {
   @Column({ type: 'date', name: 'expired_date', nullable: true })
   expired_date: Date;
 
-  @Column({ type: 'decimal', name: 'qty_plan', precision: 10, scale: 2, nullable: true })
+  @Column({ name: 'qty_plan', nullable: true })
   qty_plan: number;
   
   @Column({ nullable: true })
