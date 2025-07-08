@@ -33,13 +33,6 @@ export class CreateCheckerScanningDto {
   inbound_plan_id: string;
 
   @ApiProperty({ 
-    description: 'ID of the inbound plan item',
-    example: '123e4567-e89b-12d3-a456-426614174000'
-  })
-  @IsUUID()
-  inbound_plan_item_id: string;
-
-  @ApiProperty({ 
     description: 'ID of the checker assignment',
     example: '123e4567-e89b-12d3-a456-426614174001',
     required: false
@@ -70,20 +63,6 @@ export class CreateCheckerScanningDto {
   @IsString()
   @IsOptional()
   pallet_code?: string;
-
-  @ApiProperty({ 
-    description: 'Created by',
-    example: '123e4567-e89b-12d3-a456-426614174003'
-  })
-  @IsString()
-  created_by: string;
-
-  @ApiProperty({ 
-    description: 'Updated by',
-    example: '123e4567-e89b-12d3-a456-426614174004'
-  })
-  @IsString()
-  updated_by: string;
 
   @ApiProperty({ 
     description: 'Created at',
