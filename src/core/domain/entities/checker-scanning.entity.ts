@@ -1,5 +1,4 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable, OneToOne } from 'typeorm';
-import { InboundPlanItem } from './inbound-plan-item.entity';
 import { User } from './user.entity';
 
 @Entity('checker_scanning')
@@ -19,10 +18,6 @@ export class CheckerScanning {
   @Column({ name: 'inbound_delivery_order_id', nullable: true })
   inbound_delivery_order_id: string;
 
-  @ManyToOne(() => InboundPlanItem)
-  @JoinColumn({ name: 'inbound_plan_item_id' })
-  inbound_plan_item: InboundPlanItem;
-
   @Column({ name: 'checker_assign_id', nullable: true })
   checker_assign_id: string;
 
@@ -35,12 +30,6 @@ export class CheckerScanning {
 
   @Column({ name: 'pallet_code', nullable: true })
   pallet_code: string;
-
-  @Column({ name: 'updated_by', nullable: true })
-  updated_by: string;
-
-  @Column({ name: 'created_by', nullable: true })
-  created_by: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
