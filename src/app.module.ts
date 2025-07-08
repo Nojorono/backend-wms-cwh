@@ -23,6 +23,7 @@ import { CheckerScanningModule } from './chceker-scanning/checker-scanning.modul
 import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
+import { InboundDeliveryOrderModule } from './inbound-delivery-order/inbound-do.module';
 
 @Module({
   imports: [
@@ -46,6 +47,8 @@ import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehous
     AuthModule,
     RolePermissionModule,
     MenuModule,
+    UserModule,
+    MasterVehicleModule,
     MasterUomModule,
     MasterPalletModule,
     MasterIOModule,
@@ -57,11 +60,10 @@ import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehous
     MasterClassificationItemModule,
     InboundPlanModule,
     CheckerAssignModule,
-    UserModule,
-    MasterVehicleModule,
-    InboundTransporterModule,
     CheckerScanningModule,
     InboundAttachmentModule,
+    InboundDeliveryOrderModule,
+    InboundTransporterModule,
   ],
   providers: [
     {
