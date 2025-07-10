@@ -4,33 +4,33 @@ import { Repository } from 'typeorm';
 import { CheckerScanning } from '../core/domain/entities/checker-scanning.entity';
 import { CreateCheckerScanningDto } from './dto/create-checker-scanning.dto';
 import { UpdateCheckerScanningDto } from './dto/update-checker-scanning.dto';
-import { InboundPlanItem } from 'src/core/domain/entities/inbound-plan-item.entity';
 import { User } from 'src/core/domain/entities/user.entity';
+import { InboundDeliveryOrder } from 'src/core/domain/entities/inbound-delivery-order.entity';
 
 @Injectable()
 export class CheckerScanningRepository {
   constructor(
     @InjectRepository(CheckerScanning)
     private readonly repository: Repository<CheckerScanning>,
-    @InjectRepository(InboundPlanItem)
-    private readonly inboundPlanItemRepository: Repository<InboundPlanItem>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(InboundDeliveryOrder)
+    private readonly inboundDeliveryOrderRepository: Repository<InboundDeliveryOrder>,
     ) {}
 
   async create(createCheckerScanningDto: CreateCheckerScanningDto): Promise<CheckerScanning> {
-    const inboundPlanItem = await this.inboundPlanItemRepository.findOne({ where: { id: createCheckerScanningDto.inbound_plan_item_id } });
-    if (!inboundPlanItem) {
-      throw new NotFoundException('Inbound plan item not found');
-    }
     const checker = await this.userRepository.findOne({ where: { id: createCheckerScanningDto.checker_id } });
     if (!checker) {
       throw new NotFoundException('Checker not found');
     }
+    const inboundDeliveryOrder = await this.inboundDeliveryOrderRepository.findOne({ where: { id: createCheckerScanningDto.inbound_delivery_order_id } });
+    if (!inboundDeliveryOrder) {
+      throw new NotFoundException('Inbound delivery order not found');
+    }
     const checkerScanning = this.repository.create({
       ...createCheckerScanningDto,
-      inbound_plan_item: inboundPlanItem,
       checker: checker,
+      inbound_delivery_order_id: inboundDeliveryOrder.id,
     });
     return await this.repository.save(checkerScanning);
   }
@@ -46,18 +46,16 @@ export class CheckerScanningRepository {
     }
     return checkerScanning;
   }
-
-  async findByInboundPlanItemId(inbound_plan_item_id: string): Promise<CheckerScanning | null> {
-    const checkerScanning = await this.repository.findOne({ where: { inbound_plan_item: { id: inbound_plan_item_id } } });
-    console.log(checkerScanning);
+  async findByInboundDeliveryOrderId(inbound_delivery_order_id: string): Promise<CheckerScanning[]> {
+    const checkerScanning = await this.repository.find({ where: { inbound_delivery_order_id } });
     if (!checkerScanning) {
-      return null;
+      return [];
     }
     return checkerScanning;
   }
 
   async findByInboundPlanId(inbound_plan_id: string): Promise<CheckerScanning[]> {
-    const checkerScanning = await this.repository.find({ where: { inbound_plan_item: { inbound_plan: { id: inbound_plan_id } } } });
+    const checkerScanning = await this.repository.find({ where: { inbound_plan_id } });
     if (!checkerScanning) {
       return [];
     }
