@@ -7,10 +7,10 @@ export class UpdateMasterItemDto {
   @IsOptional()
   sku?: string;
 
-  @ApiProperty({ example: 'Item Name', required: false })
+  @ApiProperty({ example: 'Item Number', required: false })
   @IsString()
   @IsOptional()
-  name?: string;
+  item_number?: string;
 
   @ApiProperty({ example: 'Item description', required: false })
   @IsString()
@@ -21,4 +21,34 @@ export class UpdateMasterItemDto {
   @IsNumber()
   @IsOptional()
   organization_id?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  inventory_item_id?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  dus_per_stack?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  bal_per_dus?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  press_per_bal?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  bks_per_press?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  btg_per_bks?: number;
 } 
