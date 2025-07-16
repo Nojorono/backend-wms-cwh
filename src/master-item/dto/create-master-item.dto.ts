@@ -25,7 +25,7 @@ export class CreateMasterItemDto {
   @ApiProperty({ example: 1, required: false })
   @IsNumber()
   @IsOptional()
-  inventory_item_id?: number;
+  inventory_item_id?: string;
 
   @ApiProperty({ example: 1, required: false })
   @IsNumber()
