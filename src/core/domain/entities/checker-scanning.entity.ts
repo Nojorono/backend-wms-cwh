@@ -31,6 +31,12 @@ export class CheckerScanning {
   @Column({ name: 'pallet_code', nullable: true })
   pallet_code: string;
 
+  @Column({ name: 'status', nullable: true })
+  status: string;
+
+  @Column({ name: 'approved_by', nullable: true })
+  approved_by: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
