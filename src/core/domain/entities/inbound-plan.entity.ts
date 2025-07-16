@@ -21,6 +21,9 @@ export class InboundPlan {
   @Column({ name: 'organization_id', nullable: true })
   organization_id: number;
 
+  @Column({ name: 'source_id', nullable: true })
+  source_id: number;
+
   @Column({ name: 'inbound_planning_no', nullable: true })
   inbound_planning_no: string;
 

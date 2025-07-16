@@ -17,6 +17,11 @@ export class CreateInboundPlanDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsNumber()
+  source_id?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
   delivery_no?: string;
 
