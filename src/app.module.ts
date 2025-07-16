@@ -24,6 +24,7 @@ import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
 import { InboundDeliveryOrderModule } from './inbound-delivery-order/inbound-do.module';
+import { MasterSourceModule } from './master-source/master-source.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { InboundDeliveryOrderModule } from './inbound-delivery-order/inbound-do.
     RolePermissionModule,
     MenuModule,
     UserModule,
+    MasterSourceModule,
     MasterVehicleModule,
     MasterUomModule,
     MasterPalletModule,
