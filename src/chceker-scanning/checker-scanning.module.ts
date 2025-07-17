@@ -6,9 +6,10 @@ import { CheckerScanningService } from './checker-scanning.service';
 import { CheckerScanningRepository } from './checker-scanning.repository';
 import { User } from 'src/core/domain/entities/user.entity';
 import { InboundDeliveryOrder } from 'src/core/domain/entities/inbound-delivery-order.entity';
+import { InboundPlan } from 'src/core/domain/entities/inbound-plan.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CheckerScanning, User, InboundDeliveryOrder])],
+  imports: [TypeOrmModule.forFeature([CheckerScanning, User, InboundDeliveryOrder, InboundPlan])],
   controllers: [CheckerScanningController],
   providers: [
     CheckerScanningService,

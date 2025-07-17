@@ -13,14 +13,14 @@ export class CheckerScanningService {
     if (existingCheckerScanning) {
       throw new ConflictException(`Checker scanning with inbound delivery order ID ${createItemCheckerScanningDto.inbound_delivery_order_id} already exists`);
     }
+    
+    for (const item of createItemCheckerScanningDto.items) {
+      await this.repository.create({
+        ...createItemCheckerScanningDto,
+        ...item,
+      });
+    }
     return createItemCheckerScanningDto;
-    // for (const item of createItemCheckerScanningDto.items) {
-    //   await this.repository.create({
-    //     ...createItemCheckerScanningDto,
-    //     ...item,
-    //   });
-    // }
-    // return createItemCheckerScanningDto;
   }
 
   async findAll(): Promise<CheckerScanning[]> {

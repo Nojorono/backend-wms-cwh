@@ -6,6 +6,7 @@ import { CreateCheckerScanningDto } from './dto/create-checker-scanning.dto';
 import { UpdateCheckerScanningDto } from './dto/update-checker-scanning.dto';
 import { User } from 'src/core/domain/entities/user.entity';
 import { InboundDeliveryOrder } from 'src/core/domain/entities/inbound-delivery-order.entity';
+import { InboundPlan } from 'src/core/domain/entities/inbound-plan.entity';
 
 @Injectable()
 export class CheckerScanningRepository {
@@ -16,6 +17,8 @@ export class CheckerScanningRepository {
     private readonly userRepository: Repository<User>,
     @InjectRepository(InboundDeliveryOrder)
     private readonly inboundDeliveryOrderRepository: Repository<InboundDeliveryOrder>,
+    @InjectRepository(InboundPlan)
+    private readonly inboundPlanRepository: Repository<InboundPlan>,
     ) {}
 
   async create(createCheckerScanningDto: CreateCheckerScanningDto): Promise<CheckerScanning> {
@@ -27,10 +30,15 @@ export class CheckerScanningRepository {
     if (!inboundDeliveryOrder) {
       throw new NotFoundException('Inbound delivery order not found');
     }
+    const inboundPlan = await this.inboundPlanRepository.findOne({ where: { id: createCheckerScanningDto.inbound_plan_id } });
+    if (!inboundPlan) {
+      throw new NotFoundException('Inbound plan not found');
+    }
     const checkerScanning = this.repository.create({
       ...createCheckerScanningDto,
       checker: checker,
       inbound_delivery_order_id: inboundDeliveryOrder.id,
+      status: 'Waiting Inspection',
     });
     return await this.repository.save(checkerScanning);
   }
@@ -46,10 +54,10 @@ export class CheckerScanningRepository {
     }
     return checkerScanning;
   }
-  async findByInboundDeliveryOrderId(inbound_delivery_order_id: string): Promise<CheckerScanning[]> {
-    const checkerScanning = await this.repository.find({ where: { inbound_delivery_order_id } });
+  async findByInboundDeliveryOrderId(inbound_delivery_order_id: string): Promise<CheckerScanning | null> {
+    const checkerScanning = await this.repository.findOne({ where: { inbound_delivery_order_id } });
     if (!checkerScanning) {
-      return [];
+      return null; 
     }
     return checkerScanning;
   }
@@ -65,7 +73,7 @@ export class CheckerScanningRepository {
   async update(id: string, updateCheckerScanningDto: UpdateCheckerScanningDto): Promise<CheckerScanning | null> {
     const checkerScanning = await this.findOne(id);
     if (!checkerScanning) {
-      throw new NotFoundException('IO not found');
+      throw new NotFoundException('Data checker scanning not found');
     }
     await this.repository.update(id, updateCheckerScanningDto);
     return await this.findOne(id);
@@ -74,7 +82,7 @@ export class CheckerScanningRepository {
   async remove(id: string): Promise<void> {
     const checkerScanning = await this.findOne(id);
     if (!checkerScanning) {
-      throw new NotFoundException('IO not found');
+      throw new NotFoundException('Data checker scanning not found');
     }
     await this.repository.delete(id);
   }
