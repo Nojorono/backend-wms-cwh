@@ -61,4 +61,12 @@ export class CheckerScanningController {
   remove(@Param('id') id: string) {
     return this.checkerScanningService.remove(id);
   }
+
+  @Post('approve/:id/:approved_by')
+  @ApiOperation({ summary: 'Approve a Checker Scanning' })
+  @ApiResponse({ status: 200, description: 'The Checker Scanning has been successfully approved.', type: CheckerScanning })
+  @ApiResponse({ status: 404, description: 'Checker Scanning not found.' })
+  approve(@Param('id') id: string, @Param('approved_by') approved_by: string) {
+    return this.checkerScanningService.approve(id, approved_by);
+  }
 } 

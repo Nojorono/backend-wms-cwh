@@ -56,4 +56,15 @@ export class CheckerScanningService {
     await this.findOne(id);
     await this.repository.remove(id);
   }
+
+  async approve(id: string, approved_by: string): Promise<CheckerScanning> {
+    const checkerScanning = await this.repository.findOne(id);
+    if (!checkerScanning) {
+      throw new NotFoundException(`Checker scanning with ID ${id} not found`);
+    }
+    checkerScanning.status = 'Approved';
+    checkerScanning.approved_by = approved_by;
+    await this.repository.update(id, checkerScanning);
+    return checkerScanning;
+  }
 }
