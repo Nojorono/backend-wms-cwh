@@ -16,6 +16,14 @@ export class InboundTransporterService {
     return await this.repository.findAll();
   }
 
+  async findById(id: string): Promise<InboundTransporter> {
+    const inboundTransporter = await this.repository.findOne(id);
+    if (!inboundTransporter) {
+      throw new NotFoundException(`Inbound Transporter with ID ${id} not found`);
+    }
+    return inboundTransporter;
+  }
+
   async findByInboundPlanId(inbound_plan_id: string): Promise<InboundTransporter[]> {
     const inboundTransporter = await this.repository.findByInboundPlanId(inbound_plan_id);
     if (!inboundTransporter) {

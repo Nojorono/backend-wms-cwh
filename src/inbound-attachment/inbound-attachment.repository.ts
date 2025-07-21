@@ -53,4 +53,8 @@ export class InboundAttachmentRepository {
     }
     await this.repository.delete(id);
   }
+
+  async findByInboundPlanId(inbound_plan_id: string): Promise<InboundAttachment[]> {
+    return await this.repository.find({ where: { inbound_plan_id } });
+  }
 }

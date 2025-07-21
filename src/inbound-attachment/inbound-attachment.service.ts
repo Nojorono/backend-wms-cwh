@@ -129,4 +129,8 @@ export class InboundAttachmentService {
     
     return await this.findOne(attachmentId);
   }
+
+  async findByInboundPlanId(inbound_plan_id: string): Promise<InboundAttachment[]> {
+    return await this.repository.findByInboundPlanId(inbound_plan_id);
+  }
 }

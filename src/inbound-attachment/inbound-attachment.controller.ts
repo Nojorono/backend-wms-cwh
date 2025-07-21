@@ -27,12 +27,12 @@ export class InboundAttachmentController {
       return this.inboundAttachmentService.findAll();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a IO by id' })
-  @ApiResponse({ status: 200, description: 'Return the IO.', type: InboundAttachment })
-  @ApiResponse({ status: 404, description: 'IO not found.' })
-  findOne(@Param('id') id: string) {
-    return this.inboundAttachmentService.findOne(id);
+  @Get(':inbound_plan_id')
+  @ApiOperation({ summary: 'Get a Attachment by inbound_plan_id' })
+  @ApiResponse({ status: 200, description: 'Return the Attachment.', type: InboundAttachment })
+  @ApiResponse({ status: 404, description: 'Attachment not found.' })
+  findByInboundPlanId(@Param('inbound_plan_id') inbound_plan_id: string) {
+    return this.inboundAttachmentService.findByInboundPlanId(inbound_plan_id);
   }
 
   @Patch(':id')
