@@ -4,12 +4,15 @@ import { FindOptionsWhere, Repository } from 'typeorm';
 import { InboundDeliveryOrder } from '../core/domain/entities/inbound-delivery-order.entity';
 import { CreateInboundDeliveryOrderDto } from './dto/create-inbound-do.dto';
 import { UpdateInboundDeliveryOrderDto } from './dto/update-inbound-do.dto';
+import { InboundDeliveryOrderItem } from '../core/domain/entities/inbound-delivery-order-item.entity';
 
 @Injectable()
 export class InboundDeliveryOrderRepository {
   constructor(
     @InjectRepository(InboundDeliveryOrder)
     private readonly repository: Repository<InboundDeliveryOrder>,
+    @InjectRepository(InboundDeliveryOrderItem)
+    private readonly itemRepository: Repository<InboundDeliveryOrderItem>,
   ) {}
 
   async create(createInboundDeliveryOrderDto: CreateInboundDeliveryOrderDto): Promise<InboundDeliveryOrder> {
@@ -65,14 +68,37 @@ export class InboundDeliveryOrderRepository {
   }
 
   async update(id: string, updateInboundDeliveryOrderDto: UpdateInboundDeliveryOrderDto): Promise<InboundDeliveryOrder | null> {
-    const inboundDeliveryOrder = await this.findWhere({ id });
-    if (!inboundDeliveryOrder) {
-      throw new NotFoundException('Inbound Delivery Order not found');
+    const { items, ...updateFields } = updateInboundDeliveryOrderDto;
+  
+    // Update main order (already fixed)
+    await this.repository.update(id, updateFields);
+  
+    // Update items if provided
+    if (items && Array.isArray(items)) {
+      // 1. Get current items from DB
+      const existingItems = await this.itemRepository.find({ where: { inboundDeliveryOrder: { id } } });
+  
+      // 2. Update or create items
+      for (const itemDto of items) {
+        if (itemDto.id) {
+          // Update existing item
+          await this.itemRepository.update(itemDto.id, itemDto);
+        } else {
+          // Create new item
+          await this.itemRepository.create({ ...itemDto, inboundDeliveryOrder: { id } });
+        }
+      }
+  
+      // 3. Optionally, delete items not present in the new list
+      const newItemIds = items.filter(i => i.id).map(i => i.id);
+      for (const existingItem of existingItems) {
+        if (!newItemIds.includes(existingItem.id)) {
+          await this.itemRepository.delete(existingItem.id);
+        }
+      }
     }
-    await this.repository.update(id, {
-      ...updateInboundDeliveryOrderDto,
-    });
-    return await this.findOne(id);
+  
+    return await this.repository.findOne({ where: { id }, relations: ['items'] });
   }
 
   async remove(id: string): Promise<void> {

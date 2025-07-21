@@ -5,6 +5,11 @@ export class UpdateInboundDeliveryOrderItemDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  id?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
   inbound_delivery_order_id?: string;
 
   @ApiProperty({ required: false })

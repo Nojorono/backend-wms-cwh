@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsArray } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { CreateInboundDeliveryOrderItemDto } from './create-inbound-do-item.dto';
+import { UpdateInboundDeliveryOrderItemDto } from './update-inbound-do-item.dto';
 
 export class UpdateInboundDeliveryOrderDto {
   @ApiProperty({ required: false })
@@ -18,10 +18,10 @@ export class UpdateInboundDeliveryOrderDto {
   @IsString()
   number_delivery_order?: string;
 
-  @ApiProperty({ required: false, type: [CreateInboundDeliveryOrderItemDto] })
+  @ApiProperty({ required: false, type: [UpdateInboundDeliveryOrderItemDto] })
   @IsOptional()
   @IsArray()
-  items?: CreateInboundDeliveryOrderItemDto[];
+  items?: UpdateInboundDeliveryOrderItemDto[];
 
   @ApiProperty({ required: false })
   @IsOptional()
