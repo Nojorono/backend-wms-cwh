@@ -18,6 +18,12 @@ export class CheckerScanning {
   @Column({ name: 'inbound_delivery_order_id', nullable: true })
   inbound_delivery_order_id: string;
 
+  @Column({ name: 'inbound_delivery_order_item_id', nullable: true })
+  inbound_delivery_order_item_id: string;
+
+  @Column({ name: 'item_id', nullable: true })
+  item_id: string;
+
   @Column({ name: 'checker_assign_id', nullable: true })
   checker_assign_id: string;
 

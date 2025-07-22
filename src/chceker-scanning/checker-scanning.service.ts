@@ -9,10 +9,10 @@ export class CheckerScanningService {
   constructor(private readonly repository: CheckerScanningRepository) {}
   
   async create(createItemCheckerScanningDto: CreateItemCheckerScanningDto): Promise<CreateItemCheckerScanningDto> {
-    const existingCheckerScanning = await this.repository.findByInboundDeliveryOrderId(createItemCheckerScanningDto.inbound_delivery_order_id);
-    if (existingCheckerScanning) {
-      throw new ConflictException(`Checker scanning with inbound delivery order ID ${createItemCheckerScanningDto.inbound_delivery_order_id} already exists`);
-    }
+    // const existingCheckerScanning = await this.repository.findByInboundDeliveryOrderId(createItemCheckerScanningDto.inbound_delivery_order_id);
+    // if (existingCheckerScanning) {
+    //   throw new ConflictException(`Checker scanning with inbound delivery order ID ${createItemCheckerScanningDto.inbound_delivery_order_id} already exists`);
+    // }
     
     for (const item of createItemCheckerScanningDto.items) {
       await this.repository.create({

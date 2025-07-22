@@ -19,6 +19,20 @@ export class CreateCheckerScanningDto {
   inbound_delivery_order_id: string;
 
   @ApiProperty({ 
+    description: 'ID of the inbound delivery order item',
+    example: '123e4567-e89b-12d3-a456-426614174002'
+  })
+  @IsUUID()
+  inbound_delivery_order_item_id: string;
+
+  @ApiProperty({ 
+    description: 'ID of the item',
+    example: '123e4567-e89b-12d3-a456-426614174003'
+  })
+  @IsUUID()
+  item_id: string;
+
+  @ApiProperty({ 
     description: 'ID of the organization',
     example: 1
   })
@@ -94,6 +108,20 @@ export class CreateItemCheckerScanningDto {
   })
   @IsUUID()
   inbound_delivery_order_id: string;
+
+  @ApiProperty({ 
+    description: 'ID of the inbound delivery order item',
+    example: '123e4567-e89b-12d3-a456-426614174002'
+  })
+  @IsUUID()
+  inbound_delivery_order_item_id: string;
+
+  @ApiProperty({ 
+    description: 'ID of the item',
+    example: '123e4567-e89b-12d3-a456-426614174003'
+  })
+  @IsUUID()
+  item_id: string;
 
   @ApiProperty({ 
     description: 'ID of the organization',

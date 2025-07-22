@@ -45,8 +45,6 @@ export class UpdateInboundTransporterDto {
   @ApiProperty({ example: '1', required: false })
   @IsString()
   @IsOptional()
-  @IsString()
-  @IsOptional()
   unloading_end_time?: Date | string;
 
   @ApiProperty({ example: '1', required: false })
