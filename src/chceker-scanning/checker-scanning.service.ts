@@ -1,26 +1,55 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { CheckerScanningRepository } from './checker-scanning.repository';
-import { CreateItemCheckerScanningDto } from './dto/create-checker-scanning.dto';
+import { CreateCheckerScanningDto } from './dto/create-checker-scanning.dto';
 import { UpdateCheckerScanningDto } from './dto/update-checker-scanning.dto';
 import { CheckerScanning } from '../core/domain/entities/checker-scanning.entity';
+import { InboundPlan } from 'src/core/domain/entities/inbound-plan.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { InboundDeliveryOrder } from 'src/core/domain/entities/inbound-delivery-order.entity';
+import { InboundDeliveryOrderItem } from 'src/core/domain/entities/inbound-delivery-order-item.entity';
+import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
 export class CheckerScanningService {
-  constructor(private readonly repository: CheckerScanningRepository) {}
+  constructor(private readonly repository: CheckerScanningRepository,
+    @InjectRepository(InboundPlan)
+    private readonly inboundPlanRepository: Repository<InboundPlan>,
+    @InjectRepository(InboundDeliveryOrder)
+    private readonly inboundDeliveryOrderRepository: Repository<InboundDeliveryOrder>,
+    @InjectRepository(InboundDeliveryOrderItem)
+    private readonly inboundDeliveryOrderItemRepository: Repository<InboundDeliveryOrderItem>,
+    @InjectRepository(MasterItem)
+    private readonly masterItemRepository: Repository<MasterItem>,
+  ) {}
   
-  async create(createItemCheckerScanningDto: CreateItemCheckerScanningDto): Promise<CreateItemCheckerScanningDto> {
-    // const existingCheckerScanning = await this.repository.findByInboundDeliveryOrderId(createItemCheckerScanningDto.inbound_delivery_order_id);
-    // if (existingCheckerScanning) {
-    //   throw new ConflictException(`Checker scanning with inbound delivery order ID ${createItemCheckerScanningDto.inbound_delivery_order_id} already exists`);
-    // }
-    
-    for (const item of createItemCheckerScanningDto.items) {
-      await this.repository.create({
-        ...createItemCheckerScanningDto,
-        ...item,
-      });
+  async create(createCheckerScanningDto: CreateCheckerScanningDto): Promise<CreateCheckerScanningDto> {
+    const inboundPlan = await this.inboundPlanRepository.findOne({ where: { id: createCheckerScanningDto.inbound_plan_id } });
+    if (!inboundPlan) {
+      throw new NotFoundException('Inbound plan not found');
     }
-    return createItemCheckerScanningDto;
+    const inboundDeliveryOrder = await this.inboundDeliveryOrderRepository.findOne({ where: { id: createCheckerScanningDto.inbound_delivery_order_id } });
+    if (!inboundDeliveryOrder) {
+      throw new NotFoundException('Inbound delivery order not found');
+    }
+    const existingScanning = await this.repository.findByInboundDeliveryOrderItemId(createCheckerScanningDto.inbound_delivery_order_item_id);
+    if (existingScanning) {
+      const totalExistingScanning = existingScanning.reduce((acc, curr) => acc + curr.actual_qty, 0);
+      const totalScannedQuantity = totalExistingScanning + createCheckerScanningDto.actual_qty;
+      const totalQuantity = await this.inboundDeliveryOrderItemRepository.findOne({ where: { id: createCheckerScanningDto.inbound_delivery_order_item_id } });
+      if (!totalQuantity) {
+        throw new NotFoundException('Inbound delivery order item not found');
+      }
+      if (totalScannedQuantity >= totalQuantity.qty_plan) {
+        const item = await this.masterItemRepository.findOne({ where: { id: createCheckerScanningDto.item_id } });
+        if (!item) {
+          throw new NotFoundException('Item not found');
+        }
+        throw new ConflictException(`Checker scanning with inbound delivery order item number ${inboundDeliveryOrder.number_delivery_order} ${item.sku} already full scanned`);
+      }
+    }
+    await this.repository.create(createCheckerScanningDto);
+    return createCheckerScanningDto;
   }
 
   async findAll(): Promise<CheckerScanning[]> {
