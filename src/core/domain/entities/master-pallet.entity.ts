@@ -11,9 +11,6 @@ export class MasterPallet {
   @Column({ nullable: true })
   pallet_code: string;
 
-  @Column()
-  uom_name: string;
-
   @Column({ nullable: true })
   capacity: number;
 

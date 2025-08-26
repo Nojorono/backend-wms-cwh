@@ -12,11 +12,6 @@ export class UpdateMasterPalletDto {
   @IsOptional()
   pallet_code?: string;
 
-  @ApiProperty({ example: 'Standard Pallet', required: false })
-  @IsString()
-  @IsOptional()
-  uom_name?: string;
-
   @ApiProperty({ example: 100, required: false })
   @IsNumber()
   @IsOptional()
