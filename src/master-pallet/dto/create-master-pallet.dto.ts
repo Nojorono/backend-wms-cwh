@@ -11,10 +11,6 @@ export class CreateMasterPalletDto {
   @IsString()
   pallet_code: string;
 
-  @ApiProperty({ example: 'Standard Pallet' })
-  @IsString()
-  uom_name: string;
-
   @ApiProperty({ example: 100, required: false })
   @IsNumber()
   @IsOptional()
