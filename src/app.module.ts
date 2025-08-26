@@ -14,17 +14,10 @@ import { MasterWarehouseModule } from './master-warehouse/master-warehouse.modul
 import { MasterSupplierModule } from './master-supplier/master-supplier.module';
 import { MasterItemModule } from './master-item/master-item.module';
 import { MasterClassificationItemModule } from './master-classification-item/master-classification-item.module';
-import { InboundPlanModule } from './inbound-plan/inbound-plan.module';
-import { CheckerAssignModule } from './checker-assign/checker-assign.module';
 import { UserModule } from './users/user.module';
 import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
-import { InboundTransporterModule } from './inbound-transporter/inbound-transporter.module';
-import { CheckerScanningModule } from './chceker-scanning/checker-scanning.module';
-import { InboundAttachmentModule } from './inbound-attachment/inbound-attachment.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
-import { InboundDeliveryOrderModule } from './inbound-delivery-order/inbound-do.module';
-import { MasterSourceModule } from './master-source/master-source.module';
 
 @Module({
   imports: [
@@ -49,7 +42,6 @@ import { MasterSourceModule } from './master-source/master-source.module';
     RolePermissionModule,
     MenuModule,
     UserModule,
-    MasterSourceModule,
     MasterVehicleModule,
     MasterUomModule,
     MasterPalletModule,
@@ -60,12 +52,6 @@ import { MasterSourceModule } from './master-source/master-source.module';
     MasterSupplierModule,
     MasterItemModule,
     MasterClassificationItemModule,
-    InboundPlanModule,
-    CheckerAssignModule,
-    CheckerScanningModule,
-    InboundAttachmentModule,
-    InboundDeliveryOrderModule,
-    InboundTransporterModule,
   ],
   providers: [
     {
