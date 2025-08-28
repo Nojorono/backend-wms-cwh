@@ -79,8 +79,6 @@ async function seed() {
     password: hashed,
     role: role,
     roleId: role.id,
-    firstName: 'Super',
-    lastName: 'Admin',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { UserRepository } from './user.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -10,10 +10,6 @@ export class UserService {
   constructor(private readonly repository: UserRepository) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const organizationId = createUserDto.organizationId;
-    if (!organizationId) {
-      throw new BadRequestException('Organization ID is required');
-    }
     const existingUser = await this.repository.findByUsername(createUserDto.username);
     if (existingUser) {
       throw new ConflictException(`User with username ${createUserDto.username} already exists`);

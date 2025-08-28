@@ -37,14 +37,6 @@ export class UserRepository {
     return user;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<User | null> {
-    const user = await this.repository.findOne({ where: { organizationId: organization_id } });
-    if (!user) {
-      return null;
-    }
-    return user;
-  }
-
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User | null> {
     const user = await this.findOne(id);
     if (!user) {

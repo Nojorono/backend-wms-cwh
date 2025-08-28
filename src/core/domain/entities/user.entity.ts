@@ -20,17 +20,8 @@ export class User {
   @Column({ unique: true, length: 100 })
   username: string;
 
-  @Column({ name: 'organization_id', nullable: true })
-  organizationId: number;
-
   @Column({ length: 255 })
   password: string;
-
-  @Column({ name: 'first_name', length: 100 })
-  firstName: string;
-
-  @Column({ name: 'last_name', length: 100 })
-  lastName: string;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

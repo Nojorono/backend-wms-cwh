@@ -9,26 +9,12 @@ export class UpdateUserDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsNumber()
-  organizationId?: number;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
   @IsString()
   password?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  firstName?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  lastName?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 

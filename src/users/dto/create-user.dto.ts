@@ -7,25 +7,10 @@ export class CreateUserDto {
   username: string;
 
   @ApiProperty({ required: true })
-  @IsNumber()
-  organizationId: number;
-
-  @ApiProperty({ required: true })
   @IsString()
   password: string;
 
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  firstName?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  lastName?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
+  @ApiProperty({ required: true })
   @IsBoolean()
   isActive?: boolean;
 
