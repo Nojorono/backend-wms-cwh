@@ -3,7 +3,8 @@ import {
   Column, 
   ManyToOne, 
   JoinColumn, 
-  Index
+  Index,
+  OneToOne
 } from 'typeorm';
 import { Role } from './role.entity';
 import { BaseEntity } from './base.entity';
@@ -28,4 +29,7 @@ export class User extends BaseEntity {
 
   @Column({ name: 'role_id' })
   roleId: number;
+
+  @Column({ name: 'user_detail_id', nullable: true })
+  userDetailId: string;
 }

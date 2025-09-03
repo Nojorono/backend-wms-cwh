@@ -21,6 +21,10 @@ export class UserRepository {
     return await this.repository.find();
   }
 
+  async findAllWithDeleted(): Promise<User[]> {
+    return await this.repository.find({ withDeleted: true });
+  }
+
   async findByUsername(username: string): Promise<User | null> {
     const user = await this.repository.findOne({ where: { username } });
     if (!user) {
@@ -37,6 +41,14 @@ export class UserRepository {
     return user;
   }
 
+  async findOneWithDeleted(id: string): Promise<User | null> {
+    const user = await this.repository.findOne({ where: { id }, withDeleted: true });
+    if (!user) {
+      return null;
+    }
+    return user;
+  }
+
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User | null> {
     const user = await this.findOne(id);
     if (!user) {
@@ -46,8 +58,32 @@ export class UserRepository {
     return await this.findOne(id);
   }
 
+  async updateUserDetailId(id: string, userDetailId: string): Promise<void> {
+    await this.repository.update(id, { userDetailId });
+  }
+
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    await this.repository.delete(id);
+  }
+
+  async softDelete(id: string): Promise<void> {
+    const user = await this.findOne(id);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    await this.repository.softDelete(id);
+  }
+
+  async restore(id: string): Promise<void> {
+    await this.repository.restore(id);
+  }
+
+  async hardDelete(id: string): Promise<void> {
+    const user = await this.findOneWithDeleted(id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
