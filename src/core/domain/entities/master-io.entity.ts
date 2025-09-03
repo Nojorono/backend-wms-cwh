@@ -1,9 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+
+import { BaseEntity } from './base.entity';
+import { Column, Entity } from 'typeorm';
 
 @Entity('m_io')
-export class MasterIO {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+export class MasterIO extends BaseEntity {
 
   @Column({ nullable: true })
   organization_id: number;
@@ -16,10 +16,4 @@ export class MasterIO {
 
   @Column({ nullable: true })
   address: string;
-
-  @CreateDateColumn({ name: 'created_at', nullable: true })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at', nullable: true })
-  updatedAt: Date;
 } 

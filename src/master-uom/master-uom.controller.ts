@@ -30,7 +30,7 @@ export class MasterUomController {
   @ApiOperation({ summary: 'Get a UOM by id' })
   @ApiResponse({ status: 200, description: 'Return the UOM.', type: MasterUom })
   @ApiResponse({ status: 404, description: 'UOM not found.' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIntPipe) id: string) {
     return this.masterUomService.findOne(id);
   }
 
@@ -40,7 +40,7 @@ export class MasterUomController {
   @ApiResponse({ status: 404, description: 'UOM not found.' })
   @ApiResponse({ status: 409, description: 'UOM with this code already exists.' })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIntPipe) id: string,
     @Body() updateMasterUomDto: UpdateMasterUomDto,
   ) {
     return this.masterUomService.update(id, updateMasterUomDto);
@@ -50,7 +50,7 @@ export class MasterUomController {
   @ApiOperation({ summary: 'Delete a UOM' })
   @ApiResponse({ status: 200, description: 'The UOM has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'UOM not found.' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id', ParseIntPipe) id: string) {
     return this.masterUomService.remove(id);
   }
 } 

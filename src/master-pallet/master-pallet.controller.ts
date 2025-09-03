@@ -30,7 +30,7 @@ export class MasterPalletController {
   @ApiOperation({ summary: 'Get a Pallet by id' })
   @ApiResponse({ status: 200, description: 'Return the Pallet.', type: MasterPallet })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIntPipe) id: string) {
     return this.masterPalletService.findOne(id);
   }
 
@@ -40,7 +40,7 @@ export class MasterPalletController {
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
   @ApiResponse({ status: 409, description: 'Pallet with this code already exists.' })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseIntPipe) id: string,
     @Body() updateMasterPalletDto: UpdateMasterPalletDto,
   ) {
     return this.masterPalletService.update(id, updateMasterPalletDto);
@@ -50,7 +50,7 @@ export class MasterPalletController {
   @ApiOperation({ summary: 'Delete a Pallet' })
   @ApiResponse({ status: 200, description: 'The Pallet has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id', ParseIntPipe) id: string) {
     return this.masterPalletService.remove(id);
   }
 } 

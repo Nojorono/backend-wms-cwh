@@ -21,7 +21,7 @@ export class MasterPalletRepository {
     return await this.repository.find();
   }
 
-  async findOne(id: number): Promise<MasterPallet | null> {
+  async findOne(id: string): Promise<MasterPallet | null> {
     const pallet = await this.repository.findOne({ where: { id } });
     if (!pallet) {
       return null;
@@ -37,7 +37,7 @@ export class MasterPalletRepository {
     return pallet;
   }
 
-  async update(id: number, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet | null> {
+  async update(id: string, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet | null> {
     const pallet = await this.findOne(id);
     if (!pallet) {
       throw new NotFoundException('Pallet not found');
@@ -46,7 +46,7 @@ export class MasterPalletRepository {
     return await this.findOne(id);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     await this.repository.delete(id);
   }
 }

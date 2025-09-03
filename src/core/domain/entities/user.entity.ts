@@ -1,21 +1,17 @@
 import { 
   Entity, 
   Column, 
-  PrimaryGeneratedColumn, 
-  CreateDateColumn, 
-  UpdateDateColumn, 
   ManyToOne, 
   JoinColumn, 
   Index
 } from 'typeorm';
 import { Role } from './role.entity';
+import { BaseEntity } from './base.entity';
 
 @Entity('users')
 @Index(['username'], { unique: true })
 @Index(['roleId'])
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+export class User extends BaseEntity {
 
   @Column({ unique: true, length: 100 })
   username: string;
@@ -32,10 +28,4 @@ export class User {
 
   @Column({ name: 'role_id' })
   roleId: number;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 }

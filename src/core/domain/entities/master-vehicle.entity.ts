@@ -1,9 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity('m_vehicle')
-export class MasterVehicle {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+export class MasterVehicle extends BaseEntity {
 
   @Column()
   vehicle_type: string;
@@ -13,10 +12,4 @@ export class MasterVehicle {
 
   @Column({ name: 'is_active', default: true })
   is_active: boolean;
-
-  @CreateDateColumn({ name: 'created_at' })
-  created_at: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updated_at: Date;
 } 

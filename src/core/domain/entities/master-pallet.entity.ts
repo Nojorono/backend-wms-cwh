@@ -1,9 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity('m_pallet')
-export class MasterPallet {
-  @PrimaryGeneratedColumn()
-  id: number;
+export class MasterPallet extends BaseEntity {
 
   @Column({ nullable: true })
   organization_id: number;
@@ -22,10 +21,4 @@ export class MasterPallet {
 
   @Column({ name: 'is_empty', default: false })
   isEmpty: boolean;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 } 
