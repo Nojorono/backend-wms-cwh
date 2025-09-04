@@ -1,11 +1,16 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { InboundItem } from './inbound-item.entity';
 import { BaseEntity } from './base.entity';
+import { Inbound } from './inbound.entity';
 
 @Entity('inbound_do')
 export class InboundDo extends BaseEntity {
   @Column({ nullable: true })
   inbound_id: string;
+
+  @ManyToOne(() => Inbound, (inbound) => inbound.inbound_dos, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'inbound_id' })
+  inbound: Inbound;
 
   @Column({ nullable: true })
   inbound_do_number: string;
@@ -25,6 +30,6 @@ export class InboundDo extends BaseEntity {
   @Column({ default: false })
   flag_validated: boolean;
 
-  @OneToMany(() => InboundItem, (inboundItem) => inboundItem.inbound_do_id)
+  @OneToMany(() => InboundItem, (inboundItem) => inboundItem.inbound_do)
   inbound_items: InboundItem[];
 }

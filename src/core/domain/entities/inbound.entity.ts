@@ -31,6 +31,6 @@ export class Inbound extends BaseEntity {
   @Column({ nullable: true })
   arrival_date: Date;
 
-  @OneToMany(() => InboundDo, (inboundDo) => inboundDo.inbound_id)
+  @OneToMany(() => InboundDo, (inboundDo) => inboundDo.inbound)
   inbound_dos: InboundDo[];
 }
