@@ -70,7 +70,7 @@ export class CreateInboundDoDto {
   flag_validated?: boolean;
 
   @ApiPropertyOptional({
-    type: [CreateInboundItemDto],
+    type: () => [CreateInboundItemDto],
     example: [
       { item_id: 'uuid-item-1', quantity: 10, uom: 'PCS' },
       { item_id: 'uuid-item-2', quantity: 5, uom: 'BOX' },
@@ -126,11 +126,15 @@ export class CreateInboundDto {
   arrival_date?: string;
 
   @ApiPropertyOptional({
-    type: [CreateInboundDoDto],
+    type: () => [CreateInboundDoDto],
     example: [
       {
         inbound_do_number: 'DO-001',
         inbound_do_date: '2025-09-01T10:00:00.000Z',
+        attachment: 's3://bucket/path/to/attachment.pdf',
+        inbound_po_number: 'PO-123',
+        inbound_po_date: '2025-08-31T00:00:00.000Z',
+        flag_validated: false,
         inbound_items: [
           { item_id: 'uuid-item-1', quantity: 10, uom: 'DUS' },
           { item_id: 'uuid-item-2', quantity: 5, uom: 'DUS' },
@@ -142,7 +146,7 @@ export class CreateInboundDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateInboundDoDto)
-  inbound_dos?: CreateInboundDoDto[];
+  inbound_dos: CreateInboundDoDto[];
 }
 
 

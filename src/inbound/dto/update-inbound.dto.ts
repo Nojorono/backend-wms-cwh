@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './create-inbound.dto';
 
 export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) {}
