@@ -9,19 +9,19 @@ class ScaffoldGenerator {
   generateScaffold(moduleName, entityName) {
     const kebabCase = this.toKebabCase(moduleName);
     const pascalCase = this.toPascalCase(moduleName);
-    
+
     const modulePath = path.join(this.basePath, kebabCase);
-    
+
     this.createDirectory(modulePath);
     this.createDirectory(path.join(modulePath, 'dto'));
-    
+
     this.generateEntity(entityName);
     this.generateDto(modulePath, pascalCase);
     this.generateRepository(modulePath, pascalCase, entityName);
     this.generateService(modulePath, pascalCase, entityName);
     this.generateController(modulePath, pascalCase, entityName);
     this.generateModule(modulePath, pascalCase, entityName);
-    
+
     console.log(`✅ Scaffold generated for ${pascalCase} module`);
     console.log(`📁 Module path: ${modulePath}`);
   }
@@ -45,8 +45,14 @@ class ScaffoldGenerator {
   }
 
   generateEntity(entityName) {
-    const entityPath = path.join(this.basePath, 'core', 'domain', 'entities', `${entityName}.entity.ts`);
-    
+    const entityPath = path.join(
+      this.basePath,
+      'core',
+      'domain',
+      'entities',
+      `${entityName}.entity.ts`,
+    );
+
     const entityContent = `import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('${entityName.toLowerCase()}')
@@ -66,8 +72,16 @@ export class ${entityName} {
   }
 
   generateDto(modulePath, pascalCase) {
-    const createDtoPath = path.join(modulePath, 'dto', `create-${this.toKebabCase(pascalCase)}.dto.ts`);
-    const updateDtoPath = path.join(modulePath, 'dto', `update-${this.toKebabCase(pascalCase)}.dto.ts`);
+    const createDtoPath = path.join(
+      modulePath,
+      'dto',
+      `create-${this.toKebabCase(pascalCase)}.dto.ts`,
+    );
+    const updateDtoPath = path.join(
+      modulePath,
+      'dto',
+      `update-${this.toKebabCase(pascalCase)}.dto.ts`,
+    );
 
     const createDtoContent = `export class Create${pascalCase}Dto {}`;
 
@@ -82,8 +96,11 @@ export class Update${pascalCase}Dto extends PartialType(Create${pascalCase}Dto) 
   }
 
   generateRepository(modulePath, pascalCase, entityName) {
-    const repositoryPath = path.join(modulePath, `${this.toKebabCase(pascalCase)}.repository.ts`);
-    
+    const repositoryPath = path.join(
+      modulePath,
+      `${this.toKebabCase(pascalCase)}.repository.ts`,
+    );
+
     const repositoryContent = `import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -138,8 +155,11 @@ export class ${pascalCase}Repository {
   }
 
   generateService(modulePath, pascalCase, entityName) {
-    const servicePath = path.join(modulePath, `${this.toKebabCase(pascalCase)}.service.ts`);
-    
+    const servicePath = path.join(
+      modulePath,
+      `${this.toKebabCase(pascalCase)}.service.ts`,
+    );
+
     const serviceContent = `import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { ${pascalCase}Repository } from './${this.toKebabCase(pascalCase)}.repository';
 import { Create${pascalCase}Dto } from './dto/create-${this.toKebabCase(pascalCase)}.dto';
@@ -185,8 +205,11 @@ export class ${pascalCase}Service {
   }
 
   generateController(modulePath, pascalCase, entityName) {
-    const controllerPath = path.join(modulePath, `${this.toKebabCase(pascalCase)}.controller.ts`);
-    
+    const controllerPath = path.join(
+      modulePath,
+      `${this.toKebabCase(pascalCase)}.controller.ts`,
+    );
+
     const controllerContent = `import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ${pascalCase}Service } from './${this.toKebabCase(pascalCase)}.service';
@@ -249,8 +272,11 @@ export class ${pascalCase}Controller {
   }
 
   generateModule(modulePath, pascalCase, entityName) {
-    const modulePathFile = path.join(modulePath, `${this.toKebabCase(pascalCase)}.module.ts`);
-    
+    const modulePathFile = path.join(
+      modulePath,
+      `${this.toKebabCase(pascalCase)}.module.ts`,
+    );
+
     const moduleContent = `import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ${entityName} } from '../core/domain/entities/${entityName}.entity';
@@ -274,4 +300,4 @@ export class ${pascalCase}Module {}`;
   }
 }
 
-module.exports = ScaffoldGenerator; 
+module.exports = ScaffoldGenerator;

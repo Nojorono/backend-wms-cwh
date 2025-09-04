@@ -1,36 +1,23 @@
-import { 
-  Entity, 
-  Column, 
-  PrimaryGeneratedColumn, 
-  CreateDateColumn, 
-  UpdateDateColumn, 
-  ManyToOne, 
-  JoinColumn, 
-  Index
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  Index,
+  OneToOne,
 } from 'typeorm';
 import { Role } from './role.entity';
+import { BaseEntity } from './base.entity';
 
 @Entity('users')
 @Index(['username'], { unique: true })
 @Index(['roleId'])
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class User extends BaseEntity {
   @Column({ unique: true, length: 100 })
   username: string;
 
-  @Column({ name: 'organization_id', nullable: true })
-  organizationId: number;
-
   @Column({ length: 255 })
   password: string;
-
-  @Column({ name: 'first_name', length: 100 })
-  firstName: string;
-
-  @Column({ name: 'last_name', length: 100 })
-  lastName: string;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
@@ -42,9 +29,6 @@ export class User {
   @Column({ name: 'role_id' })
   roleId: number;
 
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  @Column({ name: 'user_detail_id', nullable: true })
+  userDetailId: string;
 }

@@ -20,17 +20,20 @@ A Warehouse Management System (WMS) built with NestJS following Clean Architectu
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd be-wms-nest
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Create a `.env` file in the root directory with the following content:
+
 ```env
 # Database Configuration
 DB_HOST=localhost
@@ -48,6 +51,7 @@ PORT=3000
 ```
 
 4. Start the application:
+
 ```bash
 # Development
 npm run start:dev

@@ -8,7 +8,9 @@ import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity
 export class MasterWarehouseService {
   constructor(private readonly repository: MasterWarehouseRepository) {}
 
-  async create(createMasterWarehouseDto: CreateMasterWarehouseDto): Promise<MasterWarehouse> {
+  async create(
+    createMasterWarehouseDto: CreateMasterWarehouseDto,
+  ): Promise<MasterWarehouse> {
     return await this.repository.create(createMasterWarehouseDto);
   }
 
@@ -24,12 +26,20 @@ export class MasterWarehouseService {
     return warehouse;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse[]> {
+  async findByOrganizationId(
+    organization_id: number,
+  ): Promise<MasterWarehouse[]> {
     return await this.repository.findByOrganizationId(organization_id);
   }
 
-  async update(id: string, updateMasterWarehouseDto: UpdateMasterWarehouseDto): Promise<MasterWarehouse> {
-    const updatedWarehouse = await this.repository.update(id, updateMasterWarehouseDto);
+  async update(
+    id: string,
+    updateMasterWarehouseDto: UpdateMasterWarehouseDto,
+  ): Promise<MasterWarehouse> {
+    const updatedWarehouse = await this.repository.update(
+      id,
+      updateMasterWarehouseDto,
+    );
     if (!updatedWarehouse) {
       throw new NotFoundException(`Warehouse with ID ${id} not found`);
     }

@@ -12,7 +12,9 @@ export class MasterSupplierRepository {
     private readonly repository: Repository<MasterSupplier>,
   ) {}
 
-  async create(createMasterSupplierDto: CreateMasterSupplierDto): Promise<MasterSupplier> {
+  async create(
+    createMasterSupplierDto: CreateMasterSupplierDto,
+  ): Promise<MasterSupplier> {
     const supplier = this.repository.create(createMasterSupplierDto);
     return await this.repository.save(supplier);
   }
@@ -29,15 +31,22 @@ export class MasterSupplierRepository {
     return supplier;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterSupplier | null> {
-    const supplier = await this.repository.findOne({ where: { organization_id } });
+  async findByOrganizationId(
+    organization_id: number,
+  ): Promise<MasterSupplier | null> {
+    const supplier = await this.repository.findOne({
+      where: { organization_id },
+    });
     if (!supplier) {
       return null;
     }
     return supplier;
   }
 
-  async update(id: string, updateMasterSupplierDto: UpdateMasterSupplierDto): Promise<MasterSupplier | null> {
+  async update(
+    id: string,
+    updateMasterSupplierDto: UpdateMasterSupplierDto,
+  ): Promise<MasterSupplier | null> {
     const supplier = await this.findOne(id);
     if (!supplier) {
       throw new NotFoundException('Supplier not found');

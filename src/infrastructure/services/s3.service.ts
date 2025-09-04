@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -19,16 +24,19 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  IS3Service, 
-  S3FileMetadata, 
-  S3UploadOptions, 
-  S3DownloadOptions, 
-  S3ListOptions, 
-  S3CopyOptions, 
-  S3PresignedUrlOptions 
+import {
+  IS3Service,
+  S3FileMetadata,
+  S3UploadOptions,
+  S3DownloadOptions,
+  S3ListOptions,
+  S3CopyOptions,
+  S3PresignedUrlOptions,
 } from '../../core/domain/interfaces/s3.service.interface';
-import { S3Config, S3ServiceConfig } from '../../core/domain/interfaces/s3.config.interface';
+import {
+  S3Config,
+  S3ServiceConfig,
+} from '../../core/domain/interfaces/s3.config.interface';
 
 @Injectable()
 export class S3Service implements IS3Service {
@@ -36,29 +44,72 @@ export class S3Service implements IS3Service {
   private readonly logger = new Logger(S3Service.name);
   private readonly config: S3Config;
 
-  constructor(
-    private readonly configService: ConfigService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     this.config = this.loadConfig();
     this.s3Client = this.createS3Client();
   }
 
   private loadConfig(): S3Config {
     const config: S3Config = {
-      region: this.configService.get<string>('AWS_REGION') || this.configService.get<string>('aws_region') || 'us-east-1',
-      accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID') || this.configService.get<string>('aws_access_key_id') || '',
-      secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY') || this.configService.get<string>('aws_secret_access_key') || this.configService.get<string>('secret_key') || '',
-      endpoint: this.configService.get<string>('AWS_S3_ENDPOINT') || this.configService.get<string>('aws_s3_endpoint'),
-      forcePathStyle: this.configService.get<boolean>('AWS_S3_FORCE_PATH_STYLE') || this.configService.get<boolean>('aws_s3_force_path_style') || false,
-      maxRetries: this.configService.get<number>('AWS_S3_MAX_RETRIES') || this.configService.get<number>('aws_s3_max_retries') || 3,
-      requestTimeout: this.configService.get<number>('AWS_S3_REQUEST_TIMEOUT') || this.configService.get<number>('aws_s3_request_timeout') || 30000,
-      defaultBucket: this.configService.get<string>('AWS_S3_DEFAULT_BUCKET') || this.configService.get<string>('aws_s3_default_bucket'),
-      defaultAcl: this.configService.get<'private' | 'public-read' | 'public-read-write' | 'authenticated-read'>('AWS_S3_DEFAULT_ACL') || this.configService.get<'private' | 'public-read' | 'public-read-write' | 'authenticated-read'>('aws_s3_default_acl') || 'private',
-      defaultExpiresIn: this.configService.get<number>('AWS_S3_DEFAULT_EXPIRES_IN') || this.configService.get<number>('aws_s3_default_expires_in') || 3600,
-      allowedFileTypes: this.configService.get<string[]>('AWS_S3_ALLOWED_FILE_TYPES') || this.configService.get<string[]>('aws_s3_allowed_file_types') || ['*'],
-      maxFileSize: this.configService.get<number>('AWS_S3_MAX_FILE_SIZE') || this.configService.get<number>('aws_s3_max_file_size') || 100 * 1024 * 1024, // 100MB
-      enableLogging: this.configService.get<boolean>('AWS_S3_ENABLE_LOGGING') || this.configService.get<boolean>('aws_s3_enable_logging') || true,
-      enableMetrics: this.configService.get<boolean>('AWS_S3_ENABLE_METRICS') || this.configService.get<boolean>('aws_s3_enable_metrics') || false,
+      region:
+        this.configService.get<string>('AWS_REGION') ||
+        this.configService.get<string>('aws_region') ||
+        'us-east-1',
+      accessKeyId:
+        this.configService.get<string>('AWS_ACCESS_KEY_ID') ||
+        this.configService.get<string>('aws_access_key_id') ||
+        '',
+      secretAccessKey:
+        this.configService.get<string>('AWS_SECRET_ACCESS_KEY') ||
+        this.configService.get<string>('aws_secret_access_key') ||
+        this.configService.get<string>('secret_key') ||
+        '',
+      endpoint:
+        this.configService.get<string>('AWS_S3_ENDPOINT') ||
+        this.configService.get<string>('aws_s3_endpoint'),
+      forcePathStyle:
+        this.configService.get<boolean>('AWS_S3_FORCE_PATH_STYLE') ||
+        this.configService.get<boolean>('aws_s3_force_path_style') ||
+        false,
+      maxRetries:
+        this.configService.get<number>('AWS_S3_MAX_RETRIES') ||
+        this.configService.get<number>('aws_s3_max_retries') ||
+        3,
+      requestTimeout:
+        this.configService.get<number>('AWS_S3_REQUEST_TIMEOUT') ||
+        this.configService.get<number>('aws_s3_request_timeout') ||
+        30000,
+      defaultBucket:
+        this.configService.get<string>('AWS_S3_DEFAULT_BUCKET') ||
+        this.configService.get<string>('aws_s3_default_bucket'),
+      defaultAcl:
+        this.configService.get<
+          'private' | 'public-read' | 'public-read-write' | 'authenticated-read'
+        >('AWS_S3_DEFAULT_ACL') ||
+        this.configService.get<
+          'private' | 'public-read' | 'public-read-write' | 'authenticated-read'
+        >('aws_s3_default_acl') ||
+        'private',
+      defaultExpiresIn:
+        this.configService.get<number>('AWS_S3_DEFAULT_EXPIRES_IN') ||
+        this.configService.get<number>('aws_s3_default_expires_in') ||
+        3600,
+      allowedFileTypes: this.configService.get<string[]>(
+        'AWS_S3_ALLOWED_FILE_TYPES',
+      ) ||
+        this.configService.get<string[]>('aws_s3_allowed_file_types') || ['*'],
+      maxFileSize:
+        this.configService.get<number>('AWS_S3_MAX_FILE_SIZE') ||
+        this.configService.get<number>('aws_s3_max_file_size') ||
+        100 * 1024 * 1024, // 100MB
+      enableLogging:
+        this.configService.get<boolean>('AWS_S3_ENABLE_LOGGING') ||
+        this.configService.get<boolean>('aws_s3_enable_logging') ||
+        true,
+      enableMetrics:
+        this.configService.get<boolean>('AWS_S3_ENABLE_METRICS') ||
+        this.configService.get<boolean>('aws_s3_enable_metrics') ||
+        false,
     };
 
     // Configuration can be overridden by extending the service or using environment variables
@@ -89,7 +140,11 @@ export class S3Service implements IS3Service {
     return new S3Client(clientConfig);
   }
 
-  private log(level: 'log' | 'error' | 'warn' | 'debug', message: string, context?: any): void {
+  private log(
+    level: 'log' | 'error' | 'warn' | 'debug',
+    message: string,
+    context?: any,
+  ): void {
     if (this.config.enableLogging) {
       this.logger[level](message, context);
     }
@@ -109,15 +164,27 @@ export class S3Service implements IS3Service {
 
   private validateFileSize(size: number): void {
     if (this.config.maxFileSize && size > this.config.maxFileSize) {
-      throw new BadRequestException(`File size ${size} exceeds maximum allowed size ${this.config.maxFileSize}`);
+      throw new BadRequestException(
+        `File size ${size} exceeds maximum allowed size ${this.config.maxFileSize}`,
+      );
     }
   }
 
   private validateFileType(contentType: string): void {
-    if (this.config.allowedFileTypes && this.config.allowedFileTypes.length > 0 && !this.config.allowedFileTypes.includes('*')) {
+    if (
+      this.config.allowedFileTypes &&
+      this.config.allowedFileTypes.length > 0 &&
+      !this.config.allowedFileTypes.includes('*')
+    ) {
       const fileType = contentType.split('/')[0];
-      if (!this.config.allowedFileTypes.some(type => type.includes(fileType) || type === contentType)) {
-        throw new BadRequestException(`File type ${contentType} is not allowed`);
+      if (
+        !this.config.allowedFileTypes.some(
+          (type) => type.includes(fileType) || type === contentType,
+        )
+      ) {
+        throw new BadRequestException(
+          `File type ${contentType} is not allowed`,
+        );
       }
     }
   }
@@ -153,7 +220,10 @@ export class S3Service implements IS3Service {
         Expires: options.expires,
       };
 
-      this.log('debug', `Uploading file to S3: ${bucket}/${key}`, { size: fileSize, contentType });
+      this.log('debug', `Uploading file to S3: ${bucket}/${key}`, {
+        size: fileSize,
+        contentType,
+      });
 
       const command = new PutObjectCommand(uploadParams);
       const result = await this.s3Client.send(command);
@@ -168,7 +238,9 @@ export class S3Service implements IS3Service {
         url: this.getFileUrl(bucket, key),
       };
 
-      this.log('log', `File uploaded successfully: ${bucket}/${key}`, { etag: metadata.etag });
+      this.log('log', `File uploaded successfully: ${bucket}/${key}`, {
+        etag: metadata.etag,
+      });
       return metadata;
     } catch (error) {
       this.log('error', `Failed to upload file: ${bucket}/${key}`, error);
@@ -210,7 +282,9 @@ export class S3Service implements IS3Service {
       }
 
       const buffer = Buffer.concat(chunks);
-      this.log('log', `File downloaded successfully: ${bucket}/${key}`, { size: buffer.length });
+      this.log('log', `File downloaded successfully: ${bucket}/${key}`, {
+        size: buffer.length,
+      });
       return buffer;
     } catch (error) {
       this.log('error', `Failed to download file: ${bucket}/${key}`, error);
@@ -246,7 +320,11 @@ export class S3Service implements IS3Service {
 
       return result.Body as Readable;
     } catch (error) {
-      this.log('error', `Failed to download file as stream: ${bucket}/${key}`, error);
+      this.log(
+        'error',
+        `Failed to download file as stream: ${bucket}/${key}`,
+        error,
+      );
       throw error;
     }
   }
@@ -295,16 +373,29 @@ export class S3Service implements IS3Service {
         MetadataDirective: options.metadata ? 'REPLACE' : 'COPY',
       };
 
-      this.log('debug', `Copying file in S3: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`);
+      this.log(
+        'debug',
+        `Copying file in S3: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`,
+      );
 
       const command = new CopyObjectCommand(copyParams);
       const result = await this.s3Client.send(command);
 
-      const metadata = await this.getFileMetadata(destinationBucket, destinationKey);
-      this.log('log', `File copied successfully: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`);
+      const metadata = await this.getFileMetadata(
+        destinationBucket,
+        destinationKey,
+      );
+      this.log(
+        'log',
+        `File copied successfully: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`,
+      );
       return metadata;
     } catch (error) {
-      this.log('error', `Failed to copy file: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`, error);
+      this.log(
+        'error',
+        `Failed to copy file: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`,
+        error,
+      );
       throw error;
     }
   }
@@ -317,12 +408,25 @@ export class S3Service implements IS3Service {
     options: S3CopyOptions = {},
   ): Promise<S3FileMetadata> {
     try {
-      const metadata = await this.copyFile(sourceBucket, sourceKey, destinationBucket, destinationKey, options);
+      const metadata = await this.copyFile(
+        sourceBucket,
+        sourceKey,
+        destinationBucket,
+        destinationKey,
+        options,
+      );
       await this.deleteFile(sourceBucket, sourceKey);
-      this.log('log', `File moved successfully: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`);
+      this.log(
+        'log',
+        `File moved successfully: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`,
+      );
       return metadata;
     } catch (error) {
-      this.log('error', `Failed to move file: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`, error);
+      this.log(
+        'error',
+        `Failed to move file: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`,
+        error,
+      );
       throw error;
     }
   }
@@ -387,12 +491,14 @@ export class S3Service implements IS3Service {
         ContinuationToken: options.continuationToken,
       };
 
-      this.log('debug', `Listing files from S3: ${bucket}`, { prefix: options.prefix });
+      this.log('debug', `Listing files from S3: ${bucket}`, {
+        prefix: options.prefix,
+      });
 
       const command = new ListObjectsV2Command(listParams);
       const result = await this.s3Client.send(command);
 
-      const files: S3FileMetadata[] = (result.Contents || []).map(item => ({
+      const files: S3FileMetadata[] = (result.Contents || []).map((item) => ({
         key: item.Key || '',
         bucket,
         size: item.Size || 0,
@@ -432,7 +538,8 @@ export class S3Service implements IS3Service {
       this.validateBucketNameInternal(bucket);
       this.validateKeyNameInternal(key);
 
-      const expiresIn = options.expiresIn || this.config.defaultExpiresIn || 3600;
+      const expiresIn =
+        options.expiresIn || this.config.defaultExpiresIn || 3600;
 
       const command = new PutObjectCommand({
         Bucket: bucket,
@@ -446,7 +553,11 @@ export class S3Service implements IS3Service {
       this.log('log', `Generated presigned upload URL: ${bucket}/${key}`);
       return url;
     } catch (error) {
-      this.log('error', `Failed to generate presigned upload URL: ${bucket}/${key}`, error);
+      this.log(
+        'error',
+        `Failed to generate presigned upload URL: ${bucket}/${key}`,
+        error,
+      );
       throw error;
     }
   }
@@ -460,7 +571,8 @@ export class S3Service implements IS3Service {
       this.validateBucketNameInternal(bucket);
       this.validateKeyNameInternal(key);
 
-      const expiresIn = options.expiresIn || this.config.defaultExpiresIn || 3600;
+      const expiresIn =
+        options.expiresIn || this.config.defaultExpiresIn || 3600;
 
       const command = new GetObjectCommand({
         Bucket: bucket,
@@ -475,7 +587,11 @@ export class S3Service implements IS3Service {
       this.log('log', `Generated presigned download URL: ${bucket}/${key}`);
       return url;
     } catch (error) {
-      this.log('error', `Failed to generate presigned download URL: ${bucket}/${key}`, error);
+      this.log(
+        'error',
+        `Failed to generate presigned download URL: ${bucket}/${key}`,
+        error,
+      );
       throw error;
     }
   }
@@ -498,10 +614,17 @@ export class S3Service implements IS3Service {
       });
 
       const results = await Promise.all(uploadPromises);
-      this.log('log', `Successfully uploaded ${results.length} files to S3: ${bucket}`);
+      this.log(
+        'log',
+        `Successfully uploaded ${results.length} files to S3: ${bucket}`,
+      );
       return results;
     } catch (error) {
-      this.log('error', `Failed to upload multiple files to S3: ${bucket}`, error);
+      this.log(
+        'error',
+        `Failed to upload multiple files to S3: ${bucket}`,
+        error,
+      );
       throw error;
     }
   }
@@ -517,9 +640,16 @@ export class S3Service implements IS3Service {
       });
 
       await Promise.all(deletePromises);
-      this.log('log', `Successfully deleted ${keys.length} files from S3: ${bucket}`);
+      this.log(
+        'log',
+        `Successfully deleted ${keys.length} files from S3: ${bucket}`,
+      );
     } catch (error) {
-      this.log('error', `Failed to delete multiple files from S3: ${bucket}`, error);
+      this.log(
+        'error',
+        `Failed to delete multiple files from S3: ${bucket}`,
+        error,
+      );
       throw error;
     }
   }
@@ -534,7 +664,9 @@ export class S3Service implements IS3Service {
   validateBucketName(bucket: string): boolean {
     // S3 bucket naming rules
     const bucketRegex = /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/;
-    return bucketRegex.test(bucket) && bucket.length >= 3 && bucket.length <= 63;
+    return (
+      bucketRegex.test(bucket) && bucket.length >= 3 && bucket.length <= 63
+    );
   }
 
   validateKeyName(key: string): boolean {

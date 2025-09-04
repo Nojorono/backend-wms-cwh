@@ -1,10 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity('m_supplier')
-export class MasterSupplier {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class MasterSupplier extends BaseEntity {
   @Column({ nullable: true })
   organization_id: number;
 
@@ -28,10 +26,4 @@ export class MasterSupplier {
 
   @Column({ nullable: true })
   supplier_email: string;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
 }

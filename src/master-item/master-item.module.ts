@@ -8,10 +8,7 @@ import { MasterItemRepository } from './master-item.repository';
 @Module({
   imports: [TypeOrmModule.forFeature([MasterItem])],
   controllers: [MasterItemController],
-  providers: [
-    MasterItemService,
-    MasterItemRepository,
-  ],
+  providers: [MasterItemService, MasterItemRepository],
   exports: [MasterItemService],
 })
-export class MasterItemModule {} 
+export class MasterItemModule {}

@@ -21,4 +21,4 @@ export class CreateMasterIODto {
   @IsString()
   @IsOptional()
   address?: string;
-} 
+}

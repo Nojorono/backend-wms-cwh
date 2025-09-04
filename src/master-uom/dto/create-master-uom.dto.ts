@@ -10,7 +10,10 @@ export class CreateMasterUomDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'Unit of measurement for counting items', required: false })
+  @ApiProperty({
+    example: 'Unit of measurement for counting items',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   description?: string;
@@ -19,4 +22,4 @@ export class CreateMasterUomDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
-} 
+}

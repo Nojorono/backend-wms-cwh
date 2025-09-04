@@ -14,4 +14,4 @@ import { MasterClassificationItemRepository } from './master-classification-item
   ],
   exports: [MasterClassificationItemService],
 })
-export class MasterClassificationItemModule {} 
+export class MasterClassificationItemModule {}

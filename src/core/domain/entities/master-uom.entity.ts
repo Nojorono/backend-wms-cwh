@@ -1,10 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity('m_uom')
-export class MasterUom {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class MasterUom extends BaseEntity {
   @Column({ unique: true })
   code: string;
 
@@ -16,10 +14,4 @@ export class MasterUom {
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
-} 
+}

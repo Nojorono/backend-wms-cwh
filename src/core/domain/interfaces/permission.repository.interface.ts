@@ -8,7 +8,10 @@ export interface IPermissionRepository {
   findByMenuId(menuId: number): Promise<Permission[]>;
   findMenuByRoleId(roleId: number): Promise<{ menus: any[] }>;
   create(permission: Partial<Permission>): Promise<Permission>;
-  update(id: number, permission: Partial<Permission>): Promise<Permission | null>;
+  update(
+    id: number,
+    permission: Partial<Permission>,
+  ): Promise<Permission | null>;
   delete(id: number): Promise<boolean>;
   deleteByRoleId(roleId: number): Promise<boolean>;
-} 
+}

@@ -29,7 +29,9 @@ async function seed() {
   const permissionRepo = AppDataSource.getRepository(Permission);
 
   // Check if user already exists
-  const existing = await userRepo.findOne({ where: { username: 'superadmin' } });
+  const existing = await userRepo.findOne({
+    where: { username: 'superadmin' },
+  });
   if (existing) {
     console.log('User superadmin already exists');
     await AppDataSource.destroy();
@@ -79,8 +81,6 @@ async function seed() {
     password: hashed,
     role: role,
     roleId: role.id,
-    firstName: 'Super',
-    lastName: 'Admin',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),

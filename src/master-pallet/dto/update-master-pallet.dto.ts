@@ -31,4 +31,4 @@ export class UpdateMasterPalletDto {
   @IsString()
   @IsOptional()
   barcode_image_url?: string;
-} 
+}

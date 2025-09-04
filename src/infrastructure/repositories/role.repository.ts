@@ -12,22 +12,22 @@ export class RoleRepository implements IRoleRepository {
   ) {}
 
   async findAll(): Promise<Role[]> {
-    return this.repository.find({ 
-      relations: ['permissions', 'permissions.menu'] 
+    return this.repository.find({
+      relations: ['permissions', 'permissions.menu'],
     });
   }
 
   async findById(id: number): Promise<Role | null> {
-    return this.repository.findOne({ 
-      where: { id }, 
-      relations: ['permissions', 'permissions.menu'] 
+    return this.repository.findOne({
+      where: { id },
+      relations: ['permissions', 'permissions.menu'],
     });
   }
 
   async findByName(name: string): Promise<Role | null> {
-    return this.repository.findOne({ 
-      where: { name }, 
-      relations: ['permissions', 'permissions.menu'] 
+    return this.repository.findOne({
+      where: { name },
+      relations: ['permissions', 'permissions.menu'],
     });
   }
 
@@ -45,4 +45,4 @@ export class RoleRepository implements IRoleRepository {
     const result = await this.repository.delete(id);
     return result;
   }
-} 
+}

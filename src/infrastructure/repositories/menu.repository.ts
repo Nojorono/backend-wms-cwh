@@ -69,4 +69,4 @@ export class MenuRepository implements IMenuRepository {
       order: { order: 'ASC' },
     });
   }
-} 
+}

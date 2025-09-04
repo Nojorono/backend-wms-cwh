@@ -29,7 +29,9 @@ export class MasterItemRepository {
     return item;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterItem | null> {
+  async findByOrganizationId(
+    organization_id: number,
+  ): Promise<MasterItem | null> {
     const item = await this.repository.findOne({ where: { organization_id } });
     if (!item) {
       return null;
@@ -45,7 +47,10 @@ export class MasterItemRepository {
     return item;
   }
 
-  async update(id: string, updateMasterItemDto: UpdateMasterItemDto): Promise<MasterItem | null> {
+  async update(
+    id: string,
+    updateMasterItemDto: UpdateMasterItemDto,
+  ): Promise<MasterItem | null> {
     const item = await this.findOne(id);
     if (!item) {
       throw new NotFoundException('Item not found');

@@ -14,10 +14,14 @@ export class UpdateRoleDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ description: 'Array of permissions', type: [PermissionDto], required: false })
+  @ApiProperty({
+    description: 'Array of permissions',
+    type: [PermissionDto],
+    required: false,
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PermissionDto)
   permissions?: PermissionDto[];
-} 
+}

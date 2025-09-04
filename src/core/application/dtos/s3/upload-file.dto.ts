@@ -1,4 +1,13 @@
-import { IsString, IsOptional, IsObject, IsEnum, IsDateString, IsNumber, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsObject,
+  IsEnum,
+  IsDateString,
+  IsNumber,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class S3UploadOptionsDto {
@@ -12,9 +21,9 @@ export class S3UploadOptionsDto {
   @IsObject()
   metadata?: Record<string, string>;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Access control level',
-    enum: ['private', 'public-read', 'public-read-write', 'authenticated-read']
+    enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'],
   })
   @IsOptional()
   @IsEnum(['private', 'public-read', 'public-read-write', 'authenticated-read'])
@@ -45,9 +54,9 @@ export class UploadFileDto {
   @IsString()
   contentType?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Access control level',
-    enum: ['private', 'public-read', 'public-read-write', 'authenticated-read']
+    enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'],
   })
   @IsOptional()
   @IsEnum(['private', 'public-read', 'public-read-write', 'authenticated-read'])
@@ -63,9 +72,9 @@ export class UploadMultipleFilesDto {
   @IsString()
   bucket: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Array of files to upload',
-    type: [Object]
+    type: [Object],
   })
   files: Array<{
     key: string;
@@ -122,7 +131,11 @@ export class CopyFileDto {
   @IsOptional()
   options?: {
     metadata?: Record<string, string>;
-    acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
+    acl?:
+      | 'private'
+      | 'public-read'
+      | 'public-read-write'
+      | 'authenticated-read';
   };
 }
 
@@ -141,7 +154,11 @@ export class ListFilesDto {
   @IsString()
   delimiter?: string;
 
-  @ApiPropertyOptional({ description: 'Maximum number of keys to return', minimum: 1, maximum: 1000 })
+  @ApiPropertyOptional({
+    description: 'Maximum number of keys to return',
+    minimum: 1,
+    maximum: 1000,
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
@@ -163,7 +180,11 @@ export class PresignedUrlDto {
   @IsString()
   key: string;
 
-  @ApiPropertyOptional({ description: 'Expiration time in seconds', minimum: 1, maximum: 604800 })
+  @ApiPropertyOptional({
+    description: 'Expiration time in seconds',
+    minimum: 1,
+    maximum: 604800,
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
@@ -180,8 +201,10 @@ export class PresignedUrlDto {
   @IsString()
   responseContentType?: string;
 
-  @ApiPropertyOptional({ description: 'Response content disposition for download' })
+  @ApiPropertyOptional({
+    description: 'Response content disposition for download',
+  })
   @IsOptional()
   @IsString()
   responseContentDisposition?: string;
-} 
+}

@@ -1,10 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity('m_classification_item')
-export class MasterClassificationItem {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class MasterClassificationItem extends BaseEntity {
   @Column({ nullable: true })
   classification_name: string;
 
@@ -13,10 +11,4 @@ export class MasterClassificationItem {
 
   @Column({ nullable: true })
   classification_description: string;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
-} 
+}

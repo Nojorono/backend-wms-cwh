@@ -18,6 +18,7 @@ import { UserModule } from './users/user.module';
 import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
+import { InboundModule } from './inbound/inbound.module';
 
 @Module({
   imports: [
@@ -33,7 +34,9 @@ import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehous
         username: configService.get('DB_USERNAME', 'postgres'),
         password: configService.get('DB_PASSWORD', 'postgres'),
         database: configService.get('DB_DATABASE', 'wms_db'),
-        entities: [join(__dirname, 'core', 'domain', 'entities', '*.entity.{ts,js}')],
+        entities: [
+          join(__dirname, 'core', 'domain', 'entities', '*.entity.{ts,js}'),
+        ],
         synchronize: false,
       }),
       inject: [ConfigService],
@@ -46,12 +49,13 @@ import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehous
     MasterUomModule,
     MasterPalletModule,
     MasterIOModule,
-    MasterWarehouseModule,  
+    MasterWarehouseModule,
     MasterWarehouseSubModule,
     MasterWarehouseBinModule,
     MasterSupplierModule,
     MasterItemModule,
     MasterClassificationItemModule,
+    InboundModule,
   ],
   providers: [
     {

@@ -14,7 +14,17 @@ export default new DataSource({
   username: configService.get('DB_USERNAME'),
   password: configService.get('DB_PASSWORD'),
   database: configService.get('DB_DATABASE'),
-  entities: [join(__dirname, '..', '..', 'core', 'domain', 'entities', '*.entity.{ts,js}')],
+  entities: [
+    join(
+      __dirname,
+      '..',
+      '..',
+      'core',
+      'domain',
+      'entities',
+      '*.entity.{ts,js}',
+    ),
+  ],
   migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
   synchronize: false,
-}); 
+});

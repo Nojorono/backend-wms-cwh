@@ -25,7 +25,9 @@ export class Role {
   @Column({ default: true })
   isActive: boolean;
 
-  @OneToMany(() => Permission, (permission) => permission.role, { cascade: true })
+  @OneToMany(() => Permission, (permission) => permission.role, {
+    cascade: true,
+  })
   permissions: Permission[];
 
   @OneToMany(() => User, (user: User) => user.role, { lazy: true })

@@ -8,10 +8,7 @@ import { MasterWarehouseRepository } from './master-warehouse.repository';
 @Module({
   imports: [TypeOrmModule.forFeature([MasterWarehouse])],
   controllers: [MasterWarehouseController],
-  providers: [
-    MasterWarehouseService,
-    MasterWarehouseRepository,
-  ],
+  providers: [MasterWarehouseService, MasterWarehouseRepository],
   exports: [MasterWarehouseService],
 })
-export class MasterWarehouseModule {} 
+export class MasterWarehouseModule {}

@@ -21,7 +21,7 @@ export class MasterUomRepository {
     return await this.repository.find();
   }
 
-  async findOne(id: number): Promise<MasterUom | null> {
+  async findOne(id: string): Promise<MasterUom | null> {
     const uom = await this.repository.findOne({ where: { id } });
     if (!uom) {
       return null;
@@ -37,7 +37,10 @@ export class MasterUomRepository {
     return uom;
   }
 
-  async update(id: number, updateMasterUomDto: UpdateMasterUomDto): Promise<MasterUom | null> {
+  async update(
+    id: string,
+    updateMasterUomDto: UpdateMasterUomDto,
+  ): Promise<MasterUom | null> {
     const uom = await this.findOne(id);
     if (!uom) {
       throw new NotFoundException('UOM not found');
@@ -46,7 +49,7 @@ export class MasterUomRepository {
     return await this.findOne(id);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     const uom = await this.findOne(id);
     if (!uom) {
       throw new NotFoundException('UOM not found');

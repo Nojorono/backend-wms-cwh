@@ -12,7 +12,9 @@ export class MasterWarehouseSubService {
     private readonly barcodeService: BarcodeService,
   ) {}
 
-  async create(createMasterWarehouseSubDto: CreateMasterWarehouseSubDto): Promise<MasterWarehouseSub> {
+  async create(
+    createMasterWarehouseSubDto: CreateMasterWarehouseSubDto,
+  ): Promise<MasterWarehouseSub> {
     const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
       bcid: 'code128',
       text: createMasterWarehouseSubDto.code || '',
@@ -24,10 +26,12 @@ export class MasterWarehouseSubService {
       extension: 'png',
       acl: 'public-read',
       metadata: {
-        organization_id: createMasterWarehouseSubDto.organization_id?.toString() || '',
+        organization_id:
+          createMasterWarehouseSubDto.organization_id?.toString() || '',
         warehouse_sub_id: createMasterWarehouseSubDto.code || '',
         warehouse_sub_name: createMasterWarehouseSubDto.name || '',
-        warehouse_sub_capacity_bin: createMasterWarehouseSubDto.capacity_bin?.toString() || '',
+        warehouse_sub_capacity_bin:
+          createMasterWarehouseSubDto.capacity_bin?.toString() || '',
       },
     });
     createMasterWarehouseSubDto.barcode_image_url = barcodeImageUrl.url;
@@ -46,7 +50,9 @@ export class MasterWarehouseSubService {
     return warehouseSub;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseSub[]> {
+  async findByOrganizationId(
+    organization_id: number,
+  ): Promise<MasterWarehouseSub[]> {
     return await this.repository.findByOrganizationId(organization_id);
   }
 
@@ -54,33 +60,49 @@ export class MasterWarehouseSubService {
     return await this.repository.findByWarehouseId(warehouse_id);
   }
 
-  async update(id: string, updateMasterWarehouseSubDto: UpdateMasterWarehouseSubDto): Promise<MasterWarehouseSub> {
+  async update(
+    id: string,
+    updateMasterWarehouseSubDto: UpdateMasterWarehouseSubDto,
+  ): Promise<MasterWarehouseSub> {
     const warehouseSub = await this.findOne(id);
     if (!warehouseSub) {
       throw new NotFoundException(`Warehouse with ID ${id} not found`);
     }
-    if (updateMasterWarehouseSubDto.code || updateMasterWarehouseSubDto.name || updateMasterWarehouseSubDto.capacity_bin) {
-      await this.barcodeService.deleteBarcodeImage(warehouseSub.barcode_image_url);
-      const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
-        bcid: 'code128',
-        text: updateMasterWarehouseSubDto.code || '',
-        scale: 3,
-        height: 100,
-        width: 200,
-        bucket: 'wms',
-        prefix: 'warehouse-sub',
-        extension: 'png',
-        acl: 'public-read',
-        metadata: {
-          organization_id: updateMasterWarehouseSubDto.organization_id?.toString() || '',
-          warehouse_sub_id: updateMasterWarehouseSubDto.code || '',
-          warehouse_sub_name: updateMasterWarehouseSubDto.name || '',
-          warehouse_sub_capacity_bin: updateMasterWarehouseSubDto.capacity_bin?.toString() || '',
+    if (
+      updateMasterWarehouseSubDto.code ||
+      updateMasterWarehouseSubDto.name ||
+      updateMasterWarehouseSubDto.capacity_bin
+    ) {
+      await this.barcodeService.deleteBarcodeImage(
+        warehouseSub.barcode_image_url,
+      );
+      const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode(
+        {
+          bcid: 'code128',
+          text: updateMasterWarehouseSubDto.code || '',
+          scale: 3,
+          height: 100,
+          width: 200,
+          bucket: 'wms',
+          prefix: 'warehouse-sub',
+          extension: 'png',
+          acl: 'public-read',
+          metadata: {
+            organization_id:
+              updateMasterWarehouseSubDto.organization_id?.toString() || '',
+            warehouse_sub_id: updateMasterWarehouseSubDto.code || '',
+            warehouse_sub_name: updateMasterWarehouseSubDto.name || '',
+            warehouse_sub_capacity_bin:
+              updateMasterWarehouseSubDto.capacity_bin?.toString() || '',
+          },
         },
-      });
+      );
       updateMasterWarehouseSubDto.barcode_image_url = barcodeImageUrl.url;
     }
-    const updatedWarehouseSub = await this.repository.update(id, updateMasterWarehouseSubDto);
+    const updatedWarehouseSub = await this.repository.update(
+      id,
+      updateMasterWarehouseSubDto,
+    );
     if (!updatedWarehouseSub) {
       throw new NotFoundException(`Warehouse with ID ${id} not found`);
     }

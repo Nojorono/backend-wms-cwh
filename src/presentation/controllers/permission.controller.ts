@@ -1,5 +1,19 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { PermissionService } from '../../infrastructure/services/permission.service';
 import { PermissionDto } from '../../core/application/dtos/permission/create-permission.dto';
 
@@ -71,4 +85,4 @@ export class PermissionController {
   async removeByRoleId(@Param('roleId') roleId: string) {
     return this.permissionService.deleteByRoleId(+roleId);
   }
-} 
+}

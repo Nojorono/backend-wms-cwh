@@ -11,4 +11,4 @@ export interface IMenuRepository {
   update(id: number, menu: Partial<Menu>): Promise<Menu>;
   delete(id: number): Promise<void>;
   findChildren(parentId: number): Promise<Menu[]>;
-} 
+}

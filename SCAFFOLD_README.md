@@ -38,6 +38,7 @@ node generate-scaffold.js <moduleName> <entityName> [fields...]
 ```
 
 **Example:**
+
 ```bash
 node generate-scaffold.js masterProduct Product name:string:Product Name,price:number:100.00
 ```
@@ -49,6 +50,7 @@ node generate-advanced-scaffold.js <moduleName> <entityName> [fields...]
 ```
 
 **Example:**
+
 ```bash
 node generate-advanced-scaffold.js masterProduct Product name:string:Product Name,price:number:100.00,isActive:boolean:true
 ```
@@ -58,11 +60,13 @@ node generate-advanced-scaffold.js masterProduct Product name:string:Product Nam
 Fields are specified in the format: `name:type:example`
 
 ### Supported Types:
+
 - `string` - Text fields
-- `number` - Numeric fields  
+- `number` - Numeric fields
 - `boolean` - Boolean fields
 
 ### Examples:
+
 ```bash
 # Simple module with no fields
 node generate-advanced-scaffold.js masterCategory Category
@@ -77,44 +81,53 @@ node generate-advanced-scaffold.js masterOrder Order orderNumber:string:ORD-001,
 ## 📄 Generated Files
 
 ### 1. Entity (`src/core/domain/entities/[EntityName].entity.ts`)
+
 - TypeORM entity with UUID primary key
 - Timestamps (created_at, updated_at)
 - All fields as nullable columns
 
 ### 2. DTOs (`src/[moduleName]/dto/`)
+
 - `create-[moduleName].dto.ts` - Create DTO with validation
 - `update-[moduleName].dto.ts` - Update DTO extending create DTO
 
 ### 3. Repository (`src/[moduleName]/[moduleName].repository.ts`)
+
 - CRUD operations
 - TypeORM integration
 - Error handling
 
 ### 4. Service (`src/[moduleName]/[moduleName].service.ts`)
+
 - Business logic layer
 - Error handling with proper HTTP exceptions
 - Repository integration
 
 ### 5. Controller (`src/[moduleName]/[moduleName].controller.ts`)
+
 - REST API endpoints
 - Swagger documentation
 - JWT authentication decorators
 
 ### 6. Module (`src/[moduleName]/[moduleName].module.ts`)
+
 - NestJS module configuration
 - TypeORM feature registration
 - Dependency injection setup
 
 ### 7. Migration (`src/infrastructure/database/migrations/`)
+
 - Database table creation
 - Proper column types
 - Timestamps
 
 ### 8. Interface (`src/core/domain/interfaces/[moduleName].repository.interface.ts`)
+
 - Repository interface for dependency injection
 - Clean architecture compliance
 
 ### 9. Test Spec (`src/[moduleName]/[moduleName].service.spec.ts`)
+
 - Unit test template
 - Mock repository setup
 - Test cases for all CRUD operations
@@ -134,20 +147,24 @@ DELETE /[moduleName]/:id - Delete record
 ## 🚀 Next Steps After Generation
 
 1. **Review Generated Files**
+
    - Check entity fields and relationships
    - Update validation rules in DTOs
    - Add business logic to service
 
 2. **Database Migration**
+
    ```bash
    npm run migration:run
    ```
 
 3. **Test API Endpoints**
+
    - Use Swagger UI at `/api`
    - Test with Postman or similar tool
 
 4. **Add Custom Logic**
+
    - Implement specific business rules
    - Add relationships between entities
    - Implement custom queries
@@ -159,6 +176,7 @@ DELETE /[moduleName]/:id - Delete record
 ## 🔧 Customization
 
 ### Adding Relationships
+
 Edit the entity file to add relationships:
 
 ```typescript
@@ -170,6 +188,7 @@ orderItems: OrderItem[];
 ```
 
 ### Adding Custom Validation
+
 Update DTO files with custom validation:
 
 ```typescript
@@ -184,6 +203,7 @@ price: number;
 ```
 
 ### Adding Custom Queries
+
 Extend the repository with custom methods:
 
 ```typescript
@@ -195,16 +215,19 @@ async findByCategory(categoryId: string): Promise<Product[]> {
 ## 📝 Examples
 
 ### Generate a Product Module
+
 ```bash
 node generate-advanced-scaffold.js masterProduct Product name:string:Product Name,price:number:100.00,description:string:Product description,isActive:boolean:true
 ```
 
 ### Generate a Category Module
+
 ```bash
 node generate-advanced-scaffold.js masterCategory Category name:string:Electronics,description:string:Electronic products
 ```
 
 ### Generate a User Module
+
 ```bash
 node generate-advanced-scaffold.js masterUser User email:string:user@example.com,firstName:string:John,lastName:string:Doe,isActive:boolean:true
 ```
@@ -232,6 +255,7 @@ node generate-advanced-scaffold.js masterUser User email:string:user@example.com
 4. **Type errors**: Check TypeScript configuration
 
 ### Debug Commands:
+
 ```bash
 # Check generated files
 ls -la src/[moduleName]/
@@ -253,4 +277,4 @@ npm run start:dev
 
 ---
 
-**Happy Scaffolding! 🚀** 
+**Happy Scaffolding! 🚀**

@@ -8,10 +8,7 @@ import { MasterSupplierRepository } from './master-supplier.repository';
 @Module({
   imports: [TypeOrmModule.forFeature([MasterSupplier])],
   controllers: [MasterSupplierController],
-  providers: [
-    MasterSupplierService,
-    MasterSupplierRepository,
-  ],
+  providers: [MasterSupplierService, MasterSupplierRepository],
   exports: [MasterSupplierService],
 })
-export class MasterSupplierModule {} 
+export class MasterSupplierModule {}

@@ -8,10 +8,7 @@ import { MasterIORepository } from './master-io.repository';
 @Module({
   imports: [TypeOrmModule.forFeature([MasterIO])],
   controllers: [MasterIOController],
-  providers: [
-    MasterIOService,
-    MasterIORepository,
-  ],
+  providers: [MasterIOService, MasterIORepository],
   exports: [MasterIOService],
 })
-export class MasterIOModule {} 
+export class MasterIOModule {}

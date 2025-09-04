@@ -126,10 +126,7 @@ export interface IS3Service {
     }>,
   ): Promise<S3FileMetadata[]>;
 
-  deleteMultipleFiles(
-    bucket: string,
-    keys: string[],
-  ): Promise<void>;
+  deleteMultipleFiles(bucket: string, keys: string[]): Promise<void>;
 
   // Utility methods
   generateUniqueKey(prefix?: string, extension?: string): string;
@@ -137,4 +134,4 @@ export interface IS3Service {
   validateBucketName(bucket: string): boolean;
 
   validateKeyName(key: string): boolean;
-} 
+}

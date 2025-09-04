@@ -1,4 +1,12 @@
-import { IsNotEmpty, IsString, IsNumber, IsOptional, IsBoolean, IsEnum, IsObject } from "class-validator";
+import {
+  IsNotEmpty,
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsBoolean,
+  IsEnum,
+  IsObject,
+} from 'class-validator';
 
 export class CreateBarcodeDto {
   @IsNotEmpty()

@@ -1,10 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateTableRole1710330000002 implements MigrationInterface {
-    name = 'CreateTableRole1710330000002'
+  name = 'CreateTableRole1710330000002';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             CREATE TABLE "roles" (
                 "id" SERIAL PRIMARY KEY,
                 "name" varchar NOT NULL UNIQUE,
@@ -14,13 +14,13 @@ export class CreateTableRole1710330000002 implements MigrationInterface {
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now()
             );
         `);
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE UNIQUE INDEX "IDX_roles_name" ON "roles" ("name");
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP INDEX "IDX_roles_name"`);
-        await queryRunner.query(`DROP TABLE "roles"`);
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX "IDX_roles_name"`);
+    await queryRunner.query(`DROP TABLE "roles"`);
+  }
 }

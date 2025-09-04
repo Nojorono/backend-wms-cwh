@@ -1,10 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity('m_item')
-export class MasterItem {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class MasterItem extends BaseEntity {
   @Column({ nullable: true })
   sku: string;
 
@@ -34,10 +32,4 @@ export class MasterItem {
 
   @Column({ nullable: true })
   organization_id: number;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
-} 
+}

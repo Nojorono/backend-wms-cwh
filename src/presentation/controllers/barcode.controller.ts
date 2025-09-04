@@ -1,9 +1,25 @@
-import { Controller, Post, UploadedFile, UseInterceptors, Body, BadRequestException, HttpCode, HttpStatus } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiResponse } from "@nestjs/swagger";
+import {
+  Controller,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+  Body,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+  ApiBody,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { BarcodeService } from "src/infrastructure/services/barcode.service";
+import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 import { Express } from 'express';
-import { CreateBarcodeDto } from "src/core/application/dtos/barcode/create-barcode.dto";
+import { CreateBarcodeDto } from 'src/core/application/dtos/barcode/create-barcode.dto';
 
 class UploadBarcodeImageDto {
   // Add more fields as needed for barcode metadata
@@ -19,9 +35,7 @@ class UploadBarcodeImageDto {
 @Controller('barcode')
 @ApiBearerAuth('JWT-auth')
 export class BarcodeController {
-  constructor(
-    private readonly barcodeService: BarcodeService,
-  ) {}
+  constructor(private readonly barcodeService: BarcodeService) {}
 
   @Post('upload')
   @ApiOperation({ summary: 'Upload a barcode image to S3' })
@@ -35,13 +49,25 @@ export class BarcodeController {
         prefix: { type: 'string', example: 'barcode-images' },
         extension: { type: 'string', example: 'png' },
         contentType: { type: 'string', example: 'image/png' },
-        acl: { type: 'string', enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'], example: 'private' },
+        acl: {
+          type: 'string',
+          enum: [
+            'private',
+            'public-read',
+            'public-read-write',
+            'authenticated-read',
+          ],
+          example: 'private',
+        },
         metadata: { type: 'object', additionalProperties: { type: 'string' } },
       },
       required: ['file'],
     },
   })
-  @ApiResponse({ status: 201, description: 'Barcode image uploaded successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Barcode image uploaded successfully',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
@@ -84,13 +110,25 @@ export class BarcodeController {
         bucket: { type: 'string', example: 'my-bucket' },
         prefix: { type: 'string', example: 'barcode-images' },
         extension: { type: 'string', example: 'png' },
-        acl: { type: 'string', enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'], example: 'private' },
+        acl: {
+          type: 'string',
+          enum: [
+            'private',
+            'public-read',
+            'public-read-write',
+            'authenticated-read',
+          ],
+          example: 'private',
+        },
         metadata: { type: 'object', additionalProperties: { type: 'string' } },
       },
       required: ['bcid', 'text'],
     },
   })
-  @ApiResponse({ status: 201, description: 'Barcode image generated and uploaded successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Barcode image generated and uploaded successfully',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @HttpCode(HttpStatus.CREATED)
   async generateAndStoreBarcode(@Body() body: CreateBarcodeDto) {

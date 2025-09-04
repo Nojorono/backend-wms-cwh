@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { MasterIORepository } from './master-io.repository';
 import { CreateMasterIODto } from './dto/create-master-io.dto';
 import { UpdateMasterIODto } from './dto/update-master-io.dto';
@@ -13,9 +18,12 @@ export class MasterIOService {
     if (!organizationId) {
       throw new BadRequestException('Organization ID is required');
     }
-    const existingIO = await this.repository.findByOrganizationId(organizationId);
+    const existingIO =
+      await this.repository.findByOrganizationId(organizationId);
     if (existingIO) {
-      throw new ConflictException(`IO with code ${createMasterIODto.organization_id} already exists`);
+      throw new ConflictException(
+        `IO with code ${createMasterIODto.organization_id} already exists`,
+      );
     }
     return await this.repository.create(createMasterIODto);
   }
@@ -32,12 +40,22 @@ export class MasterIOService {
     return io;
   }
 
-  async update(id: string, updateMasterIODto: UpdateMasterIODto): Promise<MasterIO> {
+  async update(
+    id: string,
+    updateMasterIODto: UpdateMasterIODto,
+  ): Promise<MasterIO> {
     const io = await this.findOne(id);
-    if (updateMasterIODto.organization_id && updateMasterIODto.organization_id !== io.organization_id) {
-      const existingIO = await this.repository.findByOrganizationId(updateMasterIODto.organization_id);
+    if (
+      updateMasterIODto.organization_id &&
+      updateMasterIODto.organization_id !== io.organization_id
+    ) {
+      const existingIO = await this.repository.findByOrganizationId(
+        updateMasterIODto.organization_id,
+      );
       if (existingIO) {
-        throw new ConflictException(`IO with code ${updateMasterIODto.organization_id} already exists`);
+        throw new ConflictException(
+          `IO with code ${updateMasterIODto.organization_id} already exists`,
+        );
       }
     }
     const updatedIO = await this.repository.update(id, updateMasterIODto);

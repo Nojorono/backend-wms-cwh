@@ -7,4 +7,4 @@ export interface IRoleRepository {
   create(role: Partial<Role>): Promise<Role>;
   update(id: number, role: Partial<Role>): Promise<Role | null>;
   delete(id: number): Promise<boolean>;
-} 
+}

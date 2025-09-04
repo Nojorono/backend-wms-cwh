@@ -41,4 +41,4 @@ export class CreateMasterSupplierDto {
   @IsString()
   @IsOptional()
   supplier_email?: string;
-} 
+}

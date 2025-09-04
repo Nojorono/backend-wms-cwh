@@ -12,8 +12,12 @@ export class MasterClassificationItemRepository {
     private readonly repository: Repository<MasterClassificationItem>,
   ) {}
 
-  async create(createMasterClassificationItemDto: CreateMasterClassificationItemDto): Promise<MasterClassificationItem> {
-    const classificationItem = this.repository.create(createMasterClassificationItemDto);
+  async create(
+    createMasterClassificationItemDto: CreateMasterClassificationItemDto,
+  ): Promise<MasterClassificationItem> {
+    const classificationItem = this.repository.create(
+      createMasterClassificationItemDto,
+    );
     return await this.repository.save(classificationItem);
   }
 
@@ -29,15 +33,22 @@ export class MasterClassificationItemRepository {
     return classificationItem;
   }
 
-  async findByCode(classification_code: string): Promise<MasterClassificationItem | null> {
-    const classificationItem = await this.repository.findOne({ where: { classification_code } });
+  async findByCode(
+    classification_code: string,
+  ): Promise<MasterClassificationItem | null> {
+    const classificationItem = await this.repository.findOne({
+      where: { classification_code },
+    });
     if (!classificationItem) {
       return null;
     }
     return classificationItem;
   }
 
-  async update(id: string, updateMasterClassificationItemDto: UpdateMasterClassificationItemDto): Promise<MasterClassificationItem | null> {
+  async update(
+    id: string,
+    updateMasterClassificationItemDto: UpdateMasterClassificationItemDto,
+  ): Promise<MasterClassificationItem | null> {
     const classificationItem = await this.findOne(id);
     if (!classificationItem) {
       throw new NotFoundException('Classification Item not found');

@@ -1,4 +1,9 @@
-import { Injectable, Inject, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { IRoleRepository } from '../../core/domain/interfaces/role.repository.interface';
 import { IPermissionRepository } from '../../core/domain/interfaces/permission.repository.interface';
 import { Role } from '../../core/domain/entities/role.entity';
@@ -17,15 +22,15 @@ export class RoleService {
   private mapRoleWithMenuActions(role: Role): any {
     // Create a map of menus with their actions from permissions
     const menuMap = new Map<number, any>();
-    
+
     // Process permissions to build menus with actions
     for (const permission of role.permissions || []) {
       if (permission.menu) {
         const menuId = permission.menu.id;
-        
+
         if (!menuMap.has(menuId)) {
           // Initialize menu if not exists
-          menuMap.set(menuId, { 
+          menuMap.set(menuId, {
             id: permission.menu.id,
             name: permission.menu.name,
             path: permission.menu.path,
@@ -34,18 +39,18 @@ export class RoleService {
             order: permission.menu.order,
             createdAt: permission.menu.createdAt,
             updatedAt: permission.menu.updatedAt,
-            actions: [] 
+            actions: [],
           });
         }
-        
+
         // Add action to the menu
         menuMap.get(menuId).actions.push(permission.action);
       }
     }
-    
+
     // Convert map to array
     const menus = Array.from(menuMap.values());
-    
+
     // Return role with mapped menus
     return {
       id: role.id,
@@ -54,13 +59,13 @@ export class RoleService {
       isActive: role.isActive,
       menus,
       createdAt: role.createdAt,
-      updatedAt: role.updatedAt
+      updatedAt: role.updatedAt,
     };
   }
 
   async findAll(): Promise<any[]> {
     const roles = await this.roleRepository.findAll();
-    return roles.map(role => this.mapRoleWithMenuActions(role));
+    return roles.map((role) => this.mapRoleWithMenuActions(role));
   }
 
   async findById(id: number): Promise<any> {
@@ -80,9 +85,13 @@ export class RoleService {
   }
 
   async create(createRoleDto: CreateRoleDto): Promise<any> {
-    const existingRole = await this.roleRepository.findByName(createRoleDto.name);
+    const existingRole = await this.roleRepository.findByName(
+      createRoleDto.name,
+    );
     if (existingRole) {
-      throw new ConflictException(`Role with name ${createRoleDto.name} already exists`);
+      throw new ConflictException(
+        `Role with name ${createRoleDto.name} already exists`,
+      );
     }
 
     // Create the role
@@ -93,7 +102,7 @@ export class RoleService {
 
     // Create permissions for each menu
     if (createRoleDto.permissions?.length) {
-      const menuIds = createRoleDto.permissions.map(p => p.menu_id);
+      const menuIds = createRoleDto.permissions.map((p) => p.menu_id);
 
       // Create permissions
       for (const permission of createRoleDto.permissions) {
@@ -145,4 +154,4 @@ export class RoleService {
       throw new NotFoundException(`Role with ID ${id} not found`);
     }
   }
-} 
+}

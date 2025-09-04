@@ -1,10 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
 
 @Entity('m_warehouse_bin')
-export class MasterWarehouseBin {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class MasterWarehouseBin extends BaseEntity {
   @Column({ nullable: true, name: 'organization_id' })
   organization_id: number;
 
@@ -25,10 +23,4 @@ export class MasterWarehouseBin {
 
   @Column({ nullable: true, name: 'barcode_image_url' })
   barcode_image_url: string;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
-} 
+}

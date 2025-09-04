@@ -14,7 +14,6 @@ if (args.length < 2) {
 const moduleName = args[0];
 const entityName = args[1];
 
-
 const generator = new ScaffoldGenerator();
 generator.generateScaffold(moduleName, entityName);
 
@@ -25,4 +24,4 @@ console.log('Next steps:');
 console.log('1. Review the generated files');
 console.log('2. Update the entity fields as needed');
 console.log('3. Create database migration if required');
-console.log('4. Test the API endpoints'); 
+console.log('4. Test the API endpoints');

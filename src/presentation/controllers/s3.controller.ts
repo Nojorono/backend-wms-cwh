@@ -15,9 +15,19 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { Inject } from '@nestjs/common';
-import { IS3Service, S3_SERVICE_TOKEN } from '../../core/domain/interfaces/s3.service.interface';
+import {
+  IS3Service,
+  S3_SERVICE_TOKEN,
+} from '../../core/domain/interfaces/s3.service.interface';
 import {
   UploadFileDto,
   UploadMultipleFilesDto,
@@ -51,10 +61,15 @@ export class S3Controller {
           format: 'binary',
         },
         contentType: { type: 'string', example: 'text/plain' },
-        acl: { 
-          type: 'string', 
-          enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'],
-          example: 'private'
+        acl: {
+          type: 'string',
+          enum: [
+            'private',
+            'public-read',
+            'public-read-write',
+            'authenticated-read',
+          ],
+          example: 'private',
         },
       },
       required: ['bucket', 'key', 'file'],
@@ -68,7 +83,7 @@ export class S3Controller {
     @Body() uploadDto: UploadFileDto,
   ) {
     if (!file) {
-      throw new BadRequestException('No file provided');    
+      throw new BadRequestException('No file provided');
     }
 
     const metadata = await this.s3Service.uploadFile(
@@ -76,11 +91,16 @@ export class S3Controller {
       uploadDto.key,
       file.buffer,
       {
-        contentType: uploadDto.contentType || uploadDto.options?.contentType || file.mimetype,
+        contentType:
+          uploadDto.contentType ||
+          uploadDto.options?.contentType ||
+          file.mimetype,
         acl: uploadDto.acl || uploadDto.options?.acl,
         metadata: uploadDto.options?.metadata,
         cacheControl: uploadDto.options?.cacheControl,
-        expires: uploadDto.options?.expires ? new Date(uploadDto.options.expires) : undefined,
+        expires: uploadDto.options?.expires
+          ? new Date(uploadDto.options.expires)
+          : undefined,
       },
     );
 
@@ -102,7 +122,8 @@ export class S3Controller {
   ) {
     const fileBuffer = await this.s3Service.downloadFile(bucket, key, {
       responseContentType: downloadDto.options?.responseContentType,
-      responseContentDisposition: downloadDto.options?.responseContentDisposition,
+      responseContentDisposition:
+        downloadDto.options?.responseContentDisposition,
       responseCacheControl: downloadDto.options?.responseCacheControl,
     });
 
@@ -120,7 +141,10 @@ export class S3Controller {
 
   @Get('metadata/:bucket/*path')
   @ApiOperation({ summary: 'Get file metadata from S3' })
-  @ApiResponse({ status: 200, description: 'File metadata retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'File metadata retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'File not found' })
   async getFileMetadata(
     @Param('bucket') bucket: string,
@@ -137,7 +161,10 @@ export class S3Controller {
 
   @Get('exists/:bucket/*path')
   @ApiOperation({ summary: 'Check if file exists in S3' })
-  @ApiResponse({ status: 200, description: 'File existence checked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'File existence checked successfully',
+  })
   async fileExists(
     @Param('bucket') bucket: string,
     @Param('path') key: string,
@@ -214,7 +241,10 @@ export class S3Controller {
 
   @Post('presigned-upload-url')
   @ApiOperation({ summary: 'Generate presigned upload URL' })
-  @ApiResponse({ status: 200, description: 'Presigned upload URL generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned upload URL generated successfully',
+  })
   async generatePresignedUploadUrl(@Body() presignedDto: PresignedUrlDto) {
     const url = await this.s3Service.generatePresignedUploadUrl(
       presignedDto.bucket,
@@ -234,7 +264,10 @@ export class S3Controller {
 
   @Post('presigned-download-url')
   @ApiOperation({ summary: 'Generate presigned download URL' })
-  @ApiResponse({ status: 200, description: 'Presigned download URL generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned download URL generated successfully',
+  })
   async generatePresignedDownloadUrl(@Body() presignedDto: PresignedUrlDto) {
     const url = await this.s3Service.generatePresignedDownloadUrl(
       presignedDto.bucket,
@@ -271,7 +304,10 @@ export class S3Controller {
 
   @Post('generate-key')
   @ApiOperation({ summary: 'Generate a unique file key' })
-  @ApiResponse({ status: 200, description: 'Unique key generated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Unique key generated successfully',
+  })
   async generateUniqueKey(
     @Body() body: { prefix?: string; extension?: string },
   ) {
@@ -283,4 +319,4 @@ export class S3Controller {
       message: 'Unique key generated successfully',
     };
   }
-} 
+}

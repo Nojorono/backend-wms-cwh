@@ -22,7 +22,7 @@ export class AuthService implements IAuthService {
     if (!user) {
       return null;
     }
-    if (user && await bcrypt.compare(password, user.password)) {
+    if (user && (await bcrypt.compare(password, user.password))) {
       return user;
     }
     return null;
@@ -40,4 +40,4 @@ export class AuthService implements IAuthService {
       throw new UnauthorizedException('Invalid token');
     }
   }
-} 
+}
