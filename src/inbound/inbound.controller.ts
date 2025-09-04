@@ -1,19 +1,21 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiExtraModels, ApiBody } from '@nestjs/swagger';
 import { InboundService } from './inbound.service';
-import { CreateInboundDto } from './dto/create-inbound.dto';
+import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './dto/create-inbound.dto';
 import { UpdateInboundDto } from './dto/update-inbound.dto';
 import { Inbound } from '../core/domain/entities/inbound.entity';
 
 @ApiTags('Inbound')
 @Controller('inbound')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(CreateInboundDoDto, CreateInboundItemDto)
 export class InboundController {
   constructor(private readonly service: InboundService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create inbound with optional DOs and Items' })
   @ApiResponse({ status: 201, type: Inbound })
+  @ApiBody({ type: CreateInboundDto })
   create(@Body() dto: CreateInboundDto) {
     return this.service.create(dto);
   }
@@ -35,6 +37,7 @@ export class InboundController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update inbound fields' })
   @ApiResponse({ status: 200, type: Inbound })
+  @ApiBody({ type: UpdateInboundDto })
   update(@Param('id') id: string, @Body() dto: UpdateInboundDto) {
     return this.service.update(id, dto);
   }
