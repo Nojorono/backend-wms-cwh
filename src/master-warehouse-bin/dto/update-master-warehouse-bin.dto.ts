@@ -17,12 +17,18 @@ export class UpdateMasterWarehouseBinDto {
   @IsOptional()
   code?: string;
 
-  @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
+  @ApiProperty({
+    example: 'Primary warehouse for storing inventory',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
+  @ApiProperty({
+    example: 'Primary warehouse for storing inventory',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   description?: string;
@@ -36,4 +42,4 @@ export class UpdateMasterWarehouseBinDto {
   @IsString()
   @IsOptional()
   barcode_image_url?: string;
-} 
+}

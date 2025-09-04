@@ -1,5 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { MasterSupplierService } from './master-supplier.service';
 import { CreateMasterSupplierDto } from './dto/create-master-supplier.dto';
 import { UpdateMasterSupplierDto } from './dto/update-master-supplier.dto';
@@ -13,22 +27,37 @@ export class MasterSupplierController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new Supplier' })
-  @ApiResponse({ status: 201, description: 'The Supplier has been successfully created.', type: MasterSupplier })
-  @ApiResponse({ status: 409, description: 'Supplier with this code already exists.' })
+  @ApiResponse({
+    status: 201,
+    description: 'The Supplier has been successfully created.',
+    type: MasterSupplier,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Supplier with this code already exists.',
+  })
   create(@Body() createMasterSupplierDto: CreateMasterSupplierDto) {
     return this.masterSupplierService.create(createMasterSupplierDto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all UOMs' })
-  @ApiResponse({ status: 200, description: 'Return all Suppliers.', type: [MasterSupplier] })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all Suppliers.',
+    type: [MasterSupplier],
+  })
   findAll() {
     return this.masterSupplierService.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a Supplier by id' })
-  @ApiResponse({ status: 200, description: 'Return the Supplier.', type: MasterSupplier })
+  @ApiResponse({
+    status: 200,
+    description: 'Return the Supplier.',
+    type: MasterSupplier,
+  })
   @ApiResponse({ status: 404, description: 'Supplier not found.' })
   findOne(@Param('id') id: string) {
     return this.masterSupplierService.findOne(id);
@@ -36,9 +65,16 @@ export class MasterSupplierController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a Supplier' })
-  @ApiResponse({ status: 200, description: 'The Supplier has been successfully updated.', type: MasterSupplier })
+  @ApiResponse({
+    status: 200,
+    description: 'The Supplier has been successfully updated.',
+    type: MasterSupplier,
+  })
   @ApiResponse({ status: 404, description: 'Supplier not found.' })
-  @ApiResponse({ status: 409, description: 'Supplier with this code already exists.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Supplier with this code already exists.',
+  })
   update(
     @Param('id') id: string,
     @Body() updateMasterSupplierDto: UpdateMasterSupplierDto,
@@ -48,9 +84,12 @@ export class MasterSupplierController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a Supplier' })
-  @ApiResponse({ status: 200, description: 'The Supplier has been successfully deleted.' })
+  @ApiResponse({
+    status: 200,
+    description: 'The Supplier has been successfully deleted.',
+  })
   @ApiResponse({ status: 404, description: 'Supplier not found.' })
   remove(@Param('id') id: string) {
     return this.masterSupplierService.remove(id);
   }
-} 
+}

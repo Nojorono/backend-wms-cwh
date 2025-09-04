@@ -34,8 +34,14 @@ export class PermissionService {
     return this.permissionRepository.create(createPermissionDto);
   }
 
-  async update(id: number, updatePermissionDto: Partial<PermissionDto>): Promise<Permission> {
-    const permission = await this.permissionRepository.update(id, updatePermissionDto);
+  async update(
+    id: number,
+    updatePermissionDto: Partial<PermissionDto>,
+  ): Promise<Permission> {
+    const permission = await this.permissionRepository.update(
+      id,
+      updatePermissionDto,
+    );
     if (!permission) {
       throw new NotFoundException(`Permission with ID ${id} not found`);
     }
@@ -55,4 +61,4 @@ export class PermissionService {
       throw new NotFoundException(`No permissions found for role ID ${roleId}`);
     }
   }
-} 
+}

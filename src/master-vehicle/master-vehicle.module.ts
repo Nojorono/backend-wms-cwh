@@ -8,10 +8,7 @@ import { MasterVehicleRepository } from './master-vehicle.repository';
 @Module({
   imports: [TypeOrmModule.forFeature([MasterVehicle])],
   controllers: [MasterVehicleController],
-  providers: [
-    MasterVehicleService,
-    MasterVehicleRepository,
-  ],
+  providers: [MasterVehicleService, MasterVehicleRepository],
   exports: [MasterVehicleService],
 })
-export class MasterVehicleModule {} 
+export class MasterVehicleModule {}

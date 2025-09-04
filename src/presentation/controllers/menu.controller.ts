@@ -1,5 +1,19 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { MenuService } from '../../infrastructure/services/menu.service';
 import { CreateMenuDto } from '../../core/application/dtos/menu/create-menu.dto';
 import { UpdateMenuDto } from '../../core/application/dtos/menu/update-menu.dto';
@@ -15,15 +29,23 @@ export class MenuController {
   @Get('parent')
   @Public()
   @ApiOperation({ summary: 'Get all parent menu items' })
-  @ApiResponse({ status: 200, description: 'Return all parent menu items', type: [Menu] })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all parent menu items',
+    type: [Menu],
+  })
   async findAllParent(): Promise<Menu[]> {
     return this.menuService.findAllParent();
   }
-  
+
   @Get()
   @Public()
   @ApiOperation({ summary: 'Get all menu items' })
-  @ApiResponse({ status: 200, description: 'Return all menu items', type: [Menu] })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all menu items',
+    type: [Menu],
+  })
   async findAll(): Promise<Menu[]> {
     return this.menuService.findAll();
   }
@@ -31,7 +53,11 @@ export class MenuController {
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get menu item by ID' })
-  @ApiResponse({ status: 200, description: 'Return menu item by ID', type: Menu })
+  @ApiResponse({
+    status: 200,
+    description: 'Return menu item by ID',
+    type: Menu,
+  })
   @ApiResponse({ status: 404, description: 'Menu item not found' })
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<Menu> {
     return this.menuService.findById(id);
@@ -39,7 +65,11 @@ export class MenuController {
 
   @Post()
   @ApiOperation({ summary: 'Create new menu item' })
-  @ApiResponse({ status: 201, description: 'Menu item created successfully', type: Menu })
+  @ApiResponse({
+    status: 201,
+    description: 'Menu item created successfully',
+    type: Menu,
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async create(@Body() createMenuDto: CreateMenuDto): Promise<Menu> {
     return this.menuService.create(createMenuDto);
@@ -47,7 +77,11 @@ export class MenuController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Update menu item' })
-  @ApiResponse({ status: 200, description: 'Menu item updated successfully', type: Menu })
+  @ApiResponse({
+    status: 200,
+    description: 'Menu item updated successfully',
+    type: Menu,
+  })
   @ApiResponse({ status: 404, description: 'Menu item not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async update(
@@ -65,4 +99,4 @@ export class MenuController {
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.menuService.delete(id);
   }
-} 
+}

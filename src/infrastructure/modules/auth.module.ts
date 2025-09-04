@@ -41,4 +41,4 @@ import { Permission } from 'src/core/domain/entities/permission.entity';
   ],
   exports: [AuthService, JwtStrategy, PassportModule],
 })
-export class AuthModule {} 
+export class AuthModule {}

@@ -18,4 +18,4 @@ import { MENU_REPOSITORY } from 'src/core/domain/interfaces/menu.repository.inte
   ],
   exports: [MenuService],
 })
-export class MenuModule {} 
+export class MenuModule {}

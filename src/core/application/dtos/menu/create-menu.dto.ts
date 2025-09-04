@@ -25,4 +25,4 @@ export class CreateMenuDto {
   @Min(0)
   @IsOptional()
   order?: number;
-} 
+}

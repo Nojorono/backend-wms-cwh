@@ -3,7 +3,6 @@ import { BaseEntity } from './base.entity';
 
 @Entity('m_vehicle')
 export class MasterVehicle extends BaseEntity {
-
   @Column()
   vehicle_type: string;
 
@@ -12,4 +11,4 @@ export class MasterVehicle extends BaseEntity {
 
   @Column({ name: 'is_active', default: true })
   is_active: boolean;
-} 
+}

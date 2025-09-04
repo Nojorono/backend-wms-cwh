@@ -2,7 +2,6 @@ import { IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateMasterClassificationItemDto {
-
   @ApiProperty({ example: 'Classification Name', required: false })
   @IsString()
   @IsOptional()
@@ -17,4 +16,4 @@ export class CreateMasterClassificationItemDto {
   @IsString()
   @IsOptional()
   classification_description?: string;
-} 
+}

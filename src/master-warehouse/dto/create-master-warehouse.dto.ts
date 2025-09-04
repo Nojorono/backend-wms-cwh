@@ -12,8 +12,11 @@ export class CreateMasterWarehouseDto {
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
+  @ApiProperty({
+    example: 'Primary warehouse for storing inventory',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   description?: string;
-} 
+}

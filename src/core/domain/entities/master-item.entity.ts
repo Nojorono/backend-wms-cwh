@@ -3,7 +3,6 @@ import { BaseEntity } from './base.entity';
 
 @Entity('m_item')
 export class MasterItem extends BaseEntity {
-
   @Column({ nullable: true })
   sku: string;
 
@@ -33,4 +32,4 @@ export class MasterItem extends BaseEntity {
 
   @Column({ nullable: true })
   organization_id: number;
-} 
+}

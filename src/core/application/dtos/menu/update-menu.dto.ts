@@ -27,4 +27,4 @@ export class UpdateMenuDto {
   @Min(0)
   @IsOptional()
   order?: number;
-} 
+}

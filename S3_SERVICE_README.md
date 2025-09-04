@@ -67,14 +67,17 @@ AWS_SECRET_ACCESS_KEY=minioadmin
 ```typescript
 // Upload file
 const metadata = await s3Service.uploadFile(
-  'my-bucket', 
-  'uploads/file.txt', 
+  'my-bucket',
+  'uploads/file.txt',
   fileBuffer,
-  { contentType: 'text/plain', acl: 'private' }
+  { contentType: 'text/plain', acl: 'private' },
 );
 
 // Download file
-const fileBuffer = await s3Service.downloadFile('my-bucket', 'uploads/file.txt');
+const fileBuffer = await s3Service.downloadFile(
+  'my-bucket',
+  'uploads/file.txt',
+);
 
 // Delete file
 await s3Service.deleteFile('my-bucket', 'uploads/file.txt');
@@ -85,21 +88,21 @@ await s3Service.deleteFile('my-bucket', 'uploads/file.txt');
 ```typescript
 // Generate presigned upload URL
 const uploadUrl = await s3Service.generatePresignedUploadUrl(
-  'my-bucket', 
+  'my-bucket',
   'uploads/file.jpg',
-  { expiresIn: 3600, contentType: 'image/jpeg' }
+  { expiresIn: 3600, contentType: 'image/jpeg' },
 );
 
 // List files with pagination
 const result = await s3Service.listFiles('my-bucket', {
   prefix: 'uploads/',
-  maxKeys: 100
+  maxKeys: 100,
 });
 
 // Batch operations
 const files = [
   { key: 'file1.txt', file: buffer1 },
-  { key: 'file2.jpg', file: buffer2 }
+  { key: 'file2.jpg', file: buffer2 },
 ];
 const results = await s3Service.uploadMultipleFiles('my-bucket', files);
 ```
@@ -125,4 +128,4 @@ The service includes comprehensive error handling with proper HTTP status codes 
 
 The service is fully testable with unit tests and integration tests for all operations.
 
-For more detailed documentation, see the inline code comments and TypeScript interfaces. 
+For more detailed documentation, see the inline code comments and TypeScript interfaces.

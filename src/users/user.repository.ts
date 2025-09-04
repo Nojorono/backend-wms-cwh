@@ -42,7 +42,10 @@ export class UserRepository {
   }
 
   async findOneWithDeleted(id: string): Promise<User | null> {
-    const user = await this.repository.findOne({ where: { id }, withDeleted: true });
+    const user = await this.repository.findOne({
+      where: { id },
+      withDeleted: true,
+    });
     if (!user) {
       return null;
     }

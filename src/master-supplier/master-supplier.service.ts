@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { MasterSupplierRepository } from './master-supplier.repository';
 import { CreateMasterSupplierDto } from './dto/create-master-supplier.dto';
 import { UpdateMasterSupplierDto } from './dto/update-master-supplier.dto';
@@ -8,14 +13,19 @@ import { MasterSupplier } from '../core/domain/entities/master-supplier.entity';
 export class MasterSupplierService {
   constructor(private readonly repository: MasterSupplierRepository) {}
 
-  async create(createMasterSupplierDto: CreateMasterSupplierDto): Promise<MasterSupplier> {
+  async create(
+    createMasterSupplierDto: CreateMasterSupplierDto,
+  ): Promise<MasterSupplier> {
     const organizationId = createMasterSupplierDto.organization_id;
     if (!organizationId) {
       throw new BadRequestException('Organization ID is required');
     }
-    const existingSupplier = await this.repository.findByOrganizationId(organizationId);
+    const existingSupplier =
+      await this.repository.findByOrganizationId(organizationId);
     if (existingSupplier) {
-      throw new ConflictException(`Supplier with code ${createMasterSupplierDto.organization_id} already exists`);
+      throw new ConflictException(
+        `Supplier with code ${createMasterSupplierDto.organization_id} already exists`,
+      );
     }
     return await this.repository.create(createMasterSupplierDto);
   }
@@ -32,15 +42,28 @@ export class MasterSupplierService {
     return supplier;
   }
 
-  async update(id: string, updateMasterSupplierDto: UpdateMasterSupplierDto): Promise<MasterSupplier> {
+  async update(
+    id: string,
+    updateMasterSupplierDto: UpdateMasterSupplierDto,
+  ): Promise<MasterSupplier> {
     const supplier = await this.findOne(id);
-    if (updateMasterSupplierDto.organization_id && updateMasterSupplierDto.organization_id !== supplier.organization_id) {
-      const existingSupplier = await this.repository.findByOrganizationId(updateMasterSupplierDto.organization_id);
+    if (
+      updateMasterSupplierDto.organization_id &&
+      updateMasterSupplierDto.organization_id !== supplier.organization_id
+    ) {
+      const existingSupplier = await this.repository.findByOrganizationId(
+        updateMasterSupplierDto.organization_id,
+      );
       if (existingSupplier) {
-        throw new ConflictException(`Supplier with code ${updateMasterSupplierDto.organization_id} already exists`);
+        throw new ConflictException(
+          `Supplier with code ${updateMasterSupplierDto.organization_id} already exists`,
+        );
       }
     }
-    const updatedSupplier = await this.repository.update(id, updateMasterSupplierDto);
+    const updatedSupplier = await this.repository.update(
+      id,
+      updateMasterSupplierDto,
+    );
     if (!updatedSupplier) {
       throw new NotFoundException(`Supplier with ID ${id} not found`);
     }

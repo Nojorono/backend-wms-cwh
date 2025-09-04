@@ -1,10 +1,10 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateTableUser1750060867607 implements MigrationInterface {
-    name = 'CreateTableUser1750060867607'
+  name = 'CreateTableUser1750060867607';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             CREATE TABLE "users" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "username" varchar(100) NOT NULL UNIQUE,
@@ -19,17 +19,17 @@ export class CreateTableUser1750060867607 implements MigrationInterface {
                 CONSTRAINT "FK_users_role_id" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT
             );
         `);
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE UNIQUE INDEX "IDX_users_username" ON "users" ("username");
         `);
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE INDEX "IDX_users_roleId" ON "users" ("role_id");
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP INDEX "IDX_users_roleId"`);
-        await queryRunner.query(`DROP INDEX "IDX_users_username"`);
-        await queryRunner.query(`DROP TABLE "users"`);
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX "IDX_users_roleId"`);
+    await queryRunner.query(`DROP INDEX "IDX_users_username"`);
+    await queryRunner.query(`DROP TABLE "users"`);
+  }
 }

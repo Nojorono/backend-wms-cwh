@@ -16,4 +16,4 @@ export class UpdateVehicleIODto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
-} 
+}

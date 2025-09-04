@@ -5,4 +5,4 @@ export interface ResponseInterface<T> {
   error?: string;
   timestamp: string;
   path: string;
-} 
+}

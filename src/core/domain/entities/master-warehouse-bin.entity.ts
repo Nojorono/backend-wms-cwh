@@ -3,7 +3,6 @@ import { BaseEntity } from './base.entity';
 
 @Entity('m_warehouse_bin')
 export class MasterWarehouseBin extends BaseEntity {
-
   @Column({ nullable: true, name: 'organization_id' })
   organization_id: number;
 
@@ -24,5 +23,4 @@ export class MasterWarehouseBin extends BaseEntity {
 
   @Column({ nullable: true, name: 'barcode_image_url' })
   barcode_image_url: string;
-
-} 
+}

@@ -18,4 +18,4 @@ import { BarcodeService } from 'src/infrastructure/services/barcode.service';
   ],
   exports: [MasterWarehouseBinService],
 })
-export class MasterWarehouseBinModule {} 
+export class MasterWarehouseBinModule {}

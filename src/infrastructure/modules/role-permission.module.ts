@@ -25,4 +25,4 @@ import { PermissionRepository } from '../repositories/permission.repository';
   ],
   exports: [RoleService, PermissionService],
 })
-export class RolePermissionModule {} 
+export class RolePermissionModule {}

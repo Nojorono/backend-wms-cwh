@@ -8,10 +8,7 @@ import { MasterUomRepository } from './master-uom.repository';
 @Module({
   imports: [TypeOrmModule.forFeature([MasterUom])],
   controllers: [MasterUomController],
-  providers: [
-    MasterUomService,
-    MasterUomRepository,
-  ],
+  providers: [MasterUomService, MasterUomRepository],
   exports: [MasterUomService],
 })
-export class MasterUomModule {} 
+export class MasterUomModule {}

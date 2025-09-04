@@ -1,6 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { S3Service } from "./s3.service";
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { S3Service } from './s3.service';
 import * as bwipjs from 'bwip-js';
 
 @Injectable()
@@ -14,8 +14,9 @@ export class BarcodeService {
     try {
       if (url.includes('s3.amazonaws.com')) {
         const urlObj = new URL(url);
-        const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
-        
+        const pathParts = urlObj.pathname
+          .split('/')
+          .filter((part) => part.length > 0);
 
         if (pathParts.length > 1) {
           const key = pathParts.slice(1).join('/');
@@ -29,13 +30,13 @@ export class BarcodeService {
         const key = keyParts.join('/');
         return key;
       }
-      
+
       const lastSlashIndex = url.lastIndexOf('/');
       if (lastSlashIndex !== -1) {
         const key = url.substring(lastSlashIndex + 1);
         return key;
       }
-      
+
       return url;
     } catch (error) {
       console.error('Error extracting S3 key from URL:', error);
@@ -50,21 +51,24 @@ export class BarcodeService {
     extension?: string;
     bucket?: string;
     metadata?: Record<string, string>;
-    acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
+    acl?:
+      | 'private'
+      | 'public-read'
+      | 'public-read-write'
+      | 'authenticated-read';
   }) {
-    const bucket = params.bucket || this.configService.get<string>('AWS_S3_DEFAULT_BUCKET');
+    const bucket =
+      params.bucket || this.configService.get<string>('AWS_S3_DEFAULT_BUCKET');
     if (!bucket) throw new Error('S3 bucket is required');
-    const key = this.s3Service.generateUniqueKey(params.prefix || 'barcode-images', params.extension);
-    const metadata = await this.s3Service.uploadFile(
-      bucket,
-      key,
-      params.file,
-      {
-        contentType: params.contentType,
-        acl: params.acl,
-        metadata: params.metadata,
-      },
+    const key = this.s3Service.generateUniqueKey(
+      params.prefix || 'barcode-images',
+      params.extension,
     );
+    const metadata = await this.s3Service.uploadFile(bucket, key, params.file, {
+      contentType: params.contentType,
+      acl: params.acl,
+      metadata: params.metadata,
+    });
     return metadata;
   }
 
@@ -75,11 +79,21 @@ export class BarcodeService {
     height?: number;
     width?: number;
     includetext?: boolean;
-    textxalign?: 'center' | 'offleft' | 'left' | 'right' | 'offright' | 'justify';
+    textxalign?:
+      | 'center'
+      | 'offleft'
+      | 'left'
+      | 'right'
+      | 'offright'
+      | 'justify';
     bucket?: string;
     prefix?: string;
     extension?: string;
-    acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
+    acl?:
+      | 'private'
+      | 'public-read'
+      | 'public-read-write'
+      | 'authenticated-read';
     metadata?: Record<string, string>;
   }) {
     // Generate barcode image as PNG buffer
@@ -104,7 +118,10 @@ export class BarcodeService {
     });
   }
 
-  async deleteBarcodeImage(barcodeImageUrl: string, bucket?: string): Promise<void> {
+  async deleteBarcodeImage(
+    barcodeImageUrl: string,
+    bucket?: string,
+  ): Promise<void> {
     // Extract bucket name from URL if not provided
     let s3Bucket = bucket;
     if (!s3Bucket && barcodeImageUrl.includes('s3.amazonaws.com')) {
@@ -113,24 +130,28 @@ export class BarcodeService {
       if (hostname.includes('.s3.')) {
         s3Bucket = hostname.split('.s3.')[0];
       } else {
-        console.log('No bucket provided and URL does not contain s3.amazonaws.com');
+        console.log(
+          'No bucket provided and URL does not contain s3.amazonaws.com',
+        );
       }
     } else if (!s3Bucket) {
-      console.log('No bucket provided and URL does not contain s3.amazonaws.com');
+      console.log(
+        'No bucket provided and URL does not contain s3.amazonaws.com',
+      );
     }
-    
+
     if (!s3Bucket) {
       s3Bucket = this.configService.get<string>('AWS_S3_DEFAULT_BUCKET');
     }
-    
+
     if (!s3Bucket) throw new Error('S3 bucket is required');
-    
+
     let key = this.extractS3KeyFromUrl(barcodeImageUrl);
-    
+
     if (key.startsWith('wms/')) {
       key = key.substring(4);
     }
-    
+
     if (key && key !== barcodeImageUrl) {
       console.log('Proceeding with deletion of key:', key);
       await this.s3Service.deleteFile(s3Bucket, key);
@@ -144,7 +165,9 @@ export class BarcodeService {
    * @param barcodeData - The scanned barcode data (string)
    * @returns Parsed JSON data or null if invalid
    */
-  async scanBarcodeAndReturnJson(barcodeData: string): Promise<Record<string, any> | null> {
+  async scanBarcodeAndReturnJson(
+    barcodeData: string,
+  ): Promise<Record<string, any> | null> {
     try {
       // Try to parse the barcode data as JSON
       const jsonData = JSON.parse(barcodeData);
@@ -169,17 +192,27 @@ export class BarcodeService {
       height?: number;
       width?: number;
       includetext?: boolean;
-      textxalign?: 'center' | 'offleft' | 'left' | 'right' | 'offright' | 'justify';
+      textxalign?:
+        | 'center'
+        | 'offleft'
+        | 'left'
+        | 'right'
+        | 'offright'
+        | 'justify';
       bucket?: string;
       prefix?: string;
       extension?: string;
-      acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
+      acl?:
+        | 'private'
+        | 'public-read'
+        | 'public-read-write'
+        | 'authenticated-read';
       metadata?: Record<string, string>;
-    } = {}
+    } = {},
   ) {
     // Convert JSON to string
     const jsonString = JSON.stringify(jsonData);
-    
+
     return this.generateAndStoreBarcode({
       bcid: options.bcid || 'code128', // Use Code128 for JSON data
       text: jsonString,
@@ -237,7 +270,7 @@ export class BarcodeService {
 
       // Parse the JSON data
       const jsonData = JSON.parse(barcodeData);
-      
+
       return {
         success: true,
         data: jsonData,
@@ -252,4 +285,3 @@ export class BarcodeService {
     }
   }
 }
-    

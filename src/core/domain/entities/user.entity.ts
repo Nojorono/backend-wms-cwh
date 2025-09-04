@@ -1,10 +1,10 @@
-import { 
-  Entity, 
-  Column, 
-  ManyToOne, 
-  JoinColumn, 
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  JoinColumn,
   Index,
-  OneToOne
+  OneToOne,
 } from 'typeorm';
 import { Role } from './role.entity';
 import { BaseEntity } from './base.entity';
@@ -13,7 +13,6 @@ import { BaseEntity } from './base.entity';
 @Index(['username'], { unique: true })
 @Index(['roleId'])
 export class User extends BaseEntity {
-
   @Column({ unique: true, length: 100 })
   username: string;
 

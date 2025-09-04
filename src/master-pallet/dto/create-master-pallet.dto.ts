@@ -30,4 +30,4 @@ export class CreateMasterPalletDto {
   @IsString()
   @IsOptional()
   barcode_image_url?: string;
-} 
+}

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { MasterItemRepository } from './master-item.repository';
 import { CreateMasterItemDto } from './dto/create-master-item.dto';
 import { UpdateMasterItemDto } from './dto/update-master-item.dto';
@@ -15,7 +20,9 @@ export class MasterItemService {
     }
     const existingItem = await this.repository.findBySku(sku);
     if (existingItem) {
-      throw new ConflictException(`Item with SKU ${createMasterItemDto.sku} already exists`);
+      throw new ConflictException(
+        `Item with SKU ${createMasterItemDto.sku} already exists`,
+      );
     }
     return await this.repository.create(createMasterItemDto);
   }
@@ -24,7 +31,7 @@ export class MasterItemService {
     return await this.repository.findAll();
   }
 
-    async findOne(id: string): Promise<MasterItem> {
+  async findOne(id: string): Promise<MasterItem> {
     const item = await this.repository.findOne(id);
     if (!item) {
       throw new NotFoundException(`Item with ID ${id} not found`);
@@ -32,12 +39,19 @@ export class MasterItemService {
     return item;
   }
 
-  async update(id: string, updateMasterItemDto: UpdateMasterItemDto): Promise<MasterItem> {
+  async update(
+    id: string,
+    updateMasterItemDto: UpdateMasterItemDto,
+  ): Promise<MasterItem> {
     const item = await this.findOne(id);
     if (updateMasterItemDto.sku && updateMasterItemDto.sku !== item.sku) {
-      const existingItem = await this.repository.findBySku(updateMasterItemDto.sku);
+      const existingItem = await this.repository.findBySku(
+        updateMasterItemDto.sku,
+      );
       if (existingItem) {
-        throw new ConflictException(`Item with SKU ${updateMasterItemDto.sku} already exists`);
+        throw new ConflictException(
+          `Item with SKU ${updateMasterItemDto.sku} already exists`,
+        );
       }
     }
     const updatedItem = await this.repository.update(id, updateMasterItemDto);

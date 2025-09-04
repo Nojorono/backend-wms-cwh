@@ -3,7 +3,6 @@ import { BaseEntity } from './base.entity';
 
 @Entity('m_uom')
 export class MasterUom extends BaseEntity {
-
   @Column({ unique: true })
   code: string;
 
@@ -15,4 +14,4 @@ export class MasterUom extends BaseEntity {
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
-} 
+}

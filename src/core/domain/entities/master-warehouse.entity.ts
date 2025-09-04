@@ -3,7 +3,6 @@ import { BaseEntity } from './base.entity';
 
 @Entity('m_warehouse')
 export class MasterWarehouse extends BaseEntity {
-
   @Column({ nullable: true })
   organization_id: number;
 
@@ -12,5 +11,4 @@ export class MasterWarehouse extends BaseEntity {
 
   @Column({ nullable: true })
   description: string;
-
-} 
+}

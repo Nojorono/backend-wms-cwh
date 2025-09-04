@@ -51,4 +51,4 @@ export class UpdateMasterItemDto {
   @IsNumber()
   @IsOptional()
   btg_per_bks?: number;
-} 
+}

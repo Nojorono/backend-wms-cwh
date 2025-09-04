@@ -12,7 +12,9 @@ export class MasterWarehouseBinRepository {
     private readonly repository: Repository<MasterWarehouseBin>,
   ) {}
 
-  async create(createMasterWarehouseBinDto: CreateMasterWarehouseBinDto): Promise<MasterWarehouseBin> {
+  async create(
+    createMasterWarehouseBinDto: CreateMasterWarehouseBinDto,
+  ): Promise<MasterWarehouseBin> {
     const warehouseBin = this.repository.create(createMasterWarehouseBinDto);
     return await this.repository.save(warehouseBin);
   }
@@ -29,15 +31,22 @@ export class MasterWarehouseBinRepository {
     return warehouseBin;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseBin[]> {
+  async findByOrganizationId(
+    organization_id: number,
+  ): Promise<MasterWarehouseBin[]> {
     return await this.repository.find({ where: { organization_id } });
   }
 
-  async findByWarehouseSubId(warehouse_sub_id: string): Promise<MasterWarehouseBin[]> {
+  async findByWarehouseSubId(
+    warehouse_sub_id: string,
+  ): Promise<MasterWarehouseBin[]> {
     return await this.repository.find({ where: { warehouse_sub_id } });
   }
 
-  async update(id: string, updateMasterWarehouseBinDto: UpdateMasterWarehouseBinDto): Promise<MasterWarehouseBin | null> {
+  async update(
+    id: string,
+    updateMasterWarehouseBinDto: UpdateMasterWarehouseBinDto,
+  ): Promise<MasterWarehouseBin | null> {
     const warehouseBin = await this.findOne(id);
     if (!warehouseBin) {
       throw new NotFoundException('Warehouse not found');

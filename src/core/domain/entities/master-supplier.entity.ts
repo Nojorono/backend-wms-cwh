@@ -3,7 +3,6 @@ import { BaseEntity } from './base.entity';
 
 @Entity('m_supplier')
 export class MasterSupplier extends BaseEntity {
-
   @Column({ nullable: true })
   organization_id: number;
 

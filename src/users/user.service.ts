@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRepository } from './user.repository';
@@ -17,17 +21,26 @@ export class UserService {
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.repository.findByUsername(createUserDto.username);
+    const existingUser = await this.repository.findByUsername(
+      createUserDto.username,
+    );
     if (existingUser) {
-      throw new ConflictException(`User with username ${createUserDto.username} already exists`);
+      throw new ConflictException(
+        `User with username ${createUserDto.username} already exists`,
+      );
     }
-    
+
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     createUserDto.password = hashedPassword;
-    
+
     const user = await this.repository.create(createUserDto);
-    
-    if (createUserDto.employeeId || createUserDto.email || createUserDto.phone || createUserDto.organizationId) {
+
+    if (
+      createUserDto.employeeId ||
+      createUserDto.email ||
+      createUserDto.phone ||
+      createUserDto.organizationId
+    ) {
       const userDetail = this.userDetailRepository.create({
         userId: user.username,
         employee_id: createUserDto.employeeId || `EMP_${user.username}`,
@@ -35,13 +48,13 @@ export class UserService {
         phone: createUserDto.phone || '0000000000',
         organizationId: createUserDto.organizationId,
       });
-      
+
       const savedUserDetail = await this.userDetailRepository.save(userDetail);
-      
+
       user.userDetailId = savedUserDetail.id;
       await this.repository.updateUserDetailId(user.id, savedUserDetail.id);
     }
-    
+
     return user;
   }
 
@@ -71,25 +84,34 @@ export class UserService {
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
-    
+
     if (updateUserDto.username && updateUserDto.username !== user.username) {
-      const existingUser = await this.repository.findByUsername(updateUserDto.username);
+      const existingUser = await this.repository.findByUsername(
+        updateUserDto.username,
+      );
       if (existingUser) {
-        throw new ConflictException(`User with username ${updateUserDto.username} already exists`);
+        throw new ConflictException(
+          `User with username ${updateUserDto.username} already exists`,
+        );
       }
     }
-    
+
     if (updateUserDto.password) {
       const hashedPassword = await bcrypt.hash(updateUserDto.password, 10);
       updateUserDto.password = hashedPassword;
     }
-    
+
     const updatedUser = await this.repository.update(id, updateUserDto);
     if (!updatedUser) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
-    
-    if (updateUserDto.employeeId || updateUserDto.email || updateUserDto.phone || updateUserDto.organizationId) {
+
+    if (
+      updateUserDto.employeeId ||
+      updateUserDto.email ||
+      updateUserDto.phone ||
+      updateUserDto.organizationId
+    ) {
       if (user.userDetailId) {
         await this.userDetailRepository.update(user.userDetailId, {
           employee_id: updateUserDto.employeeId,
@@ -105,48 +127,49 @@ export class UserService {
           phone: updateUserDto.phone || '0000000000',
           organizationId: updateUserDto.organizationId,
         });
-        
-        const savedUserDetail = await this.userDetailRepository.save(userDetail);
+
+        const savedUserDetail =
+          await this.userDetailRepository.save(userDetail);
         await this.repository.updateUserDetailId(id, savedUserDetail.id);
       }
     }
-    
+
     return await this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
-    
+
     if (user.userDetailId) {
       await this.userDetailRepository.softDelete(user.userDetailId);
     }
-    
+
     await this.repository.softDelete(id);
   }
 
   async restore(id: string): Promise<User> {
     const user = await this.findOneWithDeleted(id);
-    
+
     if (!user.deletedAt) {
       throw new ConflictException(`User with ID ${id} is not deleted`);
     }
-    
+
     await this.repository.restore(id);
-    
+
     if (user.userDetailId) {
       await this.userDetailRepository.restore(user.userDetailId);
     }
-    
+
     return await this.findOne(id);
   }
 
   async hardDelete(id: string): Promise<void> {
     const user = await this.findOneWithDeleted(id);
-    
+
     if (user.userDetailId) {
       await this.userDetailRepository.delete(user.userDetailId);
     }
-    
+
     await this.repository.hardDelete(id);
   }
 }

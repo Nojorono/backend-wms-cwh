@@ -12,7 +12,10 @@ export class CreateMasterWarehouseBinDto {
   @IsOptional()
   warehouse_sub_id?: string;
 
-  @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
+  @ApiProperty({
+    example: 'Primary warehouse for storing inventory',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   name?: string;
@@ -22,7 +25,10 @@ export class CreateMasterWarehouseBinDto {
   @IsOptional()
   code?: string;
 
-  @ApiProperty({ example: 'Primary warehouse for storing inventory', required: false })
+  @ApiProperty({
+    example: 'Primary warehouse for storing inventory',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   description?: string;
@@ -36,4 +42,4 @@ export class CreateMasterWarehouseBinDto {
   @IsString()
   @IsOptional()
   barcode_image_url?: string;
-} 
+}

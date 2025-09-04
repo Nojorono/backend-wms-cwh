@@ -5,4 +5,4 @@ export interface IPermissionRepository {
   create(permission: Partial<Permission>): Promise<Permission>;
   update(id: string, permission: Partial<Permission>): Promise<Permission>;
   delete(id: string): Promise<void>;
-} 
+}

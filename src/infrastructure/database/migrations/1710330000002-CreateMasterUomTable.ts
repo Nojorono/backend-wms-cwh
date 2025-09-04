@@ -27,4 +27,4 @@ export class CreateMasterUomTable1710330000002 implements MigrationInterface {
       DROP TABLE IF EXISTS "m_uom"
     `);
   }
-} 
+}

@@ -16,4 +16,4 @@ import { S3_SERVICE_TOKEN } from '../../core/domain/interfaces/s3.service.interf
   ],
   exports: [S3_SERVICE_TOKEN, S3Service],
 })
-export class S3Module {} 
+export class S3Module {}

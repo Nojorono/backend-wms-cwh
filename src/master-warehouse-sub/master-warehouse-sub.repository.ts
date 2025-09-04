@@ -12,7 +12,9 @@ export class MasterWarehouseSubRepository {
     private readonly repository: Repository<MasterWarehouseSub>,
   ) {}
 
-  async create(createMasterWarehouseSubDto: CreateMasterWarehouseSubDto): Promise<MasterWarehouseSub> {
+  async create(
+    createMasterWarehouseSubDto: CreateMasterWarehouseSubDto,
+  ): Promise<MasterWarehouseSub> {
     const warehouseSub = this.repository.create(createMasterWarehouseSubDto);
     return await this.repository.save(warehouseSub);
   }
@@ -29,7 +31,9 @@ export class MasterWarehouseSubRepository {
     return warehouseSub;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseSub[]> {
+  async findByOrganizationId(
+    organization_id: number,
+  ): Promise<MasterWarehouseSub[]> {
     return await this.repository.find({ where: { organization_id } });
   }
 
@@ -37,7 +41,10 @@ export class MasterWarehouseSubRepository {
     return await this.repository.find({ where: { warehouse_id } });
   }
 
-  async update(id: string, updateMasterWarehouseSubDto: UpdateMasterWarehouseSubDto): Promise<MasterWarehouseSub | null> {
+  async update(
+    id: string,
+    updateMasterWarehouseSubDto: UpdateMasterWarehouseSubDto,
+  ): Promise<MasterWarehouseSub | null> {
     const warehouseSub = await this.findOne(id);
     if (!warehouseSub) {
       throw new NotFoundException('Warehouse not found');
