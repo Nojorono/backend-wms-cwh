@@ -74,16 +74,8 @@ export class InboundService {
   }
 
   async findAll(status?: string): Promise<Inbound[]> {
-    let parents = await this.inboundRepo.findAll(status);
-    for (const p of parents) {
-      const dos = await this.inboundDoRepo.findAllByInbound(p.id);
-      for (const d of dos) {
-        const items = await this.inboundItemRepo.findAllByInboundDo(d.id);
-        (d as any).inbound_items = items;
-      }
-      (p as any).inbound_dos = dos;
-    }
-    return parents;
+    // Relations are now loaded automatically through the repository
+    return await this.inboundRepo.findAll(status);
   }
 
   async findAllPaginated(
@@ -102,14 +94,7 @@ export class InboundService {
       paginationQuery.sortOrder,
     );
 
-    for (const p of data) {
-      const dos = await this.inboundDoRepo.findAllByInbound(p.id);
-      for (const d of dos) {
-        const items = await this.inboundItemRepo.findAllByInboundDo(d.id);
-        (d as any).inbound_items = items;
-      }
-      (p as any).inbound_dos = dos;
-    }
+    // Relations are now loaded automatically through the repository
 
     const paginatedResponse = this.paginationService.createPaginatedResponse(
       data,
@@ -126,12 +111,7 @@ export class InboundService {
     if (!found) {
       throw new NotFoundException('Inbound not found');
     }
-    const dos = await this.inboundDoRepo.findAllByInbound(found.id);
-    for (const d of dos) {
-      const items = await this.inboundItemRepo.findAllByInboundDo(d.id);
-      (d as any).inbound_items = items;
-    }
-    (found as any).inbound_dos = dos;
+    // Relations are now loaded automatically through the repository
     return found;
   }
 

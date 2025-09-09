@@ -4,6 +4,7 @@ import { InboundService } from './inbound.service';
 import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './dto/create-inbound.dto';
 import { UpdateInboundDto, UpdateInboundStatusDto  } from './dto/update-inbound.dto';
 import { Inbound } from '../core/domain/entities/inbound.entity';
+import { AssignedHelper } from '../core/domain/entities/assigned-helper.entity';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
@@ -11,7 +12,7 @@ import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 @ApiTags('Inbound')
 @Controller('inbound')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(CreateInboundDoDto, CreateInboundItemDto)
+@ApiExtraModels(CreateInboundDoDto, CreateInboundItemDto, AssignedHelper)
 export class InboundController {
   constructor(private readonly service: InboundService) {}
 

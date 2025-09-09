@@ -16,7 +16,10 @@ export class InboundRepository {
   }
 
   async findAll(status?: string): Promise<Inbound[]> {
-    return await this.repository.find({ where: { status } });
+    return await this.repository.find({ 
+      where: { status },
+      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
+    });
   }
 
   async findAllPaginated(
@@ -52,6 +55,9 @@ export class InboundRepository {
     const total = await queryBuilder.getCount();
 
     const data = await queryBuilder
+      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)
@@ -61,7 +67,10 @@ export class InboundRepository {
   }
 
   async findOne(id: string): Promise<Inbound | null> {
-    const entity = await this.repository.findOne({ where: { id } });
+    const entity = await this.repository.findOne({ 
+      where: { id },
+      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
+    });
     if (!entity) {
       return null;
     }
