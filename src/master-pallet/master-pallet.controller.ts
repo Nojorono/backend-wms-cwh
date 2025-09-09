@@ -6,7 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -59,7 +58,7 @@ export class MasterPalletController {
     type: MasterPallet,
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  findOne(@Param('id', ParseIntPipe) id: string) {
+  findOne(@Param('id') id: string) {
     return this.masterPalletService.findOne(id);
   }
 
@@ -76,7 +75,7 @@ export class MasterPalletController {
     description: 'Pallet with this code already exists.',
   })
   update(
-    @Param('id', ParseIntPipe) id: string,
+    @Param('id') id: string,
     @Body() updateMasterPalletDto: UpdateMasterPalletDto,
   ) {
     return this.masterPalletService.update(id, updateMasterPalletDto);
@@ -89,7 +88,7 @@ export class MasterPalletController {
     description: 'The Pallet has been successfully deleted.',
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  remove(@Param('id', ParseIntPipe) id: string) {
+  remove(@Param('id') id: string) {
     return this.masterPalletService.remove(id);
   }
 }

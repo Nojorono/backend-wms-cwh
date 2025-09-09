@@ -29,11 +29,11 @@ export class MasterPalletService {
     }
 
     const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
-      bcid: 'code128',
+      bcid: 'qrcode',
       text: `${createMasterPalletDto.pallet_code}`,
       scale: 3,
-      height: 100,
-      width: 200,
+      height: 250,
+      width: 250,
       bucket: 'wms',
       prefix: 'pallet',
       extension: 'png',
@@ -46,7 +46,7 @@ export class MasterPalletService {
 
     const pallet = await this.repository.create({
       ...createMasterPalletDto,
-      barcode_image_url: barcodeImageUrl.url,
+      qr_image_url: barcodeImageUrl.url,
     });
 
     return pallet;
@@ -91,14 +91,14 @@ export class MasterPalletService {
       (updateMasterPalletDto.pallet_code &&
         updateMasterPalletDto.pallet_code !== pallet.pallet_code)
     ) {
-      await this.barcodeService.deleteBarcodeImage(pallet.barcode_image_url);
+      await this.barcodeService.deleteBarcodeImage(pallet.qr_image_url);
       const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode(
         {
-          bcid: 'code128',
+          bcid: 'qrcode',
           text: `${updateMasterPalletDto.pallet_code}`,
           scale: 3,
-          height: 100,
-          width: 200,
+          height: 250,
+          width: 250,
           bucket: 'wms',
           prefix: 'pallet',
           extension: 'png',
@@ -109,7 +109,7 @@ export class MasterPalletService {
           } as Record<string, string>,
         },
       );
-      updateMasterPalletDto.barcode_image_url = barcodeImageUrl.url;
+      updateMasterPalletDto.qr_image_url = barcodeImageUrl.url;
     }
     const updatedPallet = await this.repository.update(
       id,

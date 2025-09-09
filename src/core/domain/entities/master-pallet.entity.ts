@@ -13,11 +13,14 @@ export class MasterPallet extends BaseEntity {
   capacity: number;
 
   @Column({ nullable: true })
-  barcode_image_url: string;
+  qr_image_url: string;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @Column({ name: 'is_empty', default: false })
-  isEmpty: boolean;
+  isFull: boolean;
+
+  @Column({ name: 'uom', nullable: true })
+  uom: string;
 }

@@ -24,10 +24,15 @@ export class CreateMasterPalletDto {
   @ApiProperty({ example: false, required: false })
   @IsBoolean()
   @IsOptional()
-  isEmpty?: boolean;
+  isFull?: boolean;
 
   @ApiProperty({ example: 'https://example.com/pallet.png', required: false })
   @IsString()
   @IsOptional()
-  barcode_image_url?: string;
+  qr_image_url?: string;
+
+  @ApiProperty({ example: 'DUS', required: false })
+  @IsString()
+  @IsOptional()
+  uom?: string;
 }
