@@ -178,6 +178,10 @@ export class InboundService {
     await this.inboundRepo.update(id, { status: payload.status });
     return this.findOne(id);
   }
+
+  async findByAssignedHelperId(id: string): Promise<Inbound[]> {
+    return await this.inboundRepo.findByAssignedHelperId(id);
+  }
 }
 
 

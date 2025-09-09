@@ -67,5 +67,13 @@ export class InboundController {
   updateStatus(@Param('id') id: string, @Body() dto: UpdateInboundStatusDto) {
     return this.service.updateStatus(id, dto);
   }
+
+  // find by assigned helper id
+  @Get('assigned-helper/:id')
+  @ApiOperation({ summary: 'Find inbound by assigned helper user id' })
+  @ApiResponse({ status: 200, type: Inbound })
+  findByAssignedHelperId(@Param('id') id: string) {
+    return this.service.findByAssignedHelperId(id);
+  }
 }
 

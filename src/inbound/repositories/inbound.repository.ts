@@ -116,6 +116,13 @@ export class InboundRepository {
     }
     return `${prefix}${seq.toString().padStart(4, '0')}`;
   }
+
+  async findByAssignedHelperId(id: string): Promise<Inbound[]> {
+    return await this.repository.find({ 
+      where: { assigned_helpers: { helper_user_id: id } },
+      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
+    });
+  }
 }
 
 
