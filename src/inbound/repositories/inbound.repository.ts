@@ -15,12 +15,62 @@ export class InboundRepository {
     return await this.repository.save(entity);
   }
 
-  async findAll(): Promise<Inbound[]> {
-    return await this.repository.find();
+  async findAll(status?: string): Promise<Inbound[]> {
+    return await this.repository.find({ 
+      where: { status },
+      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
+    });
+  }
+
+  async findAllPaginated(
+    filters: {
+      status?: string;
+      expedition?: string;
+      origin?: string;
+      inbound_type?: string;
+      driver_name?: string;
+      license_plate?: string;
+    },
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ): Promise<{ data: Inbound[]; total: number }> {
+    const queryBuilder = this.repository.createQueryBuilder('inbound');
+
+    // Apply filters
+    if (filters.status) {
+      queryBuilder.andWhere('inbound.status = :status', { status: filters.status });
+    }
+
+    // Apply search
+    if (search) {
+      queryBuilder.andWhere(
+        '(inbound.inbound_number ILIKE :search OR inbound.expedition ILIKE :search OR inbound.origin ILIKE :search OR inbound.license_plate ILIKE :search OR inbound.driver_name ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    const total = await queryBuilder.getCount();
+
+    const data = await queryBuilder
+      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .orderBy(`inbound.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, total };
   }
 
   async findOne(id: string): Promise<Inbound | null> {
-    const entity = await this.repository.findOne({ where: { id } });
+    const entity = await this.repository.findOne({ 
+      where: { id },
+      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
+    });
     if (!entity) {
       return null;
     }
@@ -65,6 +115,13 @@ export class InboundRepository {
       }
     }
     return `${prefix}${seq.toString().padStart(4, '0')}`;
+  }
+
+  async findByAssignedHelperId(id: string): Promise<Inbound[]> {
+    return await this.repository.find({ 
+      where: { assigned_helpers: { helper_user_id: id } },
+      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
+    });
   }
 }
 

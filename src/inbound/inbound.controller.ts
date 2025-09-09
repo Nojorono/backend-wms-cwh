@@ -1,14 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiExtraModels, ApiBody } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiExtraModels, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { InboundService } from './inbound.service';
 import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './dto/create-inbound.dto';
-import { UpdateInboundDto } from './dto/update-inbound.dto';
+import { UpdateInboundDto, UpdateInboundStatusDto  } from './dto/update-inbound.dto';
 import { Inbound } from '../core/domain/entities/inbound.entity';
+import { AssignedHelper } from '../core/domain/entities/assigned-helper.entity';
+import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
+import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @ApiTags('Inbound')
 @Controller('inbound')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(CreateInboundDoDto, CreateInboundItemDto)
+@ApiExtraModels(CreateInboundDoDto, CreateInboundItemDto, AssignedHelper)
 export class InboundController {
   constructor(private readonly service: InboundService) {}
 
@@ -21,10 +25,17 @@ export class InboundController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List all inbounds' })
-  @ApiResponse({ status: 200, type: [Inbound] })
-  findAll() {
-    return this.service.findAll();
+  @ApiOperation({ summary: 'List all inbounds with pagination' })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'status',
+      description: 'Filter inbounds by status',
+      example: 'CREATED',
+    },
+  ])
+  @ApiResponse({ status: 200, type: PaginatedResponseDto<Inbound> })
+  findAll(@Query() paginationQuery: InboundPaginationQueryDto) {
+    return this.service.findAllPaginated(paginationQuery);
   }
 
   @Get(':id')
@@ -47,6 +58,22 @@ export class InboundController {
   @ApiResponse({ status: 200 })
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  // update status
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update inbound status' })
+  @ApiResponse({ status: 200, type: Inbound })
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateInboundStatusDto) {
+    return this.service.updateStatus(id, dto);
+  }
+
+  // find by assigned helper id
+  @Get('assigned-helper/:id')
+  @ApiOperation({ summary: 'Find inbound by assigned helper user id' })
+  @ApiResponse({ status: 200, type: Inbound })
+  findByAssignedHelperId(@Param('id') id: string) {
+    return this.service.findByAssignedHelperId(id);
   }
 }
 

@@ -1,6 +1,7 @@
 import { Entity, Column, OneToMany } from 'typeorm';
 import { InboundDo } from './inbound-do.entity';
 import { BaseEntity } from './base.entity';
+import { AssignedHelper } from './assigned-helper.entity';
 
 @Entity('inbound')
 export class Inbound extends BaseEntity {
@@ -33,4 +34,7 @@ export class Inbound extends BaseEntity {
 
   @OneToMany(() => InboundDo, (inboundDo) => inboundDo.inbound)
   inbound_dos: InboundDo[];
+
+  @OneToMany(() => AssignedHelper, (assignedHelper) => assignedHelper.inbound)
+  assigned_helpers: AssignedHelper[];
 }
