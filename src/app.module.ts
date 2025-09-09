@@ -19,6 +19,7 @@ import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
 import { InboundModule } from './inbound/inbound.module';
+import { PaginationModule } from './core/modules/pagination.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { InboundModule } from './inbound/inbound.module';
     MasterItemModule,
     MasterClassificationItemModule,
     InboundModule,
+    PaginationModule,
   ],
   providers: [
     {

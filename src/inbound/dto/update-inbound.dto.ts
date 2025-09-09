@@ -5,4 +5,7 @@ export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) {}
 export class UpdateInboundDoDto extends PartialType(CreateInboundDoDto) {}
 export class UpdateInboundDto extends PartialType(CreateInboundDto) {}
 
-
+export class UpdateInboundStatusDto {
+  @ApiPropertyOptional({ description: 'Status' })
+  status: string;
+}

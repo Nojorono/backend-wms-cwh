@@ -15,8 +15,49 @@ export class InboundRepository {
     return await this.repository.save(entity);
   }
 
-  async findAll(): Promise<Inbound[]> {
-    return await this.repository.find();
+  async findAll(status?: string): Promise<Inbound[]> {
+    return await this.repository.find({ where: { status } });
+  }
+
+  async findAllPaginated(
+    filters: {
+      status?: string;
+      expedition?: string;
+      origin?: string;
+      inbound_type?: string;
+      driver_name?: string;
+      license_plate?: string;
+    },
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ): Promise<{ data: Inbound[]; total: number }> {
+    const queryBuilder = this.repository.createQueryBuilder('inbound');
+
+    // Apply filters
+    if (filters.status) {
+      queryBuilder.andWhere('inbound.status = :status', { status: filters.status });
+    }
+
+    // Apply search
+    if (search) {
+      queryBuilder.andWhere(
+        '(inbound.inbound_number ILIKE :search OR inbound.expedition ILIKE :search OR inbound.origin ILIKE :search OR inbound.license_plate ILIKE :search OR inbound.driver_name ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    const total = await queryBuilder.getCount();
+
+    const data = await queryBuilder
+      .orderBy(`inbound.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, total };
   }
 
   async findOne(id: string): Promise<Inbound | null> {

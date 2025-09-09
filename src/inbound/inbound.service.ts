@@ -5,7 +5,10 @@ import { InboundRepository } from './repositories/inbound.repository';
 import { InboundDoRepository } from './repositories/inbound-do.repository';
 import { InboundItemRepository } from './repositories/inbound-item.repository';
 import { CreateInboundDto } from './dto/create-inbound.dto';
-import { UpdateInboundDto } from './dto/update-inbound.dto';
+import { UpdateInboundDto, UpdateInboundStatusDto } from './dto/update-inbound.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 
 @Injectable()
 export class InboundService {
@@ -14,6 +17,7 @@ export class InboundService {
     private readonly inboundDoRepo: InboundDoRepository,
     private readonly inboundItemRepo: InboundItemRepository,
     private readonly dataSource: DataSource,
+    private readonly paginationService: PaginationService,
   ) {}
 
   private async generateSequentialInboundNumber(now: Date): Promise<string> {
@@ -69,8 +73,8 @@ export class InboundService {
     });
   }
 
-  async findAll(): Promise<Inbound[]> {
-    const parents = await this.inboundRepo.findAll();
+  async findAll(status?: string): Promise<Inbound[]> {
+    let parents = await this.inboundRepo.findAll(status);
     for (const p of parents) {
       const dos = await this.inboundDoRepo.findAllByInbound(p.id);
       for (const d of dos) {
@@ -80,6 +84,41 @@ export class InboundService {
       (p as any).inbound_dos = dos;
     }
     return parents;
+  }
+
+  async findAllPaginated(
+    paginationQuery: InboundPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<Inbound>> {
+    const filters = {
+      status: paginationQuery.status,
+    };
+
+    const { data, total } = await this.inboundRepo.findAllPaginated(
+      filters,
+      paginationQuery.page,
+      paginationQuery.limit,
+      paginationQuery.search,
+      paginationQuery.sortBy,
+      paginationQuery.sortOrder,
+    );
+
+    for (const p of data) {
+      const dos = await this.inboundDoRepo.findAllByInbound(p.id);
+      for (const d of dos) {
+        const items = await this.inboundItemRepo.findAllByInboundDo(d.id);
+        (d as any).inbound_items = items;
+      }
+      (p as any).inbound_dos = dos;
+    }
+
+    const paginatedResponse = this.paginationService.createPaginatedResponse(
+      data,
+      paginationQuery,
+      total,
+    );
+
+    // Return the paginated response directly to avoid double wrapping
+    return paginatedResponse;
   }
 
   async findOne(id: string): Promise<Inbound> {
@@ -152,6 +191,12 @@ export class InboundService {
       await this.inboundDoRepo.softRemoveByInbound(id);
       await this.inboundRepo.remove(id);
     });
+  }
+
+  async updateStatus(id: string, payload: UpdateInboundStatusDto): Promise<Inbound> {
+    await this.findOne(id);
+    await this.inboundRepo.update(id, { status: payload.status });
+    return this.findOne(id);
   }
 }
 
