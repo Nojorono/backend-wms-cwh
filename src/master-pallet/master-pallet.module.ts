@@ -6,9 +6,10 @@ import { MasterPalletService } from './master-pallet.service';
 import { MasterPalletRepository } from './master-pallet.repository';
 import { S3Service } from 'src/infrastructure/services/s3.service';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
+import { PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterPallet])],
+  imports: [TypeOrmModule.forFeature([MasterPallet, PalletTransactionHistory])],
   controllers: [MasterPalletController],
   providers: [
     MasterPalletService,

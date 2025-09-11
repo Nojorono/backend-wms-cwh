@@ -1,6 +1,6 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
-
+import { PalletTransactionHistory } from './transaction-pallet-history.entity';
 @Entity('m_pallet')
 export class MasterPallet extends BaseEntity {
   @Column({ nullable: true })
@@ -23,4 +23,10 @@ export class MasterPallet extends BaseEntity {
 
   @Column({ name: 'uom', nullable: true })
   uom: string;
+
+  @Column({ name: 'current_quantity', type: 'int', default: 0 })
+  currentQuantity: number;
+
+  @OneToMany(() => PalletTransactionHistory, (history) => history.pallet)
+  transactionHistory: PalletTransactionHistory[];
 }

@@ -21,6 +21,7 @@ import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehous
 import { InboundModule } from './inbound/inbound.module';
 import { AssignedHelperModule } from './assigned-helper/assigned-helper.module';
 import { PaginationModule } from './core/modules/pagination.module';
+import { TransactionScanInboundModule } from './transaction-scan-inbound/transaction-scan-inbound.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { PaginationModule } from './core/modules/pagination.module';
     InboundModule,
     AssignedHelperModule,
     PaginationModule,
+    TransactionScanInboundModule,
   ],
   providers: [
     {

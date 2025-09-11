@@ -36,4 +36,9 @@ export class UpdateMasterPalletDto {
   @IsString()
   @IsOptional()
   uom?: string;
+
+  @ApiProperty({ example: 0, required: false })
+  @IsNumber()
+  @IsOptional()
+  currentQuantity?: number;
 }
