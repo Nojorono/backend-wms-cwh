@@ -71,6 +71,14 @@ export class MasterPalletService {
     return pallet;
   }
 
+  async findByPalletCode(palletCode: string): Promise<MasterPallet> {
+    const pallet = await this.repository.findByPalletCode(palletCode);
+    if (!pallet) {
+      throw new NotFoundException(`Pallet with code ${palletCode} not found`);
+    }
+    return pallet;
+  }
+
   async update(
     id: string,
     updateMasterPalletDto: UpdateMasterPalletDto,
@@ -144,6 +152,34 @@ export class MasterPalletService {
     }
 
     const currentItemQuantity = await this.getItemQuantityOnPallet(palletId, updateQuantityDto.item_id);
+    const totalPalletQuantity = await this.getTotalPalletQuantity(palletId);
+
+    if (updateQuantityDto.operation_type === QuantityOperationType.ADD) {
+      if (updateQuantityDto.quantity < 0) {
+        throw new BadRequestException('Quantity to add must be non-negative');
+      }
+    }
+    if (updateQuantityDto.operation_type === QuantityOperationType.REMOVE) {
+      if (updateQuantityDto.quantity < 0) {
+        throw new BadRequestException('Quantity to remove must be non-negative');
+      }
+      if (updateQuantityDto.quantity > currentItemQuantity) {
+        throw new BadRequestException(
+          `Cannot remove ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+        );
+      }
+    }
+    if (updateQuantityDto.operation_type === QuantityOperationType.ADJUST) {
+      if (updateQuantityDto.quantity < 0) {
+        throw new BadRequestException('Adjusted item quantity cannot be negative');
+      }
+      const projectedTotal = totalPalletQuantity - currentItemQuantity + updateQuantityDto.quantity;
+      if (projectedTotal > pallet.capacity) {
+        throw new BadRequestException(
+          `Adjusted total quantity ${projectedTotal} exceeds pallet capacity ${pallet.capacity}`,
+        );
+      }
+    }
     let newItemQuantity: number;
     let quantityChange: number;
 
@@ -172,7 +208,6 @@ export class MasterPalletService {
       throw new BadRequestException('Item quantity cannot be negative');
     }
 
-    const totalPalletQuantity = await this.getTotalPalletQuantity(palletId);
     const newTotalQuantity = totalPalletQuantity - currentItemQuantity + newItemQuantity;
 
     if (newTotalQuantity > pallet.capacity) {

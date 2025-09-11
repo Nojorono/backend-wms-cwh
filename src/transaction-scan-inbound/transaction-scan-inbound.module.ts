@@ -5,12 +5,12 @@ import { TransactionScanInboundController } from './transaction-scan-inbound.con
 import { TransactionScanInboundService } from './transaction-scan-inbound.service';
 import { TransactionScanInboundRepository } from './transaction-scan-inbound.repository';
 import { MasterPallet } from 'src/core/domain/entities/master-pallet.entity';
-import { MasterPalletRepository } from 'src/master-pallet/master-pallet.repository';
+import { MasterPalletModule } from 'src/master-pallet/master-pallet.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TransactionScanInbound, MasterPallet])],
+  imports: [TypeOrmModule.forFeature([TransactionScanInbound, MasterPallet]), MasterPalletModule],
   controllers: [TransactionScanInboundController],
-  providers: [TransactionScanInboundService, TransactionScanInboundRepository, MasterPalletRepository ],
+  providers: [TransactionScanInboundService, TransactionScanInboundRepository ],
   exports: [TransactionScanInboundService],
 })
 export class TransactionScanInboundModule {}

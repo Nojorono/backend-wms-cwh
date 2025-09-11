@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsEnum, Min, Max } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsEnum, Min, Max, IsDate } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuantityOperationType } from '../../core/domain/entities/transaction-pallet-history.entity';
 
@@ -44,6 +44,11 @@ export class UpdatePalletQuantityDto {
   @IsOptional()
   @IsString()
   uom?: string;
+
+  @ApiPropertyOptional({ example: '2025-01-01' })
+  @IsOptional()
+  @IsDate()
+  production_date?: Date;
 }
 
 export class PalletQuantityHistoryResponseDto {
@@ -83,6 +88,11 @@ export class PalletQuantityHistoryResponseDto {
   @ApiPropertyOptional({ example: 'PCS' })
   uom?: string;
 
+  @ApiPropertyOptional({ example: '2025-01-01' })
+  @IsOptional()
+  @IsDate()
+  production_date?: Date;
+
   @ApiProperty({ example: '2025-01-01T10:00:00.000Z' })
   createdAt: Date;
 }
@@ -96,6 +106,11 @@ export class PalletItemQuantityDto {
 
   @ApiProperty({ example: 'PCS', description: 'Unit of measure for the item' })
   uom: string;
+
+  @ApiPropertyOptional({ example: '2025-01-01' })
+  @IsOptional()
+  @IsDate()
+  production_date?: Date;
 
   @ApiProperty({ example: '2025-01-01T10:00:00.000Z', description: 'Last updated timestamp' })
   last_updated: Date;
