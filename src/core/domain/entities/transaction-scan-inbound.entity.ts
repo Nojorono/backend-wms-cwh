@@ -18,13 +18,16 @@ export class TransactionScanInbound extends BaseEntity {
   @JoinColumn({ name: 'inbound_id' })
   inbound: Inbound;
 
+  @Column({ type: 'date', nullable: true })
+  production_date: Date;
+
   @Column({ nullable: true })
   item_id: string;
 
   @ManyToOne(() => MasterItem, (item) => item.id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'item_id' })
   item: MasterItem;
-
+    
   @Column({ nullable: true })
   quantity: number;
 
