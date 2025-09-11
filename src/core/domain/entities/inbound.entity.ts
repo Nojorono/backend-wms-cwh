@@ -2,6 +2,7 @@ import { Entity, Column, OneToMany } from 'typeorm';
 import { InboundDo } from './inbound-do.entity';
 import { BaseEntity } from './base.entity';
 import { AssignedHelper } from './assigned-helper.entity';
+import { TransactionScanInbound } from './transaction-scan-inbound.entity';
 
 @Entity('inbound')
 export class Inbound extends BaseEntity {
@@ -40,4 +41,7 @@ export class Inbound extends BaseEntity {
 
   @OneToMany(() => AssignedHelper, (assignedHelper) => assignedHelper.inbound)
   assigned_helpers: AssignedHelper[];
+
+  @OneToMany(() => TransactionScanInbound, (transactionScanInbound) => transactionScanInbound.inbound)
+  transaction_scan_inbounds: TransactionScanInbound[];
 }

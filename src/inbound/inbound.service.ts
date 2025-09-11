@@ -175,7 +175,7 @@ export class InboundService {
 
   async updateStatus(id: string, payload: UpdateInboundStatusDto): Promise<Inbound> {
     await this.findOne(id);
-    await this.inboundRepo.update(id, { status: payload.status });
+    await this.inboundRepo.update(id, { status: payload.status, notes: payload.notes });
     return this.findOne(id);
   }
 

@@ -16,6 +16,7 @@ import {
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
+import { PalletQuantityHistoryResponseDto, PalletCapacityValidationDto, PalletItemQuantityDto, UpdatePalletQuantityDto } from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 
 @ApiTags('Master Pallet')
@@ -90,5 +91,54 @@ export class MasterPalletController {
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
   remove(@Param('id') id: string) {
     return this.masterPalletService.remove(id);
+  }
+
+  @Patch(':palletCode/quantity')
+  @ApiOperation({ summary: 'Update pallet quantity' })
+  @ApiResponse({
+    status: 200,
+    description: 'The Pallet quantity has been successfully updated.',
+    type: MasterPallet,
+  })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  updateQuantity(@Param('palletCode') palletCode: string, @Body() updateQuantityDto: UpdatePalletQuantityDto) {
+    return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
+  }
+
+  @Get('by-code/:palletCode/quantity-history')
+  @ApiOperation({ summary: 'Get pallet quantity history by pallet code' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return pallet quantity history.',
+    type: [PalletQuantityHistoryResponseDto],
+  })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  getQuantityHistoryByPalletCode(@Param('palletCode') palletCode: string) {
+    return this.masterPalletService.getQuantityHistoryByPalletCode(palletCode);
+  }
+
+  @Get('by-code/:palletCode/items')
+  @ApiOperation({ summary: 'Get all items and their quantities on a pallet by pallet code' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all items and their quantities on the pallet.',
+    type: [PalletItemQuantityDto],
+  })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  getPalletItemQuantitiesByPalletCode(@Param('palletCode') palletCode: string) {
+    return this.masterPalletService.getPalletItemQuantitiesByPalletCode(palletCode);
+  }
+
+  @Get('by-code/:palletCode/capacity-validation')
+  @ApiOperation({ summary: 'Validate pallet capacity by pallet code' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return pallet capacity validation information.',
+    type: PalletCapacityValidationDto,
+  })
+  @ApiResponse({ status: 400, description: 'Pallet capacity not set.' })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  validateCapacityByPalletCode(@Param('palletCode') palletCode: string) {
+    return this.masterPalletService.validateCapacityByPalletCode(palletCode);
   }
 }
