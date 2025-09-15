@@ -182,6 +182,10 @@ export class InboundService {
   async findByAssignedHelperId(id: string): Promise<Inbound[]> {
     return await this.inboundRepo.findByAssignedHelperId(id);
   }
+
+  async findAllTransactionScanInbound(status: string): Promise<Inbound[]> {
+    return await this.inboundRepo.findAllTransactionScanInbound(status);
+  }
 }
 
 

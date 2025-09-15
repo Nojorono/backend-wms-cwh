@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../core/domain/entities/inbound.entity';
+import { ScanInboundStatus } from 'src/core/domain/entities/transaction-scan-inbound.entity';
 
 @Injectable()
 export class InboundRepository {
@@ -69,7 +70,7 @@ export class InboundRepository {
   async findOne(id: string): Promise<Inbound | null> {
     const entity = await this.repository.findOne({ 
       where: { id },
-      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
+      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers', 'transaction_scan_inbounds']
     });
     if (!entity) {
       return null;
@@ -122,6 +123,17 @@ export class InboundRepository {
       where: { assigned_helpers: { helper_user_id: id } },
       relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
     });
+  }
+
+  async findAllTransactionScanInbound(status: string): Promise<Inbound[]> {
+    return await this.repository
+      .createQueryBuilder('inbound')
+      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
+      .where('transaction_scan_inbounds.status = :status', { status: status })
+      .getMany();
   }
 }
 
