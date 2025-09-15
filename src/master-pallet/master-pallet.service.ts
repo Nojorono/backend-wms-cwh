@@ -237,6 +237,7 @@ export class MasterPalletService {
       notes: updateQuantityDto.notes,
       user_id: updateQuantityDto.user_id,
       uom: updateQuantityDto.uom,
+      production_date: updateQuantityDto.production_date?.toISOString(),
     });
 
     return updatedPallet;
@@ -276,6 +277,7 @@ export class MasterPalletService {
       user_id: record.user_id,
       uom: record.uom,
       createdAt: record.createdAt,
+      production_date: record.production_date,
     }));
   }
 
@@ -304,6 +306,7 @@ export class MasterPalletService {
       user_id: record.user_id,
       uom: record.uom,
       createdAt: record.createdAt,
+      production_date: record.production_date,
     }));
   }
 
@@ -315,6 +318,7 @@ export class MasterPalletService {
       .select('history.item_id', 'item_id')
       .addSelect('history.uom', 'uom')
       .addSelect('MAX(history.new_quantity)', 'current_quantity')
+      .addSelect('MAX(history.production_date)', 'production_date')
       .addSelect('MAX(history.createdAt)', 'last_updated')
       .where('history.pallet_id = :palletId', { palletId })
       .groupBy('history.item_id, history.uom')
@@ -326,6 +330,7 @@ export class MasterPalletService {
       current_quantity: parseInt(item.current_quantity),
       uom: item.uom,
       last_updated: item.last_updated,
+      production_date: item.production_date,
     }));
   }
 
@@ -430,6 +435,7 @@ export class MasterPalletService {
     notes?: string;
     user_id?: string;
     uom?: string;
+    production_date?: string;
   }): Promise<PalletTransactionHistory> {
     const history = this.transactionHistoryRepository.create(data);
     return await this.transactionHistoryRepository.save(history);

@@ -1,10 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDate, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ScanInboundStatus } from '../../core/domain/entities/transaction-scan-inbound.entity';
 
 export class CreateTransactionScanInboundDto {
     @ApiProperty({ example: '2025-01-01' })
   @IsDate()
+  @Type(() => Date)
   production_date: Date;
   
   @ApiProperty({ example: 'uuid-inbound-123' })
@@ -17,6 +19,7 @@ export class CreateTransactionScanInboundDto {
 
   @ApiProperty({ example: 10 })
   @IsNumber()
+  @Type(() => Number)
   quantity: number;
 
   @ApiPropertyOptional({ example: 'PCS' })
@@ -49,6 +52,7 @@ export class CreateTransactionScanInboundDtoPallet {
 
   @ApiProperty({ example: '2025-01-01' })
   @IsDate()
+  @Type(() => Date)
   production_date: Date;
 
   @ApiProperty({ example: 'uuid-inbound-123' })
@@ -61,6 +65,7 @@ export class CreateTransactionScanInboundDtoPallet {
 
   @ApiProperty({ example: 10 })
   @IsNumber()
+  @Type(() => Number)
   quantity: number;
 
   @ApiPropertyOptional({ example: 'PCS' })

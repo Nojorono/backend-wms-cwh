@@ -18,6 +18,7 @@ export class TransactionScanInboundService {
       pallet_id: pallet.id,
     });
     await this.palletService.updateQuantityByPalletCode(pallet.pallet_code, {
+      production_date: data.production_date,
       item_id: data.item_id,
       quantity: data.quantity,
       operation_type: QuantityOperationType.ADD,
