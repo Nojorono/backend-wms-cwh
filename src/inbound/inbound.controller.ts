@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiExtraModels, ApiBody } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiExtraModels, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { InboundService } from './inbound.service';
 import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './dto/create-inbound.dto';
 import { UpdateInboundDto, UpdateInboundStatusDto  } from './dto/update-inbound.dto';
@@ -36,6 +36,14 @@ export class InboundController {
   @ApiResponse({ status: 200, type: PaginatedResponseDto<Inbound> })
   findAll(@Query() paginationQuery: InboundPaginationQueryDto) {
     return this.service.findAllPaginated(paginationQuery);
+  }
+
+  @Get('inspection')
+  @ApiOperation({ summary: 'Find all transaction scan inbound where status is PENDING' })
+  @ApiQuery({ name: 'status', type: String, required: false, example: 'PENDING' })
+  @ApiResponse({ status: 200, type: [Inbound]})
+  findAllInspection(@Query('status') status: string) {
+    return this.service.findAllTransactionScanInbound(status);
   }
 
   @Get(':id')
@@ -75,5 +83,6 @@ export class InboundController {
   findByAssignedHelperId(@Param('id') id: string) {
     return this.service.findByAssignedHelperId(id);
   }
+
 }
 

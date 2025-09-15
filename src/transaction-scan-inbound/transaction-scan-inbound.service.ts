@@ -60,6 +60,7 @@ export class TransactionScanInboundService {
       await this.palletService.updateQuantity(existing.pallet_id, {
         item_id: existing.item_id,
         quantity: existing.quantity,
+        production_date: existing.production_date,
         operation_type: QuantityOperationType.REMOVE,
         reference_id: existing.inbound_id,
         reference_type: 'INBOUND_SCAN_UPDATE',
@@ -71,6 +72,7 @@ export class TransactionScanInboundService {
       await this.palletService.updateQuantity(targetPalletId, {
         item_id: data.item_id ?? existing.item_id,
         quantity: typeof data.quantity === 'number' ? data.quantity : existing.quantity,
+        production_date: data.production_date ?? existing.production_date,
         operation_type: QuantityOperationType.ADD,
         reference_id: existing.inbound_id,
         reference_type: 'INBOUND_SCAN_UPDATE',

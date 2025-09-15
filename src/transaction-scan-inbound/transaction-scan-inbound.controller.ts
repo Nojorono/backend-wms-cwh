@@ -33,6 +33,14 @@ export class TransactionScanInboundController {
     return this.service.findOne(id);
   }
 
+  // find by inbound id
+  @Get('inbound/:inbound_id')
+  @ApiOperation({ summary: 'Get a transaction scan inbound by inbound ID' })
+  @ApiResponse({ status: 200, description: 'OK', type: TransactionScanInbound })
+  findByInboundId(@Param('inbound_id') inbound_id: string) {
+    return this.service.findByInboundId(inbound_id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a transaction scan inbound' })
   @ApiResponse({ status: 200, description: 'Updated', type: TransactionScanInbound })

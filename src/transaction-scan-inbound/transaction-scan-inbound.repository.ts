@@ -37,6 +37,10 @@ export class TransactionScanInboundRepository {
   async remove(id: string): Promise<void> {
     await this.repository.delete(id);
   }
+
+  async findByInboundId(inbound_id: string): Promise<TransactionScanInbound[]> {
+    return await this.repository.find({ where: { inbound_id } });
+  }
 }
 
 
