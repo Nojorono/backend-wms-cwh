@@ -72,6 +72,7 @@ export class InboundController {
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update inbound status' })
   @ApiResponse({ status: 200, type: Inbound })
+  @ApiBody({ type: UpdateInboundStatusDto })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateInboundStatusDto) {
     return this.service.updateStatus(id, dto);
   }

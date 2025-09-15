@@ -1,4 +1,5 @@
 import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './create-inbound.dto';
 
 export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) {}
@@ -7,8 +8,12 @@ export class UpdateInboundDto extends PartialType(CreateInboundDto) {}
 
 export class UpdateInboundStatusDto {
   @ApiPropertyOptional({ description: 'Status' })
-  status: string;
+  @IsOptional()
+  @IsString()
+  status?: string;
 
   @ApiPropertyOptional({ description: 'Notes' })
-  notes: string;
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
