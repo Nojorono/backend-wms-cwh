@@ -59,4 +59,8 @@ export class AssignedHelperRepository {
   async removeByInbound(inboundId: string): Promise<void> {
     await this.repository.softDelete({ inbound_id: inboundId });
   }
+
+  async findByInboundId(inbound_id: string): Promise<AssignedHelper[]> {
+    return await this.repository.find({ where: { inbound_id } });
+  }
 }

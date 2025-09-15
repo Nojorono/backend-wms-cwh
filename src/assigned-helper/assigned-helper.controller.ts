@@ -119,6 +119,14 @@ export class AssignedHelperController {
     return this.assignedHelperService.findOne(id);
   }
 
+  // find by inbound id
+  @Get('inbound/:inbound_id')
+  @ApiOperation({ summary: 'Get assigned helper by inbound ID' })
+  @ApiResponse({ status: 200, description: 'Assigned helper retrieved successfully', type: AssignedHelper })
+  findByInboundId(@Param('inbound_id') inbound_id: string) {
+    return this.assignedHelperService.findByInboundId(inbound_id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update assigned helper' })
   @ApiResponse({ 

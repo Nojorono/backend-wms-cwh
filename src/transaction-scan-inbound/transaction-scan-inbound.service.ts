@@ -40,6 +40,10 @@ export class TransactionScanInboundService {
     return entity;
   }
 
+  async findByInboundId(inbound_id: string): Promise<TransactionScanInbound[]> {
+    return this.repository.findByInboundId(inbound_id);
+  }
+
   async update(id: string, data: UpdateTransactionScanInboundDto): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
 
