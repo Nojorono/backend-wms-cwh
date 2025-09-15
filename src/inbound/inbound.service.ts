@@ -175,7 +175,16 @@ export class InboundService {
 
   async updateStatus(id: string, payload: UpdateInboundStatusDto): Promise<Inbound> {
     await this.findOne(id);
-    await this.inboundRepo.update(id, { status: payload.status, notes: payload.notes });
+    
+    const updateData: Partial<Inbound> = {};
+    if (payload.status !== undefined) {
+      updateData.status = payload.status;
+    }
+    if (payload.notes !== undefined) {
+      updateData.notes = payload.notes;
+    }
+    
+    await this.inboundRepo.update(id, updateData);
     return this.findOne(id);
   }
 
