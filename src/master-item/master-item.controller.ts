@@ -22,7 +22,9 @@ import { MasterItem } from '../core/domain/entities/master-item.entity';
 @Controller('master-item')
 @ApiBearerAuth('JWT-auth')
 export class MasterItemController {
-  constructor(private readonly masterItemService: MasterItemService) {}
+  constructor(
+    private readonly masterItemService: MasterItemService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Item' })
@@ -90,5 +92,13 @@ export class MasterItemController {
   @ApiResponse({ status: 404, description: 'Item not found.' })
   remove(@Param('id') id: string) {
     return this.masterItemService.remove(id);
+  }
+
+  // sync from meta oracle
+  @Post('sync-from-meta-oracle')
+  @ApiOperation({ summary: 'Sync from meta oracle' })
+  @ApiResponse({ status: 200, description: 'Sync from meta oracle' })
+  syncFromMetaOracle() {
+    return this.masterItemService.syncFromMetaOracle();
   }
 }

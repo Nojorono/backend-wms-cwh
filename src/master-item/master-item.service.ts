@@ -8,10 +8,14 @@ import { MasterItemRepository } from './master-item.repository';
 import { CreateMasterItemDto } from './dto/create-master-item.dto';
 import { UpdateMasterItemDto } from './dto/update-master-item.dto';
 import { MasterItem } from '../core/domain/entities/master-item.entity';
+import { ItemListIntegrationService, ItemListResponseDto } from './integration/item-list-integration.service';
 
 @Injectable()
 export class MasterItemService {
-  constructor(private readonly repository: MasterItemRepository) {}
+  constructor(
+    private readonly repository: MasterItemRepository,
+    private readonly itemListIntegrationService: ItemListIntegrationService,
+  ) {}
 
   async create(createMasterItemDto: CreateMasterItemDto): Promise<MasterItem> {
     const sku = createMasterItemDto.sku;
@@ -64,5 +68,36 @@ export class MasterItemService {
   async remove(id: string): Promise<void> {
     await this.findOne(id);
     await this.repository.remove(id);
+  }
+
+  async createOrUpdateFromMetaOracle(item: any): Promise<MasterItem | null> {
+    const existingItem = await this.repository.findByItemNumber(item.ITEM_NUMBER);
+    if (existingItem) {
+      return await this.repository.update(existingItem.id, {
+        sku: item.ITEM_CODE,
+        item_number: item.ITEM_NUMBER,
+        description: item.ITEM_DESCRIPTION,
+        inventory_item_id: item.INVENTORY_ITEM_ID,
+      }) || null;
+    } else {
+      return await this.repository.create({
+        sku: item.ITEM_CODE,
+        item_number: item.ITEM_NUMBER,
+        description: item.ITEM_DESCRIPTION,
+        inventory_item_id: item.INVENTORY_ITEM_ID,
+      });
+    }
+  }
+
+  async syncFromMetaOracle(): Promise<ItemListResponseDto> {
+    const itemLists = await this.itemListIntegrationService.getItemLists();
+
+    if (itemLists.status) {
+      for (const item of itemLists.data) {
+        await this.createOrUpdateFromMetaOracle(item);
+      }
+    }
+
+    return itemLists;
   }
 }

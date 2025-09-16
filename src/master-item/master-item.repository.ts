@@ -21,6 +21,32 @@ export class MasterItemRepository {
     return await this.repository.find();
   }
 
+  async findAllWithFilters(filters: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<MasterItem[]> {
+    const { search, page = 1, limit = 10, sortBy = 'created_at', sortOrder = 'desc' } = filters;
+    
+    const queryBuilder = this.repository.createQueryBuilder('masterItem');
+    
+    if (search) {
+      queryBuilder.where(
+        '(masterItem.sku ILIKE :search OR masterItem.item_number ILIKE :search OR masterItem.description ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+    
+    queryBuilder
+      .orderBy(`masterItem.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    
+    return await queryBuilder.getMany();
+  }
+
   async findOne(id: string): Promise<MasterItem | null> {
     const item = await this.repository.findOne({ where: { id } });
     if (!item) {
@@ -65,5 +91,13 @@ export class MasterItemRepository {
       throw new NotFoundException('Item not found');
     }
     await this.repository.delete(id);
+  }
+
+  async findByItemNumber(item_number: string): Promise<MasterItem | null> {
+    const item = await this.repository.findOne({ where: { item_number } });
+    if (!item) {
+      return null;
+    }
+    return item;
   }
 }
