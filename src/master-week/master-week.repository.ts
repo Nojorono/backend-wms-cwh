@@ -56,13 +56,14 @@ export class MasterWeekRepository {
     return week;
   }
 
-  async findByDate(date: Date): Promise<MasterWeek | null> {
-    // beetween TANGGAL_AWAL_MINGGU_REAL and TANGGAL_AKHIR_MINGGU_REAL
-    const week = await this.repository.findOne({ where: { TANGGAL_AWAL_MINGGU_REAL: LessThanOrEqual(date), TANGGAL_AKHIR_MINGGU_REAL: MoreThanOrEqual(date) } });
-    if (!week) {
-      return null;
-    }
-    return week;
+  async findByDate(date: Date): Promise<MasterWeek[]> {
+    // Find weeks where the date falls between TANGGAL_AWAL_MINGGU_REAL and TANGGAL_AKHIR_MINGGU_REAL
+    return await this.repository.find({ 
+      where: { 
+        TANGGAL_AWAL_MINGGU_REAL: LessThanOrEqual(date), 
+        TANGGAL_AKHIR_MINGGU_REAL: MoreThanOrEqual(date) 
+      } 
+    });
   }
 
   async update(

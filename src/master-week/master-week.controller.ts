@@ -55,15 +55,21 @@ export class MasterWeekController {
   }
 
   // find week by date
-  @Get('find-by-date')
+  @Get('find-by-date/:date')
   @ApiOperation({ summary: 'Get Week by date' })
   @ApiResponse({
     status: 200,
     description: 'Return Week by date.',
     type: [MasterWeek],
   })
-  findByDate(@Query('date') date: Date) {
-    return this.masterWeekService.findByDate(date);
+  @ApiParam({
+    name: 'date',
+    description: 'Date to filter by',
+    example: '2024-01-01',
+    type: Date,
+  })
+  findByDate(@Param('date') date: string) {
+    return this.masterWeekService.findByDate(new Date(date));
   }
 
   @Get('sync-from-meta-oracle/:tahun')
@@ -77,23 +83,6 @@ export class MasterWeekController {
   })
   syncFromMetaOracle(@Param('tahun') year: string) {
     return this.masterWeekService.syncFromMetaOracle(year);
-  }
-
-  @Get('sales/all')
-  @ApiOperation({ summary: 'Get all week sales' })
-  @ApiResponse({
-    status: 200,
-    description: 'Return all week sales.',
-  })
-  getWeekSalesAll(@Query('tahun') tahun?: string, @Query('search') search?: string, @Query('page') page?: number, @Query('limit') limit?: number) {
-    const params: { tahun?: string; search?: string; page?: number; limit?: number } = {};
-    
-    if (tahun) params.tahun = tahun;
-    if (search) params.search = search;
-    if (page) params.page = page;
-    if (limit) params.limit = limit;
-    
-    return this.masterWeekService.getWeekSalesAll(params);
   }
 
   @Get(':id')

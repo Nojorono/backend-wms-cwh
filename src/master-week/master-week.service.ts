@@ -34,7 +34,7 @@ export class MasterWeekService {
   }
 
   async findByDate(date: Date): Promise<MasterWeek[]> {
-    return await this.repository.findAll();
+    return await this.repository.findByDate(date);
   }
 
   async update(
