@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../core/domain/entities/inbound.entity';
 import { ScanInboundStatus } from 'src/core/domain/entities/transaction-scan-inbound.entity';
+import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
 export class InboundRepository {
@@ -17,10 +18,16 @@ export class InboundRepository {
   }
 
   async findAll(status?: string): Promise<Inbound[]> {
-    return await this.repository.find({ 
-      where: { status },
-      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
-    });
+    const qb = this.repository.createQueryBuilder('inbound');
+    if (status) {
+      qb.andWhere('inbound.status = :status', { status });
+    }
+    return await qb
+      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .getMany();
   }
 
   async findAllPaginated(
@@ -40,12 +47,10 @@ export class InboundRepository {
   ): Promise<{ data: Inbound[]; total: number }> {
     const queryBuilder = this.repository.createQueryBuilder('inbound');
 
-    // Apply filters
     if (filters.status) {
       queryBuilder.andWhere('inbound.status = :status', { status: filters.status });
     }
 
-    // Apply search
     if (search) {
       queryBuilder.andWhere(
         '(inbound.inbound_number ILIKE :search OR inbound.expedition ILIKE :search OR inbound.origin ILIKE :search OR inbound.license_plate ILIKE :search OR inbound.driver_name ILIKE :search)',
@@ -58,6 +63,7 @@ export class InboundRepository {
     const data = await queryBuilder
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
@@ -68,10 +74,15 @@ export class InboundRepository {
   }
 
   async findOne(id: string): Promise<Inbound | null> {
-    const entity = await this.repository.findOne({ 
-      where: { id },
-      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers', 'transaction_scan_inbounds']
-    });
+    const qb = this.repository.createQueryBuilder('inbound');
+    qb.where('inbound.id = :id', { id });
+    const entity = await qb
+      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
+      .getOne();
     if (!entity) {
       return null;
     }
@@ -119,10 +130,14 @@ export class InboundRepository {
   }
 
   async findByAssignedHelperId(id: string): Promise<Inbound[]> {
-    return await this.repository.find({ 
-      where: { assigned_helpers: { helper_user_id: id } },
-      relations: ['inbound_dos', 'inbound_dos.inbound_items', 'assigned_helpers']
-    });
+    const qb = this.repository.createQueryBuilder('inbound');
+    qb.andWhere('assigned_helpers.helper_user_id = :id', { id });
+    return await qb
+      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .getMany();
   }
 
   async findAllTransactionScanInbound(status: string): Promise<Inbound[]> {
@@ -130,6 +145,7 @@ export class InboundRepository {
       .createQueryBuilder('inbound')
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
       .where('transaction_scan_inbounds.status = :status', { status: status })
