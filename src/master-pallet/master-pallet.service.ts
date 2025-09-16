@@ -238,6 +238,7 @@ export class MasterPalletService {
       user_id: updateQuantityDto.user_id,
       uom: updateQuantityDto.uom,
       production_date: updateQuantityDto.production_date?.toISOString(),
+      week_number: updateQuantityDto.week_number,
     });
 
     return updatedPallet;
@@ -278,6 +279,7 @@ export class MasterPalletService {
       uom: record.uom,
       createdAt: record.createdAt,
       production_date: record.production_date,
+      week_number: record.week_number,
     }));
   }
 
@@ -307,6 +309,7 @@ export class MasterPalletService {
       uom: record.uom,
       createdAt: record.createdAt,
       production_date: record.production_date,
+      week_number: record.week_number,
     }));
   }
 
@@ -436,6 +439,7 @@ export class MasterPalletService {
     user_id?: string;
     uom?: string;
     production_date?: string;
+    week_number?: number;
   }): Promise<PalletTransactionHistory> {
     const history = this.transactionHistoryRepository.create(data);
     return await this.transactionHistoryRepository.save(history);

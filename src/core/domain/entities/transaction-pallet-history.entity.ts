@@ -37,6 +37,9 @@ export class PalletTransactionHistory extends BaseEntity {
   production_date: Date;  
 
   @Column({ nullable: true })
+  week_number: number;
+
+  @Column({ nullable: true })
   reference_id: string;
 
   @Column({ nullable: true })

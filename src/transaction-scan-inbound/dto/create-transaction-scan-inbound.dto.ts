@@ -8,6 +8,11 @@ export class CreateTransactionScanInboundDto {
   @IsDate()
   @Type(() => Date)
   production_date: Date;
+
+  @ApiProperty({ example: 1 })
+  @IsNumber()
+  @Type(() => Number)
+  week_number: number;
   
   @ApiProperty({ example: 'uuid-inbound-123' })
   @IsString()
@@ -54,6 +59,11 @@ export class CreateTransactionScanInboundDtoPallet {
   @IsDate()
   @Type(() => Date)
   production_date: Date;
+
+  @ApiProperty({ example: 1 })
+  @IsNumber()
+  @Type(() => Number)
+  week_number: number;
 
   @ApiProperty({ example: 'uuid-inbound-123' })
   @IsString()

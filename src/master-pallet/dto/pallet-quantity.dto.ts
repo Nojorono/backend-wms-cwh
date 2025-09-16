@@ -49,6 +49,11 @@ export class UpdatePalletQuantityDto {
   @IsOptional()
   @IsDate()
   production_date?: Date;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  week_number?: number;
 }
 
 export class PalletQuantityHistoryResponseDto {
@@ -95,6 +100,11 @@ export class PalletQuantityHistoryResponseDto {
 
   @ApiProperty({ example: '2025-01-01T10:00:00.000Z' })
   createdAt: Date;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  week_number?: number;
 }
 
 export class PalletItemQuantityDto {
@@ -114,6 +124,11 @@ export class PalletItemQuantityDto {
 
   @ApiProperty({ example: '2025-01-01T10:00:00.000Z', description: 'Last updated timestamp' })
   last_updated: Date;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  week_number?: number;
 }
 
 export class PalletCapacityValidationDto {

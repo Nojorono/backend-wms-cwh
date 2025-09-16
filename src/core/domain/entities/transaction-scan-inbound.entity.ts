@@ -22,6 +22,9 @@ export class TransactionScanInbound extends BaseEntity {
   production_date: Date;
 
   @Column({ nullable: true })
+  week_number: number;
+
+  @Column({ nullable: true })
   item_id: string;
 
   @ManyToOne(() => MasterItem, (item) => item.id, { onDelete: 'CASCADE' })

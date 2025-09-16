@@ -27,6 +27,7 @@ export class TransactionScanInboundService {
       notes: data.user_name,
       user_id: data.user_id,
       uom: data.uom,
+      week_number: data.week_number,
     });
     return scan;
   }
@@ -72,6 +73,7 @@ export class TransactionScanInboundService {
         notes: 'revert previous',
         user_id: data.user_id || existing.user_id,
         uom: existing.uom,
+        week_number: existing.week_number,
       });
 
       await this.palletService.updateQuantity(targetPalletId, {
@@ -84,6 +86,7 @@ export class TransactionScanInboundService {
         notes: data.user_name ?? existing.user_name,
         user_id: data.user_id ?? existing.user_id,
         uom: data.uom ?? existing.uom,
+        week_number: data.week_number ?? existing.week_number,
       });
     }
 
