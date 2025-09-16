@@ -23,7 +23,7 @@ export class TransactionScanInboundRepository {
       .createQueryBuilder('tsi')
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .where('tsi.inbound_id = :inbound_id', { inbound_id })
-      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id::varchar = tsi.item_id')
+      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
       .getMany();
   }
 
@@ -32,7 +32,7 @@ export class TransactionScanInboundRepository {
       .createQueryBuilder('tsi')
       .where('tsi.id = :id', { id })
       .leftJoinAndSelect('tsi.pallet', 'pallet')
-      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id::varchar = tsi.item_id')
+      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
       .getOne();
     if (!entity) return null;
     return entity;
@@ -54,8 +54,9 @@ export class TransactionScanInboundRepository {
   async findByInboundId(inbound_id: string): Promise<TransactionScanInbound[]> {
     return await this.repository
       .createQueryBuilder('tsi')
+      .leftJoinAndSelect('tsi.pallet', 'pallet')
       .where('tsi.inbound_id = :inbound_id', { inbound_id })
-      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id::varchar = tsi.item_id')
+      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
       .getMany();
   }
 }
