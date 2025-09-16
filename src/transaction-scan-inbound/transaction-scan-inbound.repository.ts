@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 import { CreateTransactionScanInboundDto, CreateTransactionScanInboundDtoPallet } from './dto/create-transaction-scan-inbound.dto';
 import { UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
+import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
 export class TransactionScanInboundRepository {
@@ -18,11 +19,23 @@ export class TransactionScanInboundRepository {
   }
 
   async findAll(inbound_id: string): Promise<TransactionScanInbound[]> {
-    return await this.repository.find({ where: { inbound_id } });
+    return await this.repository
+      .createQueryBuilder('tsi')
+      .leftJoinAndSelect('tsi.pallet', 'pallet')
+      .where('tsi.inbound_id = :inbound_id', { inbound_id })
+      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id::varchar = tsi.item_id')
+      .getMany();
   }
 
   async findOne(id: string): Promise<TransactionScanInbound | null> {
-    return await this.repository.findOne({ where: { id } });
+    const entity = await this.repository
+      .createQueryBuilder('tsi')
+      .where('tsi.id = :id', { id })
+      .leftJoinAndSelect('tsi.pallet', 'pallet')
+      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id::varchar = tsi.item_id')
+      .getOne();
+    if (!entity) return null;
+    return entity;
   }
 
   async update(id: string, data: UpdateTransactionScanInboundDto): Promise<TransactionScanInbound> {
@@ -39,7 +52,11 @@ export class TransactionScanInboundRepository {
   }
 
   async findByInboundId(inbound_id: string): Promise<TransactionScanInbound[]> {
-    return await this.repository.find({ where: { inbound_id } });
+    return await this.repository
+      .createQueryBuilder('tsi')
+      .where('tsi.inbound_id = :inbound_id', { inbound_id })
+      .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id::varchar = tsi.item_id')
+      .getMany();
   }
 }
 
