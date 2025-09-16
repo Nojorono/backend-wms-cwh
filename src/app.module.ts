@@ -13,6 +13,7 @@ import { MasterIOModule } from './master-io/master-io.module';
 import { MasterWarehouseModule } from './master-warehouse/master-warehouse.module';
 import { MasterSupplierModule } from './master-supplier/master-supplier.module';
 import { MasterItemModule } from './master-item/master-item.module';
+import { MasterWeekModule } from './master-week/master-week.module';
 import { MasterClassificationItemModule } from './master-classification-item/master-classification-item.module';
 import { UserModule } from './users/user.module';
 import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
@@ -57,6 +58,7 @@ import { TransactionScanInboundModule } from './transaction-scan-inbound/transac
     MasterWarehouseBinModule,
     MasterSupplierModule,
     MasterItemModule,
+    MasterWeekModule,
     MasterClassificationItemModule,
     InboundModule,
     AssignedHelperModule,
