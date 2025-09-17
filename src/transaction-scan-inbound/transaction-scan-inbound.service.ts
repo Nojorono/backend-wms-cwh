@@ -1,18 +1,34 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { TransactionScanInboundRepository } from './transaction-scan-inbound.repository';
 import { CreateTransactionScanInboundDto } from './dto/create-transaction-scan-inbound.dto';
 import { UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
 import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
+import { MasterItemService } from 'src/master-item/master-item.service';
+import { MasterWarehouseSubService } from 'src/master-warehouse-sub/master-warehouse-sub.service';
 import { QuantityOperationType } from 'src/core/domain/entities/transaction-pallet-history.entity';
 
 @Injectable()
 export class TransactionScanInboundService {
-  constructor(private readonly repository: TransactionScanInboundRepository, private readonly palletService: MasterPalletService) {}
+  constructor(
+    private readonly repository: TransactionScanInboundRepository, 
+    private readonly palletService: MasterPalletService,
+    private readonly itemService: MasterItemService,
+    private readonly warehouseSubService: MasterWarehouseSubService
+  ) {}
 
   async create(data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
+    const item = await this.itemService.findOne(data.item_id);
+    if (!item) throw new BadRequestException('Item not found');
+
     const pallet = await this.palletService.findByPalletCode(data.pallet_code || '');
     if (!pallet) throw new NotFoundException('Pallet not found');
+
+    if (data.m_warehouse_sub_id) {
+      const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
+      if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
+    }
+
     const scan = await this.repository.create({
       ...data,
       pallet_id: pallet.id,
@@ -48,6 +64,16 @@ export class TransactionScanInboundService {
 
   async update(id: string, data: UpdateTransactionScanInboundDto): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
+
+    if (data.item_id) {
+      const item = await this.itemService.findOne(data.item_id);
+      if (!item) throw new BadRequestException('Item not found');
+    }
+
+    if (data.m_warehouse_sub_id) {
+      const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
+      if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
+    }
 
     const affectsPallet =
       typeof data.quantity === 'number' ||

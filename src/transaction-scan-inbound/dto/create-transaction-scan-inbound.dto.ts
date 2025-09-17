@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 import { ScanInboundStatus } from '../../core/domain/entities/transaction-scan-inbound.entity';
 
 export class CreateTransactionScanInboundDto {
-    @ApiProperty({ example: '2025-01-01' })
+  @ApiProperty({ example: '2025-01-01' })
   @IsDate()
   @Type(() => Date)
   production_date: Date;
@@ -46,6 +46,11 @@ export class CreateTransactionScanInboundDto {
   @IsOptional()
   @IsString()
   pallet_code?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-warehouse-sub-1' })
+  @IsOptional()
+  @IsString()
+  m_warehouse_sub_id?: string;
 
   @ApiPropertyOptional({ enum: ScanInboundStatus, example: ScanInboundStatus.PENDING })
   @IsOptional()

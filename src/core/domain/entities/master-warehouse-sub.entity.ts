@@ -1,6 +1,11 @@
 import { Entity, Column } from 'typeorm';
 import { BaseEntity } from './base.entity';
 
+export enum WarehouseSubStagingType {
+  INBOUND = 'INBOUND',
+  OUTBOUND = 'OUTBOUND',
+}
+
 @Entity('m_warehouse_sub')
 export class MasterWarehouseSub extends BaseEntity {
   @Column({ nullable: true, name: 'organization_id' })
@@ -23,4 +28,7 @@ export class MasterWarehouseSub extends BaseEntity {
 
   @Column({ nullable: true, name: 'barcode_image_url' })
   barcode_image_url: string;
+
+  @Column({ nullable: true, name: 'is_staging' })
+  is_staging: WarehouseSubStagingType;
 }

@@ -3,6 +3,7 @@ import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
 import { MasterPallet } from './master-pallet.entity';
 import { MasterItem } from './master-item.entity';
+import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 
 export enum ScanInboundStatus {
   PENDING = 'PENDING',
@@ -49,6 +50,13 @@ export class TransactionScanInbound extends BaseEntity {
   @ManyToOne(() => MasterPallet, (pallet) => pallet.id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'pallet_id' })
   pallet: MasterPallet;
+
+  @Column({ nullable: true})
+  m_warehouse_sub_id: string;
+
+  @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'm_warehouse_sub_id' })
+  warehouseSub: MasterWarehouseSub;
 
   @Column({ nullable: true })
   status: ScanInboundStatus;

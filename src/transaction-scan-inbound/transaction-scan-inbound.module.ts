@@ -5,10 +5,19 @@ import { TransactionScanInboundController } from './transaction-scan-inbound.con
 import { TransactionScanInboundService } from './transaction-scan-inbound.service';
 import { TransactionScanInboundRepository } from './transaction-scan-inbound.repository';
 import { MasterPallet } from 'src/core/domain/entities/master-pallet.entity';
+import { MasterItem } from 'src/core/domain/entities/master-item.entity';
+import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-sub.entity';
 import { MasterPalletModule } from 'src/master-pallet/master-pallet.module';
+import { MasterItemModule } from 'src/master-item/master-item.module';
+import { MasterWarehouseSubModule } from 'src/master-warehouse-sub/master-warehouse-sub.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TransactionScanInbound, MasterPallet]), MasterPalletModule],
+  imports: [
+    TypeOrmModule.forFeature([TransactionScanInbound, MasterPallet, MasterItem, MasterWarehouseSub]), 
+    MasterPalletModule,
+    MasterItemModule,
+    MasterWarehouseSubModule
+  ],
   controllers: [TransactionScanInboundController],
   providers: [TransactionScanInboundService, TransactionScanInboundRepository ],
   exports: [TransactionScanInboundService],
