@@ -225,6 +225,10 @@ export class MasterPalletService {
       throw new NotFoundException(`Pallet with ID ${palletId} not found`);
     }
 
+    const productionDateStr = typeof updateQuantityDto.production_date === 'string'
+      ? updateQuantityDto.production_date
+      : updateQuantityDto.production_date?.toISOString();
+
     await this.createQuantityHistory({
       pallet_id: palletId,
       item_id: updateQuantityDto.item_id,
@@ -237,7 +241,7 @@ export class MasterPalletService {
       notes: updateQuantityDto.notes,
       user_id: updateQuantityDto.user_id,
       uom: updateQuantityDto.uom,
-      production_date: updateQuantityDto.production_date?.toISOString(),
+      production_date: productionDateStr,
       week_number: updateQuantityDto.week_number,
     });
 

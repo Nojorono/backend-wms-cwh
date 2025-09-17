@@ -22,7 +22,7 @@ export class TransactionScanInboundController {
   @ApiOperation({ summary: 'Get all transaction scan inbound records' })
   @ApiResponse({ status: 200, description: 'OK', type: [TransactionScanInbound] })
   @ApiQuery({ name: 'inbound_id', required: true, type: String })
-  @ApiQuery({ name: 'status', required: true, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String })
   findAll(@Query('inbound_id') inbound_id: string, @Query('status') status: string) {
     return this.service.findAll(inbound_id, status);
   }
