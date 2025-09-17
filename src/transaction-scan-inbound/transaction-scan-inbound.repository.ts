@@ -18,12 +18,13 @@ export class TransactionScanInboundRepository {
     return await this.repository.save(entity);
   }
 
-  async findAll(inbound_id: string): Promise<TransactionScanInbound[]> {
+  async findAll(inbound_id: string, status: string): Promise<TransactionScanInbound[]> {
     return await this.repository
       .createQueryBuilder('tsi')
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .where('tsi.inbound_id = :inbound_id', { inbound_id })
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
+      .where('tsi.status = :status', { status })
       .getMany();
   }
 

@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@ne
 import { TransactionScanInboundService } from './transaction-scan-inbound.service';
 import { CreateTransactionScanInboundDto } from './dto/create-transaction-scan-inbound.dto';
 import { UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
-import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
+import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 
 @ApiTags('Transaction Scan Inbound')
 @Controller('transaction-scan-inbound')
@@ -22,8 +22,9 @@ export class TransactionScanInboundController {
   @ApiOperation({ summary: 'Get all transaction scan inbound records' })
   @ApiResponse({ status: 200, description: 'OK', type: [TransactionScanInbound] })
   @ApiQuery({ name: 'inbound_id', required: true, type: String })
-  findAll(@Query('inbound_id') inbound_id: string) {
-    return this.service.findAll(inbound_id);
+  @ApiQuery({ name: 'status', required: true, type: String })
+  findAll(@Query('inbound_id') inbound_id: string, @Query('status') status: string) {
+    return this.service.findAll(inbound_id, status);
   }
 
   @Get(':id')
@@ -46,6 +47,14 @@ export class TransactionScanInboundController {
   @ApiResponse({ status: 200, description: 'Updated', type: TransactionScanInbound })
   update(@Param('id') id: string, @Body() dto: UpdateTransactionScanInboundDto) {
     return this.service.update(id, dto);
+  }
+
+  @Patch('inspection-approved/:id')
+  @ApiOperation({ summary: 'Update the inspection approved of a transaction scan inbound PENING OR COMPLETED' })
+  @ApiResponse({ status: 200, description: 'Updated', type: TransactionScanInbound })
+  @ApiQuery({ name: 'status', required: true, type: String })
+  updateInspectionApproved(@Param('id') id: string, @Query('status') status: ScanInboundStatus) {
+    return this.service.updateInspectionApproved(id, status);
   }
 
   @Delete(':id')

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { TransactionScanInboundRepository } from './transaction-scan-inbound.repository';
 import { CreateTransactionScanInboundDto } from './dto/create-transaction-scan-inbound.dto';
 import { UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
-import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
+import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
 import { MasterItemService } from 'src/master-item/master-item.service';
 import { MasterWarehouseSubService } from 'src/master-warehouse-sub/master-warehouse-sub.service';
@@ -48,8 +48,14 @@ export class TransactionScanInboundService {
     return scan;
   }
 
-  async findAll(inbound_id: string): Promise<TransactionScanInbound[]> {
-    return this.repository.findAll(inbound_id);
+  async findAll(inbound_id: string, status: string): Promise<TransactionScanInbound[]> {
+    return this.repository.findAll(inbound_id, status);
+  }
+
+  async updateInspectionApproved(id: string, status: ScanInboundStatus): Promise<TransactionScanInbound> {
+    const existing = await this.findOne(id);
+    if (!existing) throw new NotFoundException('Transaction scan inbound not found');
+    return this.repository.update(id, { ...existing, status: status });
   }
 
   async findOne(id: string): Promise<TransactionScanInbound> {
