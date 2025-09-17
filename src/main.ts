@@ -48,6 +48,11 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
+      expand: false,
+      docExpansion: 'none',
+      defaultModelsExpandDepth: 0,
+      defaultModelExpandDepth: 0,
+      tryItOutEnabled: true,
     },
   });
 

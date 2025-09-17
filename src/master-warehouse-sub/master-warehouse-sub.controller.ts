@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +18,7 @@ import {
 import { MasterWarehouseSubService } from './master-warehouse-sub.service';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
-import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
+import { MasterWarehouseSub, WarehouseSubStagingType } from '../core/domain/entities/master-warehouse-sub.entity';
 
 @ApiTags('Master Warehouse Sub')
 @Controller('master-warehouse-sub')
@@ -49,8 +50,23 @@ export class MasterWarehouseSubController {
     description: 'Return all Warehouses Sub.',
     type: [MasterWarehouseSub],
   })
-  findAll() {
+  findAll(@Query('is_staging') is_staging?: WarehouseSubStagingType) {
+    if (is_staging) {
+      return this.masterWarehouseSubService.findByIsStaging(is_staging);
+    }
     return this.masterWarehouseSubService.findAll();
+  }
+
+  @Get('is-staging')
+  @ApiOperation({ summary: 'Get a Warehouse Sub by is staging' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return the Warehouse Sub.',
+    type: [MasterWarehouseSub],
+  })
+  @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
+  findByIsStaging(@Query('is_staging') is_staging: WarehouseSubStagingType) {
+    return this.masterWarehouseSubService.findByIsStaging(is_staging);
   }
 
   @Get(':id')

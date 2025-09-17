@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { MasterWarehouseSubRepository } from './master-warehouse-sub.repository';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
-import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-sub.entity';
+import { MasterWarehouseSub, WarehouseSubStagingType } from 'src/core/domain/entities/master-warehouse-sub.entity';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 
 @Injectable()
@@ -112,5 +112,9 @@ export class MasterWarehouseSubService {
   async remove(id: string): Promise<void> {
     await this.findOne(id);
     await this.repository.remove(id);
+  }
+
+  async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByIsStaging(is_staging);
   }
 }
