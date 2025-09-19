@@ -48,8 +48,8 @@ export class TransactionScanInboundService {
     return scan;
   }
 
-  async findAll(inbound_id: string, status: string): Promise<TransactionScanInbound[]> {
-    return this.repository.findAll(inbound_id, status);
+  async findAll(inbound_id: string, status: string, item_id?: string): Promise<TransactionScanInbound[]> {
+    return this.repository.findAll(inbound_id, status, item_id);
   }
 
   async updateInspectionApproved(id: string, status: ScanInboundStatus): Promise<TransactionScanInbound> {
