@@ -131,7 +131,21 @@ export class TransactionScanInboundService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
+    
+    await this.palletService.updateQuantity(existing.pallet_id, {
+      item_id: existing.item_id,
+      quantity: existing.quantity,
+      production_date: existing.production_date,
+      operation_type: QuantityOperationType.REMOVE,
+      reference_id: existing.inbound_id,
+      reference_type: 'INBOUND_SCAN_DELETE',
+      notes: 'Transaction scan inbound deleted',
+      user_id: existing.user_id,
+      uom: existing.uom,
+      week_number: existing.week_number,
+    });
+    
     await this.repository.remove(id);
   }
 }
