@@ -30,6 +30,9 @@ export class InboundDo extends BaseEntity {
   @Column({ default: false })
   flag_validated: boolean;
 
+  @Column({ default: false })
+  validation_surat_jalan: boolean;
+
   @OneToMany(() => InboundItem, (inboundItem) => inboundItem.inbound_do)
   inbound_items: InboundItem[];
 }

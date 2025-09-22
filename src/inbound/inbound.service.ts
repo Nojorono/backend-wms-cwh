@@ -49,6 +49,7 @@ export class InboundService {
             inbound_po_number: doDto.inbound_po_number,
             inbound_po_date: doDto.inbound_po_date ? new Date(doDto.inbound_po_date) : undefined,
             flag_validated: doDto.flag_validated ?? false,
+            validation_surat_jalan: doDto.validation_surat_jalan ?? false,
           });
           if (doDto.inbound_items?.length) {
             for (const itemDto of doDto.inbound_items) {
@@ -141,6 +142,7 @@ export class InboundService {
             inbound_po_number: doDto.inbound_po_number,
             inbound_po_date: doDto.inbound_po_date ? new Date(doDto.inbound_po_date) : undefined,
             flag_validated: doDto.flag_validated ?? false,
+            validation_surat_jalan: doDto.validation_surat_jalan ?? false,
           });
           if (doDto.inbound_items?.length) {
             for (const itemDto of doDto.inbound_items) {

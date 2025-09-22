@@ -39,6 +39,11 @@ export class CreateInboundDoDto {
   @IsString()
   inbound_id?: string;
 
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  validation_surat_jalan?: boolean;
+
   @ApiPropertyOptional({ example: 'DO-001' })
   @IsOptional()
   @IsString()
@@ -135,6 +140,7 @@ export class CreateInboundDto {
         inbound_po_number: 'PO-123',
         inbound_po_date: '2025-08-31T00:00:00.000Z',
         flag_validated: false,
+        validation_surat_jalan: false,
         inbound_items: [
           { item_id: 'uuid-item-1', quantity: 10, uom: 'DUS' },
           { item_id: 'uuid-item-2', quantity: 5, uom: 'DUS' },
