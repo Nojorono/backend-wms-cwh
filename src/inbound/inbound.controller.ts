@@ -8,13 +8,14 @@ import { AssignedHelper } from '../core/domain/entities/assigned-helper.entity';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { DoValidationIntegrationService } from './integration/do-validation.integration';
 
 @ApiTags('Inbound')
 @Controller('inbound')
 @ApiBearerAuth('JWT-auth')
 @ApiExtraModels(CreateInboundDoDto, CreateInboundItemDto, AssignedHelper)
 export class InboundController {
-  constructor(private readonly service: InboundService) {}
+  constructor(private readonly service: InboundService, private readonly doValidationIntegrationService: DoValidationIntegrationService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create inbound with optional DOs and Items' })
@@ -83,6 +84,14 @@ export class InboundController {
   @ApiResponse({ status: 200, type: Inbound })
   findByAssignedHelperId(@Param('id') id: string) {
     return this.service.findByAssignedHelperId(id);
+  }
+
+  // find by surat jalan
+  @Get('do-validation/:suratJalan')
+  @ApiOperation({ summary: 'Find inbound by do validation surat jalan' })
+  @ApiResponse({ status: 200, type: Inbound })
+  findByDoValidationSuratJalan(@Param('suratJalan') suratJalan: string) {
+    return this.doValidationIntegrationService.getDoValidationBySuratJalan(suratJalan);
   }
 
 }
