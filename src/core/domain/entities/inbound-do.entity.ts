@@ -3,6 +3,12 @@ import { InboundItem } from './inbound-item.entity';
 import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
 
+export enum IntegrationStatus {
+  PENDING = 'PENDING',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+}
+
 @Entity('inbound_do')
 export class InboundDo extends BaseEntity {
   @Column({ nullable: true })
@@ -35,4 +41,7 @@ export class InboundDo extends BaseEntity {
 
   @OneToMany(() => InboundItem, (inboundItem) => inboundItem.inbound_do)
   inbound_items: InboundItem[];
+
+  @Column({ nullable: true, default: IntegrationStatus.PENDING })
+  integration_status: IntegrationStatus;
 }

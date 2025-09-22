@@ -9,6 +9,9 @@ import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
+import { UpdateSaldoInspectionDto } from './dto/update-saldo-inspection.dto';
+import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
+import { InboundItem } from '../core/domain/entities/inbound-item.entity';
 
 @ApiTags('Inbound')
 @Controller('inbound')
@@ -92,6 +95,23 @@ export class InboundController {
   @ApiResponse({ status: 200, type: Inbound })
   findByDoValidationSuratJalan(@Param('suratJalan') suratJalan: string) {
     return this.doValidationIntegrationService.getDoValidationBySuratJalan(suratJalan);
+  }
+
+  // update saldo inspection
+  @Patch('inbound-item/:id/saldo-inspection')
+  @ApiOperation({ summary: 'Update inbound item saldo inspection' })
+  @ApiResponse({ status: 200, type: InboundItem })
+  updateInboundItemSaldoInspection(@Param('id') id: string, @Body() dto: UpdateSaldoInspectionDto) {
+    return this.service.updateInboundItemSaldoInspection(id, dto);
+  }
+
+  // bulk update saldo inspection
+  @Patch('inbound-items/bulk/saldo-inspection')
+  @ApiOperation({ summary: 'Bulk update inbound items saldo inspection' })
+  @ApiResponse({ status: 200, type: [InboundItem] })
+  @ApiBody({ type: BulkUpdateSaldoInspectionDto })
+  bulkUpdateInboundItemSaldoInspection(@Body() dto: BulkUpdateSaldoInspectionDto) {
+    return this.service.bulkUpdateInboundItemSaldoInspection(dto);
   }
 
 }

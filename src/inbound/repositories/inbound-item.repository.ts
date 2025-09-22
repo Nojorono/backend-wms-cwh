@@ -55,6 +55,24 @@ export class InboundItemRepository {
   async softRemoveByInboundDo(inbound_do_id: string): Promise<void> {
     await this.repository.softDelete({ inbound_do_id });
   }
+
+  async bulkUpdateSaldoInspection(updates: Array<{id: string, quantity_inspection: number}>): Promise<InboundItem[]> {
+    const results: InboundItem[] = [];
+    
+    for (const update of updates) {
+      const existing = await this.findOne(update.id);
+      if (!existing) {
+        throw new NotFoundException(`Inbound Item with id ${update.id} not found`);
+      }
+      await this.repository.update(update.id, { quantity_inspection: update.quantity_inspection });
+      const updated = await this.findOne(update.id);
+      if (updated) {
+        results.push(updated);
+      }
+    }
+    
+    return results;
+  }
 }
 
 

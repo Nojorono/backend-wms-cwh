@@ -24,6 +24,9 @@ export class InboundItem extends BaseEntity {
 
   @Column({ nullable: true })
   quantity: number;
+  
+  @Column({ nullable: true })
+  quantity_inspection: number;
 
   @Column({ nullable: true })
   classification_id: string;
