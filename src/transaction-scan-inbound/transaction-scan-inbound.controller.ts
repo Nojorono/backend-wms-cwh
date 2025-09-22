@@ -23,8 +23,9 @@ export class TransactionScanInboundController {
   @ApiResponse({ status: 200, description: 'OK', type: [TransactionScanInbound] })
   @ApiQuery({ name: 'inbound_id', required: true, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
-  findAll(@Query('inbound_id') inbound_id: string, @Query('status') status: string) {
-    return this.service.findAll(inbound_id, status);
+  @ApiQuery({ name: 'item_id', required: false, type: String })
+  findAll(@Query('inbound_id') inbound_id: string, @Query('status') status: string, @Query('item_id') item_id: string) {
+    return this.service.findAll(inbound_id, status, item_id);
   }
 
   @Get(':id')
