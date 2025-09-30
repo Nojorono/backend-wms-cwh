@@ -1,6 +1,7 @@
 import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { PalletTransactionHistory } from './transaction-pallet-history.entity';
+import { InventoryTracking } from './inventory-tracking.entity';
 @Entity('m_pallet')
 export class MasterPallet extends BaseEntity {
   @Column({ nullable: true })
@@ -29,4 +30,7 @@ export class MasterPallet extends BaseEntity {
 
   @OneToMany(() => PalletTransactionHistory, (history) => history.pallet)
   transactionHistory: PalletTransactionHistory[];
+
+  @OneToMany(() => InventoryTracking, (inventoryTracking) => inventoryTracking.pallet)
+  inventory_trackings: InventoryTracking[];
 }

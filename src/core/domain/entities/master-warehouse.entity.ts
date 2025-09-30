@@ -1,5 +1,6 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
+import { InventoryTracking } from './inventory-tracking.entity';
 
 @Entity('m_warehouse')
 export class MasterWarehouse extends BaseEntity {
@@ -11,4 +12,7 @@ export class MasterWarehouse extends BaseEntity {
 
   @Column({ nullable: true })
   description: string;
+
+  @OneToMany(() => InventoryTracking, (inventoryTracking) => inventoryTracking.warehouse)
+  inventory_trackings: InventoryTracking[];
 }

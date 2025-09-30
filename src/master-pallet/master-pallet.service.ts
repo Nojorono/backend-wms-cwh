@@ -35,25 +35,25 @@ export class MasterPalletService {
       );
     }
 
-    const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
-      bcid: 'qrcode',
-      text: `${createMasterPalletDto.pallet_code}`,
-      scale: 3,
-      height: 250,
-      width: 250,
-      bucket: 'wms',
-      prefix: 'pallet',
-      extension: 'png',
-      acl: 'public-read',
-      metadata: {
-        pallet_code: createMasterPalletDto.pallet_code,
-        pallet_capacity: createMasterPalletDto.capacity?.toString() || '0',
-      } as Record<string, string>,
-    });
+    // const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
+    //   bcid: 'qrcode',
+    //   text: `${createMasterPalletDto.pallet_code}`,
+    //   scale: 3,
+    //   height: 250,
+    //   width: 250,
+    //   bucket: 'wms',
+    //   prefix: 'pallet',
+    //   extension: 'png',
+    //   acl: 'public-read',
+    //   metadata: {
+    //     pallet_code: createMasterPalletDto.pallet_code,
+    //     pallet_capacity: createMasterPalletDto.capacity?.toString() || '0',
+    //   } as Record<string, string>,
+    // });
 
     const pallet = await this.repository.create({
       ...createMasterPalletDto,
-      qr_image_url: barcodeImageUrl.url,
+      qr_image_url: '',
     });
 
     return pallet;
@@ -106,25 +106,25 @@ export class MasterPalletService {
       (updateMasterPalletDto.pallet_code &&
         updateMasterPalletDto.pallet_code !== pallet.pallet_code)
     ) {
-      await this.barcodeService.deleteBarcodeImage(pallet.qr_image_url);
-      const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode(
-        {
-          bcid: 'qrcode',
-          text: `${updateMasterPalletDto.pallet_code}`,
-          scale: 3,
-          height: 250,
-          width: 250,
-          bucket: 'wms',
-          prefix: 'pallet',
-          extension: 'png',
-          acl: 'public-read',
-          metadata: {
-            pallet_code: updateMasterPalletDto.pallet_code,
-            pallet_capacity: updateMasterPalletDto.capacity?.toString() || '0',
-          } as Record<string, string>,
-        },
-      );
-      updateMasterPalletDto.qr_image_url = barcodeImageUrl.url;
+      // await this.barcodeService.deleteBarcodeImage(pallet.qr_image_url);
+      // const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode(
+      //   {
+      //     bcid: 'qrcode',
+      //     text: `${updateMasterPalletDto.pallet_code}`,
+      //     scale: 3,
+      //     height: 250,
+      //     width: 250,
+      //     bucket: 'wms',
+      //     prefix: 'pallet',
+      //     extension: 'png',
+      //     acl: 'public-read',
+      //     metadata: {
+      //       pallet_code: updateMasterPalletDto.pallet_code,
+      //       pallet_capacity: updateMasterPalletDto.capacity?.toString() || '0',
+      //     } as Record<string, string>,
+      //   },
+      // );
+      updateMasterPalletDto.qr_image_url = '';
     }
     const updatedPallet = await this.repository.update(
       id,

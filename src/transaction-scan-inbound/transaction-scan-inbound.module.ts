@@ -10,13 +10,15 @@ import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-su
 import { MasterPalletModule } from 'src/master-pallet/master-pallet.module';
 import { MasterItemModule } from 'src/master-item/master-item.module';
 import { MasterWarehouseSubModule } from 'src/master-warehouse-sub/master-warehouse-sub.module';
+import { InventoryTrackingModule } from 'src/inventory-tracking/inventory-tracking.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([TransactionScanInbound, MasterPallet, MasterItem, MasterWarehouseSub]), 
     MasterPalletModule,
     MasterItemModule,
-    MasterWarehouseSubModule
+    MasterWarehouseSubModule,
+    InventoryTrackingModule
   ],
   controllers: [TransactionScanInboundController],
   providers: [TransactionScanInboundService, TransactionScanInboundRepository ],

@@ -1,5 +1,6 @@
-import { Entity, Column } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
+import { InventoryTracking } from './inventory-tracking.entity';
 
 export enum WarehouseSubStagingType {
   INBOUND = 'INBOUND',
@@ -31,4 +32,7 @@ export class MasterWarehouseSub extends BaseEntity {
 
   @Column({ nullable: true, name: 'is_staging' })
   is_staging: WarehouseSubStagingType;
+
+  @OneToMany(() => InventoryTracking, (inventoryTracking) => inventoryTracking.warehouseSub)
+  inventory_trackings: InventoryTracking[];
 }

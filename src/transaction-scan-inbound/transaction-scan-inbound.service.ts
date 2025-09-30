@@ -7,6 +7,7 @@ import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
 import { MasterItemService } from 'src/master-item/master-item.service';
 import { MasterWarehouseSubService } from 'src/master-warehouse-sub/master-warehouse-sub.service';
 import { QuantityOperationType } from 'src/core/domain/entities/transaction-pallet-history.entity';
+import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
 
 @Injectable()
 export class TransactionScanInboundService {
@@ -14,7 +15,8 @@ export class TransactionScanInboundService {
     private readonly repository: TransactionScanInboundRepository, 
     private readonly palletService: MasterPalletService,
     private readonly itemService: MasterItemService,
-    private readonly warehouseSubService: MasterWarehouseSubService
+    private readonly warehouseSubService: MasterWarehouseSubService,
+    private readonly inventoryTrackingService: InventoryTrackingService
   ) {}
 
   async create(data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
@@ -55,7 +57,14 @@ export class TransactionScanInboundService {
   async updateInspectionApproved(id: string, status: ScanInboundStatus): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
     if (!existing) throw new NotFoundException('Transaction scan inbound not found');
-    return this.repository.update(id, { ...existing, status: status });
+    const updated = await this.repository.update(id, { ...existing, status: status });
+    // if status is COMPLETED, create or update inventory tracking
+    if (status === ScanInboundStatus.COMPLETED) {
+    const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
+      if (!warehouseSub) throw new NotFoundException('Warehouse sub not found');
+      await this.inventoryTrackingService.createOrUpdateInventoryTracking(existing.pallet_id, existing.m_warehouse_sub_id, warehouseSub.warehouse_id, 'INSPECTION_COMPLETED');
+    }
+    return updated;
   }
 
   async findOne(id: string): Promise<TransactionScanInbound> {
