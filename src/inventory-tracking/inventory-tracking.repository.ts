@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import { InventoryTrackingHistory, InventoryTrackingAction } from '../core/domain/entities/inventory-tracking-history.entity';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
 
@@ -10,11 +11,27 @@ export class InventoryTrackingRepository {
   constructor(
     @InjectRepository(InventoryTracking)
     private readonly repository: Repository<InventoryTracking>,
+    @InjectRepository(InventoryTrackingHistory)
+    private readonly historyRepository: Repository<InventoryTrackingHistory>,
   ) {}
 
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
     const entity = this.repository.create(dto);
-    return await this.repository.save(entity);
+    const saved = await this.repository.save(entity);
+    await this.historyRepository.save(
+      this.historyRepository.create({
+        inventory_tracking_id: saved.id,
+        pallet_id: saved.pallet_id,
+        warehouse_id: saved.warehouse_id,
+        warehouse_sub_id: saved.warehouse_sub_id,
+        warehouse_bin_id: saved.warehouse_bin_id,
+        inventory_date: saved.inventory_date,
+        inventory_status: saved.inventory_status,
+        inventory_note: saved.inventory_note,
+        action: InventoryTrackingAction.CREATED,
+      }),
+    );
+    return saved;
   }
 
   async findAll(): Promise<InventoryTracking[]> {
@@ -59,7 +76,23 @@ export class InventoryTrackingRepository {
       return null;
     }
     await this.repository.update(id, dto as any);
-    return await this.findOne(id);
+    const updated = await this.findOne(id);
+    if (updated) {
+      await this.historyRepository.save(
+        this.historyRepository.create({
+          inventory_tracking_id: updated.id,
+          pallet_id: updated.pallet_id,
+          warehouse_id: updated.warehouse_id,
+          warehouse_sub_id: updated.warehouse_sub_id,
+          warehouse_bin_id: updated.warehouse_bin_id,
+          inventory_date: updated.inventory_date,
+          inventory_status: updated.inventory_status,
+          inventory_note: updated.inventory_note,
+          action: InventoryTrackingAction.UPDATED,
+        }),
+      );
+    }
+    return updated;
   }
 
   async remove(id: string): Promise<void> {

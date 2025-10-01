@@ -25,6 +25,9 @@ export class MasterWarehouseBin extends BaseEntity {
   @Column({ nullable: true, name: 'barcode_image_url' })
   barcode_image_url: string;
 
+  @Column({ nullable: true, name: 'current_pallet' })
+  current_pallet: number;
+
   @OneToMany(() => InventoryTracking, (inventoryTracking) => inventoryTracking.warehouseBin)
   inventory_trackings: InventoryTracking[];
 }

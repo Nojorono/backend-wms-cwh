@@ -13,6 +13,7 @@ import { UpdatePalletQuantityDto, PalletQuantityHistoryResponseDto, PalletCapaci
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import { PalletTransactionHistory, QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
+import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
 export class MasterPalletService {
@@ -261,17 +262,22 @@ export class MasterPalletService {
   }
 
   async getQuantityHistory(palletId: string): Promise<PalletQuantityHistoryResponseDto[]> {
-    await this.findOne(palletId);
-    
-    const history = await this.transactionHistoryRepository.find({
-      where: { pallet_id: palletId },
-      order: { createdAt: 'DESC' },
-    });
 
-    return history.map(record => ({
+    const history = await this.transactionHistoryRepository.createQueryBuilder('history')
+    .leftJoinAndMapOne(
+      'history.item',
+      MasterItem,
+      'item',
+      'item.id = history.item_id::uuid'
+    )    .where('history.pallet_id = :palletId', { palletId })
+    .orderBy('history.createdAt', 'DESC')
+    .getMany();
+
+    return history.map((record: any) => ({
       id: record.id,
       pallet_id: record.pallet_id,
       item_id: record.item_id,
+      item_name: record.item.sku,
       previous_quantity: record.previous_quantity,
       quantity_change: record.quantity_change,
       new_quantity: record.new_quantity,
@@ -290,18 +296,22 @@ export class MasterPalletService {
   async getItemQuantityHistory(palletId: string, itemId: string): Promise<PalletQuantityHistoryResponseDto[]> {
     await this.findOne(palletId);
     
-    const history = await this.transactionHistoryRepository.find({
-      where: { 
-        pallet_id: palletId,
-        item_id: itemId 
-      },
-      order: { createdAt: 'DESC' },
-    });
+    const history = await this.transactionHistoryRepository.createQueryBuilder('history')
+    .leftJoinAndMapOne(
+      'history.item',
+      MasterItem,
+      'item',
+      'item.id = history.item_id'
+    )    .where('history.pallet_id = :palletId', { palletId })
+    .where('history.item_id = :itemId', { itemId })
+    .orderBy('history.createdAt', 'DESC')
+    .getMany();
 
-    return history.map(record => ({
+    return history.map((record: any) => ({
       id: record.id,
       pallet_id: record.pallet_id,
       item_id: record.item_id,
+      item_name: record.item.sku,
       previous_quantity: record.previous_quantity,
       quantity_change: record.quantity_change,
       new_quantity: record.new_quantity,
@@ -317,29 +327,40 @@ export class MasterPalletService {
     }));
   }
 
-  async getPalletItemQuantities(palletId: string): Promise<PalletItemQuantityDto[]> {
-    await this.findOne(palletId);
-    
-    const itemQuantities = await this.transactionHistoryRepository
+  async getPalletItemLatestQuantity(palletId: string): Promise<PalletItemQuantityDto[]> {
+    const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
-      .select('history.item_id', 'item_id')
-      .addSelect('history.uom', 'uom')
-      .addSelect('MAX(history.new_quantity)', 'current_quantity')
-      .addSelect('MAX(history.production_date)', 'production_date')
-      .addSelect('MAX(history.createdAt)', 'last_updated')
+      .leftJoinAndMapOne(
+        'history.item',
+        MasterItem,
+        'item',
+        'item.id = history.item_id::uuid'
+      )
       .where('history.pallet_id = :palletId', { palletId })
-      .groupBy('history.item_id, history.uom')
-      .having('MAX(history.new_quantity) > 0')
-      .getRawMany();
-
-    return itemQuantities.map(item => ({
-      item_id: item.item_id,
-      current_quantity: parseInt(item.current_quantity),
-      uom: item.uom,
-      last_updated: item.last_updated,
-      production_date: item.production_date,
+      .andWhere(qb => {
+        const subQuery = qb.subQuery()
+          .select('MAX(h2.createdAt)')
+          .from('transaction_pallet_history', 'h2')
+          .where('h2.item_id = history.item_id')
+          .andWhere('h2.pallet_id = :palletId')
+          .getQuery();
+        return `history.createdAt = ${subQuery}`;
+      })
+      .setParameter('palletId', palletId);
+  
+    const results = await qb.getMany();
+  
+    return results.map((history: any) => ({
+      item_id: history.item_id,
+      item_name: history.item?.sku,
+      current_quantity: history.new_quantity,   // use your latest field
+      uom: history.uom,
+      last_updated: history.createdAt,
+      production_date: history.production_date,
+      week_number: history.week_number,
     }));
   }
+  
 
   async getQuantityHistoryByPalletCode(palletCode: string): Promise<PalletQuantityHistoryResponseDto[]> {
     const pallet = await this.repository.findByPalletCode(palletCode);
@@ -362,13 +383,13 @@ export class MasterPalletService {
     return this.getItemQuantityHistory(pallet.id, itemId);
   }
 
-  async getPalletItemQuantitiesByPalletCode(palletCode: string): Promise<PalletItemQuantityDto[]> {
+  async getPalletItemLatestQuantityByPalletCode(palletCode: string): Promise<PalletItemQuantityDto[]> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
       throw new NotFoundException(`Pallet with code ${palletCode} not found`);
     }
 
-    return this.getPalletItemQuantities(pallet.id);
+    return this.getPalletItemLatestQuantity(pallet.id);
   }
 
   async validateCapacityByPalletCode(palletCode: string): Promise<PalletCapacityValidationDto> {

@@ -117,7 +117,7 @@ export class MasterPalletController {
     return this.masterPalletService.getQuantityHistoryByPalletCode(palletCode);
   }
 
-  @Get('by-code/:palletCode/items')
+  @Get('by-code/:palletCode/current')
   @ApiOperation({ summary: 'Get all items and their quantities on a pallet by pallet code' })
   @ApiResponse({
     status: 200,
@@ -125,8 +125,8 @@ export class MasterPalletController {
     type: [PalletItemQuantityDto],
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  getPalletItemQuantitiesByPalletCode(@Param('palletCode') palletCode: string) {
-    return this.masterPalletService.getPalletItemQuantitiesByPalletCode(palletCode);
+  getPalletItemLatestQuantityByPalletCode(@Param('palletCode') palletCode: string) {
+    return this.masterPalletService.getPalletItemLatestQuantityByPalletCode(palletCode);
   }
 
   @Get('by-code/:palletCode/capacity-validation')

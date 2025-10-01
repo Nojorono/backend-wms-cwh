@@ -24,6 +24,7 @@ import { AssignedHelperModule } from './assigned-helper/assigned-helper.module';
 import { PaginationModule } from './core/modules/pagination.module';
 import { TransactionScanInboundModule } from './transaction-scan-inbound/transaction-scan-inbound.module';
 import { InventoryTrackingModule } from './inventory-tracking/inventory-tracking.module';
+import { PutAwayModule } from './put-away/put-away.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { InventoryTrackingModule } from './inventory-tracking/inventory-tracking
     PaginationModule,
     TransactionScanInboundModule,
     InventoryTrackingModule,
+    PutAwayModule,
   ],
   providers: [
     {

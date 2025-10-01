@@ -66,6 +66,9 @@ export class PalletQuantityHistoryResponseDto {
   @ApiProperty({ example: 'uuid-item-123' })
   item_id: string;
 
+  @ApiProperty({ example: 'Item Name' })
+  item_name: string;
+
   @ApiProperty({ example: 5 })
   previous_quantity: number;
 

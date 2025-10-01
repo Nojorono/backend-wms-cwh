@@ -14,6 +14,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { MasterWarehouseSubService } from './master-warehouse-sub.service';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
@@ -50,11 +51,13 @@ export class MasterWarehouseSubController {
     description: 'Return all Warehouses Sub.',
     type: [MasterWarehouseSub],
   })
+  @ApiQuery({ name: 'is_staging', required: false, enum: WarehouseSubStagingType })
   findAll(@Query('is_staging') is_staging?: WarehouseSubStagingType) {
     if (is_staging) {
       return this.masterWarehouseSubService.findByIsStaging(is_staging);
+    } else if (is_staging === undefined) {
+      return this.masterWarehouseSubService.findAll();
     }
-    return this.masterWarehouseSubService.findAll();
   }
 
   @Get('is-staging')
