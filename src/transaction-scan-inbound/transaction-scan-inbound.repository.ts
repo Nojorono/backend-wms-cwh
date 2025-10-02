@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, UpdateResult } from 'typeorm';
 import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 import { CreateTransactionScanInboundDto, CreateTransactionScanInboundDtoPallet } from './dto/create-transaction-scan-inbound.dto';
-import { UpdateManyStatusToPendingDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
+import { UpdateManyStatusToDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
@@ -69,8 +69,8 @@ export class TransactionScanInboundRepository {
       .getMany();
   }
 
-  async updateManyStatusToPending(dto: UpdateManyStatusToPendingDto): Promise<UpdateResult> {
-    return await this.repository.update(dto.ids, { status: ScanInboundStatus.PENDING });
+  async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus): Promise<UpdateResult> {
+    return await this.repository.update(dto.ids, { status: status });
   }
 }
 

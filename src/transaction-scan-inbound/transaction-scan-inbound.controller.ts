@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TransactionScanInboundService } from './transaction-scan-inbound.service';
 import { CreateTransactionScanInboundDto } from './dto/create-transaction-scan-inbound.dto';
-import { UpdateManyStatusToPendingDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
+import { UpdateManyStatusToDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
 import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 
 @ApiTags('Transaction Scan Inbound')
@@ -66,12 +66,12 @@ export class TransactionScanInboundController {
   }
 
   // update many status to PENDING
-  @Post('update-many-status-to-pending')
-  @ApiOperation({ summary: 'Update many status to PENDING' })
+  @Post('update-many-status-to/:status')
+  @ApiOperation({ summary: 'Update many status to PENDING or COMPLETED' })
   @ApiResponse({ status: 200, description: 'Updated' })
-  @ApiBody({ type: UpdateManyStatusToPendingDto })
-  updateManyStatusToPending(@Body() dto: UpdateManyStatusToPendingDto) {
-    return this.service.updateManyStatusToPending(dto);
+  @ApiBody({ type: UpdateManyStatusToDto })
+  updateManyStatusToPending(@Body() dto: UpdateManyStatusToDto, @Param('status') status: ScanInboundStatus) {
+    return this.service.updateManyStatusTo(dto, status);
   }
 }
 
