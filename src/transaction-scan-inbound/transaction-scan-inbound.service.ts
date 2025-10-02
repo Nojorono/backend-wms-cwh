@@ -162,6 +162,11 @@ export class TransactionScanInboundService {
   async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus): Promise<UpdateResult> {
     return this.repository.updateManyStatusTo(dto, status);
   }
+
+  async updateChangePallet(id: string, data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
+    this.remove(id);
+    return this.create(data as CreateTransactionScanInboundDto);
+  }
 }
 
 

@@ -73,6 +73,15 @@ export class TransactionScanInboundController {
   updateManyStatusToPending(@Body() dto: UpdateManyStatusToDto, @Param('status') status: ScanInboundStatus) {
     return this.service.updateManyStatusTo(dto, status);
   }
+
+  // update change pallet
+  @Post('change-pallet/:id')
+  @ApiOperation({ summary: 'Update change pallet' })
+  @ApiResponse({ status: 200, description: 'Updated' })
+  @ApiBody({ type: CreateTransactionScanInboundDto })
+  updateChangePallet(@Param('id') id: string, @Body() dto: CreateTransactionScanInboundDto) {
+    return this.service.updateChangePallet(id, dto);
+  }
 }
 
 
