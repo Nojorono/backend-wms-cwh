@@ -6,7 +6,9 @@ import { InventoryTracking } from '../core/domain/entities/inventory-tracking.en
 
 @Injectable()
 export class InventoryTrackingService {
-  constructor(private readonly repository: InventoryTrackingRepository) {}
+  constructor(
+    private readonly repository: InventoryTrackingRepository, 
+   ) {}
 
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
     return this.repository.create(dto);

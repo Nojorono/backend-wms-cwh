@@ -120,4 +120,59 @@ export class MasterWarehouseBinController {
   remove(@Param('id') id: string) {
     return this.masterWarehouseBinService.remove(id);
   }
+
+  @Get('suggestion/in')
+  @ApiOperation({ summary: 'Get inventory tracking list with status INSPECTION_APPROVED for put away with suggestion destination' })
+  @ApiResponse({ status: 200, description: 'OK' })
+  suggestionDestinationIn() {
+    return this.masterWarehouseBinService.suggestionDestinationIn();
+  }
+
+  @Get('suggestion/staging-pallets')
+  @ApiOperation({ summary: 'Get pallets in staging areas with smart suggested destination bin and zone based on same items/weeks' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns each staging pallet with intelligent suggestions based on item and week matching formula',
+    schema: {
+      type: 'object',
+      properties: {
+        palletSuggestions: {
+          type: 'array',
+          description: 'Array of intelligent pallet suggestions with item/week matching',
+          items: {
+            type: 'object',
+            properties: {
+              stagingPallet: {
+                type: 'object',
+                description: 'Pallet currently in staging area with INSPECTION_APPROVED status'
+              },
+              suggestedBin: {
+                type: 'object', 
+                description: 'Smart suggested destination bin (prioritizes bins with same items/weeks)'
+              },
+              suggestedZone: {
+                type: 'object',
+                description: 'Smart suggested destination zone (prioritizes zones with same items/weeks)'
+              },
+              palletItems: {
+                type: 'array',
+                description: 'Items and weeks contained in this pallet'
+              },
+              matchingBinsForSameItem: {
+                type: 'array',
+                description: 'All bins that already contain same items or weeks as this pallet'
+              },
+              matchingZonesForSameItem: {
+                type: 'array',
+                description: 'All zones that already contain same items or weeks as this pallet'
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+  getStagingPalletsWithSuggestions() {
+    return this.masterWarehouseBinService.getStagingPalletsWithSuggestions();
+  }
 }

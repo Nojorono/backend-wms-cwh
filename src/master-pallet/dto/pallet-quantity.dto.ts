@@ -114,6 +114,9 @@ export class PalletItemQuantityDto {
   @ApiProperty({ example: 'uuid-item-123' })
   item_id: string;
 
+  @ApiPropertyOptional({ example: 'JAZY-KRETEK', description: 'Item name/SKU' })
+  item_name?: string;
+
   @ApiProperty({ example: 50, description: 'Current quantity of this item on the pallet' })
   current_quantity: number;
 
