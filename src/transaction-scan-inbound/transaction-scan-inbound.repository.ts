@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
+import { Repository, UpdateResult } from 'typeorm';
+import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 import { CreateTransactionScanInboundDto, CreateTransactionScanInboundDtoPallet } from './dto/create-transaction-scan-inbound.dto';
-import { UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
+import { UpdateManyStatusToPendingDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
@@ -67,6 +67,10 @@ export class TransactionScanInboundRepository {
       .where('tsi.inbound_id = :inbound_id', { inbound_id })
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
       .getMany();
+  }
+
+  async updateManyStatusToPending(dto: UpdateManyStatusToPendingDto): Promise<UpdateResult> {
+    return await this.repository.update(dto.ids, { status: ScanInboundStatus.PENDING });
   }
 }
 

@@ -6,6 +6,7 @@ import { MasterItem } from './master-item.entity';
 import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 
 export enum ScanInboundStatus {
+  OPEN = 'OPEN',
   PENDING = 'PENDING',
   COMPLETED = 'COMPLETED',
 }

@@ -1,13 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { TransactionScanInboundRepository } from './transaction-scan-inbound.repository';
 import { CreateTransactionScanInboundDto } from './dto/create-transaction-scan-inbound.dto';
-import { UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
+import { UpdateManyStatusToPendingDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
 import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
 import { MasterItemService } from 'src/master-item/master-item.service';
 import { MasterWarehouseSubService } from 'src/master-warehouse-sub/master-warehouse-sub.service';
 import { QuantityOperationType } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
+import { UpdateResult } from 'typeorm';
 
 @Injectable()
 export class TransactionScanInboundService {
@@ -156,6 +157,10 @@ export class TransactionScanInboundService {
     });
     
     await this.repository.remove(id);
+  }
+
+  async updateManyStatusToPending(dto: UpdateManyStatusToPendingDto): Promise<UpdateResult> {
+    return this.repository.updateManyStatusToPending(dto);
   }
 }
 
