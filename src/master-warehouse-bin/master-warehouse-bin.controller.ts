@@ -121,14 +121,7 @@ export class MasterWarehouseBinController {
     return this.masterWarehouseBinService.remove(id);
   }
 
-  @Get('suggestion/in')
-  @ApiOperation({ summary: 'Get inventory tracking list with status INSPECTION_APPROVED for put away with suggestion destination' })
-  @ApiResponse({ status: 200, description: 'OK' })
-  suggestionDestinationIn() {
-    return this.masterWarehouseBinService.suggestionDestinationIn();
-  }
-
-  @Get('suggestion/staging-pallets')
+  @Get('suggestion/put-away')
   @ApiOperation({ summary: 'Get pallets in staging areas with smart suggested destination bin and zone based on same items/weeks' })
   @ApiResponse({ 
     status: 200, 
@@ -158,14 +151,6 @@ export class MasterWarehouseBinController {
                 type: 'array',
                 description: 'Items and weeks contained in this pallet'
               },
-              matchingBinsForSameItem: {
-                type: 'array',
-                description: 'All bins that already contain same items or weeks as this pallet'
-              },
-              matchingZonesForSameItem: {
-                type: 'array',
-                description: 'All zones that already contain same items or weeks as this pallet'
-              }
             }
           }
         }
