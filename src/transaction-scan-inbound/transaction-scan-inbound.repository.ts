@@ -5,6 +5,7 @@ import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entiti
 import { CreateTransactionScanInboundDto, CreateTransactionScanInboundDtoPallet } from './dto/create-transaction-scan-inbound.dto';
 import { UpdateManyStatusToDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
+import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-sub.entity';
 
 @Injectable()
 export class TransactionScanInboundRepository {
@@ -23,6 +24,7 @@ export class TransactionScanInboundRepository {
       .createQueryBuilder('tsi')
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
+      .leftJoinAndMapOne('tsi.warehouseSub', MasterWarehouseSub, 'warehouseSub', 'warehouseSub.id = tsi.m_warehouse_sub_id')
       .where('tsi.inbound_id = :inbound_id', { inbound_id });
 
     if (status) {
@@ -42,6 +44,7 @@ export class TransactionScanInboundRepository {
       .where('tsi.id = :id', { id })
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
+      .leftJoinAndMapOne('tsi.warehouseSub', MasterWarehouseSub, 'warehouseSub', 'warehouseSub.id = tsi.m_warehouse_sub_id')
       .getOne();
     if (!entity) return null;
     return entity;
@@ -79,6 +82,7 @@ export class TransactionScanInboundRepository {
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .where('tsi.inbound_id = :inbound_id', { inbound_id })
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
+      .leftJoinAndMapOne('tsi.warehouseSub', MasterWarehouseSub, 'warehouseSub', 'warehouseSub.id = tsi.m_warehouse_sub_id')
       .getMany();
   }
 
