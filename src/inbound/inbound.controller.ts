@@ -97,14 +97,6 @@ export class InboundController {
     return this.doValidationIntegrationService.getDoValidationBySuratJalan(suratJalan);
   }
 
-  // update saldo inspection
-  @Patch('inbound-item/:id/saldo-inspection')
-  @ApiOperation({ summary: 'Update inbound item saldo inspection' })
-  @ApiResponse({ status: 200, type: InboundItem })
-  updateInboundItemSaldoInspection(@Param('id') id: string, @Body() dto: UpdateSaldoInspectionDto) {
-    return this.service.updateInboundItemSaldoInspection(id, dto);
-  }
-
   // bulk update saldo inspection
   @Patch('inbound-items/bulk/saldo-inspection')
   @ApiOperation({ summary: 'Bulk update inbound items saldo inspection' })

@@ -13,6 +13,10 @@ export class BulkUpdateSaldoInspectionItemDto {
 }
 
 export class BulkUpdateSaldoInspectionDto {
+  @ApiProperty({ description: 'Inbound item ID' })
+  @IsString()
+  inbound_do_id: string;
+
   @ApiProperty({ 
     description: 'Array of inbound items to update',
     type: [BulkUpdateSaldoInspectionItemDto]

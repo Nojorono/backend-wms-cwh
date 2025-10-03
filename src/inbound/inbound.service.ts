@@ -12,6 +12,7 @@ import { PaginationService } from '../core/services/pagination.service';
 import { UpdateSaldoInspectionDto } from './dto/update-saldo-inspection.dto';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem } from '../core/domain/entities/inbound-item.entity';
+import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 
 @Injectable()
 export class InboundService {
@@ -201,24 +202,17 @@ export class InboundService {
     return await this.inboundRepo.findAllTransactionScanInbound(status);
   }
 
-  async updateInboundItemSaldoInspection(id: string, payload: UpdateSaldoInspectionDto): Promise<InboundItem> {
-    await this.findOne(id);
-    const updated = await this.inboundItemRepo.update(id, {
-      quantity_inspection: payload.quantity_inspection,
-    });
-    if (!updated) {
-      throw new NotFoundException('Inbound item not found after update');
-    }
-    return updated;
-  }
-
   async bulkUpdateInboundItemSaldoInspection(payload: BulkUpdateSaldoInspectionDto): Promise<InboundItem[]> {
     const updates = payload.items.map(item => ({
       id: item.id,
       quantity_inspection: item.quantity_inspection
     }));
     
-    return await this.inboundItemRepo.bulkUpdateSaldoInspection(updates);
+    const updateSaldo = await this.inboundItemRepo.bulkUpdateSaldoInspection(updates); 
+
+    await this.inboundDoRepo.update(payload.inbound_do_id, {integration_status: IntegrationStatus.PENDING})
+
+    return updateSaldo;
   }
 }
 
