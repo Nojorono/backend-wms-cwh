@@ -129,10 +129,6 @@ export class MasterWarehouseBinService {
     await this.repository.remove(id);
   }
 
-  async suggestionDestinationIn(): Promise<MasterWarehouseBin[]>{
-    return await this.repository.suggestionDestinationIn([])
-  }
-
   async getStagingPalletsWithSuggestions(): Promise<{
     palletSuggestions: Array<{
       stagingPallet: any,

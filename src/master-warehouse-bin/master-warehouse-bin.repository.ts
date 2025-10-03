@@ -68,28 +68,6 @@ export class MasterWarehouseBinRepository {
     await this.repository.delete(id);
   }
 
-  async suggestionDestinationOut(): Promise<MasterWarehouseBin[]> {
-    return await this.repository
-      .createQueryBuilder('bin')
-      .leftJoin('bin.inventory_trackings', 'tracking')
-      .leftJoin('tracking.warehouse', 'warehouse')
-      .where('warehouse.name = :outbound', { outbound: 'OUTBOUND' })
-      .andWhere('bin.current_pallet > bin.capacity_pallet')
-      .orderBy('(bin.current_pallet - bin.capacity_pallet)', 'DESC') // most overloaded first
-      .getMany();
-  }
-  
-  async suggestionDestinationIn($list_inventory_in_tracking: InventoryTracking[]): Promise<MasterWarehouseBin[]> {
-    console.log($list_inventory_in_tracking);
-    return await this.repository
-      .createQueryBuilder('bin')
-      .leftJoin('bin.inventory_trackings', 'tracking')
-      .leftJoin('tracking.warehouse', 'warehouse')
-      .where('bin.current_pallet < bin.capacity_pallet')
-      .orderBy('(bin.capacity_pallet - bin.current_pallet)', 'DESC') // most free space first
-      .getMany();
-  }
-
   async getStagingPalletsWithSuggestions(): Promise<{
     palletSuggestions: Array<{
       stagingPallet: InventoryTracking,
