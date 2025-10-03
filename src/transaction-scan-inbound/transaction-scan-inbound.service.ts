@@ -32,6 +32,9 @@ export class TransactionScanInboundService {
       if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
     }
 
+    const findExistPalletSameWeek = await this.repository.findExistPalletSameWeek(data.inbound_id, pallet.id, data.week_number);
+    if(findExistPalletSameWeek) throw new BadRequestException('item in pallet is same week');
+
     const scan = await this.repository.create({
       ...data,
       pallet_id: pallet.id,

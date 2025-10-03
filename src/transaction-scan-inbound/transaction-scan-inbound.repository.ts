@@ -47,6 +47,21 @@ export class TransactionScanInboundRepository {
     return entity;
   }
 
+  async findExistPalletSameWeek(
+    inbound_id: string,
+    pallet_id: string,
+    week_number: number,
+  ): Promise<TransactionScanInbound | null> {
+    return await this.repository.findOne({
+      where: {
+        inbound_id,
+        pallet_id,
+        week_number,
+      },
+    });
+  }
+  
+
   async update(id: string, data: UpdateTransactionScanInboundDto): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
     if (!existing) throw new NotFoundException('Transaction scan inbound not found');
