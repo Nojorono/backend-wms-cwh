@@ -47,16 +47,14 @@ export class TransactionScanInboundRepository {
     return entity;
   }
 
-  async findExistPalletSameWeek(
+  async findExistPallet(
     inbound_id: string,
     pallet_id: string,
-    week_number: number,
   ): Promise<TransactionScanInbound | null> {
     return await this.repository.findOne({
       where: {
         inbound_id,
         pallet_id,
-        week_number,
       },
     });
   }
