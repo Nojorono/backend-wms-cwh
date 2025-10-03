@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PutAwayTransaction } from 'src/core/domain/entities/transaction-put-away.entity';
+import { PutAwayTransaction, Status } from 'src/core/domain/entities/transaction-put-away.entity';
 import { CreatePutAwayDto, UpdatePutAwayDto } from './dto/create-put-away.dto';
 import { MasterWarehouseBin } from 'src/core/domain/entities/master-warehouse-bin.entity';
 
@@ -48,6 +48,27 @@ export class PutAwayRepository {
 
   async remove(id: string): Promise<void> {
     await this.repository.delete(id);
+  }
+
+  async findTaskByDriverId(driver_id: string): Promise<PutAwayTransaction[]> {
+    const queryBuilder = this.repository
+      .createQueryBuilder('pta')
+      .where('pta.forklift_driver_id = :forklift_driver_id', { forklift_driver_id: driver_id })
+      .andWhere('pta.status = :status', { status: Status.PENDING })
+      .getMany();
+    if (!queryBuilder) return [];
+    return queryBuilder;
+  }
+
+  async findTaskHistoryByDriverId(driver_id: string): Promise<PutAwayTransaction[]> {
+    const queryBuilder = this.repository
+      .createQueryBuilder('pta')
+      .where('pta.forklift_driver_id = :forklift_driver_id', { forklift_driver_id: driver_id })
+      .andWhere('pta.status = :status', { status: Status.COMPLETED })
+      .orderBy('pta.created_at', 'DESC')
+      .getMany();
+    if (!queryBuilder) return [];
+    return queryBuilder;
   }
 }
 

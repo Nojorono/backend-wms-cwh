@@ -35,6 +35,14 @@ export class PutAwayService {
     await this.findOne(id);
     await this.repository.remove(id);
   }
+
+  async findTaskByDriverId(driver_id: string): Promise<PutAwayTransaction[]> {
+    return this.repository.findTaskByDriverId(driver_id);
+  }
+
+  async findTaskHistoryByDriverId(driver_id: string): Promise<PutAwayTransaction[]> {
+    return this.repository.findTaskHistoryByDriverId(driver_id);
+  }
 }
 
 

@@ -160,6 +160,15 @@ export class TransactionScanInboundService {
   }
 
   async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus): Promise<UpdateResult> {
+    if (status === ScanInboundStatus.COMPLETED) {
+      for (const id of dto.ids) {
+        const existing = await this.findOne(id);
+        if (!existing) throw new NotFoundException('Transaction scan inbound not found');
+        const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
+        if (!warehouseSub) throw new NotFoundException('Warehouse sub not found');
+        await this.inventoryTrackingService.createOrUpdateInventoryTracking(existing.pallet_id, existing.m_warehouse_sub_id, warehouseSub.warehouse_id, 'INSPECTION_COMPLETED');
+      }
+    }
     return this.repository.updateManyStatusTo(dto, status);
   }
 

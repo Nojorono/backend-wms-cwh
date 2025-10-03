@@ -3,7 +3,6 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { CreatePutAwayDto, UpdatePutAwayDto } from './dto/create-put-away.dto';
 import { PutAwayTransaction } from '../core/domain/entities/transaction-put-away.entity';
 import { PutAwayService } from './put-away.service';
-import { InventoryTracking } from 'src/core/domain/entities/inventory-tracking.entity';
 
 
 @ApiTags('Put Away')
@@ -49,12 +48,19 @@ export class PutAwayController {
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
-  //inventory tracking list with status INSPECTION_APPROVED for put away with suggestion destination
-  @Get('inventory-inspected')
-  @ApiOperation({ summary: 'Get inventory tracking list with status INSPECTION_APPROVED for put away with suggestion destination' })
-  @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
-  suggestionDestinationIn() {
-    // return this.service.suggestionDestinationIn();
+
+  @Get('find-task/:driver_id')
+  @ApiOperation({ summary: 'Get Put Away task by driver id' })
+  @ApiResponse({ status: 200, description: 'OK', type: [PutAwayTransaction] })
+  findTaskByDriverId(@Param('driver_id') driver_id: string) {
+    return this.service.findTaskByDriverId(driver_id);
+  }
+
+  @Get('find-task-history/:driver_id')
+  @ApiOperation({ summary: 'Get Put Away task history by driver id' })
+  @ApiResponse({ status: 200, description: 'OK', type: [PutAwayTransaction] })
+  findTaskHistoryByDriverId(@Param('driver_id') driver_id: string) {
+    return this.service.findTaskHistoryByDriverId(driver_id);
   }
 }
 
