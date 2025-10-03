@@ -66,8 +66,8 @@ import { PutAwayModule } from './put-away/put-away.module';
     AssignedHelperModule,
     PaginationModule,
     TransactionScanInboundModule,
-    InventoryTrackingModule,
     PutAwayModule,
+    InventoryTrackingModule,
   ],
   providers: [
     {
