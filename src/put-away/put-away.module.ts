@@ -4,11 +4,16 @@ import { PutAwayController } from './put-away.controller';
 import { PutAwayService } from './put-away.service';
 import { PutAwayRepository } from './put-away.repository';
 import { PutAwayTransaction } from 'src/core/domain/entities/transaction-put-away.entity';
+import { InventoryTrackingModule } from 'src/inventory-tracking/inventory-tracking.module';
+import { MasterWarehouseBinModule } from 'src/master-warehouse-bin/master-warehouse-bin.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PutAwayTransaction])],
+  imports: [TypeOrmModule.forFeature([PutAwayTransaction]),
+  InventoryTrackingModule,
+  MasterWarehouseBinModule
+  ],
   controllers: [PutAwayController],
-  providers: [PutAwayService, PutAwayRepository],
+  providers: [ PutAwayService, PutAwayRepository ],
   exports: [PutAwayService],
 })
 export class PutAwayModule {}

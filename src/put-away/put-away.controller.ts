@@ -62,6 +62,15 @@ export class PutAwayController {
   findTaskHistoryByDriverId(@Param('driver_id') driver_id: string) {
     return this.service.findTaskHistoryByDriverId(driver_id);
   }
+
+  @Post('task-completed/:id')
+  @ApiOperation({ summary: 'Confirm completed Put Away task by id' })
+  @ApiResponse({ status: 200, description: 'Completed' })
+  @ApiResponse({ status: 404, description: 'Not found' })
+  taskCompleted(@Param('id') id: string) {
+    return this.service.taskCompleted(id);
+  }
+
 }
 
 
