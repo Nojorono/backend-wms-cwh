@@ -40,6 +40,27 @@ export class InventoryTrackingRepository {
     });
   }
 
+  async findAllByWarehouse(
+    warehouse_sub_id?: string,
+    warehouse_bin_id?: string,
+  ): Promise<InventoryTracking[]> {
+    const qb = this.repository.createQueryBuilder('inventory')
+      .leftJoinAndSelect('inventory.pallet', 'pallet')
+      .leftJoinAndSelect('inventory.warehouse', 'warehouse')
+      .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
+      .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin');
+  
+    if (warehouse_sub_id) {
+      qb.andWhere('warehouseSub.id = :warehouse_sub_id', { warehouse_sub_id });
+    }
+  
+    if (warehouse_bin_id) {
+      qb.andWhere('warehouseBin.id = :warehouse_bin_id', { warehouse_bin_id });
+    }
+  
+    return await qb.getMany();
+  }
+
   async findOne(id: string): Promise<InventoryTracking | null> {
     const entity = await this.repository.findOne({ 
       where: { id },

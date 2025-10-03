@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
@@ -25,6 +25,18 @@ export class InventoryTrackingController {
   findAll() {
     return this.service.findAll();
   }
+
+  @Get('warehouse')
+  @ApiOperation({ summary: 'Get inventory tracking by warehouse/sub/bin' })
+  @ApiQuery({ name: 'warehouse_sub_id', required: false, type: String })
+  @ApiQuery({ name: 'warehouse_bin_id', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
+  findAllByWarehouse(
+    @Query('warehouse_sub_id') warehouse_sub_id?: string,
+    @Query('warehouse_bin_id') warehouse_bin_id?: string,
+  ) {
+    return this.service.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+  } 
 
   @Get('history/:pallet_id')
   @ApiOperation({ summary: 'Get inventory tracking history by pallet id' })

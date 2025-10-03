@@ -64,7 +64,7 @@ export class PutAwayService {
       warehouse_sub_id: warehouseBin.warehouse_sub_id,
       inventory_note: 'Put Away completed by ' + existing.driver_name,
       inventory_date: new Date(),
-      inventory_status: 'PUT_AWAY_COMPLETED' });
+      inventory_status: 'IN_INVENTORY' });
     return updated;
   }
 }

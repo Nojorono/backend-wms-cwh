@@ -17,6 +17,10 @@ export class InventoryTrackingService {
   async findAll(): Promise<InventoryTracking[]> {
     return this.repository.findAll();
   }
+  
+  async findAllByWarehouse(warehouse_sub_id, warehouse_bin_id): Promise<InventoryTracking[]> {
+    return this.repository.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+  }
 
   async findOneHistoryByPalletId(pallet_id: string): Promise<InventoryTracking> {
     const entity = await this.repository.findOneHistoryByPalletId(pallet_id);
