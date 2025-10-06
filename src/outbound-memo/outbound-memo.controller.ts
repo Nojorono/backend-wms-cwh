@@ -199,4 +199,16 @@ export class OutboundMemoController {
   async remove(@Param('id') id: string) {
     return this.outboundMemoService.remove(id);
   }
+  // approved outbound memo
+  @Post(':id/approved')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Approved outbound memo' })
+  @ApiParam({ name: 'id', description: 'ID outbound memo' })
+  @ApiResponse({
+    status: 200,
+    description: 'Outbound memo berhasil diapproved',
+  })
+  async approved(@Param('id') id: string) {
+    return this.outboundMemoService.updateStatus(id, OutboundMemoStatus.APPROVED);
+  }
 }
