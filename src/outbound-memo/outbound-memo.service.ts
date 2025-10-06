@@ -1,0 +1,108 @@
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { OutboundMemoRepository } from './outbound-memo.repository';
+import { CreateOutboundMemoDto } from './dto/create-outbound-memo.dto';
+import { UpdateOutboundMemoDto } from './dto/update-outbound-memo.dto';
+import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
+import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
+
+@Injectable()
+export class OutboundMemoService {
+  constructor(
+    private readonly repository: OutboundMemoRepository,
+  ) {}
+
+  async create(data: CreateOutboundMemoDto): Promise<OutboundMemo> {
+    // Validasi delivery_date tidak boleh di masa lalu
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (new Date(data.delivery_date) < today) {
+      throw new BadRequestException('Delivery date tidak boleh di masa lalu');
+    }
+
+    // Validasi minimal 1 item
+    if (!data.outbound_memo_items || data.outbound_memo_items.length === 0) {
+      throw new BadRequestException('Minimal harus ada 1 item');
+    }
+
+    // Validasi quantity_plan harus positif
+    for (const item of data.outbound_memo_items) {
+      if (item.quantity_plan <= 0) {
+        throw new BadRequestException('Quantity plan harus lebih dari 0');
+      }
+    }
+
+    return this.repository.create(data);
+  }
+
+  async findAll(): Promise<OutboundMemo[]> {
+    return this.repository.findAll();
+  }
+
+  async findOne(id: string): Promise<OutboundMemo> {
+    return this.repository.findOne(id);
+  }
+
+  async update(id: string, data: UpdateOutboundMemoDto): Promise<OutboundMemo> {
+    const existing = await this.repository.findOne(id);
+
+    // Validasi delivery_date jika diupdate
+    if (data.delivery_date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(data.delivery_date) < today) {
+        throw new BadRequestException('Delivery date tidak boleh di masa lalu');
+      }
+    }
+
+    // Validasi quantity_plan jika diupdate
+    if (data.outbound_memo_items) {
+      for (const item of data.outbound_memo_items) {
+        if (item.quantity_plan <= 0) {
+          throw new BadRequestException('Quantity plan harus lebih dari 0');
+        }
+      }
+    }
+
+    // Validasi status transition
+    if (data.status && existing.status !== data.status) {
+      this.validateStatusTransition(existing.status, data.status);
+    }
+
+    return this.repository.update(id, data);
+  }
+
+  async remove(id: string): Promise<void> {
+    const existing = await this.repository.findOne(id);
+    
+    // Validasi tidak bisa delete jika status sudah APPROVED
+    if (existing.status === OutboundMemoStatus.APPROVED) {
+      throw new BadRequestException('Tidak dapat menghapus outbound memo yang sudah APPROVED');
+    }
+
+    return this.repository.remove(id);
+  }
+
+  async findByStatus(status: string): Promise<OutboundMemo[]> {
+    return this.repository.findByStatus(status);
+  }
+
+  async updateStatus(id: string, status: OutboundMemoStatus): Promise<OutboundMemo> {
+    const existing = await this.repository.findOne(id);
+    this.validateStatusTransition(existing.status, status);
+    
+    return this.repository.update(id, { status } as UpdateOutboundMemoDto);
+  }
+
+  private validateStatusTransition(currentStatus: OutboundMemoStatus, newStatus: OutboundMemoStatus): void {
+    const validTransitions: Record<OutboundMemoStatus, OutboundMemoStatus[]> = {
+      [OutboundMemoStatus.PENDING]: [OutboundMemoStatus.APPROVED, OutboundMemoStatus.REJECTED, OutboundMemoStatus.CANCELLED],
+      [OutboundMemoStatus.APPROVED]: [OutboundMemoStatus.CANCELLED],
+      [OutboundMemoStatus.REJECTED]: [OutboundMemoStatus.PENDING],
+      [OutboundMemoStatus.CANCELLED]: [],
+    };
+
+    if (!validTransitions[currentStatus]?.includes(newStatus)) {
+      throw new BadRequestException(`Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`);
+    }
+  }
+}

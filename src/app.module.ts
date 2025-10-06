@@ -25,6 +25,7 @@ import { PaginationModule } from './core/modules/pagination.module';
 import { TransactionScanInboundModule } from './transaction-scan-inbound/transaction-scan-inbound.module';
 import { InventoryTrackingModule } from './inventory-tracking/inventory-tracking.module';
 import { PutAwayModule } from './put-away/put-away.module';
+import { OutboundMemoModule } from './outbound-memo/outbound-memo.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { PutAwayModule } from './put-away/put-away.module';
     TransactionScanInboundModule,
     PutAwayModule,
     InventoryTrackingModule,
+    OutboundMemoModule,
   ],
   providers: [
     {
