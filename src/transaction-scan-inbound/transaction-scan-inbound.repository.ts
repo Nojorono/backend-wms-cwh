@@ -61,6 +61,18 @@ export class TransactionScanInboundRepository {
       },
     });
   }
+
+  async findItemsInPalletWithDifferentWeek(
+    pallet_id: string,
+    week_number: number,
+  ): Promise<TransactionScanInbound[]> {
+    return await this.repository.find({
+      where: {
+        pallet_id,
+      },
+      relations: ['pallet'],
+    });
+  }
   
 
   async update(id: string, data: UpdateTransactionScanInboundDto): Promise<TransactionScanInbound> {

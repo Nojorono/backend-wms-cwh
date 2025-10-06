@@ -32,8 +32,20 @@ export class TransactionScanInboundService {
       if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
     }
 
+    // Validasi week_number untuk pallet yang sama
+    const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(pallet.id, data.week_number);
+    if (existingItemsInPallet.length > 0) {
+      const differentWeekItems = existingItemsInPallet.filter(item => item.week_number !== data.week_number);
+      if (differentWeekItems.length > 0) {
+        throw new BadRequestException(`Pallet sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat menambahkan item dengan week ${data.week_number}`);
+      }
+    }
+
+    // Validasi untuk inbound yang sama
     const findExistPalletSameWeek = await this.repository.findExistPallet(data.inbound_id, pallet.id);
-    if(findExistPalletSameWeek?.week_number != data.week_number) throw new BadRequestException('item in pallet is not same week');
+    if(findExistPalletSameWeek && findExistPalletSameWeek.week_number !== data.week_number) {
+      throw new BadRequestException('Item dalam pallet harus memiliki week yang sama dengan item yang sudah ada di inbound ini');
+    }
 
     const scan = await this.repository.create({
       ...data,
@@ -92,6 +104,15 @@ export class TransactionScanInboundService {
     if (data.m_warehouse_sub_id) {
       const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
       if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
+    }
+
+    // Validasi week_number jika diupdate
+    if (data.week_number !== undefined && data.week_number !== existing.week_number) {
+      const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(existing.pallet_id, data.week_number);
+      const differentWeekItems = existingItemsInPallet.filter(item => item.id !== id && item.week_number !== data.week_number);
+      if (differentWeekItems.length > 0) {
+        throw new BadRequestException(`Pallet sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat mengubah week menjadi ${data.week_number}`);
+      }
     }
 
     const affectsPallet =
@@ -176,6 +197,18 @@ export class TransactionScanInboundService {
   }
 
   async updateChangePallet(id: string, data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
+    // Validasi week_number untuk pallet baru sebelum menghapus yang lama
+    if (data.pallet_code) {
+      const newPallet = await this.palletService.findByPalletCode(data.pallet_code);
+      if (newPallet) {
+        const existingItemsInNewPallet = await this.repository.findItemsInPalletWithDifferentWeek(newPallet.id, data.week_number);
+        const differentWeekItems = existingItemsInNewPallet.filter(item => item.week_number !== data.week_number);
+        if (differentWeekItems.length > 0) {
+          throw new BadRequestException(`Pallet baru sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat memindahkan item dengan week ${data.week_number}`);
+        }
+      }
+    }
+    
     this.remove(id);
     return this.create(data as CreateTransactionScanInboundDto);
   }
