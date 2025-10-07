@@ -26,6 +26,7 @@ import { TransactionScanInboundModule } from './transaction-scan-inbound/transac
 import { InventoryTrackingModule } from './inventory-tracking/inventory-tracking.module';
 import { PutAwayModule } from './put-away/put-away.module';
 import { OutboundMemoModule } from './outbound-memo/outbound-memo.module';
+import { OutboundDoModule } from './outbound-do/outbound-do.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { OutboundMemoModule } from './outbound-memo/outbound-memo.module';
     PutAwayModule,
     InventoryTrackingModule,
     OutboundMemoModule,
+    OutboundDoModule,
   ],
   providers: [
     {
