@@ -17,6 +17,11 @@ export class PutAwayRepository {
     return await this.repository.save(entity);
   }
 
+  async createMany(data: CreatePutAwayDto[]): Promise<PutAwayTransaction[]> {
+    const entities = this.repository.create(data);
+    return await this.repository.save(entities);
+  }
+
   async findAll(): Promise<PutAwayTransaction[]> {
     const queryBuilder = this.repository
       .createQueryBuilder('pta')

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PutAwayRepository } from './put-away.repository';
 import { CreatePutAwayDto, UpdatePutAwayDto } from './dto/create-put-away.dto';
+import { CreateManyPutAwayDto } from './dto/create-many-put-away.dto';
 import { PutAwayTransaction, Status } from 'src/core/domain/entities/transaction-put-away.entity';
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseBinService } from 'src/master-warehouse-bin/master-warehouse-bin.service';
@@ -16,6 +17,10 @@ export class PutAwayService {
 
   async create(dto: CreatePutAwayDto): Promise<PutAwayTransaction> {
     return this.repository.create(dto);
+  }
+
+  async createMany(dto: CreateManyPutAwayDto): Promise<PutAwayTransaction[]> {
+    return this.repository.createMany(dto.data);
   }
 
   async findAll(): Promise<PutAwayTransaction[]> {

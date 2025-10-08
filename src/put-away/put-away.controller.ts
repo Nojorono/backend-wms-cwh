@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CreatePutAwayDto, UpdatePutAwayDto } from './dto/create-put-away.dto';
+import { CreateManyPutAwayDto } from './dto/create-many-put-away.dto';
 import { PutAwayTransaction } from '../core/domain/entities/transaction-put-away.entity';
 import { PutAwayService } from './put-away.service';
 
@@ -16,6 +17,13 @@ export class PutAwayController {
   @ApiResponse({ status: 201, description: 'Created', type: PutAwayTransaction })
   create(@Body() dto: CreatePutAwayDto) {
     return this.service.create(dto);
+  }
+
+  @Post('create-many')
+  @ApiOperation({ summary: 'Create multiple put away records' })
+  @ApiResponse({ status: 201, description: 'Created', type: [PutAwayTransaction] })
+  createMany(@Body() dto: CreateManyPutAwayDto) {
+    return this.service.createMany(dto);
   }
 
   @Get()
