@@ -16,13 +16,16 @@ export class InventoryTrackingRepository {
   ) {}
 
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
-    const entity = this.repository.create(dto);
+    // Extract inbound_id from dto before creating to avoid saving to non-existent column
+    const { inbound_id, ...createData } = dto;
+    
+    const entity = this.repository.create(createData);
     const saved = await this.repository.save(entity);
     
     // Cek apakah sudah ada history dengan inbound_id yang sama
-    if (dto.inbound_id) {
+    if (inbound_id) {
       const existingHistory = await this.historyRepository.findOne({
-        where: { inbound_id: dto.inbound_id }
+        where: { inbound_id: inbound_id }
       });
       
       if (!existingHistory) {
@@ -37,7 +40,7 @@ export class InventoryTrackingRepository {
             inventory_status: saved.inventory_status,
             inventory_note: saved.inventory_note,
             action: InventoryTrackingAction.CREATED,
-            inbound_id: dto.inbound_id,
+            inbound_id: inbound_id,
           }),
         );
       }
@@ -122,13 +125,17 @@ export class InventoryTrackingRepository {
     if (!existing) {
       return null;
     }
-    await this.repository.update(id, dto as any);
+    
+    // Extract inbound_id from dto before updating to avoid updating non-existent column
+    const { inbound_id, ...updateData } = dto;
+    
+    await this.repository.update(id, updateData as any);
     const updated = await this.findOne(id);
     if (updated) {
       // Cek apakah sudah ada history dengan inbound_id yang sama
-      if (dto.inbound_id) {
+      if (inbound_id) {
         const existingHistory = await this.historyRepository.findOne({
-          where: { inbound_id: dto.inbound_id }
+          where: { inbound_id: inbound_id }
         });
         
         if (!existingHistory) {
@@ -143,7 +150,7 @@ export class InventoryTrackingRepository {
               inventory_status: updated.inventory_status,
               inventory_note: updated.inventory_note,
               action: InventoryTrackingAction.UPDATED,
-              inbound_id: dto.inbound_id,
+              inbound_id: inbound_id,
             }),
           );
         }
