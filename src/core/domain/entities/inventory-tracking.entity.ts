@@ -5,6 +5,12 @@ import { MasterPallet } from './master-pallet.entity';
 import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
 
+export enum ProgressionStatus {
+  NOT_STARTED = 'NOT_STARTED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+}
+
 
 @Entity('inventory_tracking')
 export class InventoryTracking extends BaseEntity {
@@ -41,6 +47,9 @@ export class InventoryTracking extends BaseEntity {
 
   @Column({ nullable: true })
   inventory_status: string;
+
+  @Column({ nullable: true, default: ProgressionStatus.NOT_STARTED })
+  progression_status: ProgressionStatus;
 
   @Column({ nullable: true })
   inventory_note: string;

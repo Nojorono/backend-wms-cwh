@@ -59,6 +59,9 @@ export class InventoryTrackingHistory extends BaseEntity {
 
   @Column({ type: 'varchar', length: 32, nullable: false, default: InventoryTrackingAction.CREATED })
   action: InventoryTrackingAction;
+
+  @Column({ nullable: true })
+  inbound_id: string;
 }
 
 

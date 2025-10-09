@@ -51,11 +51,18 @@ export class InventoryTrackingService {
     await this.repository.remove(id);
   }
 
-  async createOrUpdateInventoryTracking(pallet_id: string, warehouse_sub_id: string, warehouse_id: string, inventory_status: string): Promise<InventoryTracking> {
+  async createOrUpdateInventoryTracking(
+    pallet_id: string, 
+    warehouse_sub_id: string, 
+    warehouse_id: string, 
+    inventory_status: string,
+    inbound_id?: string
+  ): Promise<InventoryTracking> {
     const existing = await this.repository.findOneByParams(pallet_id, warehouse_sub_id, warehouse_id);
     if (existing) {
       return this.update(existing.id, { 
-        inventory_status: inventory_status
+        inventory_status: inventory_status,
+        inbound_id: inbound_id
       });
     }
     return this.create({ 
@@ -65,11 +72,61 @@ export class InventoryTrackingService {
       inventory_date: new Date(), 
       inventory_status: inventory_status, 
       inventory_note: 'Inventory tracking created',
+      inbound_id: inbound_id
     });
   }
 
   async findByItemId(item_id: string): Promise<any[]> {
     return this.repository.findByItemId(item_id);
+  }
+
+  // Method untuk mengecek apakah sudah ada history dengan inbound_id yang sama
+  async findHistoryByInboundId(inbound_id: string): Promise<any> {
+    return this.repository.findHistoryByInboundId(inbound_id);
+  }
+
+  // Method untuk mendapatkan semua history berdasarkan inbound_id
+  async findAllHistoryByInboundId(inbound_id: string): Promise<any[]> {
+    return this.repository.findAllHistoryByInboundId(inbound_id);
+  }
+
+  // Method untuk membuat inventory tracking dengan pengecekan duplikasi inbound_id
+  async createWithInboundCheck(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
+    // Jika ada inbound_id, cek apakah sudah ada history dengan inbound_id yang sama
+    if (dto.inbound_id) {
+      const existingHistory = await this.repository.findHistoryByInboundId(dto.inbound_id);
+      if (existingHistory) {
+        throw new Error(`History dengan inbound_id ${dto.inbound_id} sudah ada. Tidak dapat membuat duplikasi.`);
+      }
+    }
+    
+    return this.repository.create(dto);
+  }
+
+  // Method untuk createOrUpdate dengan pengecekan duplikasi inbound_id
+  async createOrUpdateInventoryTrackingWithInboundCheck(
+    pallet_id: string, 
+    warehouse_sub_id: string, 
+    warehouse_id: string, 
+    inventory_status: string,
+    inbound_id?: string
+  ): Promise<InventoryTracking> {
+    // Jika ada inbound_id, cek apakah sudah ada history dengan inbound_id yang sama
+    if (inbound_id) {
+      const existingHistory = await this.repository.findHistoryByInboundId(inbound_id);
+      if (existingHistory) {
+        // Jika sudah ada history dengan inbound_id yang sama, return existing tracking
+        const existingTracking = await this.repository.findOneByParams(pallet_id, warehouse_sub_id, warehouse_id);
+        if (existingTracking) {
+          return existingTracking;
+        }
+        // Jika tidak ada tracking yang sesuai, throw error
+        throw new Error(`History dengan inbound_id ${inbound_id} sudah ada untuk inbound transaction yang berbeda.`);
+      }
+    }
+
+    // Lanjutkan dengan createOrUpdate normal
+    return this.createOrUpdateInventoryTracking(pallet_id, warehouse_sub_id, warehouse_id, inventory_status, inbound_id);
   }
 }
 

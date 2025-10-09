@@ -23,6 +23,47 @@ export class InventoryTrackingController {
     return this.service.create(dto);
   }
 
+  @Post('with-inbound-check')
+  @ApiOperation({ summary: 'Create inventory tracking with inbound_id duplication check' })
+  @ApiResponse({ status: 201, description: 'Created', type: InventoryTracking })
+  @ApiResponse({ status: 400, description: 'Bad Request - Duplicate inbound_id found' })
+  createWithInboundCheck(@Body() dto: CreateInventoryTrackingDto) {
+    return this.service.createWithInboundCheck(dto);
+  }
+
+  @Post('create-or-update-with-inbound-check')
+  @ApiOperation({ summary: 'Create or update inventory tracking with inbound_id duplication check' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        pallet_id: { type: 'string', example: 'pallet-uuid' },
+        warehouse_sub_id: { type: 'string', example: 'warehouse-sub-uuid' },
+        warehouse_id: { type: 'string', example: 'warehouse-uuid' },
+        inventory_status: { type: 'string', example: 'CHECKED' },
+        inbound_id: { type: 'string', example: 'inbound-uuid' }
+      },
+      required: ['pallet_id', 'warehouse_sub_id', 'warehouse_id', 'inventory_status']
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Created or Updated', type: InventoryTracking })
+  @ApiResponse({ status: 400, description: 'Bad Request - Duplicate inbound_id found' })
+  createOrUpdateWithInboundCheck(@Body() body: {
+    pallet_id: string;
+    warehouse_sub_id: string;
+    warehouse_id: string;
+    inventory_status: string;
+    inbound_id?: string;
+  }) {
+    return this.service.createOrUpdateInventoryTrackingWithInboundCheck(
+      body.pallet_id,
+      body.warehouse_sub_id,
+      body.warehouse_id,
+      body.inventory_status,
+      body.inbound_id
+    );
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all inventory tracking records' })
   @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
@@ -47,6 +88,23 @@ export class InventoryTrackingController {
   @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
   findOneHistoryByPalletId(@Param('pallet_id') pallet_id: string) {
     return this.service.findOneHistoryByPalletId(pallet_id);
+  }
+
+  @Get('history/inbound/:inbound_id')
+  @ApiOperation({ summary: 'Get inventory tracking history by inbound_id' })
+  @ApiParam({ name: 'inbound_id', description: 'Inbound transaction ID' })
+  @ApiResponse({ status: 200, description: 'OK', type: 'array' })
+  @ApiResponse({ status: 404, description: 'No history found for this inbound_id' })
+  findHistoryByInboundId(@Param('inbound_id') inbound_id: string) {
+    return this.service.findAllHistoryByInboundId(inbound_id);
+  }
+
+  @Get('check-inbound/:inbound_id')
+  @ApiOperation({ summary: 'Check if history exists for inbound_id' })
+  @ApiParam({ name: 'inbound_id', description: 'Inbound transaction ID' })
+  @ApiResponse({ status: 200, description: 'OK', schema: { type: 'object', properties: { exists: { type: 'boolean' }, history: { type: 'object' } } } })
+  checkInboundId(@Param('inbound_id') inbound_id: string) {
+    return this.service.findHistoryByInboundId(inbound_id);
   }
 
   @Get(':id')

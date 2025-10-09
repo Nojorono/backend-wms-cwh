@@ -1,0 +1,272 @@
+---
+alwaysApply: true
+---
+
+# WMS NestJS Workspace Rules
+
+## Architecture and Project Structure
+
+### Clean Architecture
+- Use Clean Architecture with clear separation between:
+  - `core/` - Domain entities, interfaces, and business logic
+  - `infrastructure/` - Database, external services, and technical implementations
+  - `presentation/` - Controllers and DTOs
+- Each module must follow structure: controller, service, repository, dto, module
+- Use dependency injection with proper decorators (@Injectable, @Controller, etc.)
+
+### Module Structure
+- Each module must have:
+  - `*.controller.ts` - API endpoints
+  - `*.service.ts` - Business logic
+  - `*.repository.ts` - Data access layer
+  - `*.module.ts` - Module configuration
+  - `dto/` folder for request/response DTOs
+- Use naming convention: kebab-case for files and folders
+
+### Domain Entities
+- All entities must extend from `BaseEntity` (UUID, timestamps, soft delete)
+- Use proper TypeORM decorators (@Entity, @Column, @ManyToOne, @JoinColumn)
+- Implement soft delete with `@DeleteDateColumn`
+- Naming convention: snake_case for database columns, camelCase for properties
+- Each entity must have proper relationships with foreign keys
+
+### Repository Pattern
+- Implement repository interface in `core/domain/interfaces/`
+- Concrete implementation in `infrastructure/repositories/`
+- Use dependency injection with interface tokens
+- Repository must handle database operations with proper error handling
+
+## TypeScript and Coding Standards
+
+### Type Safety
+- Avoid using `any` type - use proper typing
+- Use strict null checks and proper type definitions
+- Each function must have explicit return type
+- Use interface for object shapes, type for unions/primitives
+- Use generic types for reusable components
+- Implement proper type guards for runtime type checking
+
+### CommonJS Modules
+- Project uses CommonJS modules (`"module": "commonjs" in tsconfig.json)
+- Import/export statements must be compatible with CommonJS
+- Use `require()` for dynamic imports if needed
+- Import statements must use consistent relative paths
+
+### Error Handling
+- Use custom exception classes that extend from NestJS exceptions
+- Error responses must follow format: `{ success: boolean, message: string, statusCode: number }`
+- Document error handling in Swagger with proper HTTP status codes
+- Implement proper error logging with context information
+- Use try-catch blocks for async operations
+- Handle database connection errors with proper retry mechanisms
+
+## API and Swagger Documentation
+
+### DTOs and Validation
+- Each API endpoint must have proper DTO with class-validator decorators
+- Use Swagger decorators (@ApiProperty, @ApiResponse, etc.) for documentation
+- Response DTOs must include all returned fields
+- Request DTOs must have strict input validation
+- Use @IsOptional() for optional fields, @IsNotEmpty() for required fields
+- Implement custom validators for business rules validation
+- Use @Transform() for data transformation if needed
+
+### API Endpoints
+- Use RESTful conventions for endpoint naming
+- Implement proper HTTP status codes (200, 201, 400, 401, 403, 404, 500)
+- Use pagination for list endpoints with consistent format
+- Document all endpoints with Swagger
+- Use @Public() decorator for public endpoints
+- Implement proper request/response logging for debugging
+
+### Response Format
+- Use consistent response format with success, message, data fields
+- Implement proper pagination response with metadata
+- Handle empty results with proper messaging
+- Use response interceptors for consistent formatting
+
+## Database and Migrations
+
+### TypeORM Configuration
+- Use TypeORM with PostgreSQL
+- Entity files must be in `core/domain/entities/`
+- Use migrations for schema changes
+- Do not use `synchronize: true` in production
+- Implement proper indexing for query performance
+- Use connection pooling for database connections
+- Implement query optimization with proper joins
+
+### Migrations
+- Each migration must have unique timestamp
+- Use descriptive names for migration files
+- Implement rollback strategies for failed migrations
+- Test migrations in development environment before production
+- Backup database before running migrations in production
+
+### Seeding
+- Seeders can only be run via command line (`npm run seed`)
+- Do not expose seeder endpoints in API
+- Use proper transaction handling for seeders
+- Implement idempotent seeders (can be run repeatedly without error)
+- Use proper data validation for seed data
+
+## Security and Authentication
+
+### JWT Authentication
+- Use JWT for authentication
+- Implement proper role-based access control
+- Use guards for endpoint protection
+- Validate JWT tokens at every protected endpoint
+- Implement token refresh mechanism for long-lived sessions
+- Use secure JWT secret with proper environment variables
+
+### Authorization
+- Implement role-based permissions with proper validation
+- Use decorators for permission checking
+- Implement resource-based authorization for data access
+- Validate user permissions before database operations
+
+### Input Validation
+- Use class-validator for all input validation
+- Sanitize input data before processing
+- Implement rate limiting for public endpoints
+- Validate file uploads with proper MIME type checking
+- Implement SQL injection prevention with parameterized queries
+- Use proper CORS configuration for cross-origin requests
+
+## Testing and Quality
+
+### Testing Standards
+- Unit tests for services and repositories
+- Integration tests for API endpoints
+- E2E tests for critical user flows
+- Maintain test coverage > 80%
+- Mock external dependencies in unit tests
+- Use test database for integration tests
+- Implement proper test data setup and cleanup
+
+### Code Quality
+- Use ESLint and Prettier for code formatting
+- Follow consistent naming conventions
+- Write self-documenting code with proper comments
+- Refactor duplicate code
+- Implement proper code review process
+- Use static analysis tools for code quality
+- Maintain consistent code style across the project
+
+### Performance Testing
+- Implement load testing for critical endpoints
+- Monitor database query performance
+- Test with large datasets for scalability
+- Implement proper caching strategies
+
+## Performance and Monitoring
+
+### Database Optimization
+- Use proper indexing for query performance
+- Implement query optimization with proper joins
+- Use connection pooling for database connections
+- Monitor slow queries with proper logging
+- Implement database query caching for frequently accessed data
+- Use database views for complex queries
+
+### Caching
+- Implement caching for frequently accessed data
+- Use Redis for session storage if needed
+- Cache static data that rarely changes
+- Implement cache invalidation strategies
+- Use in-memory caching for application-level data
+- Monitor cache hit rates for optimization
+
+### Monitoring
+- Implement application performance monitoring
+- Log important business events with proper context
+- Monitor database connection pool usage
+- Track API response times and error rates
+- Implement health checks for critical services
+- Use proper logging levels (debug, info, warn, error)
+
+## Deployment and Environment
+
+### Environment Configuration
+- Use ConfigModule for environment variables
+- Separate configuration for development, staging, production
+- Do not hardcode sensitive data
+- Use proper secret management
+- Implement environment-specific database configurations
+- Use proper environment validation
+
+### Logging
+- Implement structured logging with proper format
+- Log important business events with context
+- Use appropriate log levels (debug, info, warn, error)
+- Include request/response logging for debugging
+- Implement log rotation for production
+- Use centralized logging for distributed systems
+
+### Deployment
+- Implement proper health checks
+- Use containerization with Docker
+- Implement proper graceful shutdown
+- Monitor application startup time
+- Implement proper error recovery mechanisms
+
+## WMS Specific Rules
+
+### Business Logic
+- Implement proper inventory tracking with real-time updates
+- Handle inbound/outbound transactions with atomic operations
+- Maintain data consistency for warehouse operations
+- Implement proper validation for warehouse constraints
+- Use FIFO (First In, First Out) for picking operations
+- Implement proper pallet utilization tracking
+- Handle week-based production date management
+
+### Inventory Management
+- Implement real-time inventory tracking with status management
+- Use proper inventory status transitions (IN_INVENTORY, PICKED, SHIPPED)
+- Implement inventory history tracking for audit trail
+- Handle concurrent inventory updates with proper locking
+- Implement inventory validation for business rules
+
+### Warehouse Operations
+- Implement multi-level warehouse structure (warehouse → sub → bin)
+- Use proper location tracking for items
+- Implement picking suggestions with optimization algorithms
+- Handle pallet management with quantity tracking
+- Implement proper warehouse constraints validation
+
+### Data Integrity
+- Use database transactions for multi-table operations
+- Implement proper foreign key constraints
+- Validate business rules in service layer
+- Handle concurrent access for inventory updates
+- Implement proper data validation for warehouse operations
+- Use optimistic locking for concurrent updates
+
+### Integration
+- Implement proper error handling for external services
+- Use message queues for async operations
+- Implement retry mechanisms for failed operations
+- Log integration events for monitoring
+- Implement proper S3 integration for file management
+- Handle barcode generation with proper error handling
+
+### Auto-suggestion System
+- Implement AI-powered warehouse optimization
+- Use proper algorithms for picking suggestions
+- Implement location optimization for warehouse efficiency
+- Handle week-based production optimization
+- Implement proper suggestion ranking algorithms
+
+### Progression Tracking System
+- Implement real-time progression tracking for warehouse operations
+- Use progression percentage (0-100) for tracking completion
+- Implement progression status enum (NOT_STARTED, STARTED, IN_PROGRESS, NEAR_COMPLETION, COMPLETED)
+- Track operator information and timestamps for audit trail
+- Implement progression metadata for additional context
+- Handle progression history with proper action tracking
+- Use progression flags for monitoring warehouse efficiency
+- Implement progression statistics for dashboard reporting
+- Handle concurrent progression updates with proper locking
+- Implement progression validation for business rules

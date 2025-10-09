@@ -78,7 +78,7 @@ export class TransactionScanInboundService {
     if (status === ScanInboundStatus.COMPLETED) {
     const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
       if (!warehouseSub) throw new NotFoundException('Warehouse sub not found');
-      await this.inventoryTrackingService.createOrUpdateInventoryTracking(existing.pallet_id, existing.m_warehouse_sub_id, warehouseSub.warehouse_id, 'INSPECTION_COMPLETED');
+      await this.inventoryTrackingService.createOrUpdateInventoryTracking(existing.pallet_id, existing.m_warehouse_sub_id, warehouseSub.warehouse_id, 'INSPECTION_COMPLETED', existing.inbound_id);
     }
     return updated;
   }
@@ -190,7 +190,7 @@ export class TransactionScanInboundService {
         if (!existing) throw new NotFoundException('Transaction scan inbound not found');
         const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
         if (!warehouseSub) throw new NotFoundException('Warehouse sub not found');
-        await this.inventoryTrackingService.createOrUpdateInventoryTracking(existing.pallet_id, existing.m_warehouse_sub_id, warehouseSub.warehouse_id, 'INSPECTION_COMPLETED');
+        await this.inventoryTrackingService.createOrUpdateInventoryTracking(existing.pallet_id, existing.m_warehouse_sub_id, warehouseSub.warehouse_id, 'INSPECTION_COMPLETED', existing.inbound_id);
       }
     }
     return this.repository.updateManyStatusTo(dto, status);

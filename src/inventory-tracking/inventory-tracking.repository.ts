@@ -18,19 +18,45 @@ export class InventoryTrackingRepository {
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
     const entity = this.repository.create(dto);
     const saved = await this.repository.save(entity);
-    await this.historyRepository.save(
-      this.historyRepository.create({
-        inventory_tracking_id: saved.id,
-        pallet_id: saved.pallet_id,
-        warehouse_id: saved.warehouse_id,
-        warehouse_sub_id: saved.warehouse_sub_id,
-        warehouse_bin_id: saved.warehouse_bin_id,
-        inventory_date: saved.inventory_date,
-        inventory_status: saved.inventory_status,
-        inventory_note: saved.inventory_note,
-        action: InventoryTrackingAction.CREATED,
-      }),
-    );
+    
+    // Cek apakah sudah ada history dengan inbound_id yang sama
+    if (dto.inbound_id) {
+      const existingHistory = await this.historyRepository.findOne({
+        where: { inbound_id: dto.inbound_id }
+      });
+      
+      if (!existingHistory) {
+        await this.historyRepository.save(
+          this.historyRepository.create({
+            inventory_tracking_id: saved.id,
+            pallet_id: saved.pallet_id,
+            warehouse_id: saved.warehouse_id,
+            warehouse_sub_id: saved.warehouse_sub_id,
+            warehouse_bin_id: saved.warehouse_bin_id,
+            inventory_date: saved.inventory_date,
+            inventory_status: saved.inventory_status,
+            inventory_note: saved.inventory_note,
+            action: InventoryTrackingAction.CREATED,
+            inbound_id: dto.inbound_id,
+          }),
+        );
+      }
+    } else {
+      await this.historyRepository.save(
+        this.historyRepository.create({
+          inventory_tracking_id: saved.id,
+          pallet_id: saved.pallet_id,
+          warehouse_id: saved.warehouse_id,
+          warehouse_sub_id: saved.warehouse_sub_id,
+          warehouse_bin_id: saved.warehouse_bin_id,
+          inventory_date: saved.inventory_date,
+          inventory_status: saved.inventory_status,
+          inventory_note: saved.inventory_note,
+          action: InventoryTrackingAction.CREATED,
+        }),
+      );
+    }
+    
     return saved;
   }
 
@@ -99,25 +125,66 @@ export class InventoryTrackingRepository {
     await this.repository.update(id, dto as any);
     const updated = await this.findOne(id);
     if (updated) {
-      await this.historyRepository.save(
-        this.historyRepository.create({
-          inventory_tracking_id: updated.id,
-          pallet_id: updated.pallet_id,
-          warehouse_id: updated.warehouse_id,
-          warehouse_sub_id: updated.warehouse_sub_id,
-          warehouse_bin_id: updated.warehouse_bin_id,
-          inventory_date: updated.inventory_date,
-          inventory_status: updated.inventory_status,
-          inventory_note: updated.inventory_note,
-          action: InventoryTrackingAction.UPDATED,
-        }),
-      );
+      // Cek apakah sudah ada history dengan inbound_id yang sama
+      if (dto.inbound_id) {
+        const existingHistory = await this.historyRepository.findOne({
+          where: { inbound_id: dto.inbound_id }
+        });
+        
+        if (!existingHistory) {
+          await this.historyRepository.save(
+            this.historyRepository.create({
+              inventory_tracking_id: updated.id,
+              pallet_id: updated.pallet_id,
+              warehouse_id: updated.warehouse_id,
+              warehouse_sub_id: updated.warehouse_sub_id,
+              warehouse_bin_id: updated.warehouse_bin_id,
+              inventory_date: updated.inventory_date,
+              inventory_status: updated.inventory_status,
+              inventory_note: updated.inventory_note,
+              action: InventoryTrackingAction.UPDATED,
+              inbound_id: dto.inbound_id,
+            }),
+          );
+        }
+      } else {
+        await this.historyRepository.save(
+          this.historyRepository.create({
+            inventory_tracking_id: updated.id,
+            pallet_id: updated.pallet_id,
+            warehouse_id: updated.warehouse_id,
+            warehouse_sub_id: updated.warehouse_sub_id,
+            warehouse_bin_id: updated.warehouse_bin_id,
+            inventory_date: updated.inventory_date,
+            inventory_status: updated.inventory_status,
+            inventory_note: updated.inventory_note,
+            action: InventoryTrackingAction.UPDATED,
+          }),
+        );
+      }
     }
     return updated;
   }
 
   async remove(id: string): Promise<void> {
     await this.repository.delete(id);
+  }
+
+  // Method untuk mengecek apakah sudah ada history dengan inbound_id yang sama
+  async findHistoryByInboundId(inbound_id: string): Promise<InventoryTrackingHistory | null> {
+    const history = await this.historyRepository.findOne({
+      where: { inbound_id }
+    });
+    return history ?? null;
+  }
+
+  // Method untuk mendapatkan semua history berdasarkan inbound_id
+  async findAllHistoryByInboundId(inbound_id: string): Promise<InventoryTrackingHistory[]> {
+    return await this.historyRepository.find({
+      where: { inbound_id },
+      relations: ['inventoryTracking', 'pallet', 'warehouse', 'warehouseSub', 'warehouseBin'],
+      order: { createdAt: 'DESC' }
+    });
   }
 
   async findByItemId(item_id: string): Promise<any[]> {
