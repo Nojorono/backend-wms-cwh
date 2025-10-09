@@ -67,6 +67,10 @@ export class InventoryTrackingService {
       inventory_note: 'Inventory tracking created',
     });
   }
+
+  async findByItemId(item_id: string): Promise<any[]> {
+    return this.repository.findByItemId(item_id);
+  }
 }
 
 

@@ -119,6 +119,44 @@ export class InventoryTrackingRepository {
   async remove(id: string): Promise<void> {
     await this.repository.delete(id);
   }
+
+  async findByItemId(item_id: string): Promise<any[]> {
+    const query = `
+      SELECT 
+        it.id as inventory_tracking_id,
+        it.pallet_id,
+        p.pallet_code,
+        it.warehouse_id,
+        it.warehouse_sub_id,
+        it.warehouse_bin_id,
+        it.inventory_date,
+        it.inventory_status,
+        it.inventory_note,
+        pth.week_number,
+        pth.production_date,
+        pth.item_id,
+        pth.new_quantity as quantity,
+        pth.uom,
+        w.name as warehouse_name,
+        ws.name as warehouse_sub_name,
+        wb.name as bin_name,
+        wb.code as bin_code,
+        ROUND((pth.new_quantity::numeric / p.capacity::numeric) * 100, 2) as pallet_utilization
+      FROM inventory_tracking it
+      LEFT JOIN m_pallet p ON it.pallet_id = p.id
+      LEFT JOIN transaction_pallet_history pth ON p.id = pth.pallet_id
+      LEFT JOIN m_warehouse w ON it.warehouse_id = w.id
+      LEFT JOIN m_warehouse_sub ws ON it.warehouse_sub_id = ws.id
+      LEFT JOIN m_warehouse_bin wb ON it.warehouse_bin_id = wb.id
+      WHERE pth.item_id = $1
+        
+        AND pth.new_quantity > 0
+      ORDER BY it.inventory_date ASC, pth.production_date ASC
+    `;
+
+    const results = await this.repository.query(query, [item_id]) as any[];
+    return results;
+  }
 }
 
 
