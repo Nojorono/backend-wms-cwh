@@ -58,13 +58,21 @@ export class InventoryTrackingService {
     inventory_status: string,
     inbound_id?: string
   ): Promise<InventoryTracking> {
+
+
     const existing = await this.repository.findOneByParams(pallet_id, warehouse_sub_id, warehouse_id);
+    
     if (existing) {
+      // Jika sudah ada di lokasi yang sama, update saja
       return this.update(existing.id, { 
         inventory_status: inventory_status,
+        inventory_note: 'Inventory tracking updated',
+        inventory_date: new Date(),
         inbound_id: inbound_id
       });
     }
+
+    // Create new tracking record
     return this.create({ 
       pallet_id, 
       warehouse_sub_id, 

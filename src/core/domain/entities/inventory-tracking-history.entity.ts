@@ -9,6 +9,10 @@ import { InventoryTracking } from './inventory-tracking.entity';
 export enum InventoryTrackingAction {
   CREATED = 'CREATED',
   UPDATED = 'UPDATED',
+  LOCATION_CHANGED = 'LOCATION_CHANGED',
+  MOVED = 'MOVED',
+  PLACED = 'PLACED',
+  PICKED = 'PICKED',
 }
 
 @Entity('inventory_tracking_history')
