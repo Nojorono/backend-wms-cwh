@@ -117,14 +117,15 @@ export class InventoryTrackingRepository {
     
     await this.repository.update(id, updateData as any);
     const updated = await this.findOne(id);
+    
     if (updated) {
       // Cek apakah sudah ada history dengan pallet_id dan inbound_id yang sama
-      if (inbound_id) {
-        const existingHistory = await this.historyRepository.findOne({
-          where: { pallet_id: updated.pallet_id, inbound_id: inbound_id }
-        });
-        
-        if (existingHistory) {
+      const existingHistory = await this.historyRepository.findOne({
+        where: { pallet_id: updated.pallet_id, inbound_id: inbound_id },
+        order: { createdAt: 'DESC' }
+      });
+      
+        if (existingHistory?.warehouse_bin_id == updated.warehouse_bin_id) {
           await this.historyRepository.update(existingHistory.id, {
             inventory_tracking_id: updated.id,
             pallet_id: updated.pallet_id,
@@ -153,7 +154,6 @@ export class InventoryTrackingRepository {
             }),
           );
         }
-      }
     }
     return updated;
   }

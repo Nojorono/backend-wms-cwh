@@ -5,7 +5,8 @@ import { CreateManyPutAwayDto } from './dto/create-many-put-away.dto';
 import { PutAwayTransaction, Status } from 'src/core/domain/entities/transaction-put-away.entity';
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseBinService } from 'src/master-warehouse-bin/master-warehouse-bin.service';
-
+import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
+  
 @Injectable()
 export class PutAwayService {
   constructor(
@@ -69,7 +70,8 @@ export class PutAwayService {
       warehouse_sub_id: warehouseBin.warehouse_sub_id,
       inventory_note: 'Put Away completed by ' + existing.driver_name,
       inventory_date: new Date(),
-      inventory_status: 'IN_INVENTORY' });
+      inventory_status: 'IN_INVENTORY',
+      progression_status: ProgressionStatus.COMPLETED });
     return updated;
   }
 }

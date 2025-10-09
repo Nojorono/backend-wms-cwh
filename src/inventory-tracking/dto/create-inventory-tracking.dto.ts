@@ -1,5 +1,6 @@
 import { IsDateString, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
 
 export class CreateInventoryTrackingDto {
   @ApiProperty({ example: 'pallet-uuid', required: false })
@@ -46,6 +47,11 @@ export class CreateInventoryTrackingDto {
   @IsString()
   @IsOptional()
   inbound_id?: string;
+
+  @ApiProperty({ example: 'PROGRESS', required: false })
+  @IsString()
+  @IsOptional()
+  progression_status?: ProgressionStatus;
 }
 
 
