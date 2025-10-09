@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import { InventoryTracking, ProgressionStatus } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingHistory, InventoryTrackingAction } from '../core/domain/entities/inventory-tracking-history.entity';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
@@ -160,6 +160,16 @@ export class InventoryTrackingRepository {
 
   async remove(id: string): Promise<void> {
     await this.repository.delete(id);
+  }
+
+  async updateProgressionStatus(id: string, progression_status: ProgressionStatus): Promise<InventoryTracking | null> {
+    const existing = await this.findOne(id);
+    if (!existing) {
+      return null;
+    }
+
+    await this.repository.update(id, { progression_status });
+    return await this.findOne(id);
   }
 
   // Method untuk mengecek apakah sudah ada history dengan inbound_id yang sama

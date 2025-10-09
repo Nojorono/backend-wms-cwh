@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
-import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import { InventoryTracking, ProgressionStatus } from '../core/domain/entities/inventory-tracking.entity';
 
 @Injectable()
 export class InventoryTrackingService {
@@ -49,6 +49,14 @@ export class InventoryTrackingService {
   async remove(id: string): Promise<void> {
     await this.findOne(id);
     await this.repository.remove(id);
+  }
+
+  async updateProgressionStatus(id: string, progression_status: ProgressionStatus): Promise<InventoryTracking> {
+    const updated = await this.repository.updateProgressionStatus(id, progression_status);
+    if (!updated) {
+      throw new NotFoundException(`InventoryTracking with ID ${id} not found`);
+    }
+    return updated;
   }
 
   async createOrUpdateInventoryTracking(

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
-import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import { InventoryTracking, ProgressionStatus } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 
@@ -121,6 +121,30 @@ export class InventoryTrackingController {
   @ApiResponse({ status: 404, description: 'Not found' })
   update(@Param('id') id: string, @Body() dto: UpdateInventoryTrackingDto) {
     return this.service.update(id, dto);
+  }
+
+  @Patch(':id/progression-status')
+  @ApiOperation({ summary: 'Update progression status for inventory tracking' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        progression_status: { 
+          type: 'string', 
+          enum: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'],
+          example: 'IN_PROGRESS'
+        }
+      },
+      required: ['progression_status']
+    }
+  })
+  @ApiResponse({ status: 200, description: 'Progression status updated', type: InventoryTracking })
+  @ApiResponse({ status: 404, description: 'Inventory tracking not found' })
+  updateProgressionStatus(
+    @Param('id') id: string, 
+    @Body() body: { progression_status: ProgressionStatus }
+  ) {
+    return this.service.updateProgressionStatus(id, body.progression_status);
   }
 
   @Delete(':id')

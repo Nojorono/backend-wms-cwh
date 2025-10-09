@@ -17,11 +17,33 @@ export class PutAwayService {
   ) {}
 
   async create(dto: CreatePutAwayDto): Promise<PutAwayTransaction> {
-    return this.repository.create(dto);
+    const putAwayTransaction = await this.repository.create(dto);
+    
+    // Update progression status to IN_PROGRESS when putaway is created
+    if (putAwayTransaction.inventory_tracking_id) {
+      await this.inventoryTrackingService.updateProgressionStatus(
+        putAwayTransaction.inventory_tracking_id, 
+        ProgressionStatus.IN_PROGRESS
+      );
+    }
+    
+    return putAwayTransaction;
   }
 
   async createMany(dto: CreateManyPutAwayDto): Promise<PutAwayTransaction[]> {
-    return this.repository.createMany(dto.data);
+    const putAwayTransactions = await this.repository.createMany(dto.data);
+    
+    // Update progression status to IN_PROGRESS for all created putaway transactions
+    for (const transaction of putAwayTransactions) {
+      if (transaction.inventory_tracking_id) {
+        await this.inventoryTrackingService.updateProgressionStatus(
+          transaction.inventory_tracking_id, 
+          ProgressionStatus.IN_PROGRESS
+        );
+      }
+    }
+    
+    return putAwayTransactions;
   }
 
   async findAll(): Promise<PutAwayTransaction[]> {
@@ -45,7 +67,16 @@ export class PutAwayService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
+    
+    // Update progression status to NOT_STARTED when putaway is deleted
+    if (existing.inventory_tracking_id) {
+      await this.inventoryTrackingService.updateProgressionStatus(
+        existing.inventory_tracking_id, 
+        ProgressionStatus.NOT_STARTED
+      );
+    }
+    
     await this.repository.remove(id);
   }
 
