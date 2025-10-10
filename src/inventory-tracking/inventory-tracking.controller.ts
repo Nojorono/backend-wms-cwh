@@ -162,11 +162,12 @@ export class InventoryTrackingController {
     return this.autoSuggestionService.getInSuggestions(pallet_id);
   }
 
-  @Get('auto-suggestion/out/:pallet_id')
-  @ApiOperation({ summary: 'Get auto suggestions for OUT operations' })
+  @Get('auto-suggestion/out/:item_id')
+  @ApiOperation({ summary: 'Get auto suggestions for OUT operations by item ID' })
+  @ApiParam({ name: 'item_id', description: 'Item ID to get outbound suggestions for' })
   @ApiResponse({ status: 200, description: 'Auto suggestions for OUT operations' })
-  getOutSuggestions(@Param('pallet_id') pallet_id: string) {
-    return this.autoSuggestionService.getOutSuggestions(pallet_id);
+  getOutSuggestions(@Param('item_id') item_id: string) {
+    return this.autoSuggestionService.getOutSuggestions(item_id);
   }
 
   @Get('item/:item_id')

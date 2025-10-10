@@ -305,11 +305,35 @@ export class OutboundDoController {
           item_name: { type: 'string' },
           item_code: { type: 'string' },
           required_quantity: { type: 'number' },
-          available_inventory: { type: 'array' },
-          suggested_picking_locations: { type: 'array' },
-          priority: { type: 'number' },
-          estimated_picking_time: { type: 'number' },
-          week_optimization: { type: 'object' }
+          available_quantity: { type: 'number' },
+          suggested_locations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                bin_id: { type: 'string' },
+                bin_code: { type: 'string' },
+                quantity_to_pick: { type: 'number' },
+                warehouse_name: { type: 'string' },
+                warehouse_sub_name: { type: 'string' },
+                bin_name: { type: 'string' },
+                week_number: { type: 'number' },
+                production_date: { type: 'string' },
+                pallet_id: { type: 'string' },
+                pallet_code: { type: 'string' },
+                pallet_utilization: { type: 'number' },
+                zone: { type: 'string' },
+                place: { type: 'string' },
+                search_level: { type: 'string', enum: ['BIN_LEVEL', 'SUB_LEVEL', 'WAREHOUSE_LEVEL'], description: 'Level pencarian inventory (fleksibel)' },
+                location_type: { type: 'string', enum: ['BIN', 'WAREHOUSE_SUB', 'WAREHOUSE'], description: 'Tipe lokasi inventory (fleksibel)' },
+                location_priority: { type: 'number', description: 'Prioritas lokasi (1=bin, 2=sub, 3=warehouse)' },
+                age_seconds: { type: 'number', description: 'Usia inventory dalam detik untuk FIFO' }
+              }
+            }
+          },
+          total_suggested_quantity: { type: 'number' },
+          status: { type: 'string', enum: ['FULFILLED', 'PARTIAL', 'UNFULFILLED'] },
+          notes: { type: 'string' }
         }
       }
     }
@@ -329,4 +353,5 @@ export class OutboundDoController {
   async getPickingSuggestionsByMemo(@Param('memoId') memoId: string) {
     return this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId);
   }
+
 }

@@ -51,23 +51,23 @@ export class InventoryAutoSuggestionService {
   }
 
   // Auto suggestion untuk OUT operations
-  async getOutSuggestions(palletId: string): Promise<any[]> {
+  async getOutSuggestions(itemId: string): Promise<any[]> {
     const suggestions: any[] = [];
 
     // 1. Suggestion berdasarkan FIFO (First In First Out)
-    const fifoSuggestion = await this.getFifoOutSuggestion(palletId);
+    const fifoSuggestion = await this.getFifoOutSuggestion(itemId);
     if (fifoSuggestion) {
       suggestions.push(fifoSuggestion as any);
     }
 
     // 2. Suggestion berdasarkan week production code
-    const weekOutSuggestion = await this.getWeekProductionOutSuggestion(palletId);
+    const weekOutSuggestion = await this.getWeekProductionOutSuggestion(itemId);
     if (weekOutSuggestion) {
       suggestions.push(weekOutSuggestion as any);
     }
 
     // 3. Suggestion berdasarkan priority
-    const prioritySuggestion = await this.getPriorityOutSuggestion(palletId);
+    const prioritySuggestion = await this.getPriorityOutSuggestion(itemId);
     if (prioritySuggestion) {
       suggestions.push(prioritySuggestion as any);
     }
@@ -202,8 +202,8 @@ export class InventoryAutoSuggestionService {
     };
   }
 
-  private async getFifoOutSuggestion(palletId: string): Promise<any> {
-    // Query untuk mendapatkan inventory berdasarkan FIFO
+  private async getFifoOutSuggestion(itemId: string): Promise<any> {
+    // Query untuk mendapatkan inventory berdasarkan FIFO untuk item tertentu
     const query = `
       SELECT 
         it.id,
@@ -214,17 +214,18 @@ export class InventoryAutoSuggestionService {
         it.warehouse_bin_id,
         p.pallet_code,
         pth.week_number,
-        pth.production_date
+        pth.production_date,
+        pth.item_id
       FROM inventory_tracking it
       LEFT JOIN m_pallet p ON it.pallet_id = p.id
       LEFT JOIN transaction_pallet_history pth ON p.id = pth.pallet_id
-      WHERE it.pallet_id = $1
+      WHERE pth.item_id = $1
         AND it.inventory_status = 'IN_INVENTORY'
       ORDER BY it.inventory_date ASC, pth.production_date ASC
       LIMIT 1
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query, [palletId]) as any[];
+    const results = await this.inventoryTrackingRepository.query(query, [itemId]) as any[];
     
     if (results.length === 0) return null;
 
@@ -236,14 +237,15 @@ export class InventoryAutoSuggestionService {
       description: `This pallet should be prioritized for outbound due to FIFO principle`,
       reasoning: `Pallet has oldest inventory date (${oldestInventory.inventory_date}) and production date (${oldestInventory.production_date})`,
       pallet_id: oldestInventory.pallet_id,
+      item_id: oldestInventory.item_id,
       priority: 1,
       confidence_score: 95,
       estimated_savings: 15,
     };
   }
 
-  private async getWeekProductionOutSuggestion(palletId: string): Promise<any> {
-    // Query untuk mendapatkan week production dan inventory terkait
+  private async getWeekProductionOutSuggestion(itemId: string): Promise<any> {
+    // Query untuk mendapatkan week production dan inventory terkait untuk item tertentu
     const query = `
       SELECT 
         pth.week_number,
@@ -252,12 +254,13 @@ export class InventoryAutoSuggestionService {
         MIN(it.inventory_date) as oldest_inventory_date
       FROM transaction_pallet_history pth
       LEFT JOIN inventory_tracking it ON pth.pallet_id = it.pallet_id
-      WHERE pth.pallet_id = $1
+      WHERE pth.item_id = $1
         AND pth.week_number IS NOT NULL
       GROUP BY pth.week_number
+      ORDER BY pth.week_number ASC
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query, [palletId]) as any[];
+    const results = await this.inventoryTrackingRepository.query(query, [itemId]) as any[];
     
     if (results.length === 0) return null;
 
@@ -268,6 +271,7 @@ export class InventoryAutoSuggestionService {
       title: `Week ${weekData.week_number} Production Outbound Priority`,
       description: `Prioritize outbound for week ${weekData.week_number} production`,
       reasoning: `Week ${weekData.week_number} has ${weekData.available_count} available items, oldest from ${weekData.oldest_inventory_date}`,
+      item_id: itemId,
       week_number: weekData.week_number,
       priority: this.calculateWeekOutPriority(weekData.week_number),
       confidence_score: 85,
@@ -275,7 +279,7 @@ export class InventoryAutoSuggestionService {
     };
   }
 
-  private async getPriorityOutSuggestion(palletId: string): Promise<any> {
+  private async getPriorityOutSuggestion(itemId: string): Promise<any> {
     // Query untuk mendapatkan priority berdasarkan item dan demand
     const query = `
       SELECT 
@@ -285,12 +289,12 @@ export class InventoryAutoSuggestionService {
         AVG(EXTRACT(EPOCH FROM (NOW() - it.inventory_date))/86400) as days_in_inventory
       FROM transaction_pallet_history pth
       LEFT JOIN inventory_tracking it ON pth.pallet_id = it.pallet_id
-      WHERE pth.pallet_id = $1
+      WHERE pth.item_id = $1
         AND it.inventory_status = 'IN_INVENTORY'
       GROUP BY pth.item_id, pth.week_number
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query, [palletId]) as any[];
+    const results = await this.inventoryTrackingRepository.query(query, [itemId]) as any[];
     
     if (results.length === 0) return null;
 
@@ -300,7 +304,7 @@ export class InventoryAutoSuggestionService {
     return {
       type: 'PRIORITY_OUT',
       title: `High Priority Outbound`,
-      description: `This pallet should be prioritized for outbound due to long storage time`,
+      description: `This item should be prioritized for outbound due to long storage time`,
       reasoning: `Item has been in inventory for ${daysInInventory} days, exceeding optimal storage time`,
       item_id: itemData.item_id,
       week_number: itemData.week_number,
