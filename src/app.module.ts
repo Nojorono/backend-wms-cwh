@@ -28,6 +28,7 @@ import { PutAwayModule } from './put-away/put-away.module';
 import { OutboundMemoModule } from './outbound-memo/outbound-memo.module';
 import { OutboundDoModule } from './outbound-do/outbound-do.module';
 import { TransactionPickingModule } from './transaction-picking/transaction-picking.module';
+import { AssignedPickingModule } from './assigned-picking/assigned-picking.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { TransactionPickingModule } from './transaction-picking/transaction-pick
     OutboundMemoModule,
     OutboundDoModule,
     TransactionPickingModule,
+    AssignedPickingModule,
   ],
   providers: [
     {
