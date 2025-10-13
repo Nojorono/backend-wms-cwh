@@ -61,6 +61,9 @@ export class PickingTransaction extends BaseEntity {
   @Column({ nullable: true })
   classification: string;
 
+  @Column({ nullable: true })
+  uom: string;
+
   @Column({ nullable: true, default: Status.PENDING })
   status: Status;
 }

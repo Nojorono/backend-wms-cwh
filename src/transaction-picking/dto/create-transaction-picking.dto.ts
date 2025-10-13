@@ -43,6 +43,11 @@ export class CreateTransactionPickingDto {
   @IsString()
   classification?: string;
 
+  @ApiProperty({ description: 'UOM', required: false })
+  @IsOptional()
+  @IsString()
+  uom?: string;
+
   @ApiProperty({ 
     description: 'Status picking', 
     enum: Status,
