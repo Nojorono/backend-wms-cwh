@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TransactionPickingService } from './transaction-picking.service';
+import { TransactionPickingController } from './transaction-picking.controller';
+import { TransactionPickingRepository } from './transaction-picking.repository';
+import { PickingTransaction } from '../core/domain/entities/transaction-picking.entity';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([PickingTransaction])],
+  controllers: [TransactionPickingController],
+  providers: [TransactionPickingService, TransactionPickingRepository],
+  exports: [TransactionPickingService, TransactionPickingRepository],
+})
+export class TransactionPickingModule {}

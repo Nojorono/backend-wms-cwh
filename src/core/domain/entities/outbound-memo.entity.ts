@@ -7,6 +7,7 @@ export enum OutboundMemoStatus {
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
 }
 
 @Entity('outbound_memo')
