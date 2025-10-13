@@ -192,8 +192,7 @@ export class PickingSuggestionService {
           item_name: item.item_name,
           item_code: item.item_code,
           required_quantity: item.quantity_plan,
-          available_quantity: availableInventory.reduce((sum, inv) => sum + inv.quantity, 0),
-          suggested_locations: this.formatSuggestedBins(availableInventory, item.quantity_plan),
+          suggested_locations: this.getAllAvailableInventory(availableInventory, item.quantity_plan),
           total_suggested_quantity: this.calculateTotalSuggestedQuantity(availableInventory, item.quantity_plan),
           status: this.determineFulfillmentStatus(availableInventory, item.quantity_plan),
           priority: item.priority,
@@ -513,39 +512,6 @@ export class PickingSuggestionService {
     });
   }
 
-  private calculateItemPickingTime(inventory: any[]): number {
-    // Base time: 2 minutes per pallet + 1 minute per location change
-    const baseTime = inventory.length * 2;
-    const locationChanges = new Set(inventory.map(inv => `${inv.warehouse_bin_id}`)).size - 1;
-    return baseTime + locationChanges;
-  }
-
-  private analyzeWeekOptimization(inventory: any[]): any {
-    const weekGroups = new Map();
-    
-    for (const inv of inventory) {
-      const week = inv.week_number;
-      if (!weekGroups.has(week)) {
-        weekGroups.set(week, []);
-      }
-      weekGroups.get(week).push(inv);
-    }
-
-    const weekAnalysis = Array.from(weekGroups.entries()).map(([week, items]) => ({
-      week_number: week,
-      item_count: items.length,
-      total_quantity: items.reduce((sum, item) => sum + item.quantity, 0),
-      oldest_production_date: Math.min(...items.map(item => new Date(item.production_date).getTime())),
-      suggested_picking_order: items.sort((a, b) => new Date(a.production_date).getTime() - new Date(b.production_date).getTime())
-    }));
-
-    return {
-      week_groups: weekAnalysis,
-      optimization_suggestion: weekAnalysis.length > 1 ? 
-        'Consider grouping by week for efficient FIFO picking' : 
-        'All items from same week - optimal for FIFO'
-    };
-  }
 
   private async generateRouteOptimization(pickingSuggestions: any[]): Promise<any> {
     // Group by warehouse and sub for route optimization
@@ -679,75 +645,6 @@ export class PickingSuggestionService {
     }
   }
 
-
-  private formatSuggestedBins(availableInventory: any[], requiredQuantity: number): any[] {
-    const palletMap = new Map();
-    for (const inv of availableInventory) {
-      
-      // Create unique key based on pallet ID only - each pallet is separate
-      const key = inv.it_pallet_id || `no-pallet-${Math.random()}`;
-      
-      if (!palletMap.has(key)) {
-        palletMap.set(key, {
-          quantity_ready_to_pick: 0,
-          uom: inv.pth_uom,
-          inventory_progression_status: inv.it_progression_status,
-          inventory_status: inv.it_inventory_status,
-          inventory_tracking_id: inv.inventory_tracking_id,
-          warehouse_sub_name: inv.warehouse_sub_name,
-          warehouse_sub_code: inv.warehouse_sub_code,
-          warehouse_sub_id: inv.it_warehouse_sub_id,
-          warehouse_bin_id: inv.warehouse_bin_id,
-          bin_name: inv.bin_name || 'N/A',
-          bin_code: inv.bin_code || 'N/A',
-          search_level: inv.search_level,
-          location_type: inv.location_type,
-          location_priority: inv.location_priority,
-          pallet_id: inv.it_pallet_id,
-          pallet_code: inv.p_pallet_code || 'N/A',
-          pallet_utilization: inv.pallet_utilization || '0.00',
-          week_number: inv.pth_week_number,
-          production_date: inv.pth_production_date,
-          place: this.getLocationPlace(inv), // Intelligent place determination
-        });
-      }
-      
-      const pallet = palletMap.get(key);
-      pallet.quantity_ready_to_pick += inv.quantity;
-    }
-    
-    const sortedPallets = Array.from(palletMap.values()).sort((a, b) => {
-      // 1. Exact match priority: pallet with exact quantity match comes first
-      const aExactMatch = a.quantity_ready_to_pick === requiredQuantity ? 1 : 0;
-      const bExactMatch = b.quantity_ready_to_pick === requiredQuantity ? 1 : 0;
-      
-      if (aExactMatch !== bExactMatch) {
-        return bExactMatch - aExactMatch; // Exact match first
-      }
-      
-      // 2. Location priority (bin > sub > warehouse)
-      if (a.location_priority !== b.location_priority) {
-        return a.location_priority - b.location_priority;
-      }
-      
-      // 3. FIFO: older inventory first (lower week_number, higher age_seconds)
-      if (a.week_number !== b.week_number) {
-        return a.week_number - b.week_number;
-      }
-      
-      // 4. Age: older first (higher age_seconds means older)
-      if (a.age_seconds !== b.age_seconds) {
-        return parseFloat(b.age_seconds) - parseFloat(a.age_seconds);
-      }
-      
-      // 5. Quantity: higher quantity first
-      return b.quantity_ready_to_pick - a.quantity_ready_to_pick;
-    });
-
-    // Return only the best suggestion (first in sorted array)
-    return sortedPallets.slice(0, 1);
-  }
-
   private getLocationPlace(inv: any): string {
     // Intelligent place determination based on location hierarchy
     if (inv.warehouse_bin_id && inv.bin_name) {
@@ -759,47 +656,167 @@ export class PickingSuggestionService {
     }
   }
 
+  private getAllAvailableInventory(availableInventory: any[], requiredQuantity: number): any[] {
+    // Return all available inventory that can contribute to fulfilling the required quantity
+    const allSuggestions: any[] = [];
+    let remainingQuantity = requiredQuantity;
+    
+    // Sort inventory by priority: exact match > location priority > FIFO > age > quantity
+    const sortedInventory = [...availableInventory].sort((a, b) => {
+      // 1. Exact match priority
+      const aExactMatch = a.quantity === requiredQuantity ? 1 : 0;
+      const bExactMatch = b.quantity === requiredQuantity ? 1 : 0;
+      if (aExactMatch !== bExactMatch) {
+        return bExactMatch - aExactMatch;
+      }
+      
+      // 2. Location priority (bin > sub > warehouse)
+      if (a.location_priority !== b.location_priority) {
+        return a.location_priority - b.location_priority;
+      }
+      
+      // 3. FIFO: older inventory first
+      if (a.week_number !== b.week_number) {
+        return a.week_number - b.week_number;
+      }
+      
+      // 4. Age: older first
+      if (a.age_seconds !== b.age_seconds) {
+        return parseFloat(b.age_seconds) - parseFloat(a.age_seconds);
+      }
+      
+      // 5. Quantity: higher quantity first
+      return b.quantity - a.quantity;
+    });
+    
+    // Add all inventory that can contribute to fulfilling the requirement
+    for (const inv of sortedInventory) {
+      if (remainingQuantity <= 0) break;
+      
+      const quantityToTake = Math.min(inv.quantity, remainingQuantity);
+      
+      allSuggestions.push({
+        available_quantity: inv.quantity,
+        quantity_ready_to_pick: quantityToTake,
+        uom: inv.pth_uom || 'DUS',
+        inventory_progression_status: inv.it_progression_status,
+        inventory_status: inv.it_inventory_status,
+        inventory_tracking_id: inv.inventory_tracking_id,
+        warehouse_sub_name: inv.warehouse_sub_name,
+        warehouse_sub_code: inv.warehouse_sub_code,
+        warehouse_sub_id: inv.it_warehouse_sub_id,
+        warehouse_bin_id: inv.warehouse_bin_id,
+        bin_name: inv.bin_name || 'N/A',
+        bin_code: inv.bin_code || 'N/A',
+        search_level: inv.search_level,
+        location_type: inv.location_type,
+        location_priority: inv.location_priority,
+        pallet_id: inv.it_pallet_id,
+        pallet_code: inv.p_pallet_code || 'N/A',
+        pallet_utilization: inv.pallet_utilization || '0.00',
+        week_number: inv.week_number,
+        production_date: inv.production_date,
+        place: this.getLocationPlace(inv)
+      });
+      
+      remainingQuantity -= quantityToTake;
+    }
+    
+    return allSuggestions;
+  }
+
   private calculateTotalSuggestedQuantity(availableInventory: any[], requiredQuantity: number): number {
-    const totalAvailable = availableInventory.reduce((sum, inv) => sum + inv.quantity, 0);
-    return Math.min(totalAvailable, requiredQuantity);
+    const allSuggestions = this.getAllAvailableInventory(availableInventory, requiredQuantity);
+    return allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
   }
 
   private determineFulfillmentStatus(availableInventory: any[], requiredQuantity: number): string {
-    const totalAvailable = availableInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+    console.log('availableInventory', availableInventory);
     
-    // FULFILLED: Exact match - request equals total available in pallet
-    if (totalAvailable === requiredQuantity) {
+    // Get all available inventory that can contribute to fulfilling the requirement
+    const allSuggestions = this.getAllAvailableInventory(availableInventory, requiredQuantity);
+    
+    if (allSuggestions.length === 0) {
+      return 'UNFULFILLED';
+    }
+    
+    // Calculate total quantity that can be fulfilled
+    const totalFulfillable = allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
+    
+    // Check for partial pick scenario (available_quantity > quantity_ready_to_pick)
+    const hasPartialPick = allSuggestions.some(suggestion => 
+      suggestion.available_quantity > suggestion.quantity_ready_to_pick
+    );
+    
+    console.log('Status calculation:', {
+      totalFulfillable,
+      requiredQuantity,
+      hasPartialPick,
+      allSuggestions: allSuggestions.map(s => ({
+        available_quantity: s.available_quantity,
+        quantity_ready_to_pick: s.quantity_ready_to_pick
+      }))
+    });
+    
+    // PARTIAL PICK: Check for partial pick scenario first (available_quantity > quantity_ready_to_pick)
+    if (hasPartialPick) {
+      return 'PARTIAL';
+    }
+    // FULFILLED: Exact match - can fulfill exactly what's required
+    else if (totalFulfillable === requiredQuantity) {
       return 'FULFILLED';
     } 
-    // OVERFULFILLED: More than required available
-    else if (totalAvailable > requiredQuantity) {
+    // OVERFULFILLED: Can fulfill more than required
+    else if (totalFulfillable > requiredQuantity) {
       return 'OVERFULFILLED';
     } 
-    // PARTIAL: Some quantity available but not enough
-    else if (totalAvailable > 0) {
+    // PARTIAL: Can fulfill some but not all
+    else if (totalFulfillable > 0) {
       return 'PARTIAL';
     } 
-    // UNFULFILLED: No inventory available
+    // UNFULFILLED: Cannot fulfill any
     else {
       return 'UNFULFILLED';
     }
   }
 
   private generateNotes(item: any, memo: any, availableInventory: any[]): string {
-    const totalAvailable = availableInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+    const allSuggestions = this.getAllAvailableInventory(availableInventory, item.quantity_plan);
+    const totalFulfillable = allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
+    const totalAvailable = allSuggestions.reduce((sum, suggestion) => sum + suggestion.available_quantity, 0);
     const requiredQuantity = item.quantity_plan;
     
+    // Check for partial pick scenario
+    const hasPartialPick = allSuggestions.some(suggestion => 
+      suggestion.available_quantity > suggestion.quantity_ready_to_pick
+    );
+    
+    console.log('Notes calculation:', {
+      totalFulfillable,
+      totalAvailable,
+      requiredQuantity,
+      hasPartialPick,
+      allSuggestions: allSuggestions.map(s => ({
+        available_quantity: s.available_quantity,
+        quantity_ready_to_pick: s.quantity_ready_to_pick
+      }))
+    });
+    
+    // Partial pick scenario - inventory available but only partially ready (CHECK FIRST)
+    if (hasPartialPick) {
+      return `Item tersedia dengan partial pick. Tersedia: ${totalAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
+    }
     // Exact match - perfect fulfillment
-    if (totalAvailable === requiredQuantity) {
-      return `Item tersedia dengan jumlah yang tepat. Total tersedia: ${totalAvailable} ${item.uom}`;
+    else if (totalFulfillable === requiredQuantity) {
+      return `Item tersedia dengan jumlah yang tepat. Total tersedia: ${totalFulfillable} ${item.uom}`;
     } 
     // More than required available
-    else if (totalAvailable > requiredQuantity) {
-      return `Item tersedia dengan jumlah berlebih. Total tersedia: ${totalAvailable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
+    else if (totalFulfillable > requiredQuantity) {
+      return `Item tersedia dengan jumlah berlebih. Total tersedia: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
     } 
     // Partial availability
-    else if (totalAvailable > 0) {
-      return `Item tersedia sebagian. Tersedia: ${totalAvailable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
+    else if (totalFulfillable > 0) {
+      return `Item tersedia sebagian. Tersedia: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
     } 
     // No inventory available
     else {
