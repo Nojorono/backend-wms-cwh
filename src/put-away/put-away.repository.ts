@@ -60,6 +60,10 @@ export class PutAwayRepository {
       .createQueryBuilder('pta')
       .where('pta.forklift_driver_id = :forklift_driver_id', { forklift_driver_id: driver_id })
       .andWhere('pta.status = :status', { status: Status.PENDING })
+      .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
+      .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
+      .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
+      .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
       .getMany();
     if (!queryBuilder) return [];
     return queryBuilder;
@@ -70,6 +74,10 @@ export class PutAwayRepository {
       .createQueryBuilder('pta')
       .where('pta.forklift_driver_id = :forklift_driver_id', { forklift_driver_id: driver_id })
       .andWhere('pta.status = :status', { status: Status.COMPLETED })
+      .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
+      .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
+      .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
+      .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
       .orderBy('pta.created_at', 'DESC')
       .getMany();
     if (!queryBuilder) return [];
