@@ -24,7 +24,7 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'pallet'
+        'palletSource'
       ],
       order: { createdAt: 'DESC' }
     });
@@ -39,7 +39,7 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'pallet'
+        'palletSource'
       ]
     });
   }
@@ -66,7 +66,7 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'pallet'
+        'palletSource'
       ],
       order: { createdAt: 'DESC' }
     });
@@ -81,7 +81,7 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'pallet'
+        'palletSource'
       ],
       order: { createdAt: 'DESC' }
     });
@@ -89,14 +89,14 @@ export class TransactionPickingRepository {
 
   async findByPalletId(palletId: string): Promise<PickingTransaction[]> {
     return this.repository.find({
-      where: { pallet_id: palletId },
+      where: { pallet_source_id: palletId },
       relations: [
         'memo',
         'item',
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'pallet'
+        'palletSource'
       ],
       order: { createdAt: 'DESC' }
     });

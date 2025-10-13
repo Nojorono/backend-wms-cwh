@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsNumber, IsOptional, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumber, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { Status } from '../../core/domain/entities/transaction-picking.entity';
 
 export class CreateTransactionPickingDto {
@@ -31,7 +31,12 @@ export class CreateTransactionPickingDto {
   @ApiProperty({ description: 'ID pallet', required: false })
   @IsOptional()
   @IsString()
-  pallet_id?: string;
+  pallet_source_id?: string;
+
+  @ApiProperty({ description: 'Flag whole pallet', required: false })
+  @IsOptional()
+  @IsBoolean()
+  flag_whole_pallet?: boolean;
 
   @ApiProperty({ description: 'Quantity yang di-pick' })
   @IsNotEmpty()

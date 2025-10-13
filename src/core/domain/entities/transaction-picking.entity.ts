@@ -49,11 +49,14 @@ export class PickingTransaction extends BaseEntity {
   sourceBin: MasterWarehouseBin;
 
   @Column({ nullable: true })
-  pallet_id: string;
+  pallet_source_id: string;
 
   @ManyToOne(() => MasterPallet, (pallet) => pallet.id, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'pallet_id' })
-  pallet: MasterPallet;
+  @JoinColumn({ name: 'pallet_source_id' })
+  palletSource: MasterPallet;
+
+  @Column({ nullable: true, default: false })
+  flag_whole_pallet: boolean;
 
   @Column({ nullable: true })
   quantity: number;
