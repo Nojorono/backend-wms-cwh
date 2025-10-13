@@ -347,16 +347,6 @@ export class PickingSuggestionService {
       .addOrderBy('pth.new_quantity', 'DESC');
 
       const results = await queryBuilder.getRawMany();
-      console.log(`Found ${results.length} inventory records with latest pallet history for item ${itemId}`);
-      console.log('Results:', results);
-      // Debug pallet data
-      if (results.length > 0) {
-        console.log('Sample pallet data:', {
-          pallet_id: results[0].it_pallet_id,
-          pallet_code: results[0].p_pallet_code,
-          pallet_utilization: results[0].pallet_utilization
-        });
-      }
       
       return results;
     } catch (error) {
@@ -463,39 +453,6 @@ export class PickingSuggestionService {
         // Final sort: Quantity (higher first for same date)
         return b.quantity - a.quantity;
       });
-  }
-
-  private optimizePickingLocations(inventory: any[]): any[] {
-    // Group by warehouse and bin for efficient picking
-    const locationGroups = new Map();
-
-    for (const inv of inventory) {
-      const key = `${inv.warehouse_id}-${inv.warehouse_sub_id}-${inv.warehouse_bin_id}`;
-      
-      if (!locationGroups.has(key)) {
-        locationGroups.set(key, {
-          warehouse_id: inv.warehouse_id,
-          warehouse_sub_id: inv.warehouse_sub_id,
-          warehouse_bin_id: inv.warehouse_bin_id,
-          warehouse_name: inv.warehouse_name,
-          warehouse_sub_name: inv.warehouse_sub_name,
-          bin_name: inv.bin_name,
-          bin_code: inv.bin_code,
-          items: [],
-          total_quantity: 0,
-          estimated_picking_time: 0
-        });
-      }
-
-      const group = locationGroups.get(key);
-      group.items.push(inv);
-      group.total_quantity += inv.quantity;
-      group.estimated_picking_time += 2; // 2 minutes per pallet
-    }
-
-    // Sort by efficiency (most items in same location first)
-    return Array.from(locationGroups.values())
-      .sort((a, b) => b.items.length - a.items.length);
   }
 
   private calculateItemPriority(item: any, memo: any): number {
@@ -725,33 +682,33 @@ export class PickingSuggestionService {
 
   private formatSuggestedBins(availableInventory: any[], requiredQuantity: number): any[] {
     const palletMap = new Map();
-    
     for (const inv of availableInventory) {
+      
       // Create unique key based on pallet ID only - each pallet is separate
       const key = inv.it_pallet_id || `no-pallet-${Math.random()}`;
       
       if (!palletMap.has(key)) {
         palletMap.set(key, {
-          bin_id: inv.warehouse_bin_id,
-          bin_code: inv.bin_code || inv.bin_name || 'N/A',
           quantity_ready_to_pick: 0,
-          warehouse_name: inv.warehouse_name,
+          uom: inv.pth_uom,
+          inventory_progression_status: inv.it_progression_status,
+          inventory_status: inv.it_inventory_status,
+          inventory_tracking_id: inv.inventory_tracking_id,
           warehouse_sub_name: inv.warehouse_sub_name,
-          warehouse_sub_id: inv.warehouse_sub_id,
+          warehouse_sub_code: inv.warehouse_sub_code,
+          warehouse_sub_id: inv.it_warehouse_sub_id,
+          warehouse_bin_id: inv.warehouse_bin_id,
           bin_name: inv.bin_name || 'N/A',
-          week_number: inv.pth_week_number,
-          production_date: inv.production_date,
-          pallet_id: inv.it_pallet_id,
-          pallet_code: inv.p_pallet_code || 'N/A',
-          pallet_utilization: inv.pallet_utilization || '0.00',
-          zone: inv.warehouse_sub_code || inv.warehouse_sub_name,
-          place: this.getLocationPlace(inv), // Intelligent place determination
+          bin_code: inv.bin_code || 'N/A',
           search_level: inv.search_level,
           location_type: inv.location_type,
           location_priority: inv.location_priority,
-          age_seconds: inv.age_seconds,
-          inventory_status: inv.inventory_status,
-          progression_status: inv.progression_status
+          pallet_id: inv.it_pallet_id,
+          pallet_code: inv.p_pallet_code || 'N/A',
+          pallet_utilization: inv.pallet_utilization || '0.00',
+          week_number: inv.pth_week_number,
+          production_date: inv.pth_production_date,
+          place: this.getLocationPlace(inv), // Intelligent place determination
         });
       }
       
@@ -759,7 +716,7 @@ export class PickingSuggestionService {
       pallet.quantity_ready_to_pick += inv.quantity;
     }
     
-    return Array.from(palletMap.values()).sort((a, b) => {
+    const sortedPallets = Array.from(palletMap.values()).sort((a, b) => {
       // 1. Exact match priority: pallet with exact quantity match comes first
       const aExactMatch = a.quantity_ready_to_pick === requiredQuantity ? 1 : 0;
       const bExactMatch = b.quantity_ready_to_pick === requiredQuantity ? 1 : 0;
@@ -786,6 +743,9 @@ export class PickingSuggestionService {
       // 5. Quantity: higher quantity first
       return b.quantity_ready_to_pick - a.quantity_ready_to_pick;
     });
+
+    // Return only the best suggestion (first in sorted array)
+    return sortedPallets.slice(0, 1);
   }
 
   private getLocationPlace(inv: any): string {
