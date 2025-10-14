@@ -125,8 +125,30 @@ export class InventoryTrackingRepository {
         order: { createdAt: 'DESC' }
       });
       
-        if (existingHistory?.warehouse_bin_id == updated.warehouse_bin_id) {
-          await this.historyRepository.update(existingHistory.id, {
+      // Cek apakah warehouse_sub_id atau warehouse_bin_id berbeda dengan data sebelumnya
+      const isLocationChanged = existingHistory && (
+        existingHistory.warehouse_sub_id !== updated.warehouse_sub_id ||
+        existingHistory.warehouse_bin_id !== updated.warehouse_bin_id
+      );
+      
+      if (existingHistory && !isLocationChanged) {
+        // Update existing history jika lokasi tidak berubah
+        await this.historyRepository.update(existingHistory.id, {
+          inventory_tracking_id: updated.id,
+          pallet_id: updated.pallet_id,
+          warehouse_id: updated.warehouse_id,
+          warehouse_sub_id: updated.warehouse_sub_id,
+          warehouse_bin_id: updated.warehouse_bin_id,
+          inventory_date: updated.inventory_date,
+          inventory_status: updated.inventory_status,
+          inventory_note: updated.inventory_note,
+          action: InventoryTrackingAction.UPDATED,
+          inbound_id: inbound_id,
+        });
+      } else {
+        // Buat history baru jika lokasi berubah atau belum ada history
+        await this.historyRepository.save(
+          this.historyRepository.create({
             inventory_tracking_id: updated.id,
             pallet_id: updated.pallet_id,
             warehouse_id: updated.warehouse_id,
@@ -135,25 +157,11 @@ export class InventoryTrackingRepository {
             inventory_date: updated.inventory_date,
             inventory_status: updated.inventory_status,
             inventory_note: updated.inventory_note,
-            action: InventoryTrackingAction.UPDATED,
+            action: isLocationChanged ? InventoryTrackingAction.MOVED : InventoryTrackingAction.CREATED,
             inbound_id: inbound_id,
-          });
-        } else {
-          await this.historyRepository.save(
-            this.historyRepository.create({
-              inventory_tracking_id: updated.id,
-              pallet_id: updated.pallet_id,
-              warehouse_id: updated.warehouse_id,
-              warehouse_sub_id: updated.warehouse_sub_id,
-              warehouse_bin_id: updated.warehouse_bin_id,
-              inventory_date: updated.inventory_date,
-              inventory_status: updated.inventory_status,
-              inventory_note: updated.inventory_note,
-              action: InventoryTrackingAction.CREATED,
-              inbound_id: inbound_id,
-            }),
-          );
-        }
+          }),
+        );
+      }
     }
     return updated;
   }
