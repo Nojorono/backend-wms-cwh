@@ -1,6 +1,8 @@
 import { Entity, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OutboundMemoItem } from './outbound-memo-item.entity';
+import { AssignedPicking } from './assigned-picking.entity';
+import { PickingTransaction } from './transaction-picking.entity';
 
 export enum OutboundMemoStatus {
   PENDING = 'PENDING',
@@ -35,4 +37,10 @@ export class OutboundMemo extends BaseEntity {
 
   @OneToMany(() => OutboundMemoItem, (outboundMemoItem) => outboundMemoItem.outbound_memo)
   outbound_memo_items: OutboundMemoItem[];
+
+  @OneToMany(() => PickingTransaction, (transactionPicking) => transactionPicking.memo)
+  transaction_pickings: PickingTransaction[];
+
+  @OneToMany(() => AssignedPicking, (assignedPicking) => assignedPicking.memo)
+  assigned_pickings: AssignedPicking[];
 }

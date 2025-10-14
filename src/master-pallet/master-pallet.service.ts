@@ -350,15 +350,17 @@ export class MasterPalletService {
   
     const results = await qb.getMany();
   
-    return results.map((history: any) => ({
-      item_id: history.item_id,
-      item_name: history.item?.sku,
-      current_quantity: history.new_quantity,   // use your latest field
-      uom: history.uom,
-      last_updated: history.createdAt,
-      production_date: history.production_date,
-      week_number: history.week_number,
-    }));
+    return results
+      .filter((history: any) => history.new_quantity > 0) // Filter out items with quantity 0
+      .map((history: any) => ({
+        item_id: history.item_id,
+        item_name: history.item?.sku,
+        current_quantity: history.new_quantity,   // use your latest field
+        uom: history.uom,
+        last_updated: history.createdAt,
+        production_date: history.production_date,
+        week_number: history.week_number,
+      }));
   }
   
 
