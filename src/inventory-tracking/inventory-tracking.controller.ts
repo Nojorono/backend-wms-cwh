@@ -87,7 +87,7 @@ export class InventoryTrackingController {
   @ApiOperation({ summary: 'Get inventory tracking history by pallet id' })
   @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
   findOneHistoryByPalletId(@Param('pallet_id') pallet_id: string) {
-    return this.service.findOneHistoryByPalletId(pallet_id);
+    return this.service.findHistoryByPalletId(pallet_id);
   }
 
   @Get('history/inbound/:inbound_id')

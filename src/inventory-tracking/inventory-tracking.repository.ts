@@ -97,8 +97,8 @@ export class InventoryTrackingRepository {
   }
 
   // find one history by pallet id
-  async findOneHistoryByPalletId(pallet_id: string): Promise<InventoryTracking | null> {
-    const entity = await this.repository.findOne({ 
+  async findHistoryByPalletId(pallet_id: string): Promise<InventoryTrackingHistory[] | null> {
+    const entity = await this.historyRepository.find({ 
       where: { pallet_id },
       relations: ['pallet', 'warehouse', 'warehouseSub', 'warehouseBin'],
       order: { createdAt: 'DESC' }

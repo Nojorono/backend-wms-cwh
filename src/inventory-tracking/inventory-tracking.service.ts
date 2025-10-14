@@ -3,6 +3,7 @@ import { InventoryTrackingRepository } from './inventory-tracking.repository';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
 import { InventoryTracking, ProgressionStatus } from '../core/domain/entities/inventory-tracking.entity';
+import { InventoryTrackingHistory } from '../core/domain/entities/inventory-tracking-history.entity';
 
 @Injectable()
 export class InventoryTrackingService {
@@ -22,9 +23,9 @@ export class InventoryTrackingService {
     return this.repository.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
   }
 
-  async findOneHistoryByPalletId(pallet_id: string): Promise<InventoryTracking> {
-    const entity = await this.repository.findOneHistoryByPalletId(pallet_id);
-    if (!entity) {
+  async findHistoryByPalletId(pallet_id: string): Promise<InventoryTrackingHistory[]> {
+    const entity = await this.repository.findHistoryByPalletId(pallet_id);
+    if (!entity || entity.length === 0) {
       throw new NotFoundException(`InventoryTracking with pallet ID ${pallet_id} not found`);
     }
     return entity;
