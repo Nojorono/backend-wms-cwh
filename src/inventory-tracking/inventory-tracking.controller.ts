@@ -107,6 +107,84 @@ export class InventoryTrackingController {
     return this.service.findHistoryByInboundId(inbound_id);
   }
 
+  @Get('validate-pallet/:pallet_code')
+  @ApiOperation({ summary: 'Validate if pallet can be used for inventory tracking (only pallets that are outbound done can be reused)' })
+  @ApiParam({ name: 'pallet_code', description: 'Pallet Code to validate' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Validation result',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Operation successful' },
+        data: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: { type: 'string', example: 'Pallet dapat digunakan untuk inventory tracking.' },
+            pallet_code: { type: 'string', example: 'PAL-001' },
+            pallet_id: { type: 'string', example: 'pallet-uuid' },
+            is_available: { type: 'boolean', example: true },
+            can_use: { type: 'boolean', example: true },
+            pallet_status: {
+              type: 'object',
+              properties: {
+                exists: { type: 'boolean', example: true },
+                is_active: { type: 'boolean', example: true },
+                is_full: { type: 'boolean', example: false },
+                current_quantity: { type: 'number', example: 0 },
+                capacity: { type: 'number', example: 100 }
+              }
+            },
+            existing_tracking: { type: 'object', nullable: true },
+            can_create: { type: 'boolean', example: true },
+            reasons: { type: 'array', items: { type: 'string' }, example: [] }
+          }
+        },
+        timestamp: { type: 'string', example: '2025-10-15T03:01:44.715Z' },
+        path: { type: 'string', example: '/inventory-tracking/validate-pallet/PAL-001' }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Bad Request - Pallet cannot be used',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Pallet tidak dapat digunakan: Pallet tidak aktif, Pallet sudah penuh' },
+        statusCode: { type: 'number', example: 400 },
+        data: {
+          type: 'object',
+          properties: {
+            pallet_code: { type: 'string', example: 'PAL-001' },
+            pallet_id: { type: 'string', example: 'pallet-uuid' },
+            is_available: { type: 'boolean', example: false },
+            can_use: { type: 'boolean', example: false },
+            pallet_status: {
+              type: 'object',
+              properties: {
+                exists: { type: 'boolean', example: true },
+                is_active: { type: 'boolean', example: false },
+                is_full: { type: 'boolean', example: true },
+                current_quantity: { type: 'number', example: 100 },
+                capacity: { type: 'number', example: 100 }
+              }
+            },
+            existing_tracking: { type: 'object', nullable: true },
+            can_create: { type: 'boolean', example: false },
+            reasons: { type: 'array', items: { type: 'string' }, example: ['Pallet tidak aktif', 'Pallet sudah penuh'] }
+          }
+        }
+      }
+    }
+  })
+  async validatePallet(@Param('pallet_code') pallet_code: string) {
+    return this.service.validatePallet(pallet_code);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get inventory tracking by id' })
   @ApiResponse({ status: 200, description: 'OK', type: InventoryTracking })

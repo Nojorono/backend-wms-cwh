@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryTracking, ProgressionStatus } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingHistory, InventoryTrackingAction } from '../core/domain/entities/inventory-tracking-history.entity';
+import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
 
@@ -13,6 +14,8 @@ export class InventoryTrackingRepository {
     private readonly repository: Repository<InventoryTracking>,
     @InjectRepository(InventoryTrackingHistory)
     private readonly historyRepository: Repository<InventoryTrackingHistory>,
+    @InjectRepository(MasterPallet)
+    private readonly palletRepository: Repository<MasterPallet>,
   ) {}
 
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
@@ -92,6 +95,28 @@ export class InventoryTrackingRepository {
         warehouse_id 
       },
       relations: ['pallet', 'warehouse', 'warehouseSub', 'warehouseBin']
+    });
+    return entity ?? null;
+  }
+
+  async findOneByPalletId(pallet_id: string): Promise<InventoryTracking | null> {
+    const entity = await this.repository.findOne({ 
+      where: { pallet_id },
+      relations: ['pallet', 'warehouse', 'warehouseSub', 'warehouseBin']
+    });
+    return entity ?? null;
+  }
+
+  async findPalletById(pallet_id: string): Promise<MasterPallet | null> {
+    const entity = await this.palletRepository.findOne({ 
+      where: { id: pallet_id }
+    });
+    return entity ?? null;
+  }
+
+  async findPalletByCode(pallet_code: string): Promise<MasterPallet | null> {
+    const entity = await this.palletRepository.findOne({ 
+      where: { pallet_code }
     });
     return entity ?? null;
   }
