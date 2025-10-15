@@ -85,10 +85,9 @@ export class MasterWarehouseBinRepository {
       .leftJoinAndSelect('tracking.warehouseBin', 'warehouseBin')
       .where('warehouseSub.is_staging = :staging', { staging: 'INBOUND' })
       .andWhere('tracking.inventory_status = :status', { status: 'INSPECTION_COMPLETED' })
-      .andWhere('tracking.progression_status = :status', { status: ProgressionStatus.NOT_STARTED })
       .getMany();
 
-    console.log(stagingPallets);
+    console.log('stagingPallets', stagingPallets);
 
     // Early return if no staging pallets found
     if (stagingPallets.length === 0) {
@@ -126,7 +125,7 @@ export class MasterWarehouseBinRepository {
       .addSelect(['warehouseSub.id', 'warehouseSub.name', 'warehouseSub.code', 'warehouseSub.is_staging'])
       .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
       .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
-      .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
+      .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', { status: 'IN_INVENTORY' })
       .groupBy('bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging')
       .having('COUNT(DISTINCT tracking.pallet_id) < bin.capacity_pallet')
       .orderBy('(bin.capacity_pallet - COUNT(DISTINCT tracking.pallet_id))', 'DESC') // most free space first
@@ -178,7 +177,7 @@ export class MasterWarehouseBinRepository {
           .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
-          .andWhere('tracking.inventory_status = :status', { status: 'INSPECTION_COMPLETED' })
+          .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
           .groupBy('bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging')
           .having('COUNT(DISTINCT tracking.pallet_id) < bin.capacity_pallet');
 
@@ -191,7 +190,6 @@ export class MasterWarehouseBinRepository {
         }
 
         matchingBinsForSameItem = await query
-          .groupBy('bin.id')
           .orderBy('COUNT(scan.id)', 'DESC')
           .limit(1) // Only get 1 bin
           .getMany();
@@ -225,7 +223,7 @@ export class MasterWarehouseBinRepository {
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .where('bin.capacity_pallet > 0') // Has capacity
           .andWhere('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
-          .andWhere('tracking.inventory_status = :status', { status: 'INSPECTION_COMPLETED' })
+          .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
           .groupBy('bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging')
           .having('COUNT(DISTINCT tracking.pallet_id) = 0') // Completely empty bins
           .orderBy('bin.capacity_pallet', 'DESC') // Largest capacity first
