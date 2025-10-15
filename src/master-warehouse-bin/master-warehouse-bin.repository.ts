@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { CreateMasterWarehouseBinDto } from './dto/create-master-warehouse-bin.dto';
 import { UpdateMasterWarehouseBinDto } from './dto/update-master-warehouse-bin.dto';
 import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
-import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import { InventoryTracking, ProgressionStatus } from '../core/domain/entities/inventory-tracking.entity';
 import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { PalletItemQuantityDto } from '../master-pallet/dto/pallet-quantity.dto';
@@ -85,6 +85,7 @@ export class MasterWarehouseBinRepository {
       .leftJoinAndSelect('tracking.warehouseBin', 'warehouseBin')
       .where('warehouseSub.is_staging = :staging', { staging: 'INBOUND' })
       .andWhere('tracking.inventory_status = :status', { status: 'INSPECTION_COMPLETED' })
+      .andWhere('tracking.progression_status = :status', { status: ProgressionStatus.NOT_STARTED })
       .getMany();
 
     console.log(stagingPallets);
@@ -117,13 +118,18 @@ export class MasterWarehouseBinRepository {
     console.log('Sample pallet items:', allPalletItems.slice(0, 2));
 
     // Get available destination bins with their warehouse sub info
+    // Calculate current_pallet based on inventory-tracking relations
     const availableBins = await this.repository
       .createQueryBuilder('bin')
       .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
+      .leftJoin('InventoryTracking', 'tracking', 'tracking.warehouse_bin_id = bin.id')
       .addSelect(['warehouseSub.id', 'warehouseSub.name', 'warehouseSub.code', 'warehouseSub.is_staging'])
-      .where('bin.current_pallet < bin.capacity_pallet')
-      .andWhere('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
-      .orderBy('(bin.capacity_pallet - bin.current_pallet)', 'DESC') // most free space first
+      .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
+      .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
+      .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
+      .groupBy('bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging')
+      .having('COUNT(DISTINCT tracking.pallet_id) < bin.capacity_pallet')
+      .orderBy('(bin.capacity_pallet - COUNT(DISTINCT tracking.pallet_id))', 'DESC') // most free space first
       .getMany();
 
     // Get available zones (warehouse subs) with capacity
@@ -170,8 +176,11 @@ export class MasterWarehouseBinRepository {
           .leftJoin('tracking.pallet', 'pallet')
           .leftJoin('TransactionScanInbound', 'scan', 'scan.pallet_id = pallet.id')
           .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
-          .where('bin.current_pallet < bin.capacity_pallet')
-          .andWhere('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' });
+          .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
+          .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
+          .andWhere('tracking.inventory_status = :status', { status: 'INSPECTION_COMPLETED' })
+          .groupBy('bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging')
+          .having('COUNT(DISTINCT tracking.pallet_id) < bin.capacity_pallet');
 
         if (itemIds.length > 0 && weekNumbers.length > 0) {
           query = query.andWhere('(scan.item_id IN (:...itemIds) OR scan.week_number IN (:...weekNumbers))', { itemIds, weekNumbers });
@@ -207,14 +216,18 @@ export class MasterWarehouseBinRepository {
       if (!suggestedBin) {
         console.log('No bins with same items found, looking for empty bins...');
         
-        // Find empty bins (current_pallet = 0 or very low)
+        // Find empty bins (calculated current_pallet = 0)
         const emptyBins = await this.repository
           .createQueryBuilder('bin')
           .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
+          .leftJoin('InventoryTracking', 'tracking', 'tracking.warehouse_bin_id = bin.id')
           .addSelect(['warehouseSub.id', 'warehouseSub.name', 'warehouseSub.code', 'warehouseSub.is_staging'])
-          .where('bin.current_pallet = 0') // Completely empty bins
-          .andWhere('bin.capacity_pallet > 0') // Has capacity
+          .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
+          .where('bin.capacity_pallet > 0') // Has capacity
           .andWhere('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
+          .andWhere('tracking.inventory_status = :status', { status: 'INSPECTION_COMPLETED' })
+          .groupBy('bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging')
+          .having('COUNT(DISTINCT tracking.pallet_id) = 0') // Completely empty bins
           .orderBy('bin.capacity_pallet', 'DESC') // Largest capacity first
           .limit(5) // Get top 5 empty bins
           .getMany();
