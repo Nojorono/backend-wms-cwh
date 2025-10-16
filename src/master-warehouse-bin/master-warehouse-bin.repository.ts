@@ -150,6 +150,26 @@ export class MasterWarehouseBinRepository {
     }> = [];
     const usedBinIds = new Set<string>();
     const usedZoneIds = new Set<string>();
+    
+    // Group pallets by item and week for better bin assignment
+    const palletGroups = new Map<string, InventoryTracking[]>();
+    for (const stagingPallet of stagingPallets) {
+      const palletItems = allPalletItems.filter(item => item.pallet_id === stagingPallet.pallet_id);
+      const itemIds = palletItems.map(item => item.item_id).filter(Boolean);
+      const weekNumbers = palletItems.map(item => item.week_number).filter(Boolean);
+      const groupKey = `${itemIds.sort().join(',')}-${weekNumbers.sort().join(',')}`;
+      
+      if (!palletGroups.has(groupKey)) {
+        palletGroups.set(groupKey, []);
+      }
+      palletGroups.get(groupKey)!.push(stagingPallet);
+    }
+    
+    console.log('Pallet groups by item/week:', Array.from(palletGroups.entries()).map(([key, pallets]) => ({
+      key,
+      count: pallets.length,
+      palletIds: pallets.map(p => p.pallet_id)
+    })));
 
     for (const stagingPallet of stagingPallets) {
       // Get current items and weeks for this pallet from pallet service
@@ -162,6 +182,31 @@ export class MasterWarehouseBinRepository {
       console.log('Item IDs:', itemIds);
       console.log('Week numbers:', weekNumbers);
       console.log('Current quantities:', palletItems.map(item => `${item.item_name || item.item_id}: ${item.current_quantity} ${item.uom}`));
+      
+      // Check if we already assigned a bin for the same item/week combination
+      const groupKey = `${itemIds.sort().join(',')}-${weekNumbers.sort().join(',')}`;
+      const existingSuggestion = palletSuggestions.find(suggestion => {
+        const suggestionItems = suggestion.palletItems;
+        const suggestionItemIds = suggestionItems.map(item => item.item_id).filter(Boolean);
+        const suggestionWeekNumbers = suggestionItems.map(item => item.week_number).filter(Boolean);
+        const suggestionGroupKey = `${suggestionItemIds.sort().join(',')}-${suggestionWeekNumbers.sort().join(',')}`;
+        return suggestionGroupKey === groupKey;
+      });
+      
+      if (existingSuggestion) {
+        console.log(`Using same bin as previous pallet with same items: ${existingSuggestion.suggestedBin.name}`);
+        // Use the same bin as the previous pallet with same items
+        const suggestedBin = existingSuggestion.suggestedBin;
+        const suggestedZone = existingSuggestion.suggestedZone;
+        
+        palletSuggestions.push({
+          stagingPallet,
+          suggestedBin,
+          suggestedZone,
+          palletItems
+        });
+        continue;
+      }
 
       // Step 1: Try to find bins with same items/weeks
       let matchingBinsForSameItem: MasterWarehouseBin[] = [];
@@ -176,8 +221,9 @@ export class MasterWarehouseBinRepository {
           .leftJoin('TransactionScanInbound', 'scan', 'scan.pallet_id = pallet.id')
           .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
+          .addSelect('COUNT(scan.id)', 'matching_items_count')
           .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
-          .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
+          .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', { status: 'IN_INVENTORY' })
           .groupBy('bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging')
           .having('COUNT(DISTINCT tracking.pallet_id) < bin.capacity_pallet');
 
@@ -191,7 +237,8 @@ export class MasterWarehouseBinRepository {
 
         matchingBinsForSameItem = await query
           .orderBy('COUNT(scan.id)', 'DESC')
-          .limit(1) // Only get 1 bin
+          .addOrderBy('(bin.capacity_pallet - COUNT(DISTINCT tracking.pallet_id))', 'DESC')
+          .limit(3) // Get top 3 bins with same items
           .getMany();
           
         console.log('Found bins with same items/weeks:', matchingBinsForSameItem.length);
@@ -202,11 +249,12 @@ export class MasterWarehouseBinRepository {
       let suggestedZone: MasterWarehouseSub | undefined;
 
       if (matchingBinsForSameItem.length > 0) {
-        // Use bin with same items/weeks
+        // Use bin with same items/weeks - prioritize bins that already have the same items
         suggestedBin = matchingBinsForSameItem.find(bin => !usedBinIds.has(bin.id));
         if (suggestedBin) {
           // Find the zone for this bin
           suggestedZone = availableZones.find(zone => zone.id === suggestedBin?.warehouse_sub_id) as MasterWarehouseSub;
+          console.log(`Using bin with same items: ${suggestedBin.name} (${suggestedBin.id})`);
         }
       }
 

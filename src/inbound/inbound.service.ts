@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Inbound } from '../core/domain/entities/inbound.entity';
 import { InboundRepository } from './repositories/inbound.repository';
@@ -121,7 +121,16 @@ export class InboundService {
   }
 
   async update(id: string, payload: UpdateInboundDto): Promise<Inbound> {
-    await this.findOne(id);
+    const inbound = await this.findOne(id);
+
+    if (!inbound) {
+      throw new NotFoundException('Inbound not found');
+    }
+
+    if(inbound.status === 'UNLOADING') {
+      throw new BadRequestException('Inbound is already unloading');
+    }
+    
     await this.dataSource.transaction(async () => {
       await this.inboundRepo.update(id, {
         expedition: payload.expedition,
