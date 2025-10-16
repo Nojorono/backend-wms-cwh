@@ -25,7 +25,7 @@ export class InboundItem extends BaseEntity {
   @Column({ nullable: true })
   quantity: number;
   
-  @Column({ nullable: true })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quantity_inspection: number;
 
   @Column({ nullable: true })
