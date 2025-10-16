@@ -5,6 +5,7 @@ import { CreateManyPutAwayDto } from './dto/create-many-put-away.dto';
 import { PutAwayTransaction, Status } from 'src/core/domain/entities/transaction-put-away.entity';
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseBinService } from 'src/master-warehouse-bin/master-warehouse-bin.service';
+import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
 import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
   
 @Injectable()
@@ -12,8 +13,8 @@ export class PutAwayService {
   constructor(
     private readonly repository: PutAwayRepository, 
     private readonly inventoryTrackingService: InventoryTrackingService, 
-    private readonly warehouseBinService: MasterWarehouseBinService 
-
+    private readonly warehouseBinService: MasterWarehouseBinService,
+    private readonly masterPalletService: MasterPalletService
   ) {}
 
   async create(dto: CreatePutAwayDto): Promise<PutAwayTransaction> {
@@ -47,7 +48,22 @@ export class PutAwayService {
   }
 
   async findAll(): Promise<PutAwayTransaction[]> {
-    return this.repository.findAll();
+    const entities = await this.repository.findAll();
+    
+    // Get current items and quantity from pallet for each entity
+    for (const entity of entities) {
+      if (entity.inventoryTracking?.pallet_id) {
+        try {
+          const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(entity.inventoryTracking.pallet_id);
+          (entity as any).palletItems = palletItems;
+        } catch (error) {
+          console.warn(`Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`, error.message);
+          (entity as any).palletItems = [];
+        }
+      }
+    }
+    
+    return entities;
   }
 
   async findOne(id: string): Promise<PutAwayTransaction> {
@@ -55,6 +71,18 @@ export class PutAwayService {
     if (!entity) {
       throw new NotFoundException(`Put Away with ID ${id} not found`);
     }
+    
+    // Get current items and quantity from pallet
+    if (entity.inventoryTracking?.pallet_id) {
+      try {
+        const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(entity.inventoryTracking.pallet_id);
+        (entity as any).palletItems = palletItems;
+      } catch (error) {
+        console.warn(`Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`, error.message);
+        (entity as any).palletItems = [];
+      }
+    }
+    
     return entity;
   }
 

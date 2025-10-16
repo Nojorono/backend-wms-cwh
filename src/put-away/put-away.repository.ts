@@ -26,6 +26,8 @@ export class PutAwayRepository {
     const queryBuilder = this.repository
       .createQueryBuilder('pta')
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
+      .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
+      .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
       .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
 
     return await queryBuilder.getMany();
@@ -36,6 +38,8 @@ export class PutAwayRepository {
       .createQueryBuilder('pta')
       .where('pta.id = :id', { id })
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
+      .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
+      .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
       .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
       .getOne();
     if (!entity) return null;
