@@ -4,6 +4,7 @@ import { MasterPallet } from './master-pallet.entity';
 
 export enum QuantityOperationType {
   ADD = 'ADD',
+  PICK = 'PICK',
   REMOVE = 'REMOVE',
   ADJUST = 'ADJUST',
   RESET = 'RESET'
@@ -38,6 +39,9 @@ export class PalletTransactionHistory extends BaseEntity {
 
   @Column({ nullable: true })
   week_number: number;
+
+  @Column({ nullable: true })
+  inbound_id: string;
 
   @Column({ nullable: true })
   reference_id: string;

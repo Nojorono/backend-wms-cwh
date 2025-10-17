@@ -25,6 +25,11 @@ export class UpdatePalletQuantityDto {
   @IsString()
   reference_id?: string;
 
+  @ApiPropertyOptional({ example: 'uuid-inbound-123', description: 'Inbound ID for tracking' })
+  @IsOptional()
+  @IsString()
+  inbound_id?: string;
+
   @ApiPropertyOptional({ example: 'INBOUND', description: 'Reference type (INBOUND, OUTBOUND, etc.)' })
   @IsOptional()
   @IsString()

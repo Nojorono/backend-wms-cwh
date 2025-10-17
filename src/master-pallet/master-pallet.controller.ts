@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -127,6 +128,22 @@ export class MasterPalletController {
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
   getPalletItemLatestQuantityByPalletCode(@Param('palletCode') palletCode: string) {
     return this.masterPalletService.getPalletItemLatestQuantityByPalletCode(palletCode);
+  }
+
+  @Get('by-code/:palletCode/item/:itemId/history')
+  @ApiOperation({ summary: 'Get item quantity history by pallet code and item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return item quantity history.',
+    type: [PalletQuantityHistoryResponseDto],
+  })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  getItemQuantityHistoryByPalletCode(
+    @Param('palletCode') palletCode: string,
+    @Param('itemId') itemId: string,
+    @Query('uom') uom?: string
+  ) {
+    return this.masterPalletService.getItemQuantityHistoryByPalletCode(palletCode, itemId, uom);
   }
 
   @Get('by-code/:palletCode/capacity-validation')
