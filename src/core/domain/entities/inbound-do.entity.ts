@@ -5,6 +5,7 @@ import { Inbound } from './inbound.entity';
 
 export enum IntegrationStatus {
   PENDING = 'PENDING',
+  READY = 'READY',
   SUCCESS = 'SUCCESS',
   SUCCESS_PARTIAL = 'SUCCESS_PARTIAL',
   FAILED = 'FAILED',

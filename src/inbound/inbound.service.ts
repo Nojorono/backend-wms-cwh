@@ -11,7 +11,7 @@ import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 import { UpdateSaldoInspectionDto } from './dto/update-saldo-inspection.dto';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
-import { InboundItem } from '../core/domain/entities/inbound-item.entity';
+import { InboundItem, InspectionStatus } from '../core/domain/entities/inbound-item.entity';
 import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 
 @Injectable()
@@ -218,9 +218,19 @@ export class InboundService {
     }));
     
     const updateSaldo = await this.inboundItemRepo.bulkUpdateSaldoInspection(updates); 
-
-    await this.inboundDoRepo.update(payload.inbound_do_id, {integration_status: IntegrationStatus.PENDING})
-
+    // find all inbound item by inbound_do_id
+    const inboundItems = await this.inboundItemRepo.findAllByInboundDo(payload.inbound_do_id);
+    let isAllApproved = true;
+    for (const item of inboundItems) {
+      if(item.inspection_status === InspectionStatus.PENDING) {
+        isAllApproved = false;
+      }
+    }
+    if(isAllApproved) {
+      await this.inboundDoRepo.update(payload.inbound_do_id, {integration_status: IntegrationStatus.READY});
+    } else {
+      await this.inboundDoRepo.update(payload.inbound_do_id, {integration_status: IntegrationStatus.PENDING});
+    }
     return updateSaldo;
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { InboundItem } from '../../core/domain/entities/inbound-item.entity';
+import { InboundItem, InspectionStatus } from '../../core/domain/entities/inbound-item.entity';
 
 @Injectable()
 export class InboundItemRepository {
@@ -64,7 +64,7 @@ export class InboundItemRepository {
       if (!existing) {
         throw new NotFoundException(`Inbound Item with id ${update.id} not found`);
       }
-      await this.repository.update(update.id, { quantity_inspection: update.quantity_inspection });
+      await this.repository.update(update.id, { quantity_inspection: update.quantity_inspection, inspection_status: InspectionStatus.APPROVED });
       const updated = await this.findOne(update.id);
       if (updated) {
         results.push(updated);
