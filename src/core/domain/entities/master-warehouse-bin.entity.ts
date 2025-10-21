@@ -1,5 +1,6 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { InventoryTracking } from './inventory-tracking.entity';
+import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { BaseEntity } from './base.entity';
 
 @Entity('m_warehouse_bin')
@@ -30,4 +31,8 @@ export class MasterWarehouseBin extends BaseEntity {
 
   @OneToMany(() => InventoryTracking, (inventoryTracking) => inventoryTracking.warehouseBin)
   inventory_trackings: InventoryTracking[];
+
+  @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id)
+  @JoinColumn({ name: 'warehouse_sub_id' })
+  warehouseSub: MasterWarehouseSub;
 }

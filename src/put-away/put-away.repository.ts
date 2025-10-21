@@ -29,6 +29,7 @@ export class PutAwayRepository {
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
       .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
+      .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
 
     return await queryBuilder.getMany();
   }
@@ -41,6 +42,7 @@ export class PutAwayRepository {
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
       .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
+      .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
       .getOne();
     if (!entity) return null;
     return entity;
