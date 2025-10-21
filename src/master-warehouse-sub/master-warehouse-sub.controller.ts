@@ -68,8 +68,14 @@ export class MasterWarehouseSubController {
     type: [MasterWarehouseSub],
   })
   @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findByIsStaging(@Query('is_staging') is_staging: WarehouseSubStagingType) {
-    return this.masterWarehouseSubService.findByIsStaging(is_staging);
+  findByIsStaging(@Query('is_staging') is_staging: string) {
+    if (is_staging === 'null') {
+      return this.masterWarehouseSubService.findByIsStagingNull();
+    } else if (is_staging && is_staging !== 'null') {
+      return this.masterWarehouseSubService.findByIsStaging(is_staging as WarehouseSubStagingType);
+    } else {
+      return this.masterWarehouseSubService.findAll();
+    }
   }
 
   @Get(':id')

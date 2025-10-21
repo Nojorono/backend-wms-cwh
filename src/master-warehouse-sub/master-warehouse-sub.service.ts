@@ -117,4 +117,8 @@ export class MasterWarehouseSubService {
   async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
     return await this.repository.findByIsStaging(is_staging);
   }
+
+  async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByIsStagingNull();
+  }
 }

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
 import { MasterWarehouseSub, WarehouseSubStagingType } from '../core/domain/entities/master-warehouse-sub.entity';
@@ -63,5 +63,9 @@ export class MasterWarehouseSubRepository {
 
   async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
     return await this.repository.find({ where: { is_staging } });
+  }
+  
+  async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
+    return await this.repository.find({ where: { is_staging: IsNull() } });
   }
 }
