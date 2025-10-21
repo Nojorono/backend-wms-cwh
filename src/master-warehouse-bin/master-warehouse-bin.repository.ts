@@ -120,7 +120,7 @@ export class MasterWarehouseBinRepository {
     // Calculate current_pallet based on inventory-tracking relations
     const availableBins = await this.repository
       .createQueryBuilder('bin')
-      .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
+      .leftJoin('MasterWarehouseSub', 'warehouseSub', 'warehouseSub.id = bin.warehouse_sub_id')
       .leftJoin('InventoryTracking', 'tracking', 'tracking.warehouse_bin_id = bin.id')
       .addSelect(['warehouseSub.id', 'warehouseSub.name', 'warehouseSub.code', 'warehouseSub.is_staging'])
       .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
@@ -134,7 +134,7 @@ export class MasterWarehouseBinRepository {
     // Get available zones (warehouse subs) with capacity
     const availableZones = await this.repository.manager
       .createQueryBuilder('MasterWarehouseSub', 'zone')
-      .leftJoin('MasterWarehouseBin', 'bin', 'bin.warehouse_sub_id = CAST(zone.id AS TEXT)')
+      .leftJoin('MasterWarehouseBin', 'bin', 'bin.warehouse_sub_id = zone.id')
       .where('zone.is_staging IS NULL OR zone.is_staging != :staging', { staging: 'INBOUND' })
       .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
       .having('COUNT(bin.id) > 0') // zones that have bins
@@ -219,7 +219,7 @@ export class MasterWarehouseBinRepository {
           .leftJoin('bin.inventory_trackings', 'tracking')
           .leftJoin('tracking.pallet', 'pallet')
           .leftJoin('TransactionScanInbound', 'scan', 'scan.pallet_id = pallet.id')
-          .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
+          .leftJoin('MasterWarehouseSub', 'warehouseSub', 'warehouseSub.id = bin.warehouse_sub_id')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .addSelect('COUNT(scan.id)', 'matching_items_count')
           .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', { staging: 'INBOUND' })
@@ -265,7 +265,7 @@ export class MasterWarehouseBinRepository {
         // Find empty bins (calculated current_pallet = 0)
         const emptyBins = await this.repository
           .createQueryBuilder('bin')
-          .leftJoin('MasterWarehouseSub', 'warehouseSub', 'CAST(warehouseSub.id AS TEXT) = bin.warehouse_sub_id')
+          .leftJoin('MasterWarehouseSub', 'warehouseSub', 'warehouseSub.id = bin.warehouse_sub_id')
           .leftJoin('InventoryTracking', 'tracking', 'tracking.warehouse_bin_id = bin.id')
           .addSelect(['warehouseSub.id', 'warehouseSub.name', 'warehouseSub.code', 'warehouseSub.is_staging'])
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
