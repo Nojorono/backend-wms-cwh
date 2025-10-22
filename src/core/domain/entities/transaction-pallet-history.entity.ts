@@ -10,6 +10,11 @@ export enum QuantityOperationType {
   RESET = 'RESET'
 }
 
+export enum StatusInventory {
+  READY = 'READY',
+  PENDING = 'PENDING',
+}
+
 @Entity('transaction_pallet_history')
 export class PalletTransactionHistory extends BaseEntity {
   @Column({ nullable: true })
@@ -54,6 +59,9 @@ export class PalletTransactionHistory extends BaseEntity {
 
   @Column({ nullable: true })
   user_id: string;
+
+  @Column({ type: 'enum', enum: StatusInventory, default: StatusInventory.PENDING })
+  status_inventory: StatusInventory;
 
   @Column({ nullable: true })
   uom: string;
