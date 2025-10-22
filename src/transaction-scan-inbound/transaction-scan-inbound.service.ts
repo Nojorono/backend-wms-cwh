@@ -25,7 +25,16 @@ export class TransactionScanInboundService {
     if (!item) throw new BadRequestException('Item not found');
 
     const pallet = await this.palletService.findByPalletCode(data.pallet_code || '');
+
     if (!pallet) throw new NotFoundException('Pallet not found');
+
+    // check capacity pallet
+    if (pallet && pallet.capacity > 0) {
+      const capacityPallet = await this.palletService.checkCapacityForQuantity(pallet.id, data.quantity);
+      if (!capacityPallet) throw new BadRequestException('Pallet is full');
+    }else if (pallet && pallet.capacity <= 0) {
+      throw new BadRequestException('Pallet capacity is not set');
+    }
 
     if (data.m_warehouse_sub_id) {
       const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
