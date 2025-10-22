@@ -85,9 +85,8 @@ export class MasterWarehouseBinRepository {
       .leftJoinAndSelect('tracking.warehouseBin', 'warehouseBin')
       .where('warehouseSub.is_staging = :staging', { staging: 'INBOUND' })
       .andWhere('tracking.inventory_status = :status', { status: 'INSPECTION_COMPLETED' })
+      .andWhere('tracking.progression_status = :status', { status: ProgressionStatus.NOT_STARTED })
       .getMany();
-
-    console.log('stagingPallets', stagingPallets);
 
     // Early return if no staging pallets found
     if (stagingPallets.length === 0) {
