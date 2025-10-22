@@ -4,6 +4,15 @@ import { BaseEntity } from './base.entity';
 import { AssignedHelper } from './assigned-helper.entity';
 import { TransactionScanInbound } from './transaction-scan-inbound.entity';
 
+export enum InboundStatus {
+  CREATED = 'CREATED',
+  UNLOADING = 'UNLOADING',
+  INSPECTION = 'INSPECTION',
+  READY_INTEGRATION = 'READY_INTEGRATION',
+  INTEGRATED = 'INTEGRATED',
+  FAILED = 'FAILED',
+}
+
 @Entity('inbound')
 export class Inbound extends BaseEntity {
   @Column({ nullable: true })
@@ -25,7 +34,7 @@ export class Inbound extends BaseEntity {
   driver_phone: string;
 
   @Column({ nullable: true })
-  status: string;
+  status: InboundStatus;
 
   @Column({ nullable: true })
   inbound_type: string;

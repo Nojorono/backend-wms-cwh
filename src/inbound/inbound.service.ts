@@ -13,6 +13,7 @@ import { UpdateSaldoInspectionDto } from './dto/update-saldo-inspection.dto';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem, InspectionStatus } from '../core/domain/entities/inbound-item.entity';
 import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
+import { InboundStatus } from 'src/core/domain/entities/inbound.entity';
 
 @Injectable()
 export class InboundService {
@@ -38,7 +39,7 @@ export class InboundService {
         license_plate: payload.license_plate,
         driver_name: payload.driver_name,
         driver_phone: payload.driver_phone,
-        status: payload.status,
+        status: payload.status as InboundStatus,
         inbound_type: payload.inbound_type,
         arrival_date: payload.arrival_date ? new Date(payload.arrival_date) : undefined,
       });
@@ -138,7 +139,7 @@ export class InboundService {
         license_plate: payload.license_plate,
         driver_name: payload.driver_name,
         driver_phone: payload.driver_phone,
-        status: payload.status,
+        status: payload.status as InboundStatus,
         inbound_type: payload.inbound_type,
         arrival_date: payload.arrival_date ? new Date(payload.arrival_date) : undefined,
       });
@@ -193,7 +194,7 @@ export class InboundService {
     
     const updateData: Partial<Inbound> = {};
     if (payload.status !== undefined) {
-      updateData.status = payload.status;
+      updateData.status = payload.status as InboundStatus;
     }
     if (payload.notes !== undefined) {
       updateData.notes = payload.notes;
@@ -209,6 +210,87 @@ export class InboundService {
 
   async findAllTransactionScanInbound(status: string): Promise<Inbound[]> {
     return await this.inboundRepo.findAllTransactionScanInbound(status);
+  }
+
+  async sequentialStatus(id: string): Promise<Inbound> {
+    const inbound = await this.findOne(id);
+    if (!inbound) {
+      throw new NotFoundException('Inbound not found');
+    }
+
+    // Validate that inbound has DOs
+    if (!inbound.inbound_dos || inbound.inbound_dos.length === 0) {
+      throw new BadRequestException('Inbound has no delivery orders to process');
+    }
+
+    // Count statuses with proper validation
+    const statusCounts = {
+      ready: 0,
+      success: 0,
+      failed: 0,
+      pending: 0,
+      total: inbound.inbound_dos.length
+    };
+
+    // Count each status type
+    for (const inboundDo of inbound.inbound_dos) {
+      switch (inboundDo.integration_status) {
+        case IntegrationStatus.READY:
+          statusCounts.ready++;
+          break;
+        case IntegrationStatus.SUCCESS:
+          statusCounts.success++;
+          break;
+        case IntegrationStatus.FAILED:
+          statusCounts.failed++;
+          break;
+        case IntegrationStatus.PENDING:
+        default:
+          statusCounts.pending++;
+          break;
+      }
+    }
+
+    // Determine overall inbound status based on DO statuses
+    let newStatus: InboundStatus;
+    let statusReason: string;
+
+    if (statusCounts.failed > 0) {
+      // If any DO failed, inbound is failed
+      newStatus = InboundStatus.FAILED;
+      statusReason = `${statusCounts.failed} delivery order(s) failed integration`;
+    } else if (statusCounts.success === statusCounts.total) {
+      // All DOs successfully integrated
+      newStatus = InboundStatus.INTEGRATED;
+      statusReason = 'All delivery orders successfully integrated';
+    } else if (statusCounts.ready === statusCounts.total) {
+      // All DOs ready for integration
+      newStatus = InboundStatus.READY_INTEGRATION;
+      statusReason = 'All delivery orders ready for integration';
+    } else if (statusCounts.success > 0 && statusCounts.pending === 0) {
+      // Some success, no pending - partial success
+      newStatus = InboundStatus.INSPECTION;
+      statusReason = `${statusCounts.success}/${statusCounts.total} delivery orders integrated`;
+    } else {
+      // Default to inspection for mixed or pending states
+      newStatus = InboundStatus.INSPECTION;
+      statusReason = `Processing ${statusCounts.pending} pending delivery order(s)`;
+    }
+
+    // Update inbound status with timestamp
+    const updateData = {
+      status: newStatus,
+      updatedAt: new Date()
+    };
+
+    await this.inboundRepo.update(id, updateData);
+
+    // Log status change for audit
+    console.log(`Inbound ${id} status updated to ${newStatus}: ${statusReason}`);
+    console.log(`Status breakdown: Ready=${statusCounts.ready}, Success=${statusCounts.success}, Failed=${statusCounts.failed}, Pending=${statusCounts.pending}`);
+
+    // Return updated inbound
+    return await this.findOne(id);
   }
 
   async bulkUpdateInboundItemSaldoInspection(payload: BulkUpdateSaldoInspectionDto): Promise<InboundItem[]> {

@@ -106,5 +106,13 @@ export class InboundController {
     return this.service.bulkUpdateInboundItemSaldoInspection(dto);
   }
 
+  // sequential status
+  @Patch('sequential-status/:id')
+  @ApiOperation({ summary: 'Sequential status inbound' })
+  @ApiResponse({ status: 200, type: Inbound })
+  sequentialStatus(@Param('id') id: string) {
+    return this.service.sequentialStatus(id);
+  }
+
 }
 
