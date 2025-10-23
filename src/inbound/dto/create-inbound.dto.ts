@@ -62,16 +62,16 @@ export class CreateInboundDoDto {
   inbound_id?: string;
 
   @ApiPropertyOptional({ example: false })
-  @IsOptional()
+  @IsNotEmpty({ message: 'validation_surat_jalan is required' })
   @IsBoolean({ message: 'validation_surat_jalan must be a boolean' })
   validation_surat_jalan?: boolean;
 
   @ApiPropertyOptional({ example: 'DO-001' })
-  @IsOptional()
+  @IsNotEmpty({ message: 'inbound_do_number is required' })
   @IsString({ message: 'inbound_do_number must be a string' })
   @MinLength(1, { message: 'inbound_do_number must be at least 1 character' })
   @MaxLength(50, { message: 'inbound_do_number must not exceed 50 characters' })
-  inbound_do_number?: string;
+  inbound_do_number: string;
 
   @ApiPropertyOptional({ example: '2025-09-01T10:00:00.000Z' })
   @IsOptional()
@@ -85,11 +85,11 @@ export class CreateInboundDoDto {
   attachment?: string;
 
   @ApiPropertyOptional({ example: 'PO-123' })
-  @IsOptional()
+  @IsNotEmpty({ message: 'inbound_po_number is required' })
   @IsString({ message: 'inbound_po_number must be a string' })
   @MinLength(1, { message: 'inbound_po_number must be at least 1 character' })
   @MaxLength(50, { message: 'inbound_po_number must not exceed 50 characters' })
-  inbound_po_number?: string;
+  inbound_po_number: string;
 
   @ApiPropertyOptional({ example: '2025-08-31T00:00:00.000Z' })
   @IsOptional()

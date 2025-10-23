@@ -157,11 +157,12 @@ export class InboundService {
       throw new BadRequestException(`inbound_dos[${doIndex}].inbound_items cannot be empty if provided`);
     }
 
-    // Check for duplicate item_ids within the same DO
-    const itemIds = inboundItems.map(item => item.item_id);
-    const uniqueItemIds = new Set(itemIds);
-    if (itemIds.length !== uniqueItemIds.size) {
-      throw new BadRequestException(`Duplicate item_id found in inbound_dos[${doIndex}].inbound_items`);
+    // Check for duplicate item_id + uom combinations within the same DO
+    // Same item with different UOMs is allowed, but same item with same UOM is not
+    const itemUomCombinations = inboundItems.map(item => `${item.item_id}|${item.uom || 'default'}`);
+    const uniqueCombinations = new Set(itemUomCombinations);
+    if (itemUomCombinations.length !== uniqueCombinations.size) {
+      throw new BadRequestException(`Duplicate item_id + uom combination found in inbound_dos[${doIndex}].inbound_items. Same item with same UOM is not allowed`);
     }
 
     // Validate each item
