@@ -70,6 +70,7 @@ export class PutAwayRepository {
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
       .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
+      .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
       .getMany();
     if (!queryBuilder) return [];
     return queryBuilder;
@@ -84,6 +85,7 @@ export class PutAwayRepository {
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
       .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
+      .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
       .orderBy('pta.created_at', 'DESC')
       .getMany();
     if (!queryBuilder) return [];
