@@ -112,76 +112,168 @@ export class TransactionScanInboundService {
   }
 
   async update(id: string, data: UpdateTransactionScanInboundDto): Promise<TransactionScanInbound> {
-    const existing = await this.findOne(id);
-
-    if (data.item_id) {
-      const item = await this.itemService.findOne(data.item_id);
-      if (!item) throw new BadRequestException('Item not found');
-    }
-
-    if (data.m_warehouse_sub_id) {
-      const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
-      if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
-    }
-
-    // Validasi week_number jika diupdate
-    if (data.week_number !== undefined && data.week_number !== existing.week_number) {
-      const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(existing.pallet_id, data.week_number);
-      const differentWeekItems = existingItemsInPallet.filter(item => item.id !== id && item.week_number !== data.week_number);
-      if (differentWeekItems.length > 0) {
-        throw new BadRequestException(`Pallet sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat mengubah week menjadi ${data.week_number}`);
+    try {
+      // Validate input parameters
+      if (!id || typeof id !== 'string') {
+        throw new BadRequestException('Invalid transaction ID provided');
       }
+
+      if (!data || Object.keys(data).length === 0) {
+        throw new BadRequestException('No update data provided');
+      }
+
+      // Find existing transaction with proper error handling
+      const existing = await this.findOne(id);
+      if (!existing) {
+        throw new NotFoundException(`Transaction scan inbound with ID ${id} not found`);
+      }
+
+      // Validate item if being updated
+      if (data.item_id) {
+        try {
+          const item = await this.itemService.findOne(data.item_id);
+          if (!item) {
+            throw new BadRequestException(`Item with ID ${data.item_id} not found`);
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Failed to validate item: ${error.message}`);
+        }
+      }
+
+      // Validate warehouse sub if being updated
+      if (data.m_warehouse_sub_id) {
+        try {
+          const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
+          if (!warehouseSub) {
+            throw new BadRequestException(`Warehouse sub with ID ${data.m_warehouse_sub_id} not found`);
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Failed to validate warehouse sub: ${error.message}`);
+        }
+      }
+
+      // Validate week_number if being updated
+      if (data.week_number !== undefined && data.week_number !== existing.week_number) {
+        try {
+          const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(existing.pallet_id, data.week_number);
+          const differentWeekItems = existingItemsInPallet.filter(item => item.id !== id && item.week_number !== data.week_number);
+          
+          if (differentWeekItems.length > 0) {
+            throw new BadRequestException(
+              `Pallet already contains items with week ${differentWeekItems[0].week_number}. Cannot change week to ${data.week_number}`
+            );
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Failed to validate week number: ${error.message}`);
+        }
+      }
+
+      // Validate quantity if being updated
+      if (data.quantity !== undefined && (typeof data.quantity !== 'number' || data.quantity < 0)) {
+        throw new BadRequestException('Quantity must be a positive number');
+      }
+
+      // Determine if pallet operations are needed
+      const affectsPallet =
+        typeof data.quantity === 'number' ||
+        typeof data.item_id === 'string' ||
+        typeof (data as any).pallet_code === 'string' ||
+        typeof data.uom === 'string';
+
+      let targetPalletId = existing.pallet_id;
+      
+      // Validate target pallet if pallet_code is provided
+      if ((data as any).pallet_code) {
+        try {
+          const targetPallet = await this.palletService.findByPalletCode((data as any).pallet_code);
+          if (!targetPallet) {
+            throw new NotFoundException(`Target pallet with code '${(data as any).pallet_code}' not found`);
+          }
+          targetPalletId = targetPallet.id;
+        } catch (error) {
+          if (error instanceof NotFoundException) {
+            throw error;
+          }
+          throw new BadRequestException(`Failed to validate target pallet: ${error.message}`);
+        }
+      }
+
+      // Handle pallet quantity updates with proper error handling
+      if (affectsPallet) {
+        try {
+          // Remove from existing pallet
+          await this.palletService.updateQuantity(existing.pallet_id, {
+            item_id: existing.item_id,
+            quantity: existing.quantity,
+            production_date: existing.production_date,
+            operation_type: QuantityOperationType.REMOVE,
+            inbound_id: existing.inbound_id,
+            reference_id: id,
+            reference_type: 'INBOUND_SCAN_UPDATE',
+            notes: 'revert previous',
+            user_id: data.user_id || existing.user_id,
+            uom: existing.uom,
+            week_number: existing.week_number,
+          });
+
+          // Add to target pallet
+          await this.palletService.updateQuantity(targetPalletId, {
+            item_id: data.item_id ?? existing.item_id,
+            quantity: typeof data.quantity === 'number' ? data.quantity : existing.quantity,
+            production_date: data.production_date ?? existing.production_date,
+            operation_type: QuantityOperationType.ADD,
+            inbound_id: existing.inbound_id,
+            reference_id: id,
+            reference_type: 'INBOUND_SCAN_UPDATE',
+            notes: data.user_name ?? existing.user_name,
+            user_id: data.user_id ?? existing.user_id,
+            uom: data.uom ?? existing.uom,
+            week_number: data.week_number ?? existing.week_number,
+          });
+        } catch (error) {
+          throw new BadRequestException(`Failed to update pallet quantities: ${error.message}`);
+        }
+      }
+
+      // Prepare update payload
+      const payload: any = { ...data };
+      if (targetPalletId && targetPalletId !== existing.pallet_id) {
+        payload.pallet_id = targetPalletId;
+      }
+
+      // Update the transaction with error handling
+      try {
+        const updatedTransaction = await this.repository.update(id, payload);
+        if (!updatedTransaction) {
+          throw new BadRequestException('Failed to update transaction scan inbound');
+        }
+        return updatedTransaction;
+      } catch (error) {
+        throw new BadRequestException(`Database update failed: ${error.message}`);
+      }
+
+    } catch (error) {
+      // Log error for debugging
+      console.error(`Error updating transaction scan inbound ${id}:`, error);
+      
+      // Re-throw known exceptions
+      if (error instanceof BadRequestException || 
+          error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      // Wrap unknown errors
+      throw new BadRequestException(`Update operation failed: ${error.message}`);
     }
-
-    const affectsPallet =
-      typeof data.quantity === 'number' ||
-      typeof data.item_id === 'string' ||
-      typeof (data as any).pallet_code === 'string' ||
-      typeof data.uom === 'string';
-
-    let targetPalletId = existing.pallet_id;
-    if ((data as any).pallet_code) {
-      const targetPallet = await this.palletService.findByPalletCode((data as any).pallet_code || '');
-      if (!targetPallet) throw new NotFoundException('Target pallet not found');
-      targetPalletId = targetPallet.id;
-    }
-
-    if (affectsPallet) {
-      await this.palletService.updateQuantity(existing.pallet_id, {
-        item_id: existing.item_id,
-        quantity: existing.quantity,
-        production_date: existing.production_date,
-        operation_type: QuantityOperationType.REMOVE,
-        inbound_id: existing.inbound_id,
-        reference_id: id,
-        reference_type: 'INBOUND_SCAN_UPDATE',
-        notes: 'revert previous',
-        user_id: data.user_id || existing.user_id,
-        uom: existing.uom,
-        week_number: existing.week_number,
-      });
-
-      await this.palletService.updateQuantity(targetPalletId, {
-        item_id: data.item_id ?? existing.item_id,
-        quantity: typeof data.quantity === 'number' ? data.quantity : existing.quantity,
-        production_date: data.production_date ?? existing.production_date,
-        operation_type: QuantityOperationType.ADD,
-        inbound_id: existing.inbound_id,
-        reference_id: id,
-        reference_type: 'INBOUND_SCAN_UPDATE',
-        notes: data.user_name ?? existing.user_name,
-        user_id: data.user_id ?? existing.user_id,
-        uom: data.uom ?? existing.uom,
-        week_number: data.week_number ?? existing.week_number,
-      });
-    }
-
-    const payload: any = { ...data };
-    if (targetPalletId && targetPalletId !== existing.pallet_id) {
-      payload.pallet_id = targetPalletId;
-    }
-
-    return this.repository.update(id, payload);
   }
 
   async remove(id: string): Promise<void> {
