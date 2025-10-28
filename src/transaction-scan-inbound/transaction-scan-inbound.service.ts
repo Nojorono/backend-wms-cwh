@@ -36,6 +36,11 @@ export class TransactionScanInboundService {
       throw new BadRequestException('Pallet capacity is not set');
     }
 
+    // Validate UOM match between scan and pallet
+    if (pallet.uom && data.uom && pallet.uom !== data.uom) {
+      throw new BadRequestException(`UOM mismatch: Scan UOM (${data.uom}) does not match Pallet UOM (${pallet.uom})`);
+    }
+
     if (data.m_warehouse_sub_id) {
       const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
       if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
@@ -199,11 +204,30 @@ export class TransactionScanInboundService {
             throw new NotFoundException(`Target pallet with code '${(data as any).pallet_code}' not found`);
           }
           targetPalletId = targetPallet.id;
+          
+          // Validate UOM match between scan and pallet
+          const scanUom = data.uom ?? existing.uom;
+          if (targetPallet.uom && scanUom && targetPallet.uom !== scanUom) {
+            throw new BadRequestException(`UOM mismatch: Scan UOM (${scanUom}) does not match Pallet UOM (${targetPallet.uom})`);
+          }
         } catch (error) {
-          if (error instanceof NotFoundException) {
+          if (error instanceof NotFoundException || error instanceof BadRequestException) {
             throw error;
           }
           throw new BadRequestException(`Failed to validate target pallet: ${error.message}`);
+        }
+      } else if (data.uom) {
+        // Validate UOM match with existing pallet if UOM is being updated
+        try {
+          const existingPallet = await this.palletService.findOne(existing.pallet_id);
+          if (existingPallet.uom && data.uom && existingPallet.uom !== data.uom) {
+            throw new BadRequestException(`UOM mismatch: Scan UOM (${data.uom}) does not match Pallet UOM (${existingPallet.uom})`);
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Failed to validate UOM: ${error.message}`);
         }
       }
 
