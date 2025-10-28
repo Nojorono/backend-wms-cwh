@@ -61,5 +61,8 @@ export class TransactionScanInbound extends BaseEntity {
 
   @Column({ nullable: true })
   status: ScanInboundStatus;
+
+  @Column({ nullable: true })
+  inspection_by: string;
   
 }

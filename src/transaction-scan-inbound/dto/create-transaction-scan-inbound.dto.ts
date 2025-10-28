@@ -56,6 +56,11 @@ export class CreateTransactionScanInboundDto {
   @IsOptional()
   @IsEnum(ScanInboundStatus)
   status?: ScanInboundStatus;
+
+  @ApiPropertyOptional({ example: 'uuid-user-1' })
+  @IsOptional()
+  @IsString()
+  inspection_by?: string;
 }
 
 export class CreateTransactionScanInboundDtoPallet {
@@ -107,6 +112,11 @@ export class CreateTransactionScanInboundDtoPallet {
   @IsOptional()
   @IsEnum(ScanInboundStatus)
   status?: ScanInboundStatus;
+
+  @ApiPropertyOptional({ example: 'uuid-user-1' })
+  @IsOptional()
+  @IsString()
+  inspection_by?: string;
 }
 
 

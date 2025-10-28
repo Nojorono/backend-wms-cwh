@@ -80,10 +80,10 @@ export class TransactionScanInboundService {
     return this.repository.findAll(inbound_id, status, item_id);
   }
 
-  async updateInspectionApproved(id: string, status: ScanInboundStatus): Promise<TransactionScanInbound> {
+  async updateInspectionApproved(id: string, status: ScanInboundStatus, inspection_by: string): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
     if (!existing) throw new NotFoundException('Transaction scan inbound not found');
-    const updated = await this.repository.update(id, { ...existing, status: status });
+    const updated = await this.repository.update(id, { ...existing, status: status, inspection_by: inspection_by });
     // if status is COMPLETED, create or update inventory tracking
     if (status === ScanInboundStatus.COMPLETED) {
       const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
@@ -296,7 +296,7 @@ export class TransactionScanInboundService {
     await this.repository.remove(id);
   }
 
-  async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus): Promise<UpdateResult> {
+  async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus, inspection_by: string): Promise<UpdateResult> {
     if (status === ScanInboundStatus.COMPLETED) {
       for (const id of dto.ids) {
         const existing = await this.findOne(id);
@@ -314,7 +314,7 @@ export class TransactionScanInboundService {
         );
       }
     }
-    return this.repository.updateManyStatusTo(dto, status);
+    return this.repository.updateManyStatusTo(dto, status, inspection_by);
   }
 
   async updateChangePallet(id: string, data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {

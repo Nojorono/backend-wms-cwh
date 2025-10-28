@@ -98,8 +98,8 @@ export class TransactionScanInboundRepository {
       .getMany();
   }
 
-  async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus): Promise<UpdateResult> {
-    return await this.repository.update(dto.ids, { status: status });
+  async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus, inspection_by: string): Promise<UpdateResult> {
+    return await this.repository.update(dto.ids, { status: status, inspection_by: inspection_by });
   }
 }
 

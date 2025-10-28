@@ -51,11 +51,12 @@ export class TransactionScanInboundController {
   }
 
   @Patch('inspection-approved/:id')
-  @ApiOperation({ summary: 'Update the inspection approved of a transaction scan inbound PENING OR COMPLETED' })
+  @ApiOperation({ summary: 'Update the inspection approved of a transaction scan inbound PENDING OR COMPLETED' })
   @ApiResponse({ status: 200, description: 'Updated', type: TransactionScanInbound })
   @ApiQuery({ name: 'status', required: true, type: String })
-  updateInspectionApproved(@Param('id') id: string, @Query('status') status: ScanInboundStatus) {
-    return this.service.updateInspectionApproved(id, status);
+  @ApiQuery({ name: 'inspection_by', required: false, type: String })
+  updateInspectionApproved(@Param('id') id: string, @Query('status') status: ScanInboundStatus, @Query('inspection_by') inspection_by: string) {
+    return this.service.updateInspectionApproved(id, status, inspection_by);
   }
 
   @Delete(':id')
@@ -66,12 +67,14 @@ export class TransactionScanInboundController {
   }
 
   // update many status to PENDING
-  @Post('update-many-status-to/:status')
+  @Post('update-many-status-to')
   @ApiOperation({ summary: 'Update many status to PENDING or COMPLETED' })
   @ApiResponse({ status: 200, description: 'Updated' })
   @ApiBody({ type: UpdateManyStatusToDto })
-  updateManyStatusToPending(@Body() dto: UpdateManyStatusToDto, @Param('status') status: ScanInboundStatus) {
-    return this.service.updateManyStatusTo(dto, status);
+  @ApiQuery({ name: 'status', required: true, type: String })
+  @ApiQuery({ name: 'inspection_by', required: false, type: String })
+  updateManyStatusToPending(@Body() dto: UpdateManyStatusToDto, @Query('status') status: ScanInboundStatus, @Query('inspection_by') inspection_by: string) {
+    return this.service.updateManyStatusTo(dto, status, inspection_by);
   }
 
   // update change pallet
