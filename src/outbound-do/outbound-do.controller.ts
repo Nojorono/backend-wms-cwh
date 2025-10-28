@@ -49,7 +49,7 @@ export class OutboundDoController {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Delivery date tidak boleh di masa lalu' },
+        message: { type: 'string', example: 'Sequence numbers must be unique' },
         statusCode: { type: 'number', example: 400 },
       },
     },
@@ -352,6 +352,38 @@ export class OutboundDoController {
   })
   async getPickingSuggestionsByMemo(@Param('memoId') memoId: string) {
     return this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId);
+  }
+
+  @Get(':id/memo-sequence')
+  @ApiOperation({ summary: 'Dapatkan urutan sequence memo dalam outbound DO (sorted by sequence)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sequence memo berhasil didapatkan (automatically sorted by sequence number)',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          memoId: { type: 'string', example: 'uuid-memo-1' },
+          sequence: { type: 'number', example: 1 }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Outbound DO tidak ditemukan',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Outbound DO not found' },
+        statusCode: { type: 'number', example: 404 },
+      },
+    },
+  })
+  async getMemoSequence(@Param('id') id: string) {
+    return this.outboundDoService.getMemoSequence(id);
   }
 
 }

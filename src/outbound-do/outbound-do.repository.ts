@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
@@ -18,16 +18,48 @@ export class OutboundDoRepository {
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
     const { outbound_memo_ids, ...outboundDoData } = data;
     
+    // Extract memo IDs and sequences from the new structure
+    const memoIds = outbound_memo_ids?.map(item => item.memo_id) || [];
+    const memoSequences = outbound_memo_ids?.map(item => item.sequence) || [];
+    
     // Create outbound do
     const outboundDo = this.outboundDoRepository.create({
       ...outboundDoData,
-      memo_id: outbound_memo_ids || [],
+      memo_id: memoIds,
+      memo_sequence: memoSequences,
       status: data.status || 'PENDING' as any,
     });
 
-    // Find and attach outbound memos
+    // Process outbound memos sequentially with provided sequence tracking
     if (outbound_memo_ids && outbound_memo_ids.length > 0) {
-      const outboundMemos = await this.outboundMemoRepository.findByIds(outbound_memo_ids);
+      const outboundMemos: OutboundMemo[] = [];
+      
+      // Sort by sequence to process in order
+      const sortedMemos = [...outbound_memo_ids].sort((a, b) => a.sequence - b.sequence);
+      
+      for (const memoItem of sortedMemos) {
+        try {
+          console.log(`Processing memo ${memoItem.memo_id} with sequence ${memoItem.sequence}`);
+          
+          const memo = await this.outboundMemoRepository.findOne({
+            where: { id: memoItem.memo_id }
+          });
+          
+          if (!memo) {
+            throw new BadRequestException(`Outbound memo with ID ${memoItem.memo_id} not found`);
+          }
+          
+          outboundMemos.push(memo);
+          
+          console.log(`Successfully processed memo ${memoItem.memo_id} in sequence ${memoItem.sequence}`);
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          throw new BadRequestException(`Failed to process memo ${memoItem.memo_id} in sequence ${memoItem.sequence}: ${error.message}`);
+        }
+      }
+      
       outboundDo.outbound_memos = outboundMemos;
     }
 
@@ -36,10 +68,13 @@ export class OutboundDoRepository {
   }
 
   async findAll(): Promise<OutboundDo[]> {
-    return await this.outboundDoRepository.find({
+    const outboundDos = await this.outboundDoRepository.find({
       relations: ['outbound_memos'],
       order: { createdAt: 'DESC' },
     });
+
+    // Add sequence information to each memo in all outbound DOs
+    return outboundDos.map(outboundDo => this.addSequenceToMemos(outboundDo));
   }
 
   async findOne(id: string): Promise<OutboundDo> {
@@ -66,7 +101,12 @@ export class OutboundDoRepository {
     // Update outbound do
     const updateData: any = { ...outboundDoData };
     if (outbound_memo_ids !== undefined) {
-      updateData.memo_id = outbound_memo_ids;
+      // Extract memo IDs and sequences from the new structure
+      const memoIds = outbound_memo_ids?.map(item => item.memo_id) || [];
+      const memoSequences = outbound_memo_ids?.map(item => item.sequence) || [];
+      
+      updateData.memo_id = memoIds;
+      updateData.memo_sequence = memoSequences;
     }
     
     await this.outboundDoRepository.update(id, updateData);
@@ -80,10 +120,39 @@ export class OutboundDoRepository {
       
       if (outboundDo) {
         if (outbound_memo_ids.length > 0) {
-          const outboundMemos = await this.outboundMemoRepository.findByIds(outbound_memo_ids);
+          // Process outbound memos sequentially with provided sequence tracking
+          const outboundMemos: OutboundMemo[] = [];
+          
+          // Sort by sequence to process in order
+          const sortedMemos = [...outbound_memo_ids].sort((a, b) => a.sequence - b.sequence);
+          
+          for (const memoItem of sortedMemos) {
+            try {
+              console.log(`Updating memo ${memoItem.memo_id} with sequence ${memoItem.sequence}`);
+              
+              const memo = await this.outboundMemoRepository.findOne({
+                where: { id: memoItem.memo_id }
+              });
+              
+              if (!memo) {
+                throw new BadRequestException(`Outbound memo with ID ${memoItem.memo_id} not found`);
+              }
+              
+              outboundMemos.push(memo);
+              
+              console.log(`Successfully updated memo ${memoItem.memo_id} in sequence ${memoItem.sequence}`);
+            } catch (error) {
+              if (error instanceof BadRequestException) {
+                throw error;
+              }
+              throw new BadRequestException(`Failed to process memo ${memoItem.memo_id} in sequence ${memoItem.sequence}: ${error.message}`);
+            }
+          }
+          
           outboundDo.outbound_memos = outboundMemos;
         } else {
           outboundDo.outbound_memos = [];
+          outboundDo.memo_sequence = [];
         }
         await this.outboundDoRepository.save(outboundDo);
       }
@@ -98,18 +167,72 @@ export class OutboundDoRepository {
   }
 
   async findByStatus(status: string): Promise<OutboundDo[]> {
-    return await this.outboundDoRepository.find({
+    const outboundDos = await this.outboundDoRepository.find({
       where: { status: status as any },
       relations: ['outbound_memos'],
       order: { createdAt: 'DESC' },
     });
+
+    // Add sequence information to each memo
+    return outboundDos.map(outboundDo => this.addSequenceToMemos(outboundDo));
   }
 
   async findByOutboundType(outbound_type: string): Promise<OutboundDo[]> {
-    return await this.outboundDoRepository.find({
+    const outboundDos = await this.outboundDoRepository.find({
       where: { outbound_type: outbound_type as any },
       relations: ['outbound_memos'],
       order: { createdAt: 'DESC' },
     });
+
+    // Add sequence information to each memo
+    return outboundDos.map(outboundDo => this.addSequenceToMemos(outboundDo));
+  }
+
+  private addSequenceToMemos(outboundDo: OutboundDo): OutboundDo {
+    if (outboundDo.outbound_memos && outboundDo.memo_id && outboundDo.memo_sequence) {
+      // First, add sequence information to each memo
+      const memosWithSequence = outboundDo.outbound_memos.map(memo => {
+        const memoIndex = outboundDo.memo_id.indexOf(memo.id);
+        const sequence = outboundDo.memo_sequence[memoIndex] || memoIndex + 1;
+        
+        return {
+          ...memo,
+          sequence: sequence
+        } as any;
+      });
+
+      // Then sort by sequence number
+      outboundDo.outbound_memos = memosWithSequence.sort((a, b) => a.sequence - b.sequence);
+    }
+    return outboundDo;
+  }
+
+  async getMemoSequence(outboundDoId: string): Promise<{ memoId: string; sequence: number }[]> {
+    const outboundDo = await this.findOne(outboundDoId);
+    
+    if (!outboundDo.memo_id || !outboundDo.memo_sequence) {
+      return [];
+    }
+
+    const sequenceData = outboundDo.memo_id.map((memoId, index) => ({
+      memoId,
+      sequence: outboundDo.memo_sequence[index] || index + 1
+    }));
+
+    // Sort by sequence number
+    return sequenceData.sort((a, b) => a.sequence - b.sequence);
+  }
+
+  async findOneWithMemoSequence(id: string): Promise<OutboundDo> {
+    const outboundDo = await this.outboundDoRepository.findOne({
+      where: { id },
+      relations: ['outbound_memos'],
+    });
+    
+    if (!outboundDo) {
+      throw new NotFoundException('Outbound DO not found');
+    }
+
+    return this.addSequenceToMemos(outboundDo);
   }
 }

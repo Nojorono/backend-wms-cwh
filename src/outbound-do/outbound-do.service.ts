@@ -30,6 +30,17 @@ export class OutboundDoService {
       throw new BadRequestException('Minimal harus ada 1 outbound memo');
     }
 
+    // Validasi sequence numbers harus unique dan positif
+    const sequences = data.outbound_memo_ids.map(item => item.sequence);
+    const uniqueSequences = new Set(sequences);
+    if (sequences.length !== uniqueSequences.size) {
+      throw new BadRequestException('Sequence numbers must be unique');
+    }
+    
+    if (sequences.some(seq => seq <= 0)) {
+      throw new BadRequestException('Sequence numbers must be positive');
+    }
+
     // Validasi phone number format
     if (data.driver_phone && !this.isValidPhoneNumber(data.driver_phone)) {
       throw new BadRequestException('Format nomor telepon tidak valid');
@@ -43,7 +54,7 @@ export class OutboundDoService {
   }
 
   async findOne(id: string): Promise<OutboundDo> {
-    return this.repository.findOne(id);
+    return this.repository.findOneWithMemoSequence(id);
   }
 
   async update(id: string, data: UpdateOutboundDoDto): Promise<OutboundDo> {
@@ -122,5 +133,9 @@ export class OutboundDoService {
     // Validasi format nomor telepon Indonesia
     const phoneRegex = /^(\+62|62|0)[0-9]{9,13}$/;
     return phoneRegex.test(phone);
+  }
+
+  async getMemoSequence(outboundDoId: string): Promise<{ memoId: string; sequence: number }[]> {
+    return this.repository.getMemoSequence(outboundDoId);
   }
 }

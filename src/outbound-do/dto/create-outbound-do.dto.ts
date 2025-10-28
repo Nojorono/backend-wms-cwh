@@ -1,7 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDate, IsEnum, IsOptional, IsString, IsArray, IsUUID } from 'class-validator';
+import { IsDate, IsEnum, IsOptional, IsString, IsArray, IsUUID, IsNumber, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OutboundDoStatus, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
+
+export class OutboundMemoItemDto {
+  @ApiProperty({ example: 'b3a2d84c-7d29-4f47-bfb9-8158b17c5b8b' })
+  @IsString()
+  @IsUUID('4')
+  memo_id: string;
+
+  @ApiProperty({ example: 1 })
+  @IsNumber()
+  sequence: number;
+}
 
 export class CreateOutboundDoDto {
   @ApiProperty({ example: 'DO-2025-001' })
@@ -43,11 +54,15 @@ export class CreateOutboundDoDto {
   delivery_date: Date;
 
   @ApiProperty({ 
-    type: [String], 
-    example: ['uuid-memo-1', 'uuid-memo-2'],
-    description: 'Array of outbound memo IDs'
+    type: [OutboundMemoItemDto], 
+    example: [
+      { memo_id: 'b3a2d84c-7d29-4f47-bfb9-8158b17c5b8b', sequence: 1 },
+      { memo_id: 'uuid-memo-2', sequence: 2 }
+    ],
+    description: 'Array of outbound memo objects with sequence'
   })
   @IsArray()
-  @IsUUID('4', { each: true })
-  outbound_memo_ids: string[];
+  @ValidateNested({ each: true })
+  @Type(() => OutboundMemoItemDto)
+  outbound_memo_ids: OutboundMemoItemDto[];
 }

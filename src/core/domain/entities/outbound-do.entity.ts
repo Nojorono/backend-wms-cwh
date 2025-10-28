@@ -46,6 +46,9 @@ export class OutboundDo extends BaseEntity {
   @Column({ type: 'simple-array', nullable: true })
   memo_id: string[];
 
+  @Column({ type: 'simple-array', nullable: true })
+  memo_sequence: number[];
+
   @ManyToMany(() => OutboundMemo, { cascade: true })
   @JoinTable({
     name: 'outbound_do_memo',
