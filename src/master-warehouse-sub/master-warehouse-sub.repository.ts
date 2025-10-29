@@ -3,7 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
-import { MasterWarehouseSub, WarehouseSubStagingType } from '../core/domain/entities/master-warehouse-sub.entity';
+import {
+  MasterWarehouseSub,
+  WarehouseSubStagingType,
+} from '../core/domain/entities/master-warehouse-sub.entity';
 
 @Injectable()
 export class MasterWarehouseSubRepository {
@@ -31,9 +34,7 @@ export class MasterWarehouseSubRepository {
     return warehouseSub;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterWarehouseSub[]> {
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseSub[]> {
     return await this.repository.find({ where: { organization_id } });
   }
 
@@ -64,7 +65,7 @@ export class MasterWarehouseSubRepository {
   async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
     return await this.repository.find({ where: { is_staging } });
   }
-  
+
   async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
     return await this.repository.find({ where: { is_staging: IsNull() } });
   }

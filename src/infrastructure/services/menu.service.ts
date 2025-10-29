@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  Inject,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Inject } from '@nestjs/common';
 import {
   IMenuRepository,
   MENU_REPOSITORY,
@@ -37,13 +32,9 @@ export class MenuService {
 
   async create(createMenuDto: CreateMenuDto): Promise<Menu> {
     try {
-      const existingMenu = await this.menuRepository.findByPath(
-        createMenuDto.path,
-      );
+      const existingMenu = await this.menuRepository.findByPath(createMenuDto.path);
       if (existingMenu) {
-        throw new ConflictException(
-          `Menu with path ${createMenuDto.path} already exists`,
-        );
+        throw new ConflictException(`Menu with path ${createMenuDto.path} already exists`);
       }
     } catch (error) {
       if (error instanceof ConflictException) {
@@ -56,9 +47,7 @@ export class MenuService {
       try {
         await this.menuRepository.findById(createMenuDto.parentId);
       } catch (error) {
-        throw new NotFoundException(
-          `Parent menu with ID ${createMenuDto.parentId} not found`,
-        );
+        throw new NotFoundException(`Parent menu with ID ${createMenuDto.parentId} not found`);
       }
     }
 
@@ -74,13 +63,9 @@ export class MenuService {
 
     if (updateMenuDto.path) {
       try {
-        const existingMenu = await this.menuRepository.findByPath(
-          updateMenuDto.path,
-        );
+        const existingMenu = await this.menuRepository.findByPath(updateMenuDto.path);
         if (existingMenu && existingMenu.id !== id) {
-          throw new ConflictException(
-            `Menu with path ${updateMenuDto.path} already exists`,
-          );
+          throw new ConflictException(`Menu with path ${updateMenuDto.path} already exists`);
         }
       } catch (error) {
         if (error instanceof ConflictException) {
@@ -94,9 +79,7 @@ export class MenuService {
       try {
         await this.menuRepository.findById(updateMenuDto.parentId);
       } catch (error) {
-        throw new NotFoundException(
-          `Parent menu with ID ${updateMenuDto.parentId} not found`,
-        );
+        throw new NotFoundException(`Parent menu with ID ${updateMenuDto.parentId} not found`);
       }
     }
 
@@ -112,9 +95,7 @@ export class MenuService {
 
     const children = await this.menuRepository.findChildren(id);
     if (children.length > 0) {
-      throw new ConflictException(
-        'Cannot delete menu with children. Delete children first.',
-      );
+      throw new ConflictException('Cannot delete menu with children. Delete children first.');
     }
 
     await this.menuRepository.delete(id);

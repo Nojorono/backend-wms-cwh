@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterUomService } from './master-uom.service';
 import { CreateMasterUomDto } from './dto/create-master-uom.dto';
 import { UpdateMasterUomDto } from './dto/update-master-uom.dto';
@@ -71,10 +57,7 @@ export class MasterUomController {
     status: 409,
     description: 'UOM with this code already exists.',
   })
-  update(
-    @Param('id', ParseIntPipe) id: string,
-    @Body() updateMasterUomDto: UpdateMasterUomDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: string, @Body() updateMasterUomDto: UpdateMasterUomDto) {
     return this.masterUomService.update(id, updateMasterUomDto);
   }
 

@@ -1,9 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, UpdateResult } from 'typeorm';
-import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
-import { CreateTransactionScanInboundDto, CreateTransactionScanInboundDtoPallet } from './dto/create-transaction-scan-inbound.dto';
-import { UpdateManyStatusToDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
+import {
+  ScanInboundStatus,
+  TransactionScanInbound,
+} from '../core/domain/entities/transaction-scan-inbound.entity';
+import {
+  CreateTransactionScanInboundDto,
+  CreateTransactionScanInboundDtoPallet,
+} from './dto/create-transaction-scan-inbound.dto';
+import {
+  UpdateManyStatusToDto,
+  UpdateTransactionScanInboundDto,
+} from './dto/update-transaction-scan-inbound.dto';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-sub.entity';
 
@@ -19,12 +28,21 @@ export class TransactionScanInboundRepository {
     return await this.repository.save(entity);
   }
 
-  async findAll(inbound_id: string, status: string, item_id?: string): Promise<TransactionScanInbound[]> {
+  async findAll(
+    inbound_id: string,
+    status: string,
+    item_id?: string,
+  ): Promise<TransactionScanInbound[]> {
     const queryBuilder = this.repository
       .createQueryBuilder('tsi')
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
-      .leftJoinAndMapOne('tsi.warehouseSub', MasterWarehouseSub, 'warehouseSub', 'warehouseSub.id = tsi.m_warehouse_sub_id')
+      .leftJoinAndMapOne(
+        'tsi.warehouseSub',
+        MasterWarehouseSub,
+        'warehouseSub',
+        'warehouseSub.id = tsi.m_warehouse_sub_id',
+      )
       .where('tsi.inbound_id = :inbound_id', { inbound_id });
 
     if (status) {
@@ -44,7 +62,12 @@ export class TransactionScanInboundRepository {
       .where('tsi.id = :id', { id })
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
-      .leftJoinAndMapOne('tsi.warehouseSub', MasterWarehouseSub, 'warehouseSub', 'warehouseSub.id = tsi.m_warehouse_sub_id')
+      .leftJoinAndMapOne(
+        'tsi.warehouseSub',
+        MasterWarehouseSub,
+        'warehouseSub',
+        'warehouseSub.id = tsi.m_warehouse_sub_id',
+      )
       .getOne();
     if (!entity) return null;
     return entity;
@@ -73,7 +96,6 @@ export class TransactionScanInboundRepository {
       relations: ['pallet'],
     });
   }
-  
 
   async update(id: string, data: UpdateTransactionScanInboundDto): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
@@ -94,13 +116,20 @@ export class TransactionScanInboundRepository {
       .leftJoinAndSelect('tsi.pallet', 'pallet')
       .where('tsi.inbound_id = :inbound_id', { inbound_id })
       .leftJoinAndMapOne('tsi.item', MasterItem, 'item', 'item.id = tsi.item_id')
-      .leftJoinAndMapOne('tsi.warehouseSub', MasterWarehouseSub, 'warehouseSub', 'warehouseSub.id = tsi.m_warehouse_sub_id')
+      .leftJoinAndMapOne(
+        'tsi.warehouseSub',
+        MasterWarehouseSub,
+        'warehouseSub',
+        'warehouseSub.id = tsi.m_warehouse_sub_id',
+      )
       .getMany();
   }
 
-  async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus, inspection_by: string): Promise<UpdateResult> {
+  async updateManyStatusTo(
+    dto: UpdateManyStatusToDto,
+    status: ScanInboundStatus,
+    inspection_by: string,
+  ): Promise<UpdateResult> {
     return await this.repository.update(dto.ids, { status: status, inspection_by: inspection_by });
   }
 }
-
-

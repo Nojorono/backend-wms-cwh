@@ -32,7 +32,7 @@ export class TransactionScanInbound extends BaseEntity {
   @ManyToOne(() => MasterItem, (item) => item.id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'item_id' })
   item: MasterItem;
-    
+
   @Column({ nullable: true })
   quantity: number;
 
@@ -52,7 +52,7 @@ export class TransactionScanInbound extends BaseEntity {
   @JoinColumn({ name: 'pallet_id' })
   pallet: MasterPallet;
 
-  @Column({ nullable: true})
+  @Column({ nullable: true })
   m_warehouse_sub_id: string;
 
   @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id, { onDelete: 'CASCADE' })
@@ -64,5 +64,4 @@ export class TransactionScanInbound extends BaseEntity {
 
   @Column({ nullable: true })
   inspection_by: string;
-  
 }

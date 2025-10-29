@@ -7,9 +7,7 @@ import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity
 
 @Injectable()
 export class OutboundMemoService {
-  constructor(
-    private readonly repository: OutboundMemoRepository,
-  ) {}
+  constructor(private readonly repository: OutboundMemoRepository) {}
 
   async create(data: CreateOutboundMemoDto): Promise<OutboundMemo> {
     // Validasi delivery_date tidak boleh di masa lalu
@@ -73,7 +71,7 @@ export class OutboundMemoService {
 
   async remove(id: string): Promise<void> {
     const existing = await this.repository.findOne(id);
-    
+
     // Validasi tidak bisa delete jika status sudah APPROVED
     if (existing.status === OutboundMemoStatus.APPROVED) {
       throw new BadRequestException('Tidak dapat menghapus outbound memo yang sudah APPROVED');
@@ -89,13 +87,20 @@ export class OutboundMemoService {
   async updateStatus(id: string, status: OutboundMemoStatus): Promise<OutboundMemo> {
     const existing = await this.repository.findOne(id);
     this.validateStatusTransition(existing.status, status);
-    
+
     return this.repository.update(id, { status } as UpdateOutboundMemoDto);
   }
 
-  private validateStatusTransition(currentStatus: OutboundMemoStatus, newStatus: OutboundMemoStatus): void {
+  private validateStatusTransition(
+    currentStatus: OutboundMemoStatus,
+    newStatus: OutboundMemoStatus,
+  ): void {
     const validTransitions: Record<OutboundMemoStatus, OutboundMemoStatus[]> = {
-      [OutboundMemoStatus.PENDING]: [OutboundMemoStatus.APPROVED, OutboundMemoStatus.REJECTED, OutboundMemoStatus.CANCELLED],
+      [OutboundMemoStatus.PENDING]: [
+        OutboundMemoStatus.APPROVED,
+        OutboundMemoStatus.REJECTED,
+        OutboundMemoStatus.CANCELLED,
+      ],
       [OutboundMemoStatus.APPROVED]: [OutboundMemoStatus.CANCELLED, OutboundMemoStatus.COMPLETED],
       [OutboundMemoStatus.REJECTED]: [OutboundMemoStatus.PENDING],
       [OutboundMemoStatus.CANCELLED]: [],
@@ -103,7 +108,9 @@ export class OutboundMemoService {
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
-      throw new BadRequestException(`Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`);
+      throw new BadRequestException(
+        `Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`,
+      );
     }
   }
 }

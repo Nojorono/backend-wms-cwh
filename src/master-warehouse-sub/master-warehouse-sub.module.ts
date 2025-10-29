@@ -10,12 +10,7 @@ import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 @Module({
   imports: [TypeOrmModule.forFeature([MasterWarehouseSub])],
   controllers: [MasterWarehouseSubController],
-  providers: [
-    MasterWarehouseSubService,
-    MasterWarehouseSubRepository,
-    S3Service,
-    BarcodeService,
-  ],
+  providers: [MasterWarehouseSubService, MasterWarehouseSubRepository, S3Service, BarcodeService],
   exports: [MasterWarehouseSubService],
 })
 export class MasterWarehouseSubModule {}

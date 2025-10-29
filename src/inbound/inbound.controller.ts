@@ -1,8 +1,20 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiExtraModels, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiExtraModels,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { InboundService } from './inbound.service';
-import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './dto/create-inbound.dto';
-import { UpdateInboundDto, UpdateInboundStatusDto  } from './dto/update-inbound.dto';
+import {
+  CreateInboundDto,
+  CreateInboundDoDto,
+  CreateInboundItemDto,
+} from './dto/create-inbound.dto';
+import { UpdateInboundDto, UpdateInboundStatusDto } from './dto/update-inbound.dto';
 import { Inbound } from '../core/domain/entities/inbound.entity';
 import { AssignedHelper } from '../core/domain/entities/assigned-helper.entity';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
@@ -18,7 +30,10 @@ import { InboundItem } from '../core/domain/entities/inbound-item.entity';
 @ApiBearerAuth('JWT-auth')
 @ApiExtraModels(CreateInboundDoDto, CreateInboundItemDto, AssignedHelper)
 export class InboundController {
-  constructor(private readonly service: InboundService, private readonly doValidationIntegrationService: DoValidationIntegrationService) {}
+  constructor(
+    private readonly service: InboundService,
+    private readonly doValidationIntegrationService: DoValidationIntegrationService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create inbound with optional DOs and Items' })
@@ -45,7 +60,7 @@ export class InboundController {
   @Get('inspection')
   @ApiOperation({ summary: 'Find all transaction scan inbound where status is PENDING' })
   @ApiQuery({ name: 'status', type: String, required: false, example: 'PENDING' })
-  @ApiResponse({ status: 200, type: [Inbound]})
+  @ApiResponse({ status: 200, type: [Inbound] })
   findAllInspection(@Query('status') status: string) {
     return this.service.findAllTransactionScanInbound(status);
   }
@@ -113,6 +128,4 @@ export class InboundController {
   sequentialStatus(@Param('id') id: string) {
     return this.service.sequentialStatus(id);
   }
-
 }
-

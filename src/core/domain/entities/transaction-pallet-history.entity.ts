@@ -7,7 +7,7 @@ export enum QuantityOperationType {
   PICK = 'PICK',
   REMOVE = 'REMOVE',
   ADJUST = 'ADJUST',
-  RESET = 'RESET'
+  RESET = 'RESET',
 }
 
 export enum StatusInventory {
@@ -40,7 +40,7 @@ export class PalletTransactionHistory extends BaseEntity {
   operation_type: QuantityOperationType;
 
   @Column({ nullable: true })
-  production_date: Date;  
+  production_date: Date;
 
   @Column({ nullable: true })
   week_number: number;

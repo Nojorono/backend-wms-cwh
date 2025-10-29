@@ -17,9 +17,7 @@ export class MasterWarehouseBinService {
   ): Promise<MasterWarehouseBin> {
     const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
       bcid: 'code128',
-      text:
-        `${createMasterWarehouseBinDto.code}-${createMasterWarehouseBinDto.name}` ||
-        '',
+      text: `${createMasterWarehouseBinDto.code}-${createMasterWarehouseBinDto.name}` || '',
       scale: 3,
       height: 100,
       width: 200,
@@ -28,8 +26,7 @@ export class MasterWarehouseBinService {
       extension: 'png',
       acl: 'public-read',
       metadata: {
-        organization_id:
-          createMasterWarehouseBinDto.organization_id?.toString() || '',
+        organization_id: createMasterWarehouseBinDto.organization_id?.toString() || '',
         warehouse_sub_id: createMasterWarehouseBinDto.warehouse_sub_id || '',
         warehouse_bin_id: createMasterWarehouseBinDto.code || '',
         warehouse_bin_name: createMasterWarehouseBinDto.name || '',
@@ -53,15 +50,11 @@ export class MasterWarehouseBinService {
     return warehouseBin;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterWarehouseBin[]> {
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseBin[]> {
     return await this.repository.findByOrganizationId(organization_id);
   }
 
-  async findByWarehouseSubId(
-    warehouse_sub_id: string,
-  ): Promise<MasterWarehouseBin[]> {
+  async findByWarehouseSubId(warehouse_sub_id: string): Promise<MasterWarehouseBin[]> {
     return await this.repository.findByWarehouseSubId(warehouse_sub_id);
   }
 
@@ -80,44 +73,33 @@ export class MasterWarehouseBinService {
     ) {
       // delete old barcode image
       if (warehouseBin.barcode_image_url) {
-        await this.barcodeService.deleteBarcodeImage(
-          warehouseBin.barcode_image_url,
-        );
+        await this.barcodeService.deleteBarcodeImage(warehouseBin.barcode_image_url);
       }
-      const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode(
-        {
-          bcid: 'code128',
-          text:
-            `${updateMasterWarehouseBinDto.code}-${updateMasterWarehouseBinDto.name}` ||
-            '',
-          scale: 3,
-          height: 100,
-          width: 200,
-          bucket: 'wms',
-          prefix: 'warehouse-bin',
-          extension: 'png',
-          acl: 'public-read',
-          metadata: {
-            organization_id: warehouseBin.organization_id?.toString() || '',
-            warehouse_sub_id: warehouseBin.warehouse_sub_id || '',
-            warehouse_bin_id: updateMasterWarehouseBinDto.code || '',
-            warehouse_bin_name: updateMasterWarehouseBinDto.name || '',
-            warehouse_bin_description:
-              updateMasterWarehouseBinDto.description ||
-              warehouseBin.description ||
-              '',
-            warehouse_bin_capacity_pallet:
-              updateMasterWarehouseBinDto.capacity_pallet?.toString() || '',
-          },
+      const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
+        bcid: 'code128',
+        text: `${updateMasterWarehouseBinDto.code}-${updateMasterWarehouseBinDto.name}` || '',
+        scale: 3,
+        height: 100,
+        width: 200,
+        bucket: 'wms',
+        prefix: 'warehouse-bin',
+        extension: 'png',
+        acl: 'public-read',
+        metadata: {
+          organization_id: warehouseBin.organization_id?.toString() || '',
+          warehouse_sub_id: warehouseBin.warehouse_sub_id || '',
+          warehouse_bin_id: updateMasterWarehouseBinDto.code || '',
+          warehouse_bin_name: updateMasterWarehouseBinDto.name || '',
+          warehouse_bin_description:
+            updateMasterWarehouseBinDto.description || warehouseBin.description || '',
+          warehouse_bin_capacity_pallet:
+            updateMasterWarehouseBinDto.capacity_pallet?.toString() || '',
         },
-      );
+      });
       updateMasterWarehouseBinDto.barcode_image_url = barcodeImageUrl.url;
     }
 
-    const updatedWarehouseBin = await this.repository.update(
-      id,
-      updateMasterWarehouseBinDto,
-    );
+    const updatedWarehouseBin = await this.repository.update(id, updateMasterWarehouseBinDto);
     if (!updatedWarehouseBin) {
       throw new NotFoundException(`Warehouse Bin with ID ${id} not found`);
     }
@@ -131,11 +113,11 @@ export class MasterWarehouseBinService {
 
   async getStagingPalletsWithSuggestions(): Promise<{
     palletSuggestions: Array<{
-      stagingPallet: any,
-      suggestedBin: MasterWarehouseBin,
-      suggestedZone: any,
-      palletItems: any[]
-    }>
+      stagingPallet: any;
+      suggestedBin: MasterWarehouseBin;
+      suggestedZone: any;
+      palletItems: any[];
+    }>;
   }> {
     return await this.repository.getStagingPalletsWithSuggestions();
   }

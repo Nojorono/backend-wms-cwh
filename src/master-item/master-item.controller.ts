@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterItemService } from './master-item.service';
 import { CreateMasterItemDto } from './dto/create-master-item.dto';
 import { UpdateMasterItemDto } from './dto/update-master-item.dto';
@@ -22,9 +9,7 @@ import { MasterItem } from '../core/domain/entities/master-item.entity';
 @Controller('master-item')
 @ApiBearerAuth('JWT-auth')
 export class MasterItemController {
-  constructor(
-    private readonly masterItemService: MasterItemService,
-  ) {}
+  constructor(private readonly masterItemService: MasterItemService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Item' })
@@ -76,10 +61,7 @@ export class MasterItemController {
     status: 409,
     description: 'Item with this SKU already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterItemDto: UpdateMasterItemDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterItemDto: UpdateMasterItemDto) {
     return this.masterItemService.update(id, updateMasterItemDto);
   }
 

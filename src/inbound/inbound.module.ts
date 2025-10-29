@@ -18,26 +18,30 @@ import { DoValidationIntegrationService } from './integration/do-validation.inte
     ConfigModule,
     TypeOrmModule.forFeature([Inbound, InboundDo, InboundItem]),
     ClientsModule.registerAsync([
-    {
-      name: 'DO_VALIDATION_SERVICE',
-      useFactory: (configService: ConfigService) => ({
-        transport: Transport.RMQ,
-        options: {
-          urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
-          queue: configService.get('rmq.doValidation', 'do_validation_queue'),
-          queueOptions: {
-            durable: false,
+      {
+        name: 'DO_VALIDATION_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.doValidation', 'do_validation_queue'),
+            queueOptions: {
+              durable: false,
+            },
           },
-        },
-      }),
-      inject: [ConfigService],
-    },
-  ]),
- ],
+        }),
+        inject: [ConfigService],
+      },
+    ]),
+  ],
   controllers: [InboundController],
-  providers: [InboundService, InboundRepository, InboundDoRepository, InboundItemRepository, DoValidationIntegrationService],
+  providers: [
+    InboundService,
+    InboundRepository,
+    InboundDoRepository,
+    InboundItemRepository,
+    DoValidationIntegrationService,
+  ],
   exports: [InboundService],
 })
 export class InboundModule {}
-
-

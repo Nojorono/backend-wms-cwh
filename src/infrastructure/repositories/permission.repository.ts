@@ -77,10 +77,7 @@ export class PermissionRepository implements IPermissionRepository {
     return this.repository.save(newPermission);
   }
 
-  async update(
-    id: number,
-    permission: Partial<Permission>,
-  ): Promise<Permission | null> {
+  async update(id: number, permission: Partial<Permission>): Promise<Permission | null> {
     await this.repository.update(id, permission);
     return this.findById(id);
   }

@@ -1,23 +1,14 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
-import { PalletQuantityHistoryResponseDto, PalletCapacityValidationDto, PalletItemQuantityDto, UpdatePalletQuantityDto } from './dto/pallet-quantity.dto';
+import {
+  PalletQuantityHistoryResponseDto,
+  PalletCapacityValidationDto,
+  PalletItemQuantityDto,
+  UpdatePalletQuantityDto,
+} from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 
 @ApiTags('Master Pallet')
@@ -76,10 +67,7 @@ export class MasterPalletController {
     status: 409,
     description: 'Pallet with this code already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterPalletDto: UpdateMasterPalletDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterPalletDto: UpdateMasterPalletDto) {
     return this.masterPalletService.update(id, updateMasterPalletDto);
   }
 
@@ -102,7 +90,10 @@ export class MasterPalletController {
     type: MasterPallet,
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  updateQuantity(@Param('palletCode') palletCode: string, @Body() updateQuantityDto: UpdatePalletQuantityDto) {
+  updateQuantity(
+    @Param('palletCode') palletCode: string,
+    @Body() updateQuantityDto: UpdatePalletQuantityDto,
+  ) {
     return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
   }
 
@@ -141,7 +132,7 @@ export class MasterPalletController {
   getItemQuantityHistoryByPalletCode(
     @Param('palletCode') palletCode: string,
     @Param('itemId') itemId: string,
-    @Query('uom') uom?: string
+    @Query('uom') uom?: string,
   ) {
     return this.masterPalletService.getItemQuantityHistoryByPalletCode(palletCode, itemId, uom);
   }

@@ -8,10 +8,7 @@ import { MasterClassificationItemRepository } from './master-classification-item
 @Module({
   imports: [TypeOrmModule.forFeature([MasterClassificationItem])],
   controllers: [MasterClassificationItemController],
-  providers: [
-    MasterClassificationItemService,
-    MasterClassificationItemRepository,
-  ],
+  providers: [MasterClassificationItemService, MasterClassificationItemRepository],
   exports: [MasterClassificationItemService],
 })
 export class MasterClassificationItemModule {}

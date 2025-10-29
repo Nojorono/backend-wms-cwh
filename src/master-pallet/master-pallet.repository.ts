@@ -12,9 +12,7 @@ export class MasterPalletRepository {
     private readonly repository: Repository<MasterPallet>,
   ) {}
 
-  async create(
-    createMasterPalletDto: CreateMasterPalletDto,
-  ): Promise<MasterPallet> {
+  async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
     const pallet = this.repository.create(createMasterPalletDto);
     return await this.repository.save(pallet);
   }

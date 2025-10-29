@@ -11,7 +11,6 @@ export enum ProgressionStatus {
   COMPLETED = 'COMPLETED',
 }
 
-
 @Entity('inventory_tracking')
 export class InventoryTracking extends BaseEntity {
   @Column({ nullable: true })

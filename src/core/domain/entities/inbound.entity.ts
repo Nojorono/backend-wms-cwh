@@ -51,6 +51,9 @@ export class Inbound extends BaseEntity {
   @OneToMany(() => AssignedHelper, (assignedHelper) => assignedHelper.inbound)
   assigned_helpers: AssignedHelper[];
 
-  @OneToMany(() => TransactionScanInbound, (transactionScanInbound) => transactionScanInbound.inbound)
+  @OneToMany(
+    () => TransactionScanInbound,
+    (transactionScanInbound) => transactionScanInbound.inbound,
+  )
   transaction_scan_inbounds: TransactionScanInbound[];
 }

@@ -3,9 +3,9 @@ import { IsOptional, IsString } from 'class-validator';
 import { BasePaginationQueryDto } from '../../core/dto/base-pagination.dto';
 
 export class InboundPaginationQueryDto extends BasePaginationQueryDto {
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter inbounds by status',
-    example: 'CREATED'
+    example: 'CREATED',
   })
   @IsOptional()
   @IsString()

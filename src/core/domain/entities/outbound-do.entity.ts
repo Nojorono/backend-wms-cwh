@@ -30,11 +30,16 @@ export class OutboundDo extends BaseEntity {
 
   @Column({ nullable: true })
   driver_name: string;
-  
+
   @Column({ nullable: true })
   driver_phone: string;
 
-  @Column({ nullable: true, type: 'enum', enum: OutboundDoStatus, default: OutboundDoStatus.PENDING })
+  @Column({
+    nullable: true,
+    type: 'enum',
+    enum: OutboundDoStatus,
+    default: OutboundDoStatus.PENDING,
+  })
   status: OutboundDoStatus;
 
   @Column({ nullable: true, type: 'enum', enum: OutboundDoType })

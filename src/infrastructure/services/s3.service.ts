@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -33,10 +28,7 @@ import {
   S3CopyOptions,
   S3PresignedUrlOptions,
 } from '../../core/domain/interfaces/s3.service.interface';
-import {
-  S3Config,
-  S3ServiceConfig,
-} from '../../core/domain/interfaces/s3.config.interface';
+import { S3Config, S3ServiceConfig } from '../../core/domain/interfaces/s3.config.interface';
 
 @Injectable()
 export class S3Service implements IS3Service {
@@ -94,9 +86,7 @@ export class S3Service implements IS3Service {
         this.configService.get<number>('AWS_S3_DEFAULT_EXPIRES_IN') ||
         this.configService.get<number>('aws_s3_default_expires_in') ||
         3600,
-      allowedFileTypes: this.configService.get<string[]>(
-        'AWS_S3_ALLOWED_FILE_TYPES',
-      ) ||
+      allowedFileTypes: this.configService.get<string[]>('AWS_S3_ALLOWED_FILE_TYPES') ||
         this.configService.get<string[]>('aws_s3_allowed_file_types') || ['*'],
       maxFileSize:
         this.configService.get<number>('AWS_S3_MAX_FILE_SIZE') ||
@@ -140,11 +130,7 @@ export class S3Service implements IS3Service {
     return new S3Client(clientConfig);
   }
 
-  private log(
-    level: 'log' | 'error' | 'warn' | 'debug',
-    message: string,
-    context?: any,
-  ): void {
+  private log(level: 'log' | 'error' | 'warn' | 'debug', message: string, context?: any): void {
     if (this.config.enableLogging) {
       this.logger[level](message, context);
     }
@@ -182,9 +168,7 @@ export class S3Service implements IS3Service {
           (type) => type.includes(fileType) || type === contentType,
         )
       ) {
-        throw new BadRequestException(
-          `File type ${contentType} is not allowed`,
-        );
+        throw new BadRequestException(`File type ${contentType} is not allowed`);
       }
     }
   }
@@ -320,11 +304,7 @@ export class S3Service implements IS3Service {
 
       return result.Body as Readable;
     } catch (error) {
-      this.log(
-        'error',
-        `Failed to download file as stream: ${bucket}/${key}`,
-        error,
-      );
+      this.log('error', `Failed to download file as stream: ${bucket}/${key}`, error);
       throw error;
     }
   }
@@ -381,10 +361,7 @@ export class S3Service implements IS3Service {
       const command = new CopyObjectCommand(copyParams);
       const result = await this.s3Client.send(command);
 
-      const metadata = await this.getFileMetadata(
-        destinationBucket,
-        destinationKey,
-      );
+      const metadata = await this.getFileMetadata(destinationBucket, destinationKey);
       this.log(
         'log',
         `File copied successfully: ${sourceBucket}/${sourceKey} -> ${destinationBucket}/${destinationKey}`,
@@ -538,8 +515,7 @@ export class S3Service implements IS3Service {
       this.validateBucketNameInternal(bucket);
       this.validateKeyNameInternal(key);
 
-      const expiresIn =
-        options.expiresIn || this.config.defaultExpiresIn || 3600;
+      const expiresIn = options.expiresIn || this.config.defaultExpiresIn || 3600;
 
       const command = new PutObjectCommand({
         Bucket: bucket,
@@ -553,11 +529,7 @@ export class S3Service implements IS3Service {
       this.log('log', `Generated presigned upload URL: ${bucket}/${key}`);
       return url;
     } catch (error) {
-      this.log(
-        'error',
-        `Failed to generate presigned upload URL: ${bucket}/${key}`,
-        error,
-      );
+      this.log('error', `Failed to generate presigned upload URL: ${bucket}/${key}`, error);
       throw error;
     }
   }
@@ -571,8 +543,7 @@ export class S3Service implements IS3Service {
       this.validateBucketNameInternal(bucket);
       this.validateKeyNameInternal(key);
 
-      const expiresIn =
-        options.expiresIn || this.config.defaultExpiresIn || 3600;
+      const expiresIn = options.expiresIn || this.config.defaultExpiresIn || 3600;
 
       const command = new GetObjectCommand({
         Bucket: bucket,
@@ -587,11 +558,7 @@ export class S3Service implements IS3Service {
       this.log('log', `Generated presigned download URL: ${bucket}/${key}`);
       return url;
     } catch (error) {
-      this.log(
-        'error',
-        `Failed to generate presigned download URL: ${bucket}/${key}`,
-        error,
-      );
+      this.log('error', `Failed to generate presigned download URL: ${bucket}/${key}`, error);
       throw error;
     }
   }
@@ -614,17 +581,10 @@ export class S3Service implements IS3Service {
       });
 
       const results = await Promise.all(uploadPromises);
-      this.log(
-        'log',
-        `Successfully uploaded ${results.length} files to S3: ${bucket}`,
-      );
+      this.log('log', `Successfully uploaded ${results.length} files to S3: ${bucket}`);
       return results;
     } catch (error) {
-      this.log(
-        'error',
-        `Failed to upload multiple files to S3: ${bucket}`,
-        error,
-      );
+      this.log('error', `Failed to upload multiple files to S3: ${bucket}`, error);
       throw error;
     }
   }
@@ -640,16 +600,9 @@ export class S3Service implements IS3Service {
       });
 
       await Promise.all(deletePromises);
-      this.log(
-        'log',
-        `Successfully deleted ${keys.length} files from S3: ${bucket}`,
-      );
+      this.log('log', `Successfully deleted ${keys.length} files from S3: ${bucket}`);
     } catch (error) {
-      this.log(
-        'error',
-        `Failed to delete multiple files from S3: ${bucket}`,
-        error,
-      );
+      this.log('error', `Failed to delete multiple files from S3: ${bucket}`, error);
       throw error;
     }
   }
@@ -664,9 +617,7 @@ export class S3Service implements IS3Service {
   validateBucketName(bucket: string): boolean {
     // S3 bucket naming rules
     const bucketRegex = /^[a-z0-9][a-z0-9.-]*[a-z0-9]$/;
-    return (
-      bucketRegex.test(bucket) && bucket.length >= 3 && bucket.length <= 63
-    );
+    return bucketRegex.test(bucket) && bucket.length >= 3 && bucket.length <= 63;
   }
 
   validateKeyName(key: string): boolean {

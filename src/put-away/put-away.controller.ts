@@ -5,7 +5,6 @@ import { CreateManyPutAwayDto } from './dto/create-many-put-away.dto';
 import { PutAwayTransaction } from '../core/domain/entities/transaction-put-away.entity';
 import { PutAwayService } from './put-away.service';
 
-
 @ApiTags('Put Away')
 @Controller('put-away')
 @ApiBearerAuth('JWT-auth')
@@ -78,7 +77,4 @@ export class PutAwayController {
   taskCompleted(@Param('id') id: string) {
     return this.service.taskCompleted(id);
   }
-
 }
-
-

@@ -7,62 +7,67 @@ import { InventoryTrackingService } from 'src/inventory-tracking/inventory-track
 import { MasterWarehouseBinService } from 'src/master-warehouse-bin/master-warehouse-bin.service';
 import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
 import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
-  
+
 @Injectable()
 export class PutAwayService {
   constructor(
-    private readonly repository: PutAwayRepository, 
-    private readonly inventoryTrackingService: InventoryTrackingService, 
+    private readonly repository: PutAwayRepository,
+    private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly warehouseBinService: MasterWarehouseBinService,
-    private readonly masterPalletService: MasterPalletService
+    private readonly masterPalletService: MasterPalletService,
   ) {}
 
   async create(dto: CreatePutAwayDto): Promise<PutAwayTransaction> {
     const putAwayTransaction = await this.repository.create(dto);
-    
+
     // Update progression status to IN_PROGRESS when putaway is created
     if (putAwayTransaction.inventory_tracking_id) {
       await this.inventoryTrackingService.updateProgressionStatus(
-        putAwayTransaction.inventory_tracking_id, 
-        ProgressionStatus.IN_PROGRESS
+        putAwayTransaction.inventory_tracking_id,
+        ProgressionStatus.IN_PROGRESS,
       );
     }
-    
+
     return putAwayTransaction;
   }
 
   async createMany(dto: CreateManyPutAwayDto): Promise<PutAwayTransaction[]> {
     const putAwayTransactions = await this.repository.createMany(dto.data);
-    
+
     // Update progression status to IN_PROGRESS for all created putaway transactions
     for (const transaction of putAwayTransactions) {
       if (transaction.inventory_tracking_id) {
         await this.inventoryTrackingService.updateProgressionStatus(
-          transaction.inventory_tracking_id, 
-          ProgressionStatus.IN_PROGRESS
+          transaction.inventory_tracking_id,
+          ProgressionStatus.IN_PROGRESS,
         );
       }
     }
-    
+
     return putAwayTransactions;
   }
 
   async findAll(): Promise<PutAwayTransaction[]> {
     const entities = await this.repository.findAll();
-    
+
     // Get current items and quantity from pallet for each entity
     for (const entity of entities) {
       if (entity.inventoryTracking?.pallet_id) {
         try {
-          const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(entity.inventoryTracking.pallet_id);
+          const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(
+            entity.inventoryTracking.pallet_id,
+          );
           (entity as any).palletItems = palletItems;
         } catch (error) {
-          console.warn(`Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`, error.message);
+          console.warn(
+            `Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`,
+            error.message,
+          );
           (entity as any).palletItems = [];
         }
       }
     }
-    
+
     return entities;
   }
 
@@ -71,18 +76,23 @@ export class PutAwayService {
     if (!entity) {
       throw new NotFoundException(`Put Away with ID ${id} not found`);
     }
-    
+
     // Get current items and quantity from pallet
     if (entity.inventoryTracking?.pallet_id) {
       try {
-        const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(entity.inventoryTracking.pallet_id);
+        const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(
+          entity.inventoryTracking.pallet_id,
+        );
         (entity as any).palletItems = palletItems;
       } catch (error) {
-        console.warn(`Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`, error.message);
+        console.warn(
+          `Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`,
+          error.message,
+        );
         (entity as any).palletItems = [];
       }
     }
-    
+
     return entity;
   }
 
@@ -96,15 +106,15 @@ export class PutAwayService {
 
   async remove(id: string): Promise<void> {
     const existing = await this.findOne(id);
-    
+
     // Update progression status to NOT_STARTED when putaway is deleted
     if (existing.inventory_tracking_id) {
       await this.inventoryTrackingService.updateProgressionStatus(
-        existing.inventory_tracking_id, 
-        ProgressionStatus.NOT_STARTED
+        existing.inventory_tracking_id,
+        ProgressionStatus.NOT_STARTED,
       );
     }
-    
+
     await this.repository.remove(id);
   }
 
@@ -121,8 +131,10 @@ export class PutAwayService {
     if (!existing) throw new NotFoundException('Put Away task not found');
     const updated = await this.repository.update(id, { status: Status.COMPLETED });
     // update inventory tracking status to PUT_AWAY_COMPLETED
-    const inventoryTracking = await this.inventoryTrackingService.findOne(existing.inventory_tracking_id);
-    const warehouseBin = await this.warehouseBinService.findOne(existing.destination_bin_id)
+    const inventoryTracking = await this.inventoryTrackingService.findOne(
+      existing.inventory_tracking_id,
+    );
+    const warehouseBin = await this.warehouseBinService.findOne(existing.destination_bin_id);
     if (!inventoryTracking) throw new NotFoundException('Inventory tracking not found');
     await this.inventoryTrackingService.update(inventoryTracking.id, {
       warehouse_bin_id: existing.destination_bin_id,
@@ -130,9 +142,8 @@ export class PutAwayService {
       inventory_note: 'Put Away completed by ' + existing.driver_name,
       inventory_date: new Date(),
       inventory_status: 'IN_INVENTORY',
-      progression_status: ProgressionStatus.COMPLETED });
+      progression_status: ProgressionStatus.COMPLETED,
+    });
     return updated;
   }
 }
-
-

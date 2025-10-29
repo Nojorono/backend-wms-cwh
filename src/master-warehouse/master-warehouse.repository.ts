@@ -12,9 +12,7 @@ export class MasterWarehouseRepository {
     private readonly repository: Repository<MasterWarehouse>,
   ) {}
 
-  async create(
-    createMasterWarehouseDto: CreateMasterWarehouseDto,
-  ): Promise<MasterWarehouse> {
+  async create(createMasterWarehouseDto: CreateMasterWarehouseDto): Promise<MasterWarehouse> {
     const warehouse = this.repository.create(createMasterWarehouseDto);
     return await this.repository.save(warehouse);
   }
@@ -31,9 +29,7 @@ export class MasterWarehouseRepository {
     return warehouse;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterWarehouse[]> {
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse[]> {
     return await this.repository.find({ where: { organization_id } });
   }
 

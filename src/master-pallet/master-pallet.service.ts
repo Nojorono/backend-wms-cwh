@@ -9,9 +9,17 @@ import { Repository } from 'typeorm';
 import { MasterPalletRepository } from './master-pallet.repository';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
-import { UpdatePalletQuantityDto, PalletQuantityHistoryResponseDto, PalletCapacityValidationDto, PalletItemQuantityDto } from './dto/pallet-quantity.dto';
+import {
+  UpdatePalletQuantityDto,
+  PalletQuantityHistoryResponseDto,
+  PalletCapacityValidationDto,
+  PalletItemQuantityDto,
+} from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
-import { PalletTransactionHistory, QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
+import {
+  PalletTransactionHistory,
+  QuantityOperationType,
+} from '../core/domain/entities/transaction-pallet-history.entity';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
@@ -24,9 +32,7 @@ export class MasterPalletService {
     private readonly transactionHistoryRepository: Repository<PalletTransactionHistory>,
   ) {}
 
-  async create(
-    createMasterPalletDto: CreateMasterPalletDto,
-  ): Promise<MasterPallet> {
+  async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
     const existingPallet = await this.repository.findByPalletCode(
       createMasterPalletDto.pallet_code,
     );
@@ -80,10 +86,7 @@ export class MasterPalletService {
     return pallet;
   }
 
-  async update(
-    id: string,
-    updateMasterPalletDto: UpdateMasterPalletDto,
-  ): Promise<MasterPallet> {
+  async update(id: string, updateMasterPalletDto: UpdateMasterPalletDto): Promise<MasterPallet> {
     const pallet = await this.findOne(id);
     if (!pallet) {
       throw new NotFoundException('Pallet not found');
@@ -102,8 +105,7 @@ export class MasterPalletService {
       }
     }
     if (
-      (updateMasterPalletDto.capacity &&
-        updateMasterPalletDto.capacity !== pallet.capacity) ||
+      (updateMasterPalletDto.capacity && updateMasterPalletDto.capacity !== pallet.capacity) ||
       (updateMasterPalletDto.pallet_code &&
         updateMasterPalletDto.pallet_code !== pallet.pallet_code)
     ) {
@@ -127,10 +129,7 @@ export class MasterPalletService {
       // );
       updateMasterPalletDto.qr_image_url = '';
     }
-    const updatedPallet = await this.repository.update(
-      id,
-      updateMasterPalletDto,
-    );
+    const updatedPallet = await this.repository.update(id, updateMasterPalletDto);
     if (!updatedPallet) {
       throw new NotFoundException(`Pallet with ID ${id} not found`);
     }
@@ -147,27 +146,35 @@ export class MasterPalletService {
     updateQuantityDto: UpdatePalletQuantityDto,
   ): Promise<MasterPallet> {
     const pallet = await this.findOne(palletId);
-    
+
     if (!pallet.capacity || pallet.capacity <= 0) {
       throw new BadRequestException('Pallet capacity must be set and greater than 0');
     }
 
-    const currentItemQuantity = await this.getItemQuantityOnPallet(palletId, updateQuantityDto.item_id, updateQuantityDto.uom);
+    const currentItemQuantity = await this.getItemQuantityOnPallet(
+      palletId,
+      updateQuantityDto.item_id,
+      updateQuantityDto.uom,
+    );
     const totalPalletQuantity = await this.getTotalPalletQuantity(palletId);
 
     // Validate UOM consistency if there's existing quantity for this item
     if (currentItemQuantity > 0 && updateQuantityDto.uom) {
       const existingUomRecord = await this.transactionHistoryRepository.findOne({
-        where: { 
+        where: {
           pallet_id: palletId,
-          item_id: updateQuantityDto.item_id 
+          item_id: updateQuantityDto.item_id,
         },
         order: { createdAt: 'DESC' },
       });
 
-      if (existingUomRecord && existingUomRecord.uom && existingUomRecord.uom !== updateQuantityDto.uom) {
+      if (
+        existingUomRecord &&
+        existingUomRecord.uom &&
+        existingUomRecord.uom !== updateQuantityDto.uom
+      ) {
         throw new BadRequestException(
-          `UOM mismatch. Existing UOM for this item is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`
+          `UOM mismatch. Existing UOM for this item is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`,
         );
       }
     }
@@ -243,9 +250,10 @@ export class MasterPalletService {
       throw new NotFoundException(`Pallet with ID ${palletId} not found`);
     }
 
-    const productionDateStr = typeof updateQuantityDto.production_date === 'string'
-      ? updateQuantityDto.production_date
-      : updateQuantityDto.production_date?.toISOString();
+    const productionDateStr =
+      typeof updateQuantityDto.production_date === 'string'
+        ? updateQuantityDto.production_date
+        : updateQuantityDto.production_date?.toISOString();
 
     await this.createQuantityHistory({
       pallet_id: palletId,
@@ -280,16 +288,12 @@ export class MasterPalletService {
   }
 
   async getQuantityHistory(palletId: string): Promise<PalletQuantityHistoryResponseDto[]> {
-
-    const history = await this.transactionHistoryRepository.createQueryBuilder('history')
-    .leftJoinAndMapOne(
-      'history.item',
-      MasterItem,
-      'item',
-      'item.id = history.item_id::uuid'
-    )    .where('history.pallet_id = :palletId', { palletId })
-    .orderBy('history.createdAt', 'DESC')
-    .getMany();
+    const history = await this.transactionHistoryRepository
+      .createQueryBuilder('history')
+      .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id::uuid')
+      .where('history.pallet_id = :palletId', { palletId })
+      .orderBy('history.createdAt', 'DESC')
+      .getMany();
 
     return history.map((record: any) => ({
       id: record.id,
@@ -311,16 +315,16 @@ export class MasterPalletService {
     }));
   }
 
-  async getItemQuantityHistory(palletId: string, itemId: string, uom?: string): Promise<PalletQuantityHistoryResponseDto[]> {
+  async getItemQuantityHistory(
+    palletId: string,
+    itemId: string,
+    uom?: string,
+  ): Promise<PalletQuantityHistoryResponseDto[]> {
     await this.findOne(palletId);
-    
-    const qb = this.transactionHistoryRepository.createQueryBuilder('history')
-      .leftJoinAndMapOne(
-        'history.item',
-        MasterItem,
-        'item',
-        'item.id = history.item_id'
-      )
+
+    const qb = this.transactionHistoryRepository
+      .createQueryBuilder('history')
+      .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id')
       .where('history.pallet_id = :palletId', { palletId })
       .andWhere('history.item_id = :itemId', { itemId });
 
@@ -329,9 +333,7 @@ export class MasterPalletService {
       qb.andWhere('history.uom = :uom', { uom });
     }
 
-    const history = await qb
-      .orderBy('history.createdAt', 'DESC')
-      .getMany();
+    const history = await qb.orderBy('history.createdAt', 'DESC').getMany();
 
     return history.map((record: any) => ({
       id: record.id,
@@ -356,15 +358,11 @@ export class MasterPalletService {
   async getPalletItemLatestQuantity(palletId: string): Promise<PalletItemQuantityDto[]> {
     const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
-      .leftJoinAndMapOne(
-        'history.item',
-        MasterItem,
-        'item',
-        'item.id = history.item_id::uuid'
-      )
+      .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id::uuid')
       .where('history.pallet_id = :palletId', { palletId })
-      .andWhere(qb => {
-        const subQuery = qb.subQuery()
+      .andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
           .select('MAX(h2.createdAt)')
           .from('transaction_pallet_history', 'h2')
           .where('h2.item_id = history.item_id')
@@ -374,24 +372,25 @@ export class MasterPalletService {
         return `history.createdAt = ${subQuery}`;
       })
       .setParameter('palletId', palletId);
-  
+
     const results = await qb.getMany();
-  
+
     return results
       .filter((history: any) => history.new_quantity > 0) // Filter out items with quantity 0
       .map((history: any) => ({
         item_id: history.item_id,
         item_name: history.item?.sku,
-        current_quantity: history.new_quantity,   // use your latest field
+        current_quantity: history.new_quantity, // use your latest field
         uom: history.uom,
         last_updated: history.createdAt,
         production_date: history.production_date,
         week_number: history.week_number,
       }));
   }
-  
 
-  async getQuantityHistoryByPalletCode(palletCode: string): Promise<PalletQuantityHistoryResponseDto[]> {
+  async getQuantityHistoryByPalletCode(
+    palletCode: string,
+  ): Promise<PalletQuantityHistoryResponseDto[]> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
       throw new NotFoundException(`Pallet with code ${palletCode} not found`);
@@ -401,9 +400,9 @@ export class MasterPalletService {
   }
 
   async getItemQuantityHistoryByPalletCode(
-    palletCode: string, 
+    palletCode: string,
     itemId: string,
-    uom?: string
+    uom?: string,
   ): Promise<PalletQuantityHistoryResponseDto[]> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
@@ -413,7 +412,9 @@ export class MasterPalletService {
     return this.getItemQuantityHistory(pallet.id, itemId, uom);
   }
 
-  async getPalletItemLatestQuantityByPalletCode(palletCode: string): Promise<PalletItemQuantityDto[]> {
+  async getPalletItemLatestQuantityByPalletCode(
+    palletCode: string,
+  ): Promise<PalletItemQuantityDto[]> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
       throw new NotFoundException(`Pallet with code ${palletCode} not found`);
@@ -431,7 +432,10 @@ export class MasterPalletService {
     return this.validateCapacity(pallet.id);
   }
 
-  async checkCapacityForQuantityByPalletCode(palletCode: string, quantity: number): Promise<boolean> {
+  async checkCapacityForQuantityByPalletCode(
+    palletCode: string,
+    quantity: number,
+  ): Promise<boolean> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
       throw new NotFoundException(`Pallet with code ${palletCode} not found`);
@@ -442,13 +446,14 @@ export class MasterPalletService {
 
   async validateCapacity(palletId: string): Promise<PalletCapacityValidationDto> {
     const pallet = await this.findOne(palletId);
-    
+
     if (!pallet.capacity || pallet.capacity <= 0) {
       throw new BadRequestException('Pallet capacity must be set and greater than 0');
     }
 
     const availableCapacity = Math.max(0, pallet.capacity - pallet.currentQuantity);
-    const utilizationPercentage = pallet.capacity > 0 ? (pallet.currentQuantity / pallet.capacity) * 100 : 0;
+    const utilizationPercentage =
+      pallet.capacity > 0 ? (pallet.currentQuantity / pallet.capacity) * 100 : 0;
 
     return {
       capacity: pallet.capacity,
@@ -464,10 +469,14 @@ export class MasterPalletService {
     return capacityInfo.available_capacity >= quantity;
   }
 
-  private async getItemQuantityOnPallet(palletId: string, itemId: string, uom?: string): Promise<number> {
-    const whereCondition: any = { 
+  private async getItemQuantityOnPallet(
+    palletId: string,
+    itemId: string,
+    uom?: string,
+  ): Promise<number> {
+    const whereCondition: any = {
       pallet_id: palletId,
-      item_id: itemId 
+      item_id: itemId,
     };
 
     // If UOM is provided, filter by UOM as well

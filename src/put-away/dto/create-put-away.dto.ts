@@ -22,7 +22,7 @@ export class CreatePutAwayDto {
   @IsString()
   @IsOptional()
   driver_name?: string;
-  
+
   @ApiProperty({ example: '081234567890' })
   @IsString()
   @IsOptional()
@@ -39,9 +39,4 @@ export class CreatePutAwayDto {
   notes?: string;
 }
 
-
-export class UpdatePutAwayDto extends PartialType(CreatePutAwayDto) {
-
-}
-
-
+export class UpdatePutAwayDto extends PartialType(CreatePutAwayDto) {}

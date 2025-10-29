@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 import { CreatePutAwayDto } from './create-put-away.dto';
 
 export class CreateManyPutAwayDto {
-  @ApiProperty({ 
+  @ApiProperty({
     type: [CreatePutAwayDto],
     description: 'Array of put away data to create',
     example: [
@@ -15,7 +15,7 @@ export class CreateManyPutAwayDto {
         driver_name: 'John Doe',
         driver_phone: '081234567890',
         status: 'PENDING',
-        notes: 'Put away item 1'
+        notes: 'Put away item 1',
       },
       {
         inventory_tracking_id: 'uuid-inventory-2',
@@ -24,9 +24,9 @@ export class CreateManyPutAwayDto {
         driver_name: 'Jane Smith',
         driver_phone: '081234567891',
         status: 'PENDING',
-        notes: 'Put away item 2'
-      }
-    ]
+        notes: 'Put away item 2',
+      },
+    ],
   })
   @IsArray()
   @ValidateNested({ each: true })

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Inbound } from '../core/domain/entities/inbound.entity';
 import { InboundRepository } from './repositories/inbound.repository';
@@ -42,7 +47,9 @@ export class InboundService {
     if (payload.license_plate) {
       const licensePlateRegex = /^[A-Z0-9\s]+$/;
       if (!licensePlateRegex.test(payload.license_plate)) {
-        throw new BadRequestException('License plate must contain only uppercase letters, numbers, and spaces');
+        throw new BadRequestException(
+          'License plate must contain only uppercase letters, numbers, and spaces',
+        );
       }
     }
 
@@ -104,14 +111,18 @@ export class InboundService {
     // Validate DO number format
     if (doDto.inbound_do_number) {
       if (doDto.inbound_do_number.length < 1 || doDto.inbound_do_number.length > 50) {
-        throw new BadRequestException(`${prefix}.inbound_do_number must be between 1 and 50 characters`);
+        throw new BadRequestException(
+          `${prefix}.inbound_do_number must be between 1 and 50 characters`,
+        );
       }
     }
 
     // Validate PO number format
     if (doDto.inbound_po_number) {
       if (doDto.inbound_po_number.length < 1 || doDto.inbound_po_number.length > 50) {
-        throw new BadRequestException(`${prefix}.inbound_po_number must be between 1 and 50 characters`);
+        throw new BadRequestException(
+          `${prefix}.inbound_po_number must be between 1 and 50 characters`,
+        );
       }
     }
 
@@ -154,15 +165,21 @@ export class InboundService {
     }
 
     if (inboundItems.length === 0) {
-      throw new BadRequestException(`inbound_dos[${doIndex}].inbound_items cannot be empty if provided`);
+      throw new BadRequestException(
+        `inbound_dos[${doIndex}].inbound_items cannot be empty if provided`,
+      );
     }
 
     // Check for duplicate item_id + uom combinations within the same DO
     // Same item with different UOMs is allowed, but same item with same UOM is not
-    const itemUomCombinations = inboundItems.map(item => `${item.item_id}|${item.uom || 'default'}`);
+    const itemUomCombinations = inboundItems.map(
+      (item) => `${item.item_id}|${item.uom || 'default'}`,
+    );
     const uniqueCombinations = new Set(itemUomCombinations);
     if (itemUomCombinations.length !== uniqueCombinations.size) {
-      throw new BadRequestException(`Duplicate item_id + uom combination found in inbound_dos[${doIndex}].inbound_items. Same item with same UOM is not allowed`);
+      throw new BadRequestException(
+        `Duplicate item_id + uom combination found in inbound_dos[${doIndex}].inbound_items. Same item with same UOM is not allowed`,
+      );
     }
 
     // Validate each item
@@ -175,7 +192,11 @@ export class InboundService {
   /**
    * Validates a single inbound item
    */
-  private async validateInboundItem(itemDto: any, doIndex: number, itemIndex: number): Promise<void> {
+  private async validateInboundItem(
+    itemDto: any,
+    doIndex: number,
+    itemIndex: number,
+  ): Promise<void> {
     const prefix = `inbound_dos[${doIndex}].inbound_items[${itemIndex}]`;
 
     // Validate required fields
@@ -227,7 +248,9 @@ export class InboundService {
       if (payload.license_plate && payload.license_plate.trim() !== '') {
         const licensePlateRegex = /^[A-Z0-9\s]+$/;
         if (!licensePlateRegex.test(payload.license_plate)) {
-          throw new BadRequestException('License plate must contain only uppercase letters, numbers, and spaces');
+          throw new BadRequestException(
+            'License plate must contain only uppercase letters, numbers, and spaces',
+          );
         }
       }
     }
@@ -264,7 +287,7 @@ export class InboundService {
 
       return await this.dataSource.transaction(async () => {
         const inbound_number = await this.generateSequentialInboundNumber(new Date());
-        
+
         // Create the inbound record
         const inbound = await this.inboundRepo.create({
           inbound_number,
@@ -273,7 +296,7 @@ export class InboundService {
           license_plate: payload.license_plate,
           driver_name: payload.driver_name,
           driver_phone: payload.driver_phone,
-          status: payload.status as InboundStatus || InboundStatus.CREATED,
+          status: (payload.status as InboundStatus) || InboundStatus.CREATED,
           inbound_type: payload.inbound_type,
           arrival_date: payload.arrival_date ? new Date(payload.arrival_date) : undefined,
         });
@@ -291,7 +314,7 @@ export class InboundService {
               flag_validated: doDto.flag_validated ?? false,
               validation_surat_jalan: doDto.validation_surat_jalan ?? false,
             });
-            
+
             if (doDto.inbound_items?.length) {
               for (const itemDto of doDto.inbound_items) {
                 await this.inboundItemRepo.create({
@@ -316,12 +339,14 @@ export class InboundService {
       });
     } catch (error) {
       // Re-throw validation errors as-is
-      if (error instanceof BadRequestException || 
-          error instanceof NotFoundException || 
-          error instanceof ConflictException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ConflictException
+      ) {
         throw error;
       }
-      
+
       // Wrap other errors with more context
       throw new BadRequestException(`Failed to create inbound: ${error.message}`);
     }
@@ -388,7 +413,7 @@ export class InboundService {
 
       // Validate the update payload
       await this.validateInboundUpdate(payload);
-      
+
       await this.dataSource.transaction(async () => {
         await this.inboundRepo.update(id, {
           expedition: payload.expedition,
@@ -405,7 +430,7 @@ export class InboundService {
           // Soft remove existing DOs and items
           await this.inboundItemRepo.softRemoveByInbound(id);
           await this.inboundDoRepo.softRemoveByInbound(id);
-          
+
           // Create new DOs and items
           for (const doDto of payload.inbound_dos) {
             const inboundDo = await this.inboundDoRepo.create({
@@ -418,7 +443,7 @@ export class InboundService {
               flag_validated: doDto.flag_validated ?? false,
               validation_surat_jalan: doDto.validation_surat_jalan ?? false,
             });
-            
+
             if (doDto.inbound_items?.length) {
               for (const itemDto of doDto.inbound_items) {
                 await this.inboundItemRepo.create({
@@ -434,7 +459,7 @@ export class InboundService {
           }
         }
       });
-      
+
       const updated = await this.inboundRepo.findOne(id);
       if (!updated) {
         throw new NotFoundException('Inbound not found after update');
@@ -442,12 +467,14 @@ export class InboundService {
       return updated;
     } catch (error) {
       // Re-throw validation errors as-is
-      if (error instanceof BadRequestException || 
-          error instanceof NotFoundException || 
-          error instanceof ConflictException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ConflictException
+      ) {
         throw error;
       }
-      
+
       // Wrap other errors with more context
       throw new BadRequestException(`Failed to update inbound: ${error.message}`);
     }
@@ -464,7 +491,7 @@ export class InboundService {
 
   async updateStatus(id: string, payload: UpdateInboundStatusDto): Promise<Inbound> {
     await this.findOne(id);
-    
+
     const updateData: Partial<Inbound> = {};
     if (payload.status !== undefined) {
       updateData.status = payload.status as InboundStatus;
@@ -472,7 +499,7 @@ export class InboundService {
     if (payload.notes !== undefined) {
       updateData.notes = payload.notes;
     }
-    
+
     await this.inboundRepo.update(id, updateData);
     return this.findOne(id);
   }
@@ -502,7 +529,7 @@ export class InboundService {
       success: 0,
       failed: 0,
       pending: 0,
-      total: inbound.inbound_dos.length
+      total: inbound.inbound_dos.length,
     };
 
     // Count each status type
@@ -553,41 +580,47 @@ export class InboundService {
     // Update inbound status with timestamp
     const updateData = {
       status: newStatus,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     await this.inboundRepo.update(id, updateData);
 
     // Log status change for audit
     console.log(`Inbound ${id} status updated to ${newStatus}: ${statusReason}`);
-    console.log(`Status breakdown: Ready=${statusCounts.ready}, Success=${statusCounts.success}, Failed=${statusCounts.failed}, Pending=${statusCounts.pending}`);
+    console.log(
+      `Status breakdown: Ready=${statusCounts.ready}, Success=${statusCounts.success}, Failed=${statusCounts.failed}, Pending=${statusCounts.pending}`,
+    );
 
     // Return updated inbound
     return await this.findOne(id);
   }
 
-  async bulkUpdateInboundItemSaldoInspection(payload: BulkUpdateSaldoInspectionDto): Promise<InboundItem[]> {
-    const updates = payload.items.map(item => ({
+  async bulkUpdateInboundItemSaldoInspection(
+    payload: BulkUpdateSaldoInspectionDto,
+  ): Promise<InboundItem[]> {
+    const updates = payload.items.map((item) => ({
       id: item.id,
-      quantity_inspection: item.quantity_inspection
+      quantity_inspection: item.quantity_inspection,
     }));
-    
-    const updateSaldo = await this.inboundItemRepo.bulkUpdateSaldoInspection(updates); 
+
+    const updateSaldo = await this.inboundItemRepo.bulkUpdateSaldoInspection(updates);
     // find all inbound item by inbound_do_id
     const inboundItems = await this.inboundItemRepo.findAllByInboundDo(payload.inbound_do_id);
     let isAllApproved = true;
     for (const item of inboundItems) {
-      if(item.inspection_status === InspectionStatus.PENDING) {
+      if (item.inspection_status === InspectionStatus.PENDING) {
         isAllApproved = false;
       }
     }
-    if(isAllApproved) {
-      await this.inboundDoRepo.update(payload.inbound_do_id, {integration_status: IntegrationStatus.READY});
+    if (isAllApproved) {
+      await this.inboundDoRepo.update(payload.inbound_do_id, {
+        integration_status: IntegrationStatus.READY,
+      });
     } else {
-      await this.inboundDoRepo.update(payload.inbound_do_id, {integration_status: IntegrationStatus.PENDING});
+      await this.inboundDoRepo.update(payload.inbound_do_id, {
+        integration_status: IntegrationStatus.PENDING,
+      });
     }
     return updateSaldo;
   }
 }
-
-

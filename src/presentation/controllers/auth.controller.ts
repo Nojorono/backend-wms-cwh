@@ -1,15 +1,5 @@
-import {
-  Controller,
-  Post,
-  Body,
-  UnauthorizedException,
-  Inject,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { Controller, Post, Body, UnauthorizedException, Inject } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from '../../infrastructure/services/auth.service';
 import { LoginDto } from '../../core/application/dtos/auth/login.dto';
 import { Public } from '../../core/decorators/public.decorator';
@@ -30,16 +20,11 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto) {
-    const user = await this.authService.validateUser(
-      loginDto.username,
-      loginDto.password,
-    );
+    const user = await this.authService.validateUser(loginDto.username, loginDto.password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    const permissions = await this.permissionRepository.findMenuByRoleId(
-      user.roleId,
-    );
+    const permissions = await this.permissionRepository.findMenuByRoleId(user.roleId);
     if (permissions.menus.length === 0) {
       throw new UnauthorizedException('User has no permissions');
     }

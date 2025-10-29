@@ -12,10 +12,10 @@ export class UpdatePalletQuantityDto {
   @Min(0)
   quantity: number;
 
-  @ApiProperty({ 
-    enum: QuantityOperationType, 
+  @ApiProperty({
+    enum: QuantityOperationType,
     example: QuantityOperationType.ADD,
-    description: 'Type of quantity operation'
+    description: 'Type of quantity operation',
   })
   @IsEnum(QuantityOperationType)
   operation_type: QuantityOperationType;
@@ -30,17 +30,26 @@ export class UpdatePalletQuantityDto {
   @IsString()
   inbound_id?: string;
 
-  @ApiPropertyOptional({ example: 'INBOUND', description: 'Reference type (INBOUND, OUTBOUND, etc.)' })
+  @ApiPropertyOptional({
+    example: 'INBOUND',
+    description: 'Reference type (INBOUND, OUTBOUND, etc.)',
+  })
   @IsOptional()
   @IsString()
   reference_type?: string;
 
-  @ApiPropertyOptional({ example: 'Added items from inbound DO-001', description: 'Notes about the operation' })
+  @ApiPropertyOptional({
+    example: 'Added items from inbound DO-001',
+    description: 'Notes about the operation',
+  })
   @IsOptional()
   @IsString()
   notes?: string;
 
-  @ApiPropertyOptional({ example: 'uuid-user-123', description: 'User who performed the operation' })
+  @ApiPropertyOptional({
+    example: 'uuid-user-123',
+    description: 'User who performed the operation',
+  })
   @IsOptional()
   @IsString()
   user_id?: string;

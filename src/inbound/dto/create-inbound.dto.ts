@@ -1,21 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { 
-  IsArray, 
-  IsBoolean, 
-  IsDateString, 
-  IsNumber, 
-  IsOptional, 
-  IsString, 
-  ValidateNested, 
-  IsNotEmpty, 
-  IsUUID, 
-  IsPositive, 
-  IsEnum, 
-  MinLength, 
-  MaxLength, 
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+  IsNotEmpty,
+  IsUUID,
+  IsPositive,
+  IsEnum,
+  MinLength,
+  MaxLength,
   Matches,
   IsPhoneNumber,
-  IsUrl
+  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InboundStatus } from '../../core/domain/entities/inbound.entity';
@@ -116,7 +116,6 @@ export class CreateInboundDoDto {
 }
 
 export class CreateInboundDto {
-
   @ApiPropertyOptional({ example: 'Carrier A' })
   @IsOptional()
   @IsString({ message: 'expedition must be a string' })
@@ -136,7 +135,9 @@ export class CreateInboundDto {
   @IsString({ message: 'license_plate must be a string' })
   @MinLength(1, { message: 'license_plate must be at least 1 character' })
   @MaxLength(20, { message: 'license_plate must not exceed 20 characters' })
-  @Matches(/^[A-Z0-9\s]+$/, { message: 'license_plate must contain only uppercase letters, numbers, and spaces' })
+  @Matches(/^[A-Z0-9\s]+$/, {
+    message: 'license_plate must contain only uppercase letters, numbers, and spaces',
+  })
   license_plate?: string;
 
   @ApiPropertyOptional({ example: 'John Doe' })
@@ -193,5 +194,3 @@ export class CreateInboundDto {
   @Type(() => CreateInboundDoDto)
   inbound_dos?: CreateInboundDoDto[];
 }
-
-

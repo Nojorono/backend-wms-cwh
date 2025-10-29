@@ -56,9 +56,7 @@ export class WeekListIntegrationService {
       );
 
       if (this.connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
-        const delay =
-          this.CONNECTION_RETRY_DELAY *
-          Math.pow(1.5, this.connectionAttempts - 1);
+        const delay = this.CONNECTION_RETRY_DELAY * Math.pow(1.5, this.connectionAttempts - 1);
         this.logger.log(`Retrying connection in ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         return this.ensureConnection();
@@ -71,18 +69,22 @@ export class WeekListIntegrationService {
       }
     }
   }
-  
 
-  async getWeekSalesAll(params?: { tahun?: string; search?: string; page?: number; limit?: number }): Promise<WeekSalesResponseDto> {
+  async getWeekSalesAll(params?: {
+    tahun?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<WeekSalesResponseDto> {
     try {
       this.logger.log(`Fetching week sales from external service with params:`, params);
-      
+
       const response = await firstValueFrom(
         this.weekSalesClient.send('week_sales.findAll', params || {}),
       );
 
       this.logger.log(`Successfully fetched ${response.data?.length || 0} week sales`);
-      
+
       return response;
     } catch (error) {
       this.logger.error('Error fetching week sales:', error);

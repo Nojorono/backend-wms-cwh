@@ -30,21 +30,21 @@ export class MasterWeekRepository {
     sortOrder?: 'asc' | 'desc';
   }): Promise<MasterWeek[]> {
     const { search, page = 1, limit = 10, sortBy = 'created_at', sortOrder = 'desc' } = filters;
-    
+
     const queryBuilder = this.repository.createQueryBuilder('masterWeek');
-    
+
     if (search) {
       queryBuilder.where(
         '(masterWeek.BULAN::text ILIKE :search OR masterWeek.MINGGU::text ILIKE :search OR masterWeek.QUARTER::text ILIKE :search OR masterWeek.TAHUN::text ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
-    
+
     queryBuilder
       .orderBy(`masterWeek.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
-    
+
     return await queryBuilder.getMany();
   }
 
@@ -58,18 +58,15 @@ export class MasterWeekRepository {
 
   async findByDate(date: Date): Promise<MasterWeek[]> {
     // Find weeks where the date falls between TANGGAL_AWAL_MINGGU_REAL and TANGGAL_AKHIR_MINGGU_REAL
-    return await this.repository.find({ 
-      where: { 
-        TANGGAL_AWAL_MINGGU_REAL: LessThanOrEqual(date), 
-        TANGGAL_AKHIR_MINGGU_REAL: MoreThanOrEqual(date) 
-      } 
+    return await this.repository.find({
+      where: {
+        TANGGAL_AWAL_MINGGU_REAL: LessThanOrEqual(date),
+        TANGGAL_AKHIR_MINGGU_REAL: MoreThanOrEqual(date),
+      },
     });
   }
 
-  async update(
-    id: string,
-    updateMasterWeekDto: UpdateMasterWeekDto,
-  ): Promise<MasterWeek | null> {
+  async update(id: string, updateMasterWeekDto: UpdateMasterWeekDto): Promise<MasterWeek | null> {
     const week = await this.findOne(id);
     if (!week) {
       throw new NotFoundException('Week not found');

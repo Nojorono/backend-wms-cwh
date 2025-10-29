@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDate, IsEnum, IsOptional, IsString, IsArray, IsUUID, IsNumber, ValidateNested } from 'class-validator';
+import {
+  IsDate,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsArray,
+  IsUUID,
+  IsNumber,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { OutboundDoStatus, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
 
@@ -34,7 +43,7 @@ export class CreateOutboundDoDto {
   @ApiProperty({ example: 'John Doe' })
   @IsString()
   driver_name: string;
-  
+
   @ApiProperty({ example: '081234567890' })
   @IsString()
   driver_phone: string;
@@ -53,13 +62,13 @@ export class CreateOutboundDoDto {
   @Type(() => Date)
   delivery_date: Date;
 
-  @ApiProperty({ 
-    type: [OutboundMemoItemDto], 
+  @ApiProperty({
+    type: [OutboundMemoItemDto],
     example: [
       { memo_id: 'b3a2d84c-7d29-4f47-bfb9-8158b17c5b8b', sequence: 1 },
-      { memo_id: 'uuid-memo-2', sequence: 2 }
+      { memo_id: 'uuid-memo-2', sequence: 2 },
     ],
-    description: 'Array of outbound memo objects with sequence'
+    description: 'Array of outbound memo objects with sequence',
   })
   @IsArray()
   @ValidateNested({ each: true })

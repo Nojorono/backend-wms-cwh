@@ -43,7 +43,11 @@ export class CreateInventoryTrackingDto {
   @IsOptional()
   inspection_date?: Date | string;
 
-  @ApiProperty({ example: 'inbound-uuid', required: false, description: 'ID dari inbound transaction untuk mencegah duplikasi history' })
+  @ApiProperty({
+    example: 'inbound-uuid',
+    required: false,
+    description: 'ID dari inbound transaction untuk mencegah duplikasi history',
+  })
   @IsString()
   @IsOptional()
   inbound_id?: string;
@@ -53,5 +57,3 @@ export class CreateInventoryTrackingDto {
   @IsOptional()
   progression_status?: ProgressionStatus;
 }
-
-

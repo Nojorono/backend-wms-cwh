@@ -11,20 +11,16 @@ import { MasterClassificationItem } from '../core/domain/entities/master-classif
 
 @Injectable()
 export class MasterClassificationItemService {
-  constructor(
-    private readonly repository: MasterClassificationItemRepository,
-  ) {}
+  constructor(private readonly repository: MasterClassificationItemRepository) {}
 
   async create(
     createMasterClassificationItemDto: CreateMasterClassificationItemDto,
   ): Promise<MasterClassificationItem> {
-    const classification_code =
-      createMasterClassificationItemDto.classification_code;
+    const classification_code = createMasterClassificationItemDto.classification_code;
     if (!classification_code) {
       throw new BadRequestException('Classification Code is required');
     }
-    const existingClassificationItem =
-      await this.repository.findByCode(classification_code);
+    const existingClassificationItem = await this.repository.findByCode(classification_code);
     if (existingClassificationItem) {
       throw new ConflictException(
         `Classification Item with Code ${classification_code} already exists`,
@@ -40,9 +36,7 @@ export class MasterClassificationItemService {
   async findOne(id: string): Promise<MasterClassificationItem> {
     const classificationItem = await this.repository.findOne(id);
     if (!classificationItem) {
-      throw new NotFoundException(
-        `Classification Item with ID ${id} not found`,
-      );
+      throw new NotFoundException(`Classification Item with ID ${id} not found`);
     }
     return classificationItem;
   }
@@ -72,9 +66,7 @@ export class MasterClassificationItemService {
       updateMasterClassificationItemDto,
     );
     if (!updatedClassificationItem) {
-      throw new NotFoundException(
-        `Classification Item with ID ${id} not found`,
-      );
+      throw new NotFoundException(`Classification Item with ID ${id} not found`);
     }
     return updatedClassificationItem;
   }

@@ -28,8 +28,13 @@ export class PutAwayRepository {
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
-      .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
-      .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
+      .leftJoinAndMapOne(
+        'pta.destinationBin',
+        MasterWarehouseBin,
+        'destinationBin',
+        'destinationBin.id = pta.destination_bin_id',
+      )
+      .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub');
 
     return await queryBuilder.getMany();
   }
@@ -41,7 +46,12 @@ export class PutAwayRepository {
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
-      .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
+      .leftJoinAndMapOne(
+        'pta.destinationBin',
+        MasterWarehouseBin,
+        'destinationBin',
+        'destinationBin.id = pta.destination_bin_id',
+      )
       .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
       .getOne();
     if (!entity) return null;
@@ -69,7 +79,12 @@ export class PutAwayRepository {
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
-      .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
+      .leftJoinAndMapOne(
+        'pta.destinationBin',
+        MasterWarehouseBin,
+        'destinationBin',
+        'destinationBin.id = pta.destination_bin_id',
+      )
       .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
       .getMany();
     if (!queryBuilder) return [];
@@ -84,7 +99,12 @@ export class PutAwayRepository {
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
-      .leftJoinAndMapOne('pta.destinationBin', MasterWarehouseBin, 'destinationBin', 'destinationBin.id = pta.destination_bin_id')
+      .leftJoinAndMapOne(
+        'pta.destinationBin',
+        MasterWarehouseBin,
+        'destinationBin',
+        'destinationBin.id = pta.destination_bin_id',
+      )
       .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub')
       .orderBy('pta.created_at', 'DESC')
       .getMany();
@@ -92,5 +112,3 @@ export class PutAwayRepository {
     return queryBuilder;
   }
 }
-
-

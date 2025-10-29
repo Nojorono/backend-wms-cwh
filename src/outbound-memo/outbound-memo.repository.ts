@@ -17,21 +17,21 @@ export class OutboundMemoRepository {
 
   async create(data: CreateOutboundMemoDto): Promise<OutboundMemo> {
     const { outbound_memo_items, ...outboundMemoData } = data;
-    
+
     // Create outbound memo
     const outboundMemo = this.outboundMemoRepository.create({
       ...outboundMemoData,
-      status: data.status || 'PENDING' as any,
+      status: data.status || ('PENDING' as any),
     });
     const savedOutboundMemo = await this.outboundMemoRepository.save(outboundMemo);
 
     // Create outbound memo items
     if (outbound_memo_items && outbound_memo_items.length > 0) {
-      const items = outbound_memo_items.map(item => 
+      const items = outbound_memo_items.map((item) =>
         this.outboundMemoItemRepository.create({
           ...item,
           outbound_memo_id: savedOutboundMemo.id,
-        })
+        }),
       );
       await this.outboundMemoItemRepository.save(items);
     }
@@ -57,9 +57,9 @@ export class OutboundMemoRepository {
 
   async update(id: string, data: UpdateOutboundMemoDto): Promise<OutboundMemo> {
     const existing = await this.findOne(id);
-    
+
     const { outbound_memo_items, ...outboundMemoData } = data;
-    
+
     // Update outbound memo
     await this.outboundMemoRepository.update(id, outboundMemoData);
 
@@ -67,14 +67,14 @@ export class OutboundMemoRepository {
     if (outbound_memo_items) {
       // Delete existing items
       await this.outboundMemoItemRepository.delete({ outbound_memo_id: id });
-      
+
       // Create new items
       if (outbound_memo_items.length > 0) {
-        const items = outbound_memo_items.map(item => 
+        const items = outbound_memo_items.map((item) =>
           this.outboundMemoItemRepository.create({
             ...item,
             outbound_memo_id: id,
-          })
+          }),
         );
         await this.outboundMemoItemRepository.save(items);
       }
@@ -96,4 +96,3 @@ export class OutboundMemoRepository {
     });
   }
 }
-  

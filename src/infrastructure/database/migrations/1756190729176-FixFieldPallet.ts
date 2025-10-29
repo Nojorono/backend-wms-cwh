@@ -31,27 +31,17 @@ export class FixFieldPallet1756190729176 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "m_io" ADD COLUMN IF NOT EXISTS "address" character varying`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "m_io" ALTER COLUMN "created_at" DROP NOT NULL`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "m_io" ALTER COLUMN "updated_at" DROP NOT NULL`,
-    );
+    await queryRunner.query(`ALTER TABLE "m_io" ALTER COLUMN "created_at" DROP NOT NULL`);
+    await queryRunner.query(`ALTER TABLE "m_io" ALTER COLUMN "updated_at" DROP NOT NULL`);
     await queryRunner.query(
       `ALTER TABLE "m_pallet" ALTER COLUMN "barcode_image_url" DROP NOT NULL`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "m_pallet" ALTER COLUMN "barcode_image_url" SET NOT NULL`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "m_io" ALTER COLUMN "updated_at" SET NOT NULL`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "m_io" ALTER COLUMN "created_at" SET NOT NULL`,
-    );
+    await queryRunner.query(`ALTER TABLE "m_pallet" ALTER COLUMN "barcode_image_url" SET NOT NULL`);
+    await queryRunner.query(`ALTER TABLE "m_io" ALTER COLUMN "updated_at" SET NOT NULL`);
+    await queryRunner.query(`ALTER TABLE "m_io" ALTER COLUMN "created_at" SET NOT NULL`);
     await queryRunner.query(`ALTER TABLE "m_io" DROP COLUMN IF EXISTS "address"`);
     await queryRunner.query(
       `ALTER TABLE "m_warehouse_sub" DROP COLUMN IF EXISTS "barcode_image_url"`,

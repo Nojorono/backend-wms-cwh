@@ -130,10 +130,7 @@ export class OutboundMemoController {
       },
     },
   })
-  async update(
-    @Param('id') id: string,
-    @Body() updateOutboundMemoDto: UpdateOutboundMemoDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateOutboundMemoDto: UpdateOutboundMemoDto) {
     return this.outboundMemoService.update(id, updateOutboundMemoDto);
   }
 
@@ -152,15 +149,15 @@ export class OutboundMemoController {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Tidak dapat mengubah status dari APPROVED ke PENDING' },
+        message: {
+          type: 'string',
+          example: 'Tidak dapat mengubah status dari APPROVED ke PENDING',
+        },
         statusCode: { type: 'number', example: 400 },
       },
     },
   })
-  async updateStatus(
-    @Param('id') id: string,
-    @Body('status') status: OutboundMemoStatus,
-  ) {
+  async updateStatus(@Param('id') id: string, @Body('status') status: OutboundMemoStatus) {
     return this.outboundMemoService.updateStatus(id, status);
   }
 
@@ -179,7 +176,10 @@ export class OutboundMemoController {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Tidak dapat menghapus outbound memo yang sudah APPROVED' },
+        message: {
+          type: 'string',
+          example: 'Tidak dapat menghapus outbound memo yang sudah APPROVED',
+        },
         statusCode: { type: 'number', example: 400 },
       },
     },

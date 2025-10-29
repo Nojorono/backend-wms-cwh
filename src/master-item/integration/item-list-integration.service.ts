@@ -22,9 +22,7 @@ export class ItemListIntegrationService implements OnModuleInit {
   private readonly MAX_CONNECTION_ATTEMPTS = 5;
   private readonly CONNECTION_RETRY_DELAY = 2000; // 2 seconds
 
-  constructor(
-    @Inject('ITEM_LIST_SERVICE') private readonly itemListClient: ClientProxy,
-  ) {}
+  constructor(@Inject('ITEM_LIST_SERVICE') private readonly itemListClient: ClientProxy) {}
 
   async onModuleInit() {
     this.logger.log('Initializing connection to RabbitMQ item list service...');
@@ -54,9 +52,7 @@ export class ItemListIntegrationService implements OnModuleInit {
       );
 
       if (this.connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
-        const delay =
-          this.CONNECTION_RETRY_DELAY *
-          Math.pow(1.5, this.connectionAttempts - 1);
+        const delay = this.CONNECTION_RETRY_DELAY * Math.pow(1.5, this.connectionAttempts - 1);
         this.logger.log(`Retrying connection in ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         return this.ensureConnection();
@@ -70,11 +66,8 @@ export class ItemListIntegrationService implements OnModuleInit {
     }
   }
 
-  async getItemLists(
-    params?: ItemListQueryDto,
-  ): Promise<ItemListResponseDto> {
+  async getItemLists(params?: ItemListQueryDto): Promise<ItemListResponseDto> {
     try {
-
       const queryParams: ItemListQueryDto = {
         search: params?.search || undefined,
         page: params?.page,
@@ -83,27 +76,20 @@ export class ItemListIntegrationService implements OnModuleInit {
         sortOrder: params?.sortOrder || 'desc',
       };
 
-      this.logger.log(
-        'Sending request to item list service with params:',
-        queryParams,
-      );
+      this.logger.log('Sending request to item list service with params:', queryParams);
 
       const timeoutMs = 30000;
       this.logger.log(`Using timeout of ${timeoutMs}ms for RabbitMQ request`);
 
       const itemListResponse = await firstValueFrom(
-        this.itemListClient
-          .send<ItemListResponseDto>('item-list.findAll', queryParams)
-          .pipe(
-            timeout(timeoutMs),
-            catchError((error) => {
-              this.logger.error(
-                `RabbitMQ request failed: ${error.message || 'Unknown error'}`,
-              );
-              this.connectionEstablished = false;
-              throw error; // Let the catch block handle fallback
-            }),
-          ),
+        this.itemListClient.send<ItemListResponseDto>('item-list.findAll', queryParams).pipe(
+          timeout(timeoutMs),
+          catchError((error) => {
+            this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
+            this.connectionEstablished = false;
+            throw error; // Let the catch block handle fallback
+          }),
+        ),
       );
 
       this.logger.log('Received response from item list service:', {
@@ -117,9 +103,7 @@ export class ItemListIntegrationService implements OnModuleInit {
         data: itemListResponse?.data || [],
         count: itemListResponse?.count || 0,
         status: itemListResponse?.status ?? false,
-        message:
-          itemListResponse?.message ||
-          'No data received from item list service',
+        message: itemListResponse?.message || 'No data received from item list service',
       };
 
       if (itemListResponse?.currentPage !== undefined) {
@@ -130,7 +114,10 @@ export class ItemListIntegrationService implements OnModuleInit {
 
       return response;
     } catch (error) {
-      this.logger.error('Error getting item lists via RabbitMQ, falling back to local service:', error);
+      this.logger.error(
+        'Error getting item lists via RabbitMQ, falling back to local service:',
+        error,
+      );
       this.connectionEstablished = false;
       throw error;
     }
@@ -138,10 +125,7 @@ export class ItemListIntegrationService implements OnModuleInit {
 
   async getItemListById(itemId: string): Promise<ItemListResponseDto> {
     try {
-
-      this.logger.log(
-        `Sending request to get item by ID: ${itemId}`,
-      );
+      this.logger.log(`Sending request to get item by ID: ${itemId}`);
 
       const timeoutMs = 20000;
       this.logger.log(`Using timeout of ${timeoutMs}ms for RabbitMQ request`);
@@ -154,9 +138,7 @@ export class ItemListIntegrationService implements OnModuleInit {
           .pipe(
             timeout(timeoutMs),
             catchError((error) => {
-              this.logger.error(
-                `RabbitMQ request failed: ${error.message || 'Unknown error'}`,
-              );
+              this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
               this.connectionEstablished = false;
               throw error; // Let the catch block handle fallback
             }),
@@ -183,10 +165,7 @@ export class ItemListIntegrationService implements OnModuleInit {
 
   async searchItemLists(searchTerm: string): Promise<ItemListResponseDto> {
     try {
-
-      this.logger.log(
-        `Sending search request for term: ${searchTerm}`,
-      );
+      this.logger.log(`Sending search request for term: ${searchTerm}`);
 
       const timeoutMs = 30000;
       this.logger.log(`Using timeout of ${timeoutMs}ms for RabbitMQ request`);
@@ -199,9 +178,7 @@ export class ItemListIntegrationService implements OnModuleInit {
           .pipe(
             timeout(timeoutMs),
             catchError((error) => {
-              this.logger.error(
-                `RabbitMQ request failed: ${error.message || 'Unknown error'}`,
-              );
+              this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
               this.connectionEstablished = false;
               throw error; // Let the catch block handle fallback
             }),
@@ -219,23 +196,22 @@ export class ItemListIntegrationService implements OnModuleInit {
         data: searchResponse?.data || [],
         count: searchResponse?.count || 0,
         status: searchResponse?.status ?? false,
-        message:
-          searchResponse?.message ||
-          'No search results received from item list service',
+        message: searchResponse?.message || 'No search results received from item list service',
       };
 
       return response;
     } catch (error) {
-      this.logger.error('Error searching item lists via RabbitMQ, falling back to local service:', error);
+      this.logger.error(
+        'Error searching item lists via RabbitMQ, falling back to local service:',
+        error,
+      );
       this.connectionEstablished = false;
-      
+
       throw error;
     }
   }
 
-  async invalidateItemListCache(
-    itemId?: string,
-  ): Promise<{ status: boolean; message: string }> {
+  async invalidateItemListCache(itemId?: string): Promise<{ status: boolean; message: string }> {
     try {
       await this.ensureConnection();
 
@@ -247,12 +223,9 @@ export class ItemListIntegrationService implements OnModuleInit {
 
       const response = await firstValueFrom(
         this.itemListClient
-          .send<{ status: boolean; message: string }>(
-            'invalidate_item_list_cache',
-            {
-              itemId,
-            },
-          )
+          .send<{ status: boolean; message: string }>('invalidate_item_list_cache', {
+            itemId,
+          })
           .pipe(
             timeout(timeoutMs),
             catchError((error) => {
@@ -267,9 +240,7 @@ export class ItemListIntegrationService implements OnModuleInit {
           ),
       );
 
-      this.logger.log(
-        `Cache invalidation response: ${JSON.stringify(response)}`,
-      );
+      this.logger.log(`Cache invalidation response: ${JSON.stringify(response)}`);
       return (
         response || {
           status: false,

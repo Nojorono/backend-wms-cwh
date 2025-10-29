@@ -3,11 +3,7 @@ import { PaginationQueryDto, PaginationMetaDto, PaginatedResponseDto } from '../
 
 @Injectable()
 export class PaginationService {
-  createPaginationMeta(
-    page: number,
-    limit: number,
-    total: number,
-  ): PaginationMetaDto {
+  createPaginationMeta(page: number, limit: number, total: number): PaginationMetaDto {
     const totalPages = Math.ceil(total / limit);
     const hasNextPage = page < totalPages;
     const hasPreviousPage = page > 1;

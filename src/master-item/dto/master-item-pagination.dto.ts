@@ -4,59 +4,59 @@ import { Type } from 'class-transformer';
 import { BasePaginationQueryDto } from '../../core/dto/base-pagination.dto';
 
 export class MasterItemPaginationQueryDto extends BasePaginationQueryDto {
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter items by name',
-    example: 'Product A'
+    example: 'Product A',
   })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter items by code',
-    example: 'ITEM-001'
+    example: 'ITEM-001',
   })
   @IsOptional()
   @IsString()
   code?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter items by category',
-    example: 'Electronics'
+    example: 'Electronics',
   })
   @IsOptional()
   @IsString()
   category?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter items by supplier ID',
-    example: 'uuid-supplier-123'
+    example: 'uuid-supplier-123',
   })
   @IsOptional()
   @IsString()
   supplier_id?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter items by minimum price',
-    example: 100
+    example: 100,
   })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   min_price?: number;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter items by maximum price',
-    example: 1000
+    example: 1000,
   })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   max_price?: number;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Filter items by active status',
-    example: true
+    example: true,
   })
   @IsOptional()
   @Type(() => Boolean)

@@ -15,19 +15,21 @@ import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      InventoryTracking, 
+      InventoryTracking,
       InventoryTrackingHistory,
       MasterPallet,
       MasterItem,
       MasterWarehouse,
       MasterWarehouseSub,
-      MasterWarehouseBin
-    ])
+      MasterWarehouseBin,
+    ]),
   ],
   controllers: [InventoryTrackingController],
-  providers: [InventoryTrackingService, InventoryTrackingRepository, InventoryAutoSuggestionService],
+  providers: [
+    InventoryTrackingService,
+    InventoryTrackingRepository,
+    InventoryAutoSuggestionService,
+  ],
   exports: [InventoryTrackingService, InventoryAutoSuggestionService],
 })
 export class InventoryTrackingModule {}
-
-

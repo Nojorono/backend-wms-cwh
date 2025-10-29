@@ -1,8 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { TransactionScanInboundRepository } from './transaction-scan-inbound.repository';
 import { CreateTransactionScanInboundDto } from './dto/create-transaction-scan-inbound.dto';
-import { UpdateManyStatusToDto, UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
-import { ScanInboundStatus, TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
+import {
+  UpdateManyStatusToDto,
+  UpdateTransactionScanInboundDto,
+} from './dto/update-transaction-scan-inbound.dto';
+import {
+  ScanInboundStatus,
+  TransactionScanInbound,
+} from '../core/domain/entities/transaction-scan-inbound.entity';
 import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
 import { MasterItemService } from 'src/master-item/master-item.service';
 import { MasterWarehouseSubService } from 'src/master-warehouse-sub/master-warehouse-sub.service';
@@ -13,11 +19,11 @@ import { UpdateResult } from 'typeorm';
 @Injectable()
 export class TransactionScanInboundService {
   constructor(
-    private readonly repository: TransactionScanInboundRepository, 
+    private readonly repository: TransactionScanInboundRepository,
     private readonly palletService: MasterPalletService,
     private readonly itemService: MasterItemService,
     private readonly warehouseSubService: MasterWarehouseSubService,
-    private readonly inventoryTrackingService: InventoryTrackingService
+    private readonly inventoryTrackingService: InventoryTrackingService,
   ) {}
 
   async create(data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
@@ -30,15 +36,20 @@ export class TransactionScanInboundService {
 
     // check capacity pallet
     if (pallet && pallet.capacity > 0) {
-      const capacityPallet = await this.palletService.checkCapacityForQuantity(pallet.id, data.quantity);
+      const capacityPallet = await this.palletService.checkCapacityForQuantity(
+        pallet.id,
+        data.quantity,
+      );
       if (!capacityPallet) throw new BadRequestException('Pallet is full');
-    }else if (pallet && pallet.capacity <= 0) {
+    } else if (pallet && pallet.capacity <= 0) {
       throw new BadRequestException('Pallet capacity is not set');
     }
 
     // Validate UOM match between scan and pallet
     if (pallet.uom && data.uom && pallet.uom !== data.uom) {
-      throw new BadRequestException(`UOM mismatch: Scan UOM (${data.uom}) does not match Pallet UOM (${pallet.uom})`);
+      throw new BadRequestException(
+        `UOM mismatch: Scan UOM (${data.uom}) does not match Pallet UOM (${pallet.uom})`,
+      );
     }
 
     if (data.m_warehouse_sub_id) {
@@ -47,18 +58,30 @@ export class TransactionScanInboundService {
     }
 
     // Validasi week_number untuk pallet yang sama
-    const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(pallet.id, data.week_number);
+    const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(
+      pallet.id,
+      data.week_number,
+    );
     if (existingItemsInPallet.length > 0) {
-      const differentWeekItems = existingItemsInPallet.filter(item => item.week_number !== data.week_number);
+      const differentWeekItems = existingItemsInPallet.filter(
+        (item) => item.week_number !== data.week_number,
+      );
       if (differentWeekItems.length > 0) {
-        throw new BadRequestException(`Pallet sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat menambahkan item dengan week ${data.week_number}`);
+        throw new BadRequestException(
+          `Pallet sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat menambahkan item dengan week ${data.week_number}`,
+        );
       }
     }
 
     // Validasi untuk inbound yang sama
-    const findExistPalletSameWeek = await this.repository.findExistPallet(data.inbound_id, pallet.id);
-    if(findExistPalletSameWeek && findExistPalletSameWeek.week_number !== data.week_number) {
-      throw new BadRequestException('Item dalam pallet harus memiliki week yang sama dengan item yang sudah ada di inbound ini');
+    const findExistPalletSameWeek = await this.repository.findExistPallet(
+      data.inbound_id,
+      pallet.id,
+    );
+    if (findExistPalletSameWeek && findExistPalletSameWeek.week_number !== data.week_number) {
+      throw new BadRequestException(
+        'Item dalam pallet harus memiliki week yang sama dengan item yang sudah ada di inbound ini',
+      );
     }
 
     const scan = await this.repository.create({
@@ -81,26 +104,38 @@ export class TransactionScanInboundService {
     return scan;
   }
 
-  async findAll(inbound_id: string, status: string, item_id?: string): Promise<TransactionScanInbound[]> {
+  async findAll(
+    inbound_id: string,
+    status: string,
+    item_id?: string,
+  ): Promise<TransactionScanInbound[]> {
     return this.repository.findAll(inbound_id, status, item_id);
   }
 
-  async updateInspectionApproved(id: string, status: ScanInboundStatus, inspection_by: string): Promise<TransactionScanInbound> {
+  async updateInspectionApproved(
+    id: string,
+    status: ScanInboundStatus,
+    inspection_by: string,
+  ): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
     if (!existing) throw new NotFoundException('Transaction scan inbound not found');
-    const updated = await this.repository.update(id, { ...existing, status: status, inspection_by: inspection_by });
+    const updated = await this.repository.update(id, {
+      ...existing,
+      status: status,
+      inspection_by: inspection_by,
+    });
     // if status is COMPLETED, create or update inventory tracking
     if (status === ScanInboundStatus.COMPLETED) {
       const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
       if (!warehouseSub) throw new NotFoundException('Warehouse sub not found');
-      
+
       // createOrUpdateInventoryTracking now automatically detects location changes
       await this.inventoryTrackingService.createOrUpdateInventoryTracking(
-        existing.pallet_id, 
-        existing.m_warehouse_sub_id, 
-        warehouseSub.warehouse_id, 
-        'INSPECTION_COMPLETED', 
-        existing.inbound_id
+        existing.pallet_id,
+        existing.m_warehouse_sub_id,
+        warehouseSub.warehouse_id,
+        'INSPECTION_COMPLETED',
+        existing.inbound_id,
       );
     }
     return updated;
@@ -153,7 +188,9 @@ export class TransactionScanInboundService {
         try {
           const warehouseSub = await this.warehouseSubService.findOne(data.m_warehouse_sub_id);
           if (!warehouseSub) {
-            throw new BadRequestException(`Warehouse sub with ID ${data.m_warehouse_sub_id} not found`);
+            throw new BadRequestException(
+              `Warehouse sub with ID ${data.m_warehouse_sub_id} not found`,
+            );
           }
         } catch (error) {
           if (error instanceof BadRequestException) {
@@ -166,12 +203,17 @@ export class TransactionScanInboundService {
       // Validate week_number if being updated
       if (data.week_number !== undefined && data.week_number !== existing.week_number) {
         try {
-          const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(existing.pallet_id, data.week_number);
-          const differentWeekItems = existingItemsInPallet.filter(item => item.id !== id && item.week_number !== data.week_number);
-          
+          const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(
+            existing.pallet_id,
+            data.week_number,
+          );
+          const differentWeekItems = existingItemsInPallet.filter(
+            (item) => item.id !== id && item.week_number !== data.week_number,
+          );
+
           if (differentWeekItems.length > 0) {
             throw new BadRequestException(
-              `Pallet already contains items with week ${differentWeekItems[0].week_number}. Cannot change week to ${data.week_number}`
+              `Pallet already contains items with week ${differentWeekItems[0].week_number}. Cannot change week to ${data.week_number}`,
             );
           }
         } catch (error) {
@@ -195,20 +237,24 @@ export class TransactionScanInboundService {
         typeof data.uom === 'string';
 
       let targetPalletId = existing.pallet_id;
-      
+
       // Validate target pallet if pallet_code is provided
       if ((data as any).pallet_code) {
         try {
           const targetPallet = await this.palletService.findByPalletCode((data as any).pallet_code);
           if (!targetPallet) {
-            throw new NotFoundException(`Target pallet with code '${(data as any).pallet_code}' not found`);
+            throw new NotFoundException(
+              `Target pallet with code '${(data as any).pallet_code}' not found`,
+            );
           }
           targetPalletId = targetPallet.id;
-          
+
           // Validate UOM match between scan and pallet
           const scanUom = data.uom ?? existing.uom;
           if (targetPallet.uom && scanUom && targetPallet.uom !== scanUom) {
-            throw new BadRequestException(`UOM mismatch: Scan UOM (${scanUom}) does not match Pallet UOM (${targetPallet.uom})`);
+            throw new BadRequestException(
+              `UOM mismatch: Scan UOM (${scanUom}) does not match Pallet UOM (${targetPallet.uom})`,
+            );
           }
         } catch (error) {
           if (error instanceof NotFoundException || error instanceof BadRequestException) {
@@ -221,7 +267,9 @@ export class TransactionScanInboundService {
         try {
           const existingPallet = await this.palletService.findOne(existing.pallet_id);
           if (existingPallet.uom && data.uom && existingPallet.uom !== data.uom) {
-            throw new BadRequestException(`UOM mismatch: Scan UOM (${data.uom}) does not match Pallet UOM (${existingPallet.uom})`);
+            throw new BadRequestException(
+              `UOM mismatch: Scan UOM (${data.uom}) does not match Pallet UOM (${existingPallet.uom})`,
+            );
           }
         } catch (error) {
           if (error instanceof BadRequestException) {
@@ -284,17 +332,15 @@ export class TransactionScanInboundService {
       } catch (error) {
         throw new BadRequestException(`Database update failed: ${error.message}`);
       }
-
     } catch (error) {
       // Log error for debugging
       console.error(`Error updating transaction scan inbound ${id}:`, error);
-      
+
       // Re-throw known exceptions
-      if (error instanceof BadRequestException || 
-          error instanceof NotFoundException) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
       }
-      
+
       // Wrap unknown errors
       throw new BadRequestException(`Update operation failed: ${error.message}`);
     }
@@ -302,7 +348,7 @@ export class TransactionScanInboundService {
 
   async remove(id: string): Promise<void> {
     const existing = await this.findOne(id);
-    
+
     await this.palletService.updateQuantity(existing.pallet_id, {
       item_id: existing.item_id,
       quantity: existing.quantity,
@@ -316,47 +362,59 @@ export class TransactionScanInboundService {
       uom: existing.uom,
       week_number: existing.week_number,
     });
-    
+
     await this.repository.remove(id);
   }
 
-  async updateManyStatusTo(dto: UpdateManyStatusToDto, status: ScanInboundStatus, inspection_by: string): Promise<UpdateResult> {
+  async updateManyStatusTo(
+    dto: UpdateManyStatusToDto,
+    status: ScanInboundStatus,
+    inspection_by: string,
+  ): Promise<UpdateResult> {
     if (status === ScanInboundStatus.COMPLETED) {
       for (const id of dto.ids) {
         const existing = await this.findOne(id);
         if (!existing) throw new NotFoundException('Transaction scan inbound not found');
         const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
         if (!warehouseSub) throw new NotFoundException('Warehouse sub not found');
-        
+
         // createOrUpdateInventoryTracking now automatically detects location changes
         await this.inventoryTrackingService.createOrUpdateInventoryTracking(
-          existing.pallet_id, 
-          existing.m_warehouse_sub_id, 
-          warehouseSub.warehouse_id, 
-          'INSPECTION_COMPLETED', 
-          existing.inbound_id
+          existing.pallet_id,
+          existing.m_warehouse_sub_id,
+          warehouseSub.warehouse_id,
+          'INSPECTION_COMPLETED',
+          existing.inbound_id,
         );
       }
     }
     return this.repository.updateManyStatusTo(dto, status, inspection_by);
   }
 
-  async updateChangePallet(id: string, data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
+  async updateChangePallet(
+    id: string,
+    data: CreateTransactionScanInboundDto,
+  ): Promise<TransactionScanInbound> {
     // Validasi week_number untuk pallet baru sebelum menghapus yang lama
     if (data.pallet_code) {
       const newPallet = await this.palletService.findByPalletCode(data.pallet_code);
       if (newPallet) {
-        const existingItemsInNewPallet = await this.repository.findItemsInPalletWithDifferentWeek(newPallet.id, data.week_number);
-        const differentWeekItems = existingItemsInNewPallet.filter(item => item.week_number !== data.week_number);
+        const existingItemsInNewPallet = await this.repository.findItemsInPalletWithDifferentWeek(
+          newPallet.id,
+          data.week_number,
+        );
+        const differentWeekItems = existingItemsInNewPallet.filter(
+          (item) => item.week_number !== data.week_number,
+        );
         if (differentWeekItems.length > 0) {
-          throw new BadRequestException(`Pallet baru sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat memindahkan item dengan week ${data.week_number}`);
+          throw new BadRequestException(
+            `Pallet baru sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat memindahkan item dengan week ${data.week_number}`,
+          );
         }
       }
     }
-    
+
     this.remove(id);
     return this.create(data as CreateTransactionScanInboundDto);
   }
 }
-
-

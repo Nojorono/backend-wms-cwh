@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateMasterWarehouseSub1751615240935
-  implements MigrationInterface
-{
+export class CreateMasterWarehouseSub1751615240935 implements MigrationInterface {
   name = 'CreateMasterWarehouseSub1751615240935';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

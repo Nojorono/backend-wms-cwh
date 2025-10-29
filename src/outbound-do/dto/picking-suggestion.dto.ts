@@ -4,55 +4,55 @@ import { PickingSuggestionLocationDto } from './picking-suggestion-location.dto'
 export class PickingSuggestionDto {
   @ApiProperty({
     description: 'Outbound memo ID',
-    example: 'f10e4290-fa5a-4571-9a97-c9eeb7a9fe01'
+    example: 'f10e4290-fa5a-4571-9a97-c9eeb7a9fe01',
   })
   memo_id: string;
 
   @ApiProperty({
     description: 'Item ID',
-    example: '7f9f8a1e-5420-48a6-a10a-c85037f9abfa'
+    example: '7f9f8a1e-5420-48a6-a10a-c85037f9abfa',
   })
   item_id: string;
 
   @ApiProperty({
     description: 'Item name',
-    example: 'CLAS MILD - 16'
+    example: 'CLAS MILD - 16',
   })
   item_name: string;
 
   @ApiProperty({
     description: 'Item code',
-    example: 'RK.CLM.160000'
+    example: 'RK.CLM.160000',
   })
   item_code: string;
 
   @ApiProperty({
     description: 'Required quantity for this item',
-    example: 100
+    example: 100,
   })
   required_quantity: number;
 
   @ApiProperty({
     description: 'Suggested picking locations for this item',
-    type: [PickingSuggestionLocationDto]
+    type: [PickingSuggestionLocationDto],
   })
   suggested_locations: PickingSuggestionLocationDto[];
 
   @ApiProperty({
     description: 'Total suggested quantity across all locations',
-    example: 38
+    example: 38,
   })
   total_suggested_quantity: number;
 
   @ApiProperty({
     description: 'Priority level for picking (lower number = higher priority)',
-    example: 5
+    example: 5,
   })
   priority: number;
 
   @ApiProperty({
     description: 'Notes about the picking suggestion',
-    example: 'Item tersedia sebagian. Tersedia: 38 DUS, Dibutuhkan: 100 DUS'
+    example: 'Item tersedia sebagian. Tersedia: 38 DUS, Dibutuhkan: 100 DUS',
   })
   notes: string;
 }

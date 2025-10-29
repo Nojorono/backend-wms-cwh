@@ -10,7 +10,7 @@ import { MasterItem } from './master-item.entity';
 export enum Status {
   PENDING = 'PENDING',
   COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED'
+  CANCELLED = 'CANCELLED',
 }
 
 @Entity('transaction_picking')
@@ -30,7 +30,9 @@ export class PickingTransaction extends BaseEntity {
   @Column({ nullable: true })
   inventory_tracking_id: string;
 
-  @ManyToOne(() => InventoryTracking, (inventoryTracking) => inventoryTracking.id, { onDelete: 'CASCADE' })
+  @ManyToOne(() => InventoryTracking, (inventoryTracking) => inventoryTracking.id, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'inventory_tracking_id' })
   inventoryTracking: InventoryTracking;
 

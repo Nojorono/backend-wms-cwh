@@ -9,11 +9,7 @@ export class PaginationHelper {
     paginationQuery: PaginationQueryDto,
     total: number,
   ): Promise<PaginatedResponseDto<T>> {
-    return this.paginationService.createPaginatedResponse(
-      data,
-      paginationQuery,
-      total,
-    );
+    return this.paginationService.createPaginatedResponse(data, paginationQuery, total);
   }
 
   getSkip(page: number, limit: number): number {

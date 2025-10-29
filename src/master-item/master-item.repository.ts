@@ -29,21 +29,21 @@ export class MasterItemRepository {
     sortOrder?: 'asc' | 'desc';
   }): Promise<MasterItem[]> {
     const { search, page = 1, limit = 10, sortBy = 'created_at', sortOrder = 'desc' } = filters;
-    
+
     const queryBuilder = this.repository.createQueryBuilder('masterItem');
-    
+
     if (search) {
       queryBuilder.where(
         '(masterItem.sku ILIKE :search OR masterItem.item_number ILIKE :search OR masterItem.description ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
-    
+
     queryBuilder
       .orderBy(`masterItem.${sortBy}`, sortOrder.toUpperCase() as 'ASC' | 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
-    
+
     return await queryBuilder.getMany();
   }
 
@@ -55,9 +55,7 @@ export class MasterItemRepository {
     return item;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterItem | null> {
+  async findByOrganizationId(organization_id: number): Promise<MasterItem | null> {
     const item = await this.repository.findOne({ where: { organization_id } });
     if (!item) {
       return null;
@@ -73,10 +71,7 @@ export class MasterItemRepository {
     return item;
   }
 
-  async update(
-    id: string,
-    updateMasterItemDto: UpdateMasterItemDto,
-  ): Promise<MasterItem | null> {
+  async update(id: string, updateMasterItemDto: UpdateMasterItemDto): Promise<MasterItem | null> {
     const item = await this.findOne(id);
     if (!item) {
       throw new NotFoundException('Item not found');

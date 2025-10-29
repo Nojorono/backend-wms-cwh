@@ -25,7 +25,12 @@ export class InboundRepository {
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
-      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndMapOne(
+        'inbound_items.item',
+        MasterItem,
+        'item',
+        'item.id::varchar = inbound_items.item_id',
+      )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .getMany();
   }
@@ -54,7 +59,7 @@ export class InboundRepository {
     if (search) {
       queryBuilder.andWhere(
         '(inbound.inbound_number ILIKE :search OR inbound.expedition ILIKE :search OR inbound.origin ILIKE :search OR inbound.license_plate ILIKE :search OR inbound.driver_name ILIKE :search)',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
 
@@ -63,7 +68,12 @@ export class InboundRepository {
     const data = await queryBuilder
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
-      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndMapOne(
+        'inbound_items.item',
+        MasterItem,
+        'item',
+        'item.id::varchar = inbound_items.item_id',
+      )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
@@ -79,7 +89,12 @@ export class InboundRepository {
     const entity = await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
-      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndMapOne(
+        'inbound_items.item',
+        MasterItem,
+        'item',
+        'item.id::varchar = inbound_items.item_id',
+      )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
       .getOne();
@@ -135,7 +150,12 @@ export class InboundRepository {
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
-      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndMapOne(
+        'inbound_items.item',
+        MasterItem,
+        'item',
+        'item.id::varchar = inbound_items.item_id',
+      )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .getMany();
   }
@@ -145,12 +165,15 @@ export class InboundRepository {
       .createQueryBuilder('inbound')
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
-      .leftJoinAndMapOne('inbound_items.item', MasterItem, 'item', 'item.id::varchar = inbound_items.item_id')
+      .leftJoinAndMapOne(
+        'inbound_items.item',
+        MasterItem,
+        'item',
+        'item.id::varchar = inbound_items.item_id',
+      )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
       .where('transaction_scan_inbounds.status = :status', { status: status })
       .getMany();
   }
 }
-
-

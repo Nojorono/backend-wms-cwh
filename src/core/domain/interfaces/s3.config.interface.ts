@@ -7,11 +7,7 @@ export interface S3Config {
   maxRetries?: number;
   requestTimeout?: number;
   defaultBucket?: string;
-  defaultAcl?:
-    | 'private'
-    | 'public-read'
-    | 'public-read-write'
-    | 'authenticated-read';
+  defaultAcl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
   defaultExpiresIn?: number; // seconds
   allowedFileTypes?: string[];
   maxFileSize?: number; // bytes

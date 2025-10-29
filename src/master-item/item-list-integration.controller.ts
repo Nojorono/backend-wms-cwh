@@ -1,17 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ItemListIntegrationService } from './integration/item-list-integration.service';
 import { ItemListQueryDto } from './dto/item-list-query.dto';
 
@@ -19,9 +7,7 @@ import { ItemListQueryDto } from './dto/item-list-query.dto';
 @Controller('item-list-integration')
 @ApiBearerAuth('JWT-auth')
 export class ItemListIntegrationController {
-  constructor(
-    private readonly itemListIntegrationService: ItemListIntegrationService,
-  ) {}
+  constructor(private readonly itemListIntegrationService: ItemListIntegrationService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all items via RabbitMQ' })

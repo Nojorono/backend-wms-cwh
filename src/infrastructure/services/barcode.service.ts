@@ -14,9 +14,7 @@ export class BarcodeService {
     try {
       if (url.includes('s3.amazonaws.com')) {
         const urlObj = new URL(url);
-        const pathParts = urlObj.pathname
-          .split('/')
-          .filter((part) => part.length > 0);
+        const pathParts = urlObj.pathname.split('/').filter((part) => part.length > 0);
 
         if (pathParts.length > 1) {
           const key = pathParts.slice(1).join('/');
@@ -51,14 +49,9 @@ export class BarcodeService {
     extension?: string;
     bucket?: string;
     metadata?: Record<string, string>;
-    acl?:
-      | 'private'
-      | 'public-read'
-      | 'public-read-write'
-      | 'authenticated-read';
+    acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
   }) {
-    const bucket =
-      params.bucket || this.configService.get<string>('AWS_S3_DEFAULT_BUCKET');
+    const bucket = params.bucket || this.configService.get<string>('AWS_S3_DEFAULT_BUCKET');
     if (!bucket) throw new Error('S3 bucket is required');
     const key = this.s3Service.generateUniqueKey(
       params.prefix || 'barcode-images',
@@ -79,21 +72,11 @@ export class BarcodeService {
     height?: number;
     width?: number;
     includetext?: boolean;
-    textxalign?:
-      | 'center'
-      | 'offleft'
-      | 'left'
-      | 'right'
-      | 'offright'
-      | 'justify';
+    textxalign?: 'center' | 'offleft' | 'left' | 'right' | 'offright' | 'justify';
     bucket?: string;
     prefix?: string;
     extension?: string;
-    acl?:
-      | 'private'
-      | 'public-read'
-      | 'public-read-write'
-      | 'authenticated-read';
+    acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
     metadata?: Record<string, string>;
   }) {
     // Generate barcode image as PNG buffer
@@ -118,10 +101,7 @@ export class BarcodeService {
     });
   }
 
-  async deleteBarcodeImage(
-    barcodeImageUrl: string,
-    bucket?: string,
-  ): Promise<void> {
+  async deleteBarcodeImage(barcodeImageUrl: string, bucket?: string): Promise<void> {
     // Extract bucket name from URL if not provided
     let s3Bucket = bucket;
     if (!s3Bucket && barcodeImageUrl.includes('s3.amazonaws.com')) {
@@ -130,14 +110,10 @@ export class BarcodeService {
       if (hostname.includes('.s3.')) {
         s3Bucket = hostname.split('.s3.')[0];
       } else {
-        console.log(
-          'No bucket provided and URL does not contain s3.amazonaws.com',
-        );
+        console.log('No bucket provided and URL does not contain s3.amazonaws.com');
       }
     } else if (!s3Bucket) {
-      console.log(
-        'No bucket provided and URL does not contain s3.amazonaws.com',
-      );
+      console.log('No bucket provided and URL does not contain s3.amazonaws.com');
     }
 
     if (!s3Bucket) {
@@ -165,9 +141,7 @@ export class BarcodeService {
    * @param barcodeData - The scanned barcode data (string)
    * @returns Parsed JSON data or null if invalid
    */
-  async scanBarcodeAndReturnJson(
-    barcodeData: string,
-  ): Promise<Record<string, any> | null> {
+  async scanBarcodeAndReturnJson(barcodeData: string): Promise<Record<string, any> | null> {
     try {
       // Try to parse the barcode data as JSON
       const jsonData = JSON.parse(barcodeData);
@@ -192,21 +166,11 @@ export class BarcodeService {
       height?: number;
       width?: number;
       includetext?: boolean;
-      textxalign?:
-        | 'center'
-        | 'offleft'
-        | 'left'
-        | 'right'
-        | 'offright'
-        | 'justify';
+      textxalign?: 'center' | 'offleft' | 'left' | 'right' | 'offright' | 'justify';
       bucket?: string;
       prefix?: string;
       extension?: string;
-      acl?:
-        | 'private'
-        | 'public-read'
-        | 'public-read-write'
-        | 'authenticated-read';
+      acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
       metadata?: Record<string, string>;
     } = {},
   ) {

@@ -15,9 +15,7 @@ export class MasterClassificationItemRepository {
   async create(
     createMasterClassificationItemDto: CreateMasterClassificationItemDto,
   ): Promise<MasterClassificationItem> {
-    const classificationItem = this.repository.create(
-      createMasterClassificationItemDto,
-    );
+    const classificationItem = this.repository.create(createMasterClassificationItemDto);
     return await this.repository.save(classificationItem);
   }
 
@@ -33,9 +31,7 @@ export class MasterClassificationItemRepository {
     return classificationItem;
   }
 
-  async findByCode(
-    classification_code: string,
-  ): Promise<MasterClassificationItem | null> {
+  async findByCode(classification_code: string): Promise<MasterClassificationItem | null> {
     const classificationItem = await this.repository.findOne({
       where: { classification_code },
     });

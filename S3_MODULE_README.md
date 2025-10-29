@@ -5,6 +5,7 @@ A comprehensive and flexible S3 file upload module for the WMS NestJS applicatio
 ## Features
 
 ### 🚀 Core Features
+
 - **Flexible File Upload**: Single and batch file uploads with customizable options
 - **Advanced Validation**: File type, size, and extension validation with custom rules
 - **Multiple Upload Strategies**: Direct upload, presigned URLs, and custom validation
@@ -15,6 +16,7 @@ A comprehensive and flexible S3 file upload module for the WMS NestJS applicatio
 - **Security**: ACL controls and secure file handling
 
 ### 📁 File Operations
+
 - Upload single or multiple files
 - Download files as buffer or stream
 - Copy and move files between buckets
@@ -25,6 +27,7 @@ A comprehensive and flexible S3 file upload module for the WMS NestJS applicatio
 - Metadata retrieval
 
 ### 🔧 Configuration Options
+
 - Maximum file size limits
 - Allowed MIME types and extensions
 - Unique file name generation
@@ -37,6 +40,7 @@ A comprehensive and flexible S3 file upload module for the WMS NestJS applicatio
 ### Basic Upload Operations
 
 #### 1. Single File Upload
+
 ```http
 POST /s3/upload
 Content-Type: multipart/form-data
@@ -51,6 +55,7 @@ Content-Type: multipart/form-data
 ```
 
 #### 2. Flexible Single File Upload
+
 ```http
 POST /s3/upload/flexible
 Content-Type: multipart/form-data
@@ -70,6 +75,7 @@ Content-Type: multipart/form-data
 ```
 
 #### 3. Batch File Upload
+
 ```http
 POST /s3/upload/batch
 Content-Type: multipart/form-data
@@ -87,31 +93,37 @@ Content-Type: multipart/form-data
 ### File Management Operations
 
 #### 4. Download File
+
 ```http
 GET /s3/download/{bucket}/{path}
 ```
 
 #### 5. Get File Metadata
+
 ```http
 GET /s3/metadata/{bucket}/{path}
 ```
 
 #### 6. Check File Existence
+
 ```http
 GET /s3/exists/{bucket}/{path}
 ```
 
 #### 7. List Files
+
 ```http
 GET /s3/list/{bucket}?prefix=uploads&maxKeys=100
 ```
 
 #### 8. Delete File
+
 ```http
 DELETE /s3/{bucket}/{path}
 ```
 
 #### 9. Copy File
+
 ```http
 PUT /s3/copy
 {
@@ -125,6 +137,7 @@ PUT /s3/copy
 ### Advanced Operations
 
 #### 10. File Validation
+
 ```http
 POST /s3/upload/validate
 Content-Type: multipart/form-data
@@ -135,6 +148,7 @@ Content-Type: multipart/form-data
 ```
 
 #### 11. Custom Validation Upload
+
 ```http
 POST /s3/upload/custom-validation
 Content-Type: multipart/form-data
@@ -151,6 +165,7 @@ Content-Type: multipart/form-data
 ```
 
 #### 12. Generate Presigned URLs
+
 ```http
 POST /s3/presigned-upload-url
 {
@@ -162,6 +177,7 @@ POST /s3/presigned-upload-url
 ```
 
 #### 13. Configuration Management
+
 ```http
 GET /s3/upload/config
 PUT /s3/upload/config
@@ -231,11 +247,11 @@ export class MyService {
         acl: 'private',
         metadata: {
           category: 'invoice',
-          uploadedBy: 'user123'
-        }
-      }
+          uploadedBy: 'user123',
+        },
+      },
     });
-    
+
     return result;
   }
 }
@@ -258,12 +274,12 @@ async uploadMultipleDocuments(files: Express.Multer.File[]) {
       }
     }
   });
-  
+
   console.log(`Uploaded ${result.successfulUploads}/${result.totalFiles} files`);
   if (result.errors?.length > 0) {
     console.log('Errors:', result.errors);
   }
-  
+
   return result;
 }
 ```
@@ -274,23 +290,23 @@ async uploadMultipleDocuments(files: Express.Multer.File[]) {
 async uploadWithCustomValidation(file: Express.Multer.File) {
   const customValidation = (file: Express.Multer.File) => {
     const errors: string[] = [];
-    
+
     // Custom business rules
     if (file.size > 5 * 1024 * 1024) { // 5MB limit
       errors.push('File too large for this operation');
     }
-    
+
     if (!file.originalname.includes('invoice')) {
       errors.push('File must be an invoice');
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,
       warnings: []
     };
   };
-  
+
   return await this.fileUploadService.uploadFileWithCustomValidation(
     file,
     customValidation,
@@ -316,15 +332,15 @@ export class MyService {
       contentType: 'application/pdf',
       acl: 'private',
       metadata: {
-        uploadedAt: new Date().toISOString()
-      }
+        uploadedAt: new Date().toISOString(),
+      },
     });
   }
 
   async generatePresignedUrl(bucket: string, key: string) {
     return await this.s3Service.generatePresignedUploadUrl(bucket, key, {
       expiresIn: 3600,
-      contentType: 'application/pdf'
+      contentType: 'application/pdf',
     });
   }
 }
@@ -335,42 +351,46 @@ export class MyService {
 The module provides comprehensive error handling:
 
 ### Validation Errors
+
 - File size exceeds limits
 - Unsupported file types
 - Invalid file extensions
 - Custom validation failures
 
 ### S3 Errors
+
 - Bucket access denied
 - File not found
 - Network connectivity issues
 - AWS service errors
 
 ### Example Error Response
+
 ```json
 {
   "success": false,
   "message": "File validation failed: File size exceeds maximum allowed size",
-  "errors": [
-    "File size 150000000 exceeds maximum allowed size 100000000"
-  ]
+  "errors": ["File size 150000000 exceeds maximum allowed size 100000000"]
 }
 ```
 
 ## Security Features
 
 ### Access Control
+
 - Configurable ACL settings (private, public-read, etc.)
 - Bucket-level permissions
 - Key-based access control
 
 ### File Validation
+
 - MIME type validation
 - File extension checking
 - Size limits
 - Custom validation rules
 
 ### Secure Uploads
+
 - Presigned URLs for secure uploads
 - Metadata sanitization
 - File name sanitization
@@ -378,16 +398,19 @@ The module provides comprehensive error handling:
 ## Performance Considerations
 
 ### File Size Limits
+
 - Default: 100MB per file
 - Configurable via environment variables
 - Multer middleware limits
 
 ### Batch Operations
+
 - Parallel upload processing
 - Configurable concurrency
 - Error handling per file
 
 ### Caching
+
 - Metadata caching
 - URL generation optimization
 - Connection pooling
@@ -395,12 +418,14 @@ The module provides comprehensive error handling:
 ## Monitoring and Logging
 
 ### Logging Levels
+
 - Debug: Detailed operation logs
 - Info: Successful operations
 - Warn: Validation warnings
 - Error: Failed operations
 
 ### Metrics
+
 - Upload success/failure rates
 - File size distributions
 - Processing times
@@ -409,26 +434,31 @@ The module provides comprehensive error handling:
 ## Best Practices
 
 ### 1. File Naming
+
 - Use unique names to prevent conflicts
 - Sanitize file names for S3 compatibility
 - Use meaningful prefixes for organization
 
 ### 2. Error Handling
+
 - Always handle upload errors gracefully
 - Provide meaningful error messages
 - Implement retry logic for transient failures
 
 ### 3. Security
+
 - Validate file types and sizes
 - Use appropriate ACL settings
 - Sanitize metadata inputs
 
 ### 4. Performance
+
 - Use batch uploads for multiple files
 - Implement proper error handling
 - Monitor upload performance
 
 ### 5. Organization
+
 - Use consistent naming conventions
 - Organize files with prefixes
 - Implement proper cleanup procedures
@@ -438,16 +468,19 @@ The module provides comprehensive error handling:
 ### Common Issues
 
 1. **File Upload Fails**
+
    - Check file size limits
    - Verify MIME type is allowed
    - Ensure S3 credentials are correct
 
 2. **Validation Errors**
+
    - Check allowed file types
    - Verify file extensions
    - Review custom validation rules
 
 3. **S3 Access Issues**
+
    - Verify AWS credentials
    - Check bucket permissions
    - Ensure region is correct
@@ -460,6 +493,7 @@ The module provides comprehensive error handling:
 ### Debug Mode
 
 Enable debug logging by setting:
+
 ```env
 AWS_S3_ENABLE_LOGGING=true
 ```

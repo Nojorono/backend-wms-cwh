@@ -18,8 +18,7 @@ export class MasterIOService {
     if (!organizationId) {
       throw new BadRequestException('Organization ID is required');
     }
-    const existingIO =
-      await this.repository.findByOrganizationId(organizationId);
+    const existingIO = await this.repository.findByOrganizationId(organizationId);
     if (existingIO) {
       throw new ConflictException(
         `IO with code ${createMasterIODto.organization_id} already exists`,
@@ -40,10 +39,7 @@ export class MasterIOService {
     return io;
   }
 
-  async update(
-    id: string,
-    updateMasterIODto: UpdateMasterIODto,
-  ): Promise<MasterIO> {
+  async update(id: string, updateMasterIODto: UpdateMasterIODto): Promise<MasterIO> {
     const io = await this.findOne(id);
     if (
       updateMasterIODto.organization_id &&

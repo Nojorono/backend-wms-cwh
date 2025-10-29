@@ -67,35 +67,36 @@ export class FileUploadService {
 
   private loadConfig(): FileUploadConfig {
     return {
-      maxFileSize:
-        this.configService.get<number>('FILE_UPLOAD_MAX_SIZE') ||
-        100 * 1024 * 1024, // 100MB
-      allowedMimeTypes:
-        this.configService.get<string[]>('FILE_UPLOAD_ALLOWED_MIME_TYPES') ||
-        [
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'image/webp',
-          'application/pdf',
-          'text/plain',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ],
-      allowedExtensions:
-        this.configService.get<string[]>('FILE_UPLOAD_ALLOWED_EXTENSIONS') ||
-        ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt', '.doc', '.docx', '.xls', '.xlsx'],
+      maxFileSize: this.configService.get<number>('FILE_UPLOAD_MAX_SIZE') || 100 * 1024 * 1024, // 100MB
+      allowedMimeTypes: this.configService.get<string[]>('FILE_UPLOAD_ALLOWED_MIME_TYPES') || [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'application/pdf',
+        'text/plain',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ],
+      allowedExtensions: this.configService.get<string[]>('FILE_UPLOAD_ALLOWED_EXTENSIONS') || [
+        '.jpg',
+        '.jpeg',
+        '.png',
+        '.gif',
+        '.webp',
+        '.pdf',
+        '.txt',
+        '.doc',
+        '.docx',
+        '.xls',
+        '.xlsx',
+      ],
       generateUniqueNames:
-        this.configService.get<boolean>('FILE_UPLOAD_GENERATE_UNIQUE_NAMES') ||
-        true,
-      defaultBucket:
-        this.configService.get<string>('AWS_S3_DEFAULT_BUCKET') ||
-        'wms-uploads',
-      uploadPath:
-        this.configService.get<string>('FILE_UPLOAD_PATH') ||
-        'uploads',
+        this.configService.get<boolean>('FILE_UPLOAD_GENERATE_UNIQUE_NAMES') || true,
+      defaultBucket: this.configService.get<string>('AWS_S3_DEFAULT_BUCKET') || 'wms-uploads',
+      uploadPath: this.configService.get<string>('FILE_UPLOAD_PATH') || 'uploads',
     };
   }
 
@@ -111,9 +112,7 @@ export class FileUploadService {
 
     // Check file size
     if (file.size > this.config.maxFileSize) {
-      errors.push(
-        `File size ${file.size} exceeds maximum allowed size ${this.config.maxFileSize}`,
-      );
+      errors.push(`File size ${file.size} exceeds maximum allowed size ${this.config.maxFileSize}`);
     }
 
     // Check MIME type using detected content type
@@ -139,9 +138,7 @@ export class FileUploadService {
 
     // Check if MIME type matches extension
     if (!this.validateMimeTypeExtension(detectedContentType, extension)) {
-      warnings.push(
-        `File extension ${extension} may not match MIME type ${detectedContentType}`,
-      );
+      warnings.push(`File extension ${extension} may not match MIME type ${detectedContentType}`);
     }
 
     return {
@@ -192,14 +189,14 @@ export class FileUploadService {
   ): string {
     const extension = preserveExtension ? extname(originalName) : '';
     const baseName = originalName.replace(extname(originalName), '');
-    
+
     if (this.config.generateUniqueNames) {
       const uuid = uuidv4();
       const timestamp = Date.now();
       const sanitizedName = this.sanitizeFileName(baseName);
       return `${this.config.uploadPath}/${prefix || 'files'}/${timestamp}-${uuid}-${sanitizedName}${extension}`;
     }
-    
+
     const sanitizedName = this.sanitizeFileName(baseName);
     return `${this.config.uploadPath}/${prefix || 'files'}/${sanitizedName}${extension}`;
   }
@@ -224,11 +221,13 @@ export class FileUploadService {
     }
 
     // Generate file key
-    const key = options.key || this.generateFileKey(
-      file.originalname,
-      options.prefix,
-      options.preserveOriginalName !== false,
-    );
+    const key =
+      options.key ||
+      this.generateFileKey(
+        file.originalname,
+        options.prefix,
+        options.preserveOriginalName !== false,
+      );
 
     // Use provided bucket or default
     const bucket = options.bucket || this.config.defaultBucket;
@@ -249,12 +248,7 @@ export class FileUploadService {
     this.logger.log(`Uploading file: ${file.originalname} to ${bucket}/${key}`);
 
     try {
-      const result = await this.s3Service.uploadFile(
-        bucket,
-        key,
-        file.buffer,
-        s3Options,
-      );
+      const result = await this.s3Service.uploadFile(bucket, key, file.buffer, s3Options);
 
       this.logger.log(`File uploaded successfully: ${bucket}/${key}`);
       return result;
@@ -311,7 +305,7 @@ export class FileUploadService {
           preserveOriginalName: options.preserveOriginalNames,
           s3Options: options.s3Options,
         });
-        
+
         result.files.push(uploadResult);
         result.successfulUploads++;
       } catch (error) {
@@ -320,7 +314,7 @@ export class FileUploadService {
         result.errors = result.errors || [];
         result.errors.push(errorMessage);
         this.logger.error(errorMessage, error);
-        
+
         if (!options.continueOnError) {
           throw error;
         }
@@ -392,11 +386,15 @@ export class FileUploadService {
    */
   private detectContentType(file: MulterFile): string {
     let contentType = file.mimetype;
-    
+
     // If MIME type is missing or incorrect, detect from file extension
-    if (!contentType || contentType === 'application/octet-stream' || contentType === 'binary/octet-stream') {
+    if (
+      !contentType ||
+      contentType === 'application/octet-stream' ||
+      contentType === 'binary/octet-stream'
+    ) {
       const extension = extname(file.originalname).toLowerCase();
-      
+
       switch (extension) {
         case '.pdf':
           contentType = 'application/pdf';
@@ -433,7 +431,7 @@ export class FileUploadService {
           contentType = 'application/octet-stream';
       }
     }
-    
+
     // Fix common content type issues
     if (contentType === 'pdf' || contentType === 'PDF') {
       contentType = 'application/pdf';
@@ -454,7 +452,7 @@ export class FileUploadService {
     } else if (contentType === 'xlsx') {
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     }
-    
+
     return contentType;
   }
 

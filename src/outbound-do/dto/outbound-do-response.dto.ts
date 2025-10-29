@@ -42,7 +42,7 @@ export class OutboundDoResponseDto {
 
   @ApiProperty({ example: 'John Doe' })
   driver_name: string;
-  
+
   @ApiProperty({ example: '081234567890' })
   driver_phone: string;
 

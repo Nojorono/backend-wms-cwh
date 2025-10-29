@@ -17,15 +17,15 @@ import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      OutboundDo, 
-      OutboundMemo, 
+      OutboundDo,
+      OutboundMemo,
       OutboundMemoItem,
       InventoryTracking,
       MasterItem,
       MasterWarehouseBin,
       MasterWarehouseSub,
       MasterWarehouse,
-      MasterPallet
+      MasterPallet,
     ]),
   ],
   controllers: [OutboundDoController],

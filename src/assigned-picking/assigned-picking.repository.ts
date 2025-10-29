@@ -19,14 +19,14 @@ export class AssignedPickingRepository {
   async findAll(): Promise<AssignedPicking[]> {
     return this.repository.find({
       relations: ['memo'],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
   async findOne(id: string): Promise<AssignedPicking | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ['memo']
+      relations: ['memo'],
     });
   }
 
@@ -47,7 +47,7 @@ export class AssignedPickingRepository {
     return this.repository.find({
       where: { memo_id: memoId },
       relations: ['memo'],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -55,7 +55,7 @@ export class AssignedPickingRepository {
     return this.repository.find({
       where: { picking_user_id: pickingUserId },
       relations: ['memo'],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -63,17 +63,20 @@ export class AssignedPickingRepository {
     return this.repository.find({
       where: { picking_name: pickingName },
       relations: ['memo'],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
-  async checkExistingAssignment(memoId: string, pickingUserId: string): Promise<AssignedPicking | null> {
+  async checkExistingAssignment(
+    memoId: string,
+    pickingUserId: string,
+  ): Promise<AssignedPicking | null> {
     return this.repository.findOne({
-      where: { 
+      where: {
         memo_id: memoId,
-        picking_user_id: pickingUserId
+        picking_user_id: pickingUserId,
       },
-      relations: ['memo']
+      relations: ['memo'],
     });
   }
 }

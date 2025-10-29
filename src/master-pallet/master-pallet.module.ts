@@ -11,12 +11,7 @@ import { PalletTransactionHistory } from '../core/domain/entities/transaction-pa
 @Module({
   imports: [TypeOrmModule.forFeature([MasterPallet, PalletTransactionHistory])],
   controllers: [MasterPalletController],
-  providers: [
-    MasterPalletService,
-    MasterPalletRepository,
-    S3Service,
-    BarcodeService,
-  ],
+  providers: [MasterPalletService, MasterPalletRepository, S3Service, BarcodeService],
   exports: [MasterPalletService],
 })
 export class MasterPalletModule {}

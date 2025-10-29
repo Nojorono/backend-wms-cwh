@@ -21,9 +21,7 @@ export class DoValidationIntegrationService implements OnModuleInit {
   private readonly MAX_CONNECTION_ATTEMPTS = 5;
   private readonly CONNECTION_RETRY_DELAY = 2000; // 2 seconds
 
-  constructor(
-    @Inject('DO_VALIDATION_SERVICE') private readonly doValidationClient: ClientProxy,
-  ) {}
+  constructor(@Inject('DO_VALIDATION_SERVICE') private readonly doValidationClient: ClientProxy) {}
 
   async onModuleInit() {
     this.logger.log('Initializing connection to RabbitMQ do validation service...');
@@ -53,9 +51,7 @@ export class DoValidationIntegrationService implements OnModuleInit {
       );
 
       if (this.connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
-        const delay =
-          this.CONNECTION_RETRY_DELAY *
-          Math.pow(1.5, this.connectionAttempts - 1);
+        const delay = this.CONNECTION_RETRY_DELAY * Math.pow(1.5, this.connectionAttempts - 1);
         this.logger.log(`Retrying connection in ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         return this.ensureConnection();
@@ -69,11 +65,8 @@ export class DoValidationIntegrationService implements OnModuleInit {
     }
   }
 
-  async getItemLists(
-    params?: DoValidationQueryDto,
-  ): Promise<DoValidationResponseDto> {
+  async getItemLists(params?: DoValidationQueryDto): Promise<DoValidationResponseDto> {
     try {
-
       const queryParams: DoValidationQueryDto = {
         no_surat_jalan: params?.no_surat_jalan || undefined,
         page: params?.page,
@@ -94,9 +87,7 @@ export class DoValidationIntegrationService implements OnModuleInit {
           .pipe(
             timeout(timeoutMs),
             catchError((error) => {
-              this.logger.error(
-                `RabbitMQ request failed: ${error.message || 'Unknown error'}`,
-              );
+              this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
               this.connectionEstablished = false;
               throw error; // Let the catch block handle fallback
             }),
@@ -127,7 +118,10 @@ export class DoValidationIntegrationService implements OnModuleInit {
 
       return response;
     } catch (error) {
-      this.logger.error('Error getting do validations via RabbitMQ, falling back to local integration service:', error);
+      this.logger.error(
+        'Error getting do validations via RabbitMQ, falling back to local integration service:',
+        error,
+      );
       this.connectionEstablished = false;
       throw error;
     }
@@ -135,7 +129,6 @@ export class DoValidationIntegrationService implements OnModuleInit {
 
   async getDoValidationBySuratJalan(suratJalan: string): Promise<DoValidationResponseDto> {
     try {
-
       this.logger.log(
         `Sending request to get do validation integration by surat jalan: ${suratJalan}`,
       );
@@ -151,9 +144,7 @@ export class DoValidationIntegrationService implements OnModuleInit {
           .pipe(
             timeout(timeoutMs),
             catchError((error) => {
-              this.logger.error(
-                `RabbitMQ request failed: ${error.message || 'Unknown error'}`,
-              );
+              this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
               this.connectionEstablished = false;
               throw error; // Let the catch block handle fallback
             }),

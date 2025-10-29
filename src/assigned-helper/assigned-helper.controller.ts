@@ -13,8 +13,8 @@ export class AssignedHelperController {
 
   @Post()
   @ApiOperation({ summary: 'Create assigned helper' })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Assigned helper created successfully',
     schema: {
       type: 'object',
@@ -32,11 +32,11 @@ export class AssignedHelperController {
             id: { type: 'string', example: 'uuid-inbound-123' },
             inbound_number: { type: 'string', example: 'INB-2025-001' },
             expedition: { type: 'string', example: 'Carrier A' },
-            status: { type: 'string', example: 'CREATED' }
-          }
-        }
-      }
-    }
+            status: { type: 'string', example: 'CREATED' },
+          },
+        },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Bad Request' })
   create(@Body() createAssignedHelperDto: CreateAssignedHelperDto) {
@@ -45,15 +45,15 @@ export class AssignedHelperController {
 
   @Get()
   @ApiOperation({ summary: 'List all assigned helpers' })
-  @ApiQuery({ 
-    name: 'inbound_id', 
-    required: false, 
+  @ApiQuery({
+    name: 'inbound_id',
+    required: false,
     type: String,
     description: 'Filter by inbound ID',
-    example: 'uuid-inbound-123'
+    example: 'uuid-inbound-123',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'List of assigned helpers retrieved successfully',
     schema: {
       type: 'array',
@@ -73,12 +73,12 @@ export class AssignedHelperController {
               id: { type: 'string', example: 'uuid-inbound-123' },
               inbound_number: { type: 'string', example: 'INB-2025-001' },
               expedition: { type: 'string', example: 'Carrier A' },
-              status: { type: 'string', example: 'CREATED' }
-            }
-          }
-        }
-      }
-    }
+              status: { type: 'string', example: 'CREATED' },
+            },
+          },
+        },
+      },
+    },
   })
   findAll(@Query('inbound_id') inboundId?: string) {
     if (inboundId) {
@@ -89,8 +89,8 @@ export class AssignedHelperController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get assigned helper by id' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Assigned helper retrieved successfully',
     schema: {
       type: 'object',
@@ -108,11 +108,11 @@ export class AssignedHelperController {
             id: { type: 'string', example: 'uuid-inbound-123' },
             inbound_number: { type: 'string', example: 'INB-2025-001' },
             expedition: { type: 'string', example: 'Carrier A' },
-            status: { type: 'string', example: 'CREATED' }
-          }
-        }
-      }
-    }
+            status: { type: 'string', example: 'CREATED' },
+          },
+        },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Assigned helper not found' })
   findOne(@Param('id') id: string) {
@@ -122,15 +122,19 @@ export class AssignedHelperController {
   // find by inbound id
   @Get('inbound/:inbound_id')
   @ApiOperation({ summary: 'Get assigned helper by inbound ID' })
-  @ApiResponse({ status: 200, description: 'Assigned helper retrieved successfully', type: AssignedHelper })
+  @ApiResponse({
+    status: 200,
+    description: 'Assigned helper retrieved successfully',
+    type: AssignedHelper,
+  })
   findByInboundId(@Param('inbound_id') inbound_id: string) {
     return this.assignedHelperService.findByInboundId(inbound_id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update assigned helper' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Assigned helper updated successfully',
     schema: {
       type: 'object',
@@ -148,11 +152,11 @@ export class AssignedHelperController {
             id: { type: 'string', example: 'uuid-inbound-123' },
             inbound_number: { type: 'string', example: 'INB-2025-001' },
             expedition: { type: 'string', example: 'Carrier A' },
-            status: { type: 'string', example: 'CREATED' }
-          }
-        }
-      }
-    }
+            status: { type: 'string', example: 'CREATED' },
+          },
+        },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Assigned helper not found' })
   update(@Param('id') id: string, @Body() updateAssignedHelperDto: UpdateAssignedHelperDto) {

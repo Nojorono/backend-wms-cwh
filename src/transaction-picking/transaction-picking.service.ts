@@ -6,9 +6,7 @@ import { PickingTransaction, Status } from '../core/domain/entities/transaction-
 
 @Injectable()
 export class TransactionPickingService {
-  constructor(
-    private readonly repository: TransactionPickingRepository,
-  ) {}
+  constructor(private readonly repository: TransactionPickingRepository) {}
 
   async create(data: CreateTransactionPickingDto): Promise<PickingTransaction> {
     // Validasi quantity harus positif
@@ -58,7 +56,9 @@ export class TransactionPickingService {
 
     // Validasi tidak bisa delete jika status sudah COMPLETED
     if (existing.status === Status.COMPLETED) {
-      throw new BadRequestException('Tidak dapat menghapus transaction picking yang sudah COMPLETED');
+      throw new BadRequestException(
+        'Tidak dapat menghapus transaction picking yang sudah COMPLETED',
+      );
     }
 
     return this.repository.remove(id);
@@ -83,7 +83,7 @@ export class TransactionPickingService {
     }
 
     this.validateStatusTransition(existing.status, status);
-    
+
     return this.repository.updateStatus(id, status);
   }
 
@@ -95,7 +95,9 @@ export class TransactionPickingService {
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
-      throw new BadRequestException(`Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`);
+      throw new BadRequestException(
+        `Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`,
+      );
     }
   }
 }

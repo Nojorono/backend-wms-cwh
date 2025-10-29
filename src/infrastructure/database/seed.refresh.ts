@@ -33,7 +33,7 @@ async function seedRefresh() {
   try {
     // Clear existing data and reset ID sequences
     console.log('🗑️  Clearing existing data and resetting ID sequences...');
-    
+
     // Use TRUNCATE CASCADE to clear all data and reset ID sequences
     await AppDataSource.query('TRUNCATE TABLE permissions CASCADE');
     console.log('✅ Permissions cleared and ID sequence reset');
@@ -83,10 +83,22 @@ async function seedRefresh() {
       { key: 'pallet', name: 'Pallet', path: '/master_pallet', icon: 'FaWarehouse', order: 1 },
       { key: 'uom', name: 'UOM', path: '/master_uom', icon: 'FaWarehouse', order: 1 },
       { key: 'io', name: 'IO', path: '/master_io', icon: 'FaRegFileAlt', order: 3 },
-      { key: 'warehouse', name: 'Warehouse', path: '/master_warehouse', icon: 'FaRegFileAlt', order: 4 },
+      {
+        key: 'warehouse',
+        name: 'Warehouse',
+        path: '/master_warehouse',
+        icon: 'FaRegFileAlt',
+        order: 4,
+      },
       { key: 'zone', name: 'Zone', path: '/master_zone', icon: 'FaRegFileAlt', order: 5 },
       { key: 'bin', name: 'Bin', path: '/master_bin', icon: 'FaRegFileAlt', order: 6 },
-      { key: 'classification', name: 'Classification', path: '/master_classification', icon: 'FaRegFileAlt', order: 7 },
+      {
+        key: 'classification',
+        name: 'Classification',
+        path: '/master_classification',
+        icon: 'FaRegFileAlt',
+        order: 7,
+      },
       { key: 'item', name: 'Item', path: '/master_item', icon: 'FaRegFileAlt', order: 7 },
     ];
 
@@ -129,7 +141,13 @@ async function seedRefresh() {
 
     // Step 4: Create Inbound sub-menus
     const inboundSubMenus = [
-      { key: 'inbound_planning', name: 'Inbound Good Receive', path: '/inbound_planning', icon: 'FaWarehouse', order: 1 },
+      {
+        key: 'inbound_planning',
+        name: 'Inbound Good Receive',
+        path: '/inbound_planning',
+        icon: 'FaWarehouse',
+        order: 1,
+      },
       { key: 'putaway', name: 'Put Away', path: '/putaway', icon: 'FaPeopleCarry', order: 2 },
     ];
 
@@ -196,7 +214,7 @@ async function seedRefresh() {
     console.log('✅ Roles created');
 
     // Get the superadmin role for the user
-    const role = createdRoles.find(r => r.name === 'superadmin');
+    const role = createdRoles.find((r) => r.name === 'superadmin');
     if (!role) {
       throw new Error('Superadmin role not found');
     }
@@ -238,7 +256,6 @@ async function seedRefresh() {
     console.log(`   - ${createdRoles.length} roles created`);
     console.log(`   - ${createdMenus.length} permissions created`);
     console.log('   - 1 superadmin user created');
-
   } catch (error) {
     console.error('❌ Seed refresh failed:', error);
     throw error;

@@ -24,9 +24,9 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource'
+        'palletSource',
       ],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -39,8 +39,8 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource'
-      ]
+        'palletSource',
+      ],
     });
   }
 
@@ -66,9 +66,9 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource'
+        'palletSource',
       ],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -81,9 +81,9 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource'
+        'palletSource',
       ],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -96,9 +96,9 @@ export class TransactionPickingRepository {
         'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource'
+        'palletSource',
       ],
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 

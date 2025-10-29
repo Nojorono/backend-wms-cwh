@@ -8,7 +8,10 @@ import { MasterItemRepository } from './master-item.repository';
 import { CreateMasterItemDto } from './dto/create-master-item.dto';
 import { UpdateMasterItemDto } from './dto/update-master-item.dto';
 import { MasterItem } from '../core/domain/entities/master-item.entity';
-import { ItemListIntegrationService, ItemListResponseDto } from './integration/item-list-integration.service';
+import {
+  ItemListIntegrationService,
+  ItemListResponseDto,
+} from './integration/item-list-integration.service';
 
 @Injectable()
 export class MasterItemService {
@@ -24,9 +27,7 @@ export class MasterItemService {
     }
     const existingItem = await this.repository.findBySku(sku);
     if (existingItem) {
-      throw new ConflictException(
-        `Item with SKU ${createMasterItemDto.sku} already exists`,
-      );
+      throw new ConflictException(`Item with SKU ${createMasterItemDto.sku} already exists`);
     }
     return await this.repository.create(createMasterItemDto);
   }
@@ -43,19 +44,12 @@ export class MasterItemService {
     return item;
   }
 
-  async update(
-    id: string,
-    updateMasterItemDto: UpdateMasterItemDto,
-  ): Promise<MasterItem> {
+  async update(id: string, updateMasterItemDto: UpdateMasterItemDto): Promise<MasterItem> {
     const item = await this.findOne(id);
     if (updateMasterItemDto.sku && updateMasterItemDto.sku !== item.sku) {
-      const existingItem = await this.repository.findBySku(
-        updateMasterItemDto.sku,
-      );
+      const existingItem = await this.repository.findBySku(updateMasterItemDto.sku);
       if (existingItem) {
-        throw new ConflictException(
-          `Item with SKU ${updateMasterItemDto.sku} already exists`,
-        );
+        throw new ConflictException(`Item with SKU ${updateMasterItemDto.sku} already exists`);
       }
     }
     const updatedItem = await this.repository.update(id, updateMasterItemDto);
@@ -73,12 +67,14 @@ export class MasterItemService {
   async createOrUpdateFromMetaOracle(item: any): Promise<MasterItem | null> {
     const existingItem = await this.repository.findByItemNumber(item.ITEM_NUMBER);
     if (existingItem) {
-      return await this.repository.update(existingItem.id, {
-        sku: item.ITEM_CODE,
-        item_number: item.ITEM_NUMBER,
-        description: item.ITEM_DESCRIPTION,
-        inventory_item_id: item.INVENTORY_ITEM_ID,
-      }) || null;
+      return (
+        (await this.repository.update(existingItem.id, {
+          sku: item.ITEM_CODE,
+          item_number: item.ITEM_NUMBER,
+          description: item.ITEM_DESCRIPTION,
+          inventory_item_id: item.INVENTORY_ITEM_ID,
+        })) || null
+      );
     } else {
       return await this.repository.create({
         sku: item.ITEM_CODE,

@@ -7,9 +7,7 @@ import { WeekListQueryDto } from './dto/week-list-query.dto';
 @Controller('week-list-integration')
 @ApiBearerAuth('JWT-auth')
 export class WeekListIntegrationController {
-  constructor(
-    private readonly masterWeekService: MasterWeekService,
-  ) {}
+  constructor(private readonly masterWeekService: MasterWeekService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get week list with filters' })

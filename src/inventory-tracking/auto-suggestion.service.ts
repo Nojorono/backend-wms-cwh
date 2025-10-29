@@ -90,8 +90,8 @@ export class InventoryAutoSuggestionService {
       GROUP BY pth.week_number, pth.item_id, pth.production_date
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query, [palletId]) as any[];
-    
+    const results = (await this.inventoryTrackingRepository.query(query, [palletId])) as any[];
+
     if (results.length === 0) return null;
 
     const weekNumber = results[0].week_number;
@@ -138,8 +138,8 @@ export class InventoryAutoSuggestionService {
       LIMIT 5
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query) as any[];
-    
+    const results = (await this.inventoryTrackingRepository.query(query)) as any[];
+
     if (results.length === 0) return null;
 
     const bestLocation = results[0];
@@ -182,8 +182,8 @@ export class InventoryAutoSuggestionService {
       LIMIT 3
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query) as any[];
-    
+    const results = (await this.inventoryTrackingRepository.query(query)) as any[];
+
     if (results.length === 0) return null;
 
     const optimalLocation = results[0];
@@ -225,8 +225,8 @@ export class InventoryAutoSuggestionService {
       LIMIT 1
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query, [itemId]) as any[];
-    
+    const results = (await this.inventoryTrackingRepository.query(query, [itemId])) as any[];
+
     if (results.length === 0) return null;
 
     const oldestInventory = results[0];
@@ -260,8 +260,8 @@ export class InventoryAutoSuggestionService {
       ORDER BY pth.week_number ASC
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query, [itemId]) as any[];
-    
+    const results = (await this.inventoryTrackingRepository.query(query, [itemId])) as any[];
+
     if (results.length === 0) return null;
 
     const weekData = results[0];
@@ -294,8 +294,8 @@ export class InventoryAutoSuggestionService {
       GROUP BY pth.item_id, pth.week_number
     `;
 
-    const results = await this.inventoryTrackingRepository.query(query, [itemId]) as any[];
-    
+    const results = (await this.inventoryTrackingRepository.query(query, [itemId])) as any[];
+
     if (results.length === 0) return null;
 
     const itemData = results[0];
@@ -360,7 +360,7 @@ export class InventoryAutoSuggestionService {
   private calculateWeekOutPriority(weekNumber: number): number {
     const currentWeek = this.getCurrentWeek();
     const weekDifference = currentWeek - weekNumber;
-    
+
     // Higher priority for older weeks
     if (weekDifference > 4) return 1; // Very high priority
     if (weekDifference > 2) return 2; // High priority

@@ -6,9 +6,7 @@ import { UpdateAssignedHelperDto } from './dto/update-assigned-helper.dto';
 
 @Injectable()
 export class AssignedHelperService {
-  constructor(
-    private readonly assignedHelperRepo: AssignedHelperRepository,
-  ) {}
+  constructor(private readonly assignedHelperRepo: AssignedHelperRepository) {}
 
   async create(createAssignedHelperDto: CreateAssignedHelperDto): Promise<AssignedHelper> {
     return await this.assignedHelperRepo.create(createAssignedHelperDto);
@@ -34,7 +32,10 @@ export class AssignedHelperService {
     return await this.assignedHelperRepo.findByInboundId(inbound_id);
   }
 
-  async update(id: string, updateAssignedHelperDto: UpdateAssignedHelperDto): Promise<AssignedHelper> {
+  async update(
+    id: string,
+    updateAssignedHelperDto: UpdateAssignedHelperDto,
+  ): Promise<AssignedHelper> {
     const updated = await this.assignedHelperRepo.update(id, updateAssignedHelperDto);
     if (!updated) {
       throw new NotFoundException('AssignedHelper not found');

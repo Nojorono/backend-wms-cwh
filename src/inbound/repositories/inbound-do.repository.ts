@@ -48,5 +48,3 @@ export class InboundDoRepository {
     await this.repository.softDelete({ inbound_id });
   }
 }
-
-

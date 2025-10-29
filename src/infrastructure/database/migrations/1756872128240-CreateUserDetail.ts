@@ -23,9 +23,7 @@ export class CreateUserDetail1756872128240 implements MigrationInterface {
     const defaultOrgId = defaultOrg[0]?.id;
 
     if (defaultOrgId) {
-      const existingUsers = await queryRunner.query(
-        `SELECT id, username FROM "users"`,
-      );
+      const existingUsers = await queryRunner.query(`SELECT id, username FROM "users"`);
 
       for (const user of existingUsers) {
         const userDetailId = await queryRunner.query(
@@ -40,17 +38,15 @@ export class CreateUserDetail1756872128240 implements MigrationInterface {
         );
 
         if (userDetailId[0]?.id) {
-          await queryRunner.query(
-            `UPDATE "users" SET "user_detail_id" = $1 WHERE "id" = $2`,
-            [userDetailId[0].id, user.id],
-          );
+          await queryRunner.query(`UPDATE "users" SET "user_detail_id" = $1 WHERE "id" = $2`, [
+            userDetailId[0].id,
+            user.id,
+          ]);
         }
       }
     }
 
-    await queryRunner.query(
-      `ALTER TABLE "users" ALTER COLUMN "user_detail_id" SET NOT NULL`,
-    );
+    await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "user_detail_id" SET NOT NULL`);
     await queryRunner.query(
       `ALTER TABLE "users" ADD CONSTRAINT "UQ_7fbd789ba2d9f9643ff3be7e7b0" UNIQUE ("user_detail_id")`,
     );
@@ -63,19 +59,13 @@ export class CreateUserDetail1756872128240 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "users" DROP CONSTRAINT "FK_7fbd789ba2d9f9643ff3be7e7b0"`,
-    );
+    await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_7fbd789ba2d9f9643ff3be7e7b0"`);
     await queryRunner.query(
       `ALTER TABLE "user_details" DROP CONSTRAINT "FK_8ee6c4e464e4375b3b323963745"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "users" DROP CONSTRAINT "UQ_7fbd789ba2d9f9643ff3be7e7b0"`,
-    );
+    await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "UQ_7fbd789ba2d9f9643ff3be7e7b0"`);
     await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "user_detail_id"`);
-    await queryRunner.query(
-      `DROP INDEX "public"."IDX_ef1a1915f99bcf7a87049f7449"`,
-    );
+    await queryRunner.query(`DROP INDEX "public"."IDX_ef1a1915f99bcf7a87049f7449"`);
     await queryRunner.query(`DROP TABLE "user_details"`);
     await queryRunner.query(`DELETE FROM "m_io" WHERE organization_id = 1`);
   }

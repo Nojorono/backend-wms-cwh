@@ -18,8 +18,7 @@ export class MasterVehicleService {
     if (!vehicleType) {
       throw new BadRequestException('Vehicle Type is required');
     }
-    const existingVehicle =
-      await this.repository.findByVehicleType(vehicleType);
+    const existingVehicle = await this.repository.findByVehicleType(vehicleType);
     if (existingVehicle) {
       throw new ConflictException(
         `Vehicle with type ${createVehicleIODto.vehicle_type} already exists`,
@@ -40,10 +39,7 @@ export class MasterVehicleService {
     return vehicle;
   }
 
-  async update(
-    id: string,
-    updateVehicleIODto: UpdateVehicleIODto,
-  ): Promise<MasterVehicle> {
+  async update(id: string, updateVehicleIODto: UpdateVehicleIODto): Promise<MasterVehicle> {
     const vehicle = await this.findOne(id);
     if (
       updateVehicleIODto.vehicle_type &&

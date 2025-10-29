@@ -29,10 +29,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { Inject } from '@nestjs/common';
-import {
-  IS3Service,
-  S3_SERVICE_TOKEN,
-} from '../../core/domain/interfaces/s3.service.interface';
+import { IS3Service, S3_SERVICE_TOKEN } from '../../core/domain/interfaces/s3.service.interface';
 import { FileUploadService } from '../../infrastructure/services/file-upload.service';
 import {
   UploadFileDto,
@@ -70,9 +67,10 @@ export class S3Controller {
   ) {}
 
   @Post('upload')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Upload a single file to S3 with automatic content type detection',
-    description: 'Upload a file to S3. Content type is automatically detected from the file extension and MIME type.'
+    description:
+      'Upload a file to S3. Content type is automatically detected from the file extension and MIME type.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -88,12 +86,7 @@ export class S3Controller {
         },
         acl: {
           type: 'string',
-          enum: [
-            'private',
-            'public-read',
-            'public-read-write',
-            'authenticated-read',
-          ],
+          enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'],
           example: 'private',
           description: 'Access control level for the uploaded file',
         },
@@ -101,8 +94,8 @@ export class S3Controller {
       required: ['bucket', 'key', 'file'],
     },
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'File uploaded successfully',
     schema: {
       type: 'object',
@@ -118,49 +111,39 @@ export class S3Controller {
             contentType: { type: 'string', example: 'text/plain' },
             lastModified: { type: 'string', format: 'date-time' },
             etag: { type: 'string', example: '24a03a5a14c8383c03b8e65e19bfbabf' },
-            url: { type: 'string', example: 'https://bucket.s3.region.amazonaws.com/key' }
-          }
+            url: { type: 'string', example: 'https://bucket.s3.region.amazonaws.com/key' },
+          },
         },
         timestamp: { type: 'string', format: 'date-time' },
-        path: { type: 'string', example: '/s3/upload' }
-      }
-    }
+        path: { type: 'string', example: '/s3/upload' },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(
-    @UploadedFile() file: any,
-    @Body() uploadDto: UploadFileDto,
-  ) {
+  async uploadFile(@UploadedFile() file: any, @Body() uploadDto: UploadFileDto) {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
 
     // Automatically detect content type from uploaded file
     const detectedContentType = this.detectContentType(file);
-    
+
     // Log the detection for debugging
     this.logger.log(`File upload detected: ${file.originalname} -> ${detectedContentType}`);
 
-    const metadata = await this.s3Service.uploadFile(
-      uploadDto.bucket,
-      uploadDto.key,
-      file.buffer,
-      {
-        contentType: detectedContentType, // Use automatically detected content type
-        acl: uploadDto.acl || (detectedContentType === 'application/pdf' ? 'public-read' : 'private'), // PDFs are public-readable
-        metadata: {
-          ...uploadDto.options?.metadata,
-          originalMimeType: file.mimetype,
-          detectedContentType,
-          fileName: file.originalname,
-        },
-        cacheControl: uploadDto.options?.cacheControl,
-        expires: uploadDto.options?.expires
-          ? new Date(uploadDto.options.expires)
-          : undefined,
+    const metadata = await this.s3Service.uploadFile(uploadDto.bucket, uploadDto.key, file.buffer, {
+      contentType: detectedContentType, // Use automatically detected content type
+      acl: uploadDto.acl || (detectedContentType === 'application/pdf' ? 'public-read' : 'private'), // PDFs are public-readable
+      metadata: {
+        ...uploadDto.options?.metadata,
+        originalMimeType: file.mimetype,
+        detectedContentType,
+        fileName: file.originalname,
       },
-    );
+      cacheControl: uploadDto.options?.cacheControl,
+      expires: uploadDto.options?.expires ? new Date(uploadDto.options.expires) : undefined,
+    });
 
     return metadata;
   }
@@ -179,12 +162,12 @@ export class S3Controller {
     try {
       // Get file metadata first to determine content type
       const metadata = await this.s3Service.getFileMetadata(bucket, key);
-      
+
       // Set proper headers
       res.setHeader('Content-Type', metadata.contentType);
       res.setHeader('Content-Length', metadata.size);
       res.setHeader('Content-Disposition', `inline; filename="${metadata.key.split('/').pop()}"`);
-      
+
       // Stream the file directly to response
       const fileStream = await this.s3Service.downloadFileAsStream(bucket, key, {
         responseContentType: downloadDto.options?.responseContentType,
@@ -204,9 +187,10 @@ export class S3Controller {
   }
 
   @Get('view/:bucket/*path')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'View a file in browser (especially PDFs)',
-    description: 'Streams file content directly to browser for viewing. Perfect for PDFs, images, etc.'
+    description:
+      'Streams file content directly to browser for viewing. Perfect for PDFs, images, etc.',
   })
   @ApiResponse({ status: 200, description: 'File displayed successfully' })
   @ApiResponse({ status: 404, description: 'File not found' })
@@ -218,17 +202,17 @@ export class S3Controller {
     try {
       // Get file metadata first to determine content type
       const metadata = await this.s3Service.getFileMetadata(bucket, key);
-      
+
       // Set proper headers for browser viewing
       res.setHeader('Content-Type', metadata.contentType);
       res.setHeader('Content-Length', metadata.size);
       res.setHeader('Content-Disposition', `inline; filename="${metadata.key.split('/').pop()}"`);
       res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-      
+
       // Stream the file directly to response
       const fileStream = await this.s3Service.downloadFileAsStream(bucket, key);
       fileStream.pipe(res);
-      
+
       this.logger.log(`File viewed: ${bucket}/${key} (${metadata.contentType})`);
     } catch (error) {
       this.logger.error(`Failed to view file: ${bucket}/${key}`, error);
@@ -241,9 +225,9 @@ export class S3Controller {
   }
 
   @Get('presigned-url/:bucket/*path')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate presigned URL for private file access',
-    description: 'Generates a temporary presigned URL for accessing private files'
+    description: 'Generates a temporary presigned URL for accessing private files',
   })
   @ApiResponse({ status: 200, description: 'Presigned URL generated successfully' })
   @ApiResponse({ status: 404, description: 'File not found' })
@@ -284,10 +268,7 @@ export class S3Controller {
     description: 'File metadata retrieved successfully',
   })
   @ApiResponse({ status: 404, description: 'File not found' })
-  async getFileMetadata(
-    @Param('bucket') bucket: string,
-    @Param('path') key: string,
-  ) {
+  async getFileMetadata(@Param('bucket') bucket: string, @Param('path') key: string) {
     const metadata = await this.s3Service.getFileMetadata(bucket, key);
 
     return metadata;
@@ -299,10 +280,7 @@ export class S3Controller {
     status: 200,
     description: 'File existence checked successfully',
   })
-  async fileExists(
-    @Param('bucket') bucket: string,
-    @Param('path') key: string,
-  ) {
+  async fileExists(@Param('bucket') bucket: string, @Param('path') key: string) {
     const exists = await this.s3Service.fileExists(bucket, key);
 
     return { exists };
@@ -311,10 +289,7 @@ export class S3Controller {
   @Get('list/:bucket')
   @ApiOperation({ summary: 'List files in S3 bucket' })
   @ApiResponse({ status: 200, description: 'Files listed successfully' })
-  async listFiles(
-    @Param('bucket') bucket: string,
-    @Query() listDto: ListFilesDto,
-  ) {
+  async listFiles(@Param('bucket') bucket: string, @Query() listDto: ListFilesDto) {
     const result = await this.s3Service.listFiles(bucket, {
       prefix: listDto.prefix,
       delimiter: listDto.delimiter,
@@ -349,10 +324,7 @@ export class S3Controller {
   @ApiOperation({ summary: 'Delete a file from S3' })
   @ApiResponse({ status: 204, description: 'File deleted successfully' })
   @ApiResponse({ status: 404, description: 'File not found' })
-  async deleteFile(
-    @Param('bucket') bucket: string,
-    @Param('path') key: string,
-  ) {
+  async deleteFile(@Param('bucket') bucket: string, @Param('path') key: string) {
     await this.s3Service.deleteFile(bucket, key);
 
     return { message: 'File deleted successfully' };
@@ -400,10 +372,7 @@ export class S3Controller {
   @Get('url/:bucket/*path')
   @ApiOperation({ summary: 'Get public URL for a file' })
   @ApiResponse({ status: 200, description: 'File URL retrieved successfully' })
-  async getFileUrl(
-    @Param('bucket') bucket: string,
-    @Param('path') key: string,
-  ) {
+  async getFileUrl(@Param('bucket') bucket: string, @Param('path') key: string) {
     const url = this.s3Service.getFileUrl(bucket, key);
 
     return { url };
@@ -415,9 +384,7 @@ export class S3Controller {
     status: 200,
     description: 'Unique key generated successfully',
   })
-  async generateUniqueKey(
-    @Body() body: { prefix?: string; extension?: string },
-  ) {
+  async generateUniqueKey(@Body() body: { prefix?: string; extension?: string }) {
     const key = this.s3Service.generateUniqueKey(body.prefix, body.extension);
 
     return { key };
@@ -426,9 +393,10 @@ export class S3Controller {
   // ===== ENHANCED FLEXIBLE UPLOAD ENDPOINTS =====
 
   @Post('upload/flexible')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Flexible single file upload with automatic content type detection',
-    description: 'Upload a single file with flexible configuration options. Content type is automatically detected from the file.'
+    description:
+      'Upload a single file with flexible configuration options. Content type is automatically detected from the file.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -459,17 +427,14 @@ export class S3Controller {
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
   @ApiResponse({ status: 400, description: 'Bad request or validation failed' })
   @UseInterceptors(FileInterceptor('file'))
-  async flexibleUpload(
-    @UploadedFile() file: MulterFile,
-    @Body() uploadDto: FlexibleUploadDto,
-  ) {
+  async flexibleUpload(@UploadedFile() file: MulterFile, @Body() uploadDto: FlexibleUploadDto) {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
 
     // Automatically detect content type from uploaded file
     const detectedContentType = this.detectContentType(file);
-    
+
     // Log the detection for debugging
     this.logger.log(`Flexible upload detected: ${file.originalname} -> ${detectedContentType}`);
 
@@ -496,9 +461,10 @@ export class S3Controller {
   }
 
   @Post('upload/batch')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Batch upload multiple files with flexible options',
-    description: 'Upload multiple files with flexible configuration options, validation, and error handling'
+    description:
+      'Upload multiple files with flexible configuration options, validation, and error handling',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -530,16 +496,13 @@ export class S3Controller {
   @ApiResponse({ status: 201, description: 'Files uploaded successfully' })
   @ApiResponse({ status: 400, description: 'Bad request or validation failed' })
   @UseInterceptors(FilesInterceptor('files', 10)) // Maximum 10 files
-  async batchUpload(
-    @UploadedFiles() files: MulterFile[],
-    @Body() uploadDto: BatchUploadDto,
-  ) {
+  async batchUpload(@UploadedFiles() files: MulterFile[], @Body() uploadDto: BatchUploadDto) {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files provided');
     }
 
     // Log file detection for debugging
-    files.forEach(file => {
+    files.forEach((file) => {
       const detectedContentType = this.detectContentType(file);
       this.logger.log(`Batch upload detected: ${file.originalname} -> ${detectedContentType}`);
     });
@@ -560,9 +523,9 @@ export class S3Controller {
   }
 
   @Post('upload/validate')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Validate files before upload',
-    description: 'Validate files against configured rules without uploading them'
+    description: 'Validate files against configured rules without uploading them',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -583,9 +546,7 @@ export class S3Controller {
   @ApiResponse({ status: 200, description: 'Files validated successfully' })
   @ApiResponse({ status: 400, description: 'File validation failed' })
   @UseInterceptors(FilesInterceptor('files', 10))
-  async validateFiles(
-    @UploadedFiles() files: MulterFile[],
-  ) {
+  async validateFiles(@UploadedFiles() files: MulterFile[]) {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files provided');
     }
@@ -616,7 +577,8 @@ export class S3Controller {
   @ApiOperation({ summary: 'Update file upload configuration' })
   @ApiResponse({ status: 200, description: 'Configuration updated successfully' })
   async updateUploadConfig(
-    @Body() configUpdate: Partial<{
+    @Body()
+    configUpdate: Partial<{
       maxFileSize: number;
       allowedMimeTypes: string[];
       allowedExtensions: string[];
@@ -631,9 +593,9 @@ export class S3Controller {
   }
 
   @Post('upload/custom-validation')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Upload file with custom validation',
-    description: 'Upload a file with custom validation rules (for advanced use cases)'
+    description: 'Upload a file with custom validation rules (for advanced use cases)',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -663,10 +625,7 @@ export class S3Controller {
   @ApiResponse({ status: 201, description: 'File uploaded successfully' })
   @ApiResponse({ status: 400, description: 'Custom validation failed' })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadWithCustomValidation(
-    @UploadedFile() file: MulterFile,
-    @Body() uploadDto: any,
-  ) {
+  async uploadWithCustomValidation(@UploadedFile() file: MulterFile, @Body() uploadDto: any) {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
@@ -677,19 +636,28 @@ export class S3Controller {
       const warnings: string[] = [];
 
       // Apply custom validation rules
-      if (uploadDto.customValidationRules?.maxFileSize && 
-          file.size > uploadDto.customValidationRules.maxFileSize) {
-        errors.push(`File size exceeds custom limit of ${uploadDto.customValidationRules.maxFileSize}`);
+      if (
+        uploadDto.customValidationRules?.maxFileSize &&
+        file.size > uploadDto.customValidationRules.maxFileSize
+      ) {
+        errors.push(
+          `File size exceeds custom limit of ${uploadDto.customValidationRules.maxFileSize}`,
+        );
       }
 
-      if (uploadDto.customValidationRules?.allowedMimeTypes?.length > 0 &&
-          !uploadDto.customValidationRules.allowedMimeTypes.includes(file.mimetype)) {
+      if (
+        uploadDto.customValidationRules?.allowedMimeTypes?.length > 0 &&
+        !uploadDto.customValidationRules.allowedMimeTypes.includes(file.mimetype)
+      ) {
         errors.push(`File type ${file.mimetype} not allowed by custom rules`);
       }
 
       const extension = file.originalname.split('.').pop()?.toLowerCase();
-      if (uploadDto.customValidationRules?.allowedExtensions?.length > 0 &&
-          extension && !uploadDto.customValidationRules.allowedExtensions.includes(`.${extension}`)) {
+      if (
+        uploadDto.customValidationRules?.allowedExtensions?.length > 0 &&
+        extension &&
+        !uploadDto.customValidationRules.allowedExtensions.includes(`.${extension}`)
+      ) {
         errors.push(`File extension .${extension} not allowed by custom rules`);
       }
 
@@ -715,9 +683,9 @@ export class S3Controller {
   }
 
   @Post('upload/test-pdf')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Test PDF upload with enhanced content type detection',
-    description: 'Special endpoint to test PDF file uploads with proper content type handling'
+    description: 'Special endpoint to test PDF file uploads with proper content type handling',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -734,8 +702,8 @@ export class S3Controller {
       required: ['file'],
     },
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'PDF file uploaded successfully',
     schema: {
       type: 'object',
@@ -751,13 +719,13 @@ export class S3Controller {
             contentType: { type: 'string', example: 'application/pdf' },
             lastModified: { type: 'string', format: 'date-time' },
             etag: { type: 'string', example: '3093fe00d383311bfac0909d5f24319e' },
-            url: { type: 'string', example: 'https://bucket.s3.region.amazonaws.com/key' }
-          }
+            url: { type: 'string', example: 'https://bucket.s3.region.amazonaws.com/key' },
+          },
         },
         timestamp: { type: 'string', format: 'date-time' },
-        path: { type: 'string', example: '/s3/upload/test-pdf' }
-      }
-    }
+        path: { type: 'string', example: '/s3/upload/test-pdf' },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Bad request or validation failed' })
   @UseInterceptors(FileInterceptor('file'))
@@ -771,7 +739,7 @@ export class S3Controller {
 
     // Force PDF content type detection
     const detectedContentType = this.detectContentType(file);
-    
+
     if (detectedContentType !== 'application/pdf') {
       throw new BadRequestException(`File is not a PDF. Detected type: ${detectedContentType}`);
     }
@@ -779,22 +747,17 @@ export class S3Controller {
     const bucket = body.bucket || 'my-bucket';
     const key = body.key || `test-pdf/${file.originalname}`;
 
-    const metadata = await this.s3Service.uploadFile(
-      bucket,
-      key,
-      file.buffer,
-      {
-        contentType: 'application/pdf',
-        acl: 'private',
-        metadata: {
-          originalName: file.originalname,
-          uploadedAt: new Date().toISOString(),
-          fileSize: file.size.toString(),
-          testUpload: 'true',
-          detectedContentType,
-        },
+    const metadata = await this.s3Service.uploadFile(bucket, key, file.buffer, {
+      contentType: 'application/pdf',
+      acl: 'private',
+      metadata: {
+        originalName: file.originalname,
+        uploadedAt: new Date().toISOString(),
+        fileSize: file.size.toString(),
+        testUpload: 'true',
+        detectedContentType,
       },
-    );
+    });
 
     return {
       ...metadata,
@@ -808,9 +771,10 @@ export class S3Controller {
   }
 
   @Post('upload/auto-detect')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Upload file with automatic content type detection demo',
-    description: 'Demonstrates automatic content type detection for any file type. Shows detected content type in response.'
+    description:
+      'Demonstrates automatic content type detection for any file type. Shows detected content type in response.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -828,8 +792,8 @@ export class S3Controller {
       required: ['file'],
     },
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'File uploaded with automatic content type detection',
     schema: {
       type: 'object',
@@ -853,15 +817,15 @@ export class S3Controller {
                 detectedContentType: { type: 'string', example: 'application/pdf' },
                 fileName: { type: 'string', example: 'sample.pdf' },
                 fileExtension: { type: 'string', example: '.pdf' },
-                detectionMethod: { type: 'string', example: 'extension-based' }
-              }
-            }
-          }
+                detectionMethod: { type: 'string', example: 'extension-based' },
+              },
+            },
+          },
         },
         timestamp: { type: 'string', format: 'date-time' },
-        path: { type: 'string', example: '/s3/upload/auto-detect' }
-      }
-    }
+        path: { type: 'string', example: '/s3/upload/auto-detect' },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Bad request or validation failed' })
   @UseInterceptors(FileInterceptor('file'))
@@ -876,30 +840,25 @@ export class S3Controller {
     // Automatically detect content type
     const detectedContentType = this.detectContentType(file);
     const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
-    
+
     // Log the detection for debugging
     this.logger.log(`Auto-detect upload: ${file.originalname} -> ${detectedContentType}`);
 
     const bucket = body.bucket || 'my-bucket';
     const key = body.key || `auto-detect/${file.originalname}`;
 
-    const metadata = await this.s3Service.uploadFile(
-      bucket,
-      key,
-      file.buffer,
-      {
-        contentType: detectedContentType,
-        acl: 'private',
-        metadata: {
-          originalName: file.originalname,
-          uploadedAt: new Date().toISOString(),
-          fileSize: file.size.toString(),
-          autoDetected: 'true',
-          originalMimeType: file.mimetype,
-          detectedContentType,
-        },
+    const metadata = await this.s3Service.uploadFile(bucket, key, file.buffer, {
+      contentType: detectedContentType,
+      acl: 'private',
+      metadata: {
+        originalName: file.originalname,
+        uploadedAt: new Date().toISOString(),
+        fileSize: file.size.toString(),
+        autoDetected: 'true',
+        originalMimeType: file.mimetype,
+        detectedContentType,
       },
-    );
+    });
 
     return {
       ...metadata,
@@ -918,11 +877,15 @@ export class S3Controller {
    */
   private detectContentType(file: MulterFile): string {
     let contentType = file.mimetype;
-    
+
     // If MIME type is missing or incorrect, detect from file extension
-    if (!contentType || contentType === 'application/octet-stream' || contentType === 'binary/octet-stream') {
+    if (
+      !contentType ||
+      contentType === 'application/octet-stream' ||
+      contentType === 'binary/octet-stream'
+    ) {
       const extension = file.originalname.split('.').pop()?.toLowerCase();
-      
+
       switch (extension) {
         // Images
         case 'jpg':
@@ -948,7 +911,7 @@ export class S3Controller {
         case 'tif':
           contentType = 'image/tiff';
           break;
-        
+
         // Documents
         case 'pdf':
           contentType = 'application/pdf';
@@ -965,7 +928,7 @@ export class S3Controller {
         case 'odt':
           contentType = 'application/vnd.oasis.opendocument.text';
           break;
-        
+
         // Spreadsheets
         case 'xls':
           contentType = 'application/vnd.ms-excel';
@@ -979,7 +942,7 @@ export class S3Controller {
         case 'csv':
           contentType = 'text/csv';
           break;
-        
+
         // Presentations
         case 'ppt':
           contentType = 'application/vnd.ms-powerpoint';
@@ -990,7 +953,7 @@ export class S3Controller {
         case 'odp':
           contentType = 'application/vnd.oasis.opendocument.presentation';
           break;
-        
+
         // Text files
         case 'txt':
           contentType = 'text/plain';
@@ -1011,7 +974,7 @@ export class S3Controller {
         case 'xml':
           contentType = 'application/xml';
           break;
-        
+
         // Archives
         case 'zip':
           contentType = 'application/zip';
@@ -1028,7 +991,7 @@ export class S3Controller {
         case 'gz':
           contentType = 'application/gzip';
           break;
-        
+
         // Audio
         case 'mp3':
           contentType = 'audio/mpeg';
@@ -1042,7 +1005,7 @@ export class S3Controller {
         case 'm4a':
           contentType = 'audio/mp4';
           break;
-        
+
         // Video
         case 'mp4':
           contentType = 'video/mp4';
@@ -1062,12 +1025,12 @@ export class S3Controller {
         case 'webm':
           contentType = 'video/webm';
           break;
-        
+
         default:
           contentType = 'application/octet-stream';
       }
     }
-    
+
     // Fix common content type issues
     if (contentType === 'pdf' || contentType === 'PDF') {
       contentType = 'application/pdf';
@@ -1088,7 +1051,7 @@ export class S3Controller {
     } else if (contentType === 'xlsx') {
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     }
-    
+
     return contentType;
   }
 }

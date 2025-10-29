@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Inject,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ConflictException } from '@nestjs/common';
 import { IRoleRepository } from '../../core/domain/interfaces/role.repository.interface';
 import { IPermissionRepository } from '../../core/domain/interfaces/permission.repository.interface';
 import { Role } from '../../core/domain/entities/role.entity';
@@ -85,13 +80,9 @@ export class RoleService {
   }
 
   async create(createRoleDto: CreateRoleDto): Promise<any> {
-    const existingRole = await this.roleRepository.findByName(
-      createRoleDto.name,
-    );
+    const existingRole = await this.roleRepository.findByName(createRoleDto.name);
     if (existingRole) {
-      throw new ConflictException(
-        `Role with name ${createRoleDto.name} already exists`,
-      );
+      throw new ConflictException(`Role with name ${createRoleDto.name} already exists`);
     }
 
     // Create the role

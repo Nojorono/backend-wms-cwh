@@ -45,9 +45,7 @@ import { S3Module } from './infrastructure/modules/s3.module';
         username: configService.get('DB_USERNAME', 'postgres'),
         password: configService.get('DB_PASSWORD', 'postgres'),
         database: configService.get('DB_DATABASE', 'wms_db'),
-        entities: [
-          join(__dirname, 'core', 'domain', 'entities', '*.entity.{ts,js}'),
-        ],
+        entities: [join(__dirname, 'core', 'domain', 'entities', '*.entity.{ts,js}')],
         synchronize: false,
       }),
       inject: [ConfigService],

@@ -53,11 +53,11 @@ export class CreateTransactionPickingDto {
   @IsString()
   uom?: string;
 
-  @ApiProperty({ 
-    description: 'Status picking', 
+  @ApiProperty({
+    description: 'Status picking',
     enum: Status,
     default: Status.PENDING,
-    required: false 
+    required: false,
   })
   @IsOptional()
   @IsEnum(Status)

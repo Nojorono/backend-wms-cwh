@@ -8,7 +8,11 @@ import { MasterWeekRepository } from './master-week.repository';
 import { CreateMasterWeekDto } from './dto/create-master-week.dto';
 import { UpdateMasterWeekDto } from './dto/update-master-week.dto';
 import { MasterWeek } from '../core/domain/entities/master-week.entity';
-import { WeekListIntegrationService, WeekListResponseDto, WeekSalesResponseDto } from './integration/week-list-integration.service';
+import {
+  WeekListIntegrationService,
+  WeekListResponseDto,
+  WeekSalesResponseDto,
+} from './integration/week-list-integration.service';
 
 @Injectable()
 export class MasterWeekService {
@@ -37,10 +41,7 @@ export class MasterWeekService {
     return await this.repository.findByDate(date);
   }
 
-  async update(
-    id: string,
-    updateMasterWeekDto: UpdateMasterWeekDto,
-  ): Promise<MasterWeek> {
+  async update(id: string, updateMasterWeekDto: UpdateMasterWeekDto): Promise<MasterWeek> {
     const updatedWeek = await this.repository.update(id, updateMasterWeekDto);
     if (!updatedWeek) {
       throw new NotFoundException(`Week with ID ${id} not found`);
@@ -78,7 +79,12 @@ export class MasterWeekService {
     return weekLists;
   }
 
-  async getWeekSalesAll(params?: { tahun?: string; search?: string; page?: number; limit?: number }): Promise<WeekSalesResponseDto> {
+  async getWeekSalesAll(params?: {
+    tahun?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<WeekSalesResponseDto> {
     return await this.weekListIntegrationService.getWeekSalesAll(params);
   }
 }

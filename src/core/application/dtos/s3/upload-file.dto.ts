@@ -131,11 +131,7 @@ export class CopyFileDto {
   @IsOptional()
   options?: {
     metadata?: Record<string, string>;
-    acl?:
-      | 'private'
-      | 'public-read'
-      | 'public-read-write'
-      | 'authenticated-read';
+    acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read';
   };
 }
 

@@ -90,10 +90,7 @@ export class OutboundDoController {
     description: 'Daftar outbound DO',
     type: [OutboundDoResponseDto],
   })
-  async findAll(
-    @Query('status') status?: string,
-    @Query('outbound_type') outbound_type?: string,
-  ) {
+  async findAll(@Query('status') status?: string, @Query('outbound_type') outbound_type?: string) {
     if (status) {
       return this.outboundDoService.findByStatus(status);
     }
@@ -159,10 +156,7 @@ export class OutboundDoController {
       },
     },
   })
-  async update(
-    @Param('id') id: string,
-    @Body() updateOutboundDoDto: UpdateOutboundDoDto,
-  ) {
+  async update(@Param('id') id: string, @Body() updateOutboundDoDto: UpdateOutboundDoDto) {
     return this.outboundDoService.update(id, updateOutboundDoDto);
   }
 
@@ -181,15 +175,15 @@ export class OutboundDoController {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Tidak dapat mengubah status dari COMPLETED ke PENDING' },
+        message: {
+          type: 'string',
+          example: 'Tidak dapat mengubah status dari COMPLETED ke PENDING',
+        },
         statusCode: { type: 'number', example: 400 },
       },
     },
   })
-  async updateStatus(
-    @Param('id') id: string,
-    @Body('status') status: OutboundDoStatus,
-  ) {
+  async updateStatus(@Param('id') id: string, @Body('status') status: OutboundDoStatus) {
     return this.outboundDoService.updateStatus(id, status);
   }
 
@@ -208,7 +202,10 @@ export class OutboundDoController {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Tidak dapat menghapus outbound DO yang sudah COMPLETED' },
+        message: {
+          type: 'string',
+          example: 'Tidak dapat menghapus outbound DO yang sudah COMPLETED',
+        },
         statusCode: { type: 'number', example: 400 },
       },
     },
@@ -235,7 +232,7 @@ export class OutboundDoController {
   @ApiResponse({
     status: 200,
     description: 'Picking suggestions untuk memo tertentu',
-    type: PickingSuggestionsResponseDto
+    type: PickingSuggestionsResponseDto,
   })
   @ApiResponse({
     status: 404,
@@ -264,10 +261,10 @@ export class OutboundDoController {
         type: 'object',
         properties: {
           memoId: { type: 'string', example: 'uuid-memo-1' },
-          sequence: { type: 'number', example: 1 }
-        }
-      }
-    }
+          sequence: { type: 'number', example: 1 },
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 404,
@@ -284,5 +281,4 @@ export class OutboundDoController {
   async getMemoSequence(@Param('id') id: string) {
     return this.outboundDoService.getMemoSequence(id);
   }
-
 }

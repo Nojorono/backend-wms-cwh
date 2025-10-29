@@ -60,13 +60,17 @@ export class PickingSuggestionService {
     }
 
     // Generate route optimization
-    suggestions.routeOptimization = await this.generateRouteOptimization(suggestions.pickingSuggestions);
+    suggestions.routeOptimization = await this.generateRouteOptimization(
+      suggestions.pickingSuggestions,
+    );
 
     // Generate priority items
     suggestions.priorityItems = await this.generatePriorityItems(suggestions.pickingSuggestions);
 
     // Calculate estimated picking time
-    suggestions.estimatedPickingTime = this.calculateEstimatedPickingTime(suggestions.pickingSuggestions);
+    suggestions.estimatedPickingTime = this.calculateEstimatedPickingTime(
+      suggestions.pickingSuggestions,
+    );
 
     return suggestions.pickingSuggestions;
   }
@@ -109,13 +113,13 @@ export class PickingSuggestionService {
     `;
 
     try {
-    const results = await this.outboundDoRepository.query(query, [outboundDoId]) as any[];
-    
-    if (results.length === 0) return null;
+      const results = (await this.outboundDoRepository.query(query, [outboundDoId])) as any[];
 
-    // Group results by memo
-    const groupedResults = this.groupResultsByMemo(results);
-    return groupedResults as any;
+      if (results.length === 0) return null;
+
+      // Group results by memo
+      const groupedResults = this.groupResultsByMemo(results);
+      return groupedResults as any;
     } catch (error) {
       console.error('Error in getOutboundDoWithDetails:', error);
       console.error('Query parameters:', { outboundDoId });
@@ -131,7 +135,7 @@ export class PickingSuggestionService {
       driver_name: results[0].driver_name,
       delivery_date: results[0].delivery_date,
       status: results[0].do_status,
-      outbound_memos: []
+      outbound_memos: [],
     };
 
     const memoMap = new Map();
@@ -148,7 +152,7 @@ export class PickingSuggestionService {
           destination: result.destination,
           delivery_date: result.memo_delivery_date,
           status: result.memo_status,
-          items: []
+          items: [],
         });
       }
 
@@ -159,7 +163,7 @@ export class PickingSuggestionService {
           item_name: result.item_name,
           item_code: result.item_code,
           quantity_plan: result.quantity_plan,
-          uom: result.uom
+          uom: result.uom,
         });
       }
     }
@@ -172,10 +176,12 @@ export class PickingSuggestionService {
     const suggestions: PickingSuggestionDto[] = [];
 
     // Calculate priority for each item and sort by priority
-    const itemsWithPriority = memo.items.map(item => ({
-      ...item,
-      priority: this.calculateItemPriority(item, memo)
-    })).sort((a, b) => a.priority - b.priority); // Lower number = higher priority
+    const itemsWithPriority = memo.items
+      .map((item) => ({
+        ...item,
+        priority: this.calculateItemPriority(item, memo),
+      }))
+      .sort((a, b) => a.priority - b.priority); // Lower number = higher priority
 
     for (const item of itemsWithPriority) {
       // Validate item before processing
@@ -185,8 +191,11 @@ export class PickingSuggestionService {
       }
 
       // Find available inventory for this item
-      const availableInventory = await this.findAvailableInventoryForItem(item.item_id, item.quantity_plan);
-      
+      const availableInventory = await this.findAvailableInventoryForItem(
+        item.item_id,
+        item.quantity_plan,
+      );
+
       if (availableInventory.length > 0) {
         const suggestion = {
           memo_id: memo.id,
@@ -194,8 +203,14 @@ export class PickingSuggestionService {
           item_name: item.item_name,
           item_code: item.item_code,
           required_quantity: item.quantity_plan,
-          suggested_locations: this.getAllAvailableInventory(availableInventory, item.quantity_plan),
-          total_suggested_quantity: this.calculateTotalSuggestedQuantity(availableInventory, item.quantity_plan),
+          suggested_locations: this.getAllAvailableInventory(
+            availableInventory,
+            item.quantity_plan,
+          ),
+          total_suggested_quantity: this.calculateTotalSuggestedQuantity(
+            availableInventory,
+            item.quantity_plan,
+          ),
           priority: item.priority,
           notes: this.generateNotes(item, memo, availableInventory),
         };
@@ -222,7 +237,10 @@ export class PickingSuggestionService {
     return this.sortSuggestionsByPriority(suggestions);
   }
 
-  private async findAvailableInventoryForItem(itemId: string, requiredQuantity: number): Promise<any[]> {
+  private async findAvailableInventoryForItem(
+    itemId: string,
+    requiredQuantity: number,
+  ): Promise<any[]> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
       console.warn('findAvailableInventoryForItem: itemId is empty or null');
@@ -236,10 +254,8 @@ export class PickingSuggestionService {
     }
 
     try {
-            // Try multiple search strategies in order of preference
-            const searchStrategies = [
-              () => this.searchInventoryWithPalletHistory(itemId),
-            ];
+      // Try multiple search strategies in order of preference
+      const searchStrategies = [() => this.searchInventoryWithPalletHistory(itemId)];
 
       let results: any[] = [];
 
@@ -279,74 +295,75 @@ export class PickingSuggestionService {
         .leftJoin('it.warehouse', 'w')
         .leftJoin('it.warehouseSub', 'ws')
         .leftJoin('it.warehouseBin', 'wb')
-      .select([
-        'it.id as inventory_tracking_id',
-        'it.pallet_id',
-        'p.pallet_code',
-        'it.warehouse_id',
-        'it.warehouse_sub_id',
-        'it.warehouse_bin_id',
-        'it.inventory_date',
-        'it.inventory_status',
-        'it.progression_status',
-        'pth.week_number',
-        'pth.production_date',
-        'pth.item_id',
-        'pth.new_quantity as quantity',
-        'pth.uom',
-        'pth.created_at as pallet_history_created_at',
-        'w.name as warehouse_name',
-        'w.description as warehouse_description',
-        'ws.name as warehouse_sub_name',
-        'ws.code as warehouse_sub_code',
-        'ws.description as warehouse_sub_description',
-        'wb.name as bin_name',
-        'wb.code as bin_code',
-        'wb.description as bin_description',
-        'ROUND((pth.new_quantity::numeric / p.capacity::numeric) * 100, 2) as pallet_utilization',
-        `CASE 
+        .select([
+          'it.id as inventory_tracking_id',
+          'it.pallet_id',
+          'p.pallet_code',
+          'it.warehouse_id',
+          'it.warehouse_sub_id',
+          'it.warehouse_bin_id',
+          'it.inventory_date',
+          'it.inventory_status',
+          'it.progression_status',
+          'pth.week_number',
+          'pth.production_date',
+          'pth.item_id',
+          'pth.new_quantity as quantity',
+          'pth.uom',
+          'pth.created_at as pallet_history_created_at',
+          'w.name as warehouse_name',
+          'w.description as warehouse_description',
+          'ws.name as warehouse_sub_name',
+          'ws.code as warehouse_sub_code',
+          'ws.description as warehouse_sub_description',
+          'wb.name as bin_name',
+          'wb.code as bin_code',
+          'wb.description as bin_description',
+          'ROUND((pth.new_quantity::numeric / p.capacity::numeric) * 100, 2) as pallet_utilization',
+          `CASE 
           WHEN it.warehouse_bin_id IS NOT NULL THEN 'BIN_LEVEL'
           WHEN it.warehouse_sub_id IS NOT NULL THEN 'SUB_LEVEL'
           ELSE 'WAREHOUSE_LEVEL'
         END as search_level`,
-        `CASE 
+          `CASE 
           WHEN it.warehouse_bin_id IS NOT NULL THEN 'BIN'
           WHEN it.warehouse_sub_id IS NOT NULL THEN 'WAREHOUSE_SUB'
           ELSE 'WAREHOUSE'
         END as location_type`,
-        `CASE 
+          `CASE 
           WHEN it.warehouse_bin_id IS NOT NULL THEN 1
           WHEN it.warehouse_sub_id IS NOT NULL THEN 2
           ELSE 3
         END as location_priority`,
-        'EXTRACT(EPOCH FROM (NOW() - it.inventory_date)) as age_seconds'
-      ])
-      .where('pth.item_id = :itemId', { itemId })
-      .andWhere('it.inventory_status IN (:...statuses)', { 
-        statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED'] 
-      })
-      .andWhere('pth.new_quantity > 0')
-      .andWhere('(it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)')
-      .andWhere('pth.item_id IS NOT NULL')
-      .andWhere('it.pallet_id IS NOT NULL')
-      .andWhere('pth.pallet_id IS NOT NULL')
-      .andWhere('p.id IS NOT NULL')
-      .andWhere(qb => {
-        const subQuery = qb.subQuery()
-          .select('MAX(pth2.created_at)')
-          .from('transaction_pallet_history', 'pth2')
-          .where('pth2.item_id = pth.item_id')
-          .andWhere('pth2.pallet_id = pth.pallet_id')
-          .getQuery();
-        return `pth.created_at = ${subQuery}`;
-      })
-      .orderBy('location_priority', 'ASC')
-      .addOrderBy('it.inventory_date', 'ASC')
-      .addOrderBy('pth.production_date', 'ASC')
-      .addOrderBy('pth.new_quantity', 'DESC');
+          'EXTRACT(EPOCH FROM (NOW() - it.inventory_date)) as age_seconds',
+        ])
+        .where('pth.item_id = :itemId', { itemId })
+        .andWhere('it.inventory_status IN (:...statuses)', {
+          statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED'],
+        })
+        .andWhere('pth.new_quantity > 0')
+        .andWhere('(it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)')
+        .andWhere('pth.item_id IS NOT NULL')
+        .andWhere('it.pallet_id IS NOT NULL')
+        .andWhere('pth.pallet_id IS NOT NULL')
+        .andWhere('p.id IS NOT NULL')
+        .andWhere((qb) => {
+          const subQuery = qb
+            .subQuery()
+            .select('MAX(pth2.created_at)')
+            .from('transaction_pallet_history', 'pth2')
+            .where('pth2.item_id = pth.item_id')
+            .andWhere('pth2.pallet_id = pth.pallet_id')
+            .getQuery();
+          return `pth.created_at = ${subQuery}`;
+        })
+        .orderBy('location_priority', 'ASC')
+        .addOrderBy('it.inventory_date', 'ASC')
+        .addOrderBy('pth.production_date', 'ASC')
+        .addOrderBy('pth.new_quantity', 'DESC');
 
       const results = await queryBuilder.getRawMany();
-      
+
       return results;
     } catch (error) {
       console.warn('searchInventoryWithPalletHistory failed:', error.message);
@@ -356,7 +373,6 @@ export class PickingSuggestionService {
 
   private async debugInventorySearch(itemId: string): Promise<void> {
     try {
-      
       // Try simple query first without complex joins
       const simpleQuery = this.inventoryTrackingRepository
         .createQueryBuilder('it')
@@ -367,16 +383,16 @@ export class PickingSuggestionService {
           'it.warehouse_sub_id',
           'it.warehouse_bin_id',
           'it.inventory_status',
-          'it.progression_status'
+          'it.progression_status',
         ])
-        .where('it.inventory_status IN (:...statuses)', { 
-          statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING'] 
+        .where('it.inventory_status IN (:...statuses)', {
+          statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING'],
         })
         .orderBy('it.created_at', 'DESC')
         .limit(10);
 
       const simpleResults = await simpleQuery.getRawMany();
-      
+
       // Try with pallet join if simple query works
       if (simpleResults.length > 0) {
         const debugQuery = this.inventoryTrackingRepository
@@ -385,27 +401,27 @@ export class PickingSuggestionService {
           .leftJoin('it.warehouse', 'w')
           .leftJoin('it.warehouseSub', 'ws')
           .leftJoin('it.warehouseBin', 'wb')
-        .select([
-          'it.id',
-          'it.pallet_id',
-          'it.warehouse_id',
-          'it.warehouse_sub_id',
-          'it.warehouse_bin_id',
-          'it.inventory_status',
-          'it.progression_status',
-          'p.pallet_code',
-          'p.currentQuantity',
-          'w.name as warehouse_name',
-          'ws.name as warehouse_sub_name',
-          'ws.is_staging',
-          'wb.name as bin_name'
-        ])
-        .where('it.inventory_status IN (:...statuses)', { 
-          statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING'] 
-        })
-        .andWhere('it.pallet_id IS NOT NULL')
-        .orderBy('it.created_at', 'DESC')
-        .limit(10);
+          .select([
+            'it.id',
+            'it.pallet_id',
+            'it.warehouse_id',
+            'it.warehouse_sub_id',
+            'it.warehouse_bin_id',
+            'it.inventory_status',
+            'it.progression_status',
+            'p.pallet_code',
+            'p.currentQuantity',
+            'w.name as warehouse_name',
+            'ws.name as warehouse_sub_name',
+            'ws.is_staging',
+            'wb.name as bin_name',
+          ])
+          .where('it.inventory_status IN (:...statuses)', {
+            statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING'],
+          })
+          .andWhere('it.pallet_id IS NOT NULL')
+          .orderBy('it.created_at', 'DESC')
+          .limit(10);
 
         const debugResults = await debugQuery.getRawMany();
       }
@@ -422,7 +438,7 @@ export class PickingSuggestionService {
 
   private filterAndSortInventory(inventory: any[], requiredQuantity: number): any[] {
     return inventory
-      .filter(inv => {
+      .filter((inv) => {
         // Filter based on quantity and utilization
         const hasEnoughQuantity = inv.quantity >= requiredQuantity;
         const hasPartialQuantity = inv.quantity > 0 && inv.pallet_utilization < 100;
@@ -433,19 +449,19 @@ export class PickingSuggestionService {
         if (a.location_priority !== b.location_priority) {
           return a.location_priority - b.location_priority;
         }
-        
+
         // Secondary sort: FIFO (oldest first)
         const dateA = new Date(a.inventory_date);
         const dateB = new Date(b.inventory_date);
         if (dateA.getTime() !== dateB.getTime()) {
           return dateA.getTime() - dateB.getTime();
         }
-        
+
         // Tertiary sort: Production date
         if (a.production_date !== b.production_date) {
           return new Date(a.production_date).getTime() - new Date(b.production_date).getTime();
         }
-        
+
         // Final sort: Quantity (higher first for same date)
         return b.quantity - a.quantity;
       });
@@ -457,8 +473,10 @@ export class PickingSuggestionService {
     // Priority 1: Critical items (urgent delivery + high quantity)
     const deliveryDate = new Date(memo.delivery_date);
     const today = new Date();
-    const daysUntilDelivery = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
+    const daysUntilDelivery = Math.ceil(
+      (deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
     // Very high priority for urgent delivery dates
     if (daysUntilDelivery <= 1) {
       priority = 1; // Critical priority
@@ -494,21 +512,20 @@ export class PickingSuggestionService {
       if (a.priority !== b.priority) {
         return a.priority - b.priority;
       }
-      
+
       // Then sort by fulfillment status (FULFILLED first, then OVERFULFILLED, then PARTIAL, then UNFULFILLED)
-      const statusOrder = { 'FULFILLED': 1, 'OVERFULFILLED': 2, 'PARTIAL': 3, 'UNFULFILLED': 4 };
+      const statusOrder = { FULFILLED: 1, OVERFULFILLED: 2, PARTIAL: 3, UNFULFILLED: 4 };
       const aStatusOrder = statusOrder[a.status] || 5;
       const bStatusOrder = statusOrder[b.status] || 5;
-      
+
       if (aStatusOrder !== bStatusOrder) {
         return aStatusOrder - bStatusOrder;
       }
-      
+
       // Finally sort by available quantity (higher quantity first)
       return b.available_quantity - a.available_quantity;
     });
   }
-
 
   private async generateRouteOptimization(pickingSuggestions: any[]): Promise<any> {
     // Group by warehouse and sub for route optimization
@@ -517,7 +534,7 @@ export class PickingSuggestionService {
     for (const suggestion of pickingSuggestions) {
       for (const location of suggestion.suggested_picking_locations) {
         const key = `${location.warehouse_id}-${location.warehouse_sub_id}`;
-        
+
         if (!routeGroups.has(key)) {
           routeGroups.set(key, {
             warehouse_id: location.warehouse_id,
@@ -525,7 +542,7 @@ export class PickingSuggestionService {
             warehouse_name: location.warehouse_name,
             warehouse_sub_name: location.warehouse_sub_name,
             bins: [],
-            total_estimated_time: 0
+            total_estimated_time: 0,
           });
         }
 
@@ -536,45 +553,51 @@ export class PickingSuggestionService {
     }
 
     // Sort by efficiency and create optimal route
-    const optimalRoute = Array.from(routeGroups.values())
-      .sort((a, b) => b.total_estimated_time - a.total_estimated_time);
+    const optimalRoute = Array.from(routeGroups.values()).sort(
+      (a, b) => b.total_estimated_time - a.total_estimated_time,
+    );
 
     return {
       optimal_route: optimalRoute,
-      total_estimated_time: optimalRoute.reduce((sum, route) => sum + route.total_estimated_time, 0),
-      route_efficiency_score: this.calculateRouteEfficiency(optimalRoute)
+      total_estimated_time: optimalRoute.reduce(
+        (sum, route) => sum + route.total_estimated_time,
+        0,
+      ),
+      route_efficiency_score: this.calculateRouteEfficiency(optimalRoute),
     };
   }
 
   private async generatePriorityItems(pickingSuggestions: any[]): Promise<any[]> {
     return pickingSuggestions
       .sort((a, b) => a.priority - b.priority)
-      .map(suggestion => ({
+      .map((suggestion) => ({
         item_name: suggestion.item_name,
         item_code: suggestion.item_code,
         priority: suggestion.priority,
         required_quantity: suggestion.required_quantity,
         estimated_picking_time: suggestion.estimated_picking_time,
-        week_optimization: suggestion.week_optimization
+        week_optimization: suggestion.week_optimization,
       }));
   }
 
   private calculateEstimatedPickingTime(pickingSuggestions: any[]): number {
-    return pickingSuggestions.reduce((total, suggestion) => 
-      total + suggestion.estimated_picking_time, 0);
+    return pickingSuggestions.reduce(
+      (total, suggestion) => total + suggestion.estimated_picking_time,
+      0,
+    );
   }
 
   private calculateRouteEfficiency(route: any[]): number {
     // Calculate efficiency based on warehouse proximity and bin accessibility
     let efficiency = 100;
-    
+
     for (let i = 1; i < route.length; i++) {
       // Penalize for warehouse changes
-      if (route[i].warehouse_id !== route[i-1].warehouse_id) {
+      if (route[i].warehouse_id !== route[i - 1].warehouse_id) {
         efficiency -= 20;
       }
       // Penalize for sub-warehouse changes
-      else if (route[i].warehouse_sub_id !== route[i-1].warehouse_sub_id) {
+      else if (route[i].warehouse_sub_id !== route[i - 1].warehouse_sub_id) {
         efficiency -= 10;
       }
     }
@@ -612,29 +635,31 @@ export class PickingSuggestionService {
     `;
 
     try {
-    const results = await this.outboundMemoRepository.query(query, [memoId]) as any[];
-    
-    if (results.length === 0) return [];
+      const results = (await this.outboundMemoRepository.query(query, [memoId])) as any[];
 
-    const memo = {
-      id: results[0].memo_id,
-      requestor: results[0].requestor,
-      origin: results[0].origin,
-      ship_to: results[0].ship_to,
-      destination: results[0].destination,
-      delivery_date: results[0].delivery_date,
-      status: results[0].status,
-      items: results.filter(r => r.memo_item_id).map(r => ({
-        id: r.memo_item_id,
-        item_id: r.item_id,
-        item_name: r.item_name,
-        item_code: r.item_code,
-        quantity_plan: r.quantity_plan,
-        uom: r.uom
-      }))
-    };
+      if (results.length === 0) return [];
 
-    return await this.generatePickingSuggestionsForMemo(memo);
+      const memo = {
+        id: results[0].memo_id,
+        requestor: results[0].requestor,
+        origin: results[0].origin,
+        ship_to: results[0].ship_to,
+        destination: results[0].destination,
+        delivery_date: results[0].delivery_date,
+        status: results[0].status,
+        items: results
+          .filter((r) => r.memo_item_id)
+          .map((r) => ({
+            id: r.memo_item_id,
+            item_id: r.item_id,
+            item_name: r.item_name,
+            item_code: r.item_code,
+            quantity_plan: r.quantity_plan,
+            uom: r.uom,
+          })),
+      };
+
+      return await this.generatePickingSuggestionsForMemo(memo);
     } catch (error) {
       console.error('Error in getPickingSuggestionsByMemo:', error);
       console.error('Query parameters:', { memoId });
@@ -653,15 +678,17 @@ export class PickingSuggestionService {
     }
   }
 
-  private getAllAvailableInventory(availableInventory: any[], requiredQuantity: number): PickingSuggestionLocationDto[] {
+  private getAllAvailableInventory(
+    availableInventory: any[],
+    requiredQuantity: number,
+  ): PickingSuggestionLocationDto[] {
     // Group inventory by bin level for global suggestions
     const binGroups = new Map();
-    
+
     // Group inventory by bin (warehouse_bin_id) or sub-warehouse (warehouse_sub_id) if no bin
     for (const inv of availableInventory) {
       const binKey = inv.warehouse_bin_id || `sub_${inv.it_warehouse_sub_id}`;
-      
-      
+
       if (!binGroups.has(binKey)) {
         binGroups.set(binKey, {
           warehouse_name: inv.warehouse_name,
@@ -676,38 +703,38 @@ export class PickingSuggestionService {
           location_priority: inv.location_priority,
           place: this.getLocationPlace(inv),
           total_quantity: 0,
-          items: []
+          items: [],
         });
       }
-      
+
       const group = binGroups.get(binKey);
       group.total_quantity += inv.quantity;
       group.items.push(inv);
     }
-    
+
     // Convert to array and sort by priority
     const sortedBins = Array.from(binGroups.values()).sort((a, b) => {
       // 1. Location priority (bin > sub > warehouse)
       if (a.location_priority !== b.location_priority) {
         return a.location_priority - b.location_priority;
       }
-      
+
       // 2. Total quantity (higher first)
       return b.total_quantity - a.total_quantity;
     });
-    
+
     // Generate suggestions for each bin
     const allSuggestions: any[] = [];
     let remainingQuantity = requiredQuantity;
-    
+
     for (const bin of sortedBins) {
       if (remainingQuantity <= 0) break;
-      
+
       const quantityToTake = Math.min(bin.total_quantity, remainingQuantity);
-      
+
       // Find the most representative item for status and other details
       const representativeItem = bin.items[0];
-      
+
       allSuggestions.push({
         available_quantity: bin.total_quantity,
         quantity_ready_to_pick: quantityToTake,
@@ -725,70 +752,40 @@ export class PickingSuggestionService {
         location_priority: bin.location_priority,
         week_number: representativeItem.pth_week_number,
         production_date: representativeItem.production_date,
-        place: bin.place
+        place: bin.place,
       });
-      
+
       remainingQuantity -= quantityToTake;
     }
-    
+
     return allSuggestions;
   }
 
-  private calculateTotalSuggestedQuantity(availableInventory: any[], requiredQuantity: number): number {
+  private calculateTotalSuggestedQuantity(
+    availableInventory: any[],
+    requiredQuantity: number,
+  ): number {
     const allSuggestions = this.getAllAvailableInventory(availableInventory, requiredQuantity);
     return allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
   }
 
-  private determineFulfillmentStatus(availableInventory: any[], requiredQuantity: number): string {
-    
-    // Get all available inventory that can contribute to fulfilling the requirement
-    const allSuggestions = this.getAllAvailableInventory(availableInventory, requiredQuantity);
-    
-    if (allSuggestions.length === 0) {
-      return 'UNFULFILLED';
-    }
-    
-    // Calculate total quantity that can be fulfilled
-    const totalFulfillable = allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
-    
-    // Check for partial pick scenario (available_quantity > quantity_ready_to_pick)
-    const hasPartialPick = allSuggestions.some(suggestion => 
-      suggestion.available_quantity > suggestion.quantity_ready_to_pick
-    );
-    
-    // PARTIAL PICK: Check for partial pick scenario first (available_quantity > quantity_ready_to_pick)
-    if (hasPartialPick) {
-      return 'PARTIAL';
-    }
-    // FULFILLED: Exact match - can fulfill exactly what's required
-    else if (totalFulfillable === requiredQuantity) {
-      return 'FULFILLED';
-    } 
-    // OVERFULFILLED: Can fulfill more than required
-    else if (totalFulfillable > requiredQuantity) {
-      return 'OVERFULFILLED';
-    } 
-    // PARTIAL: Can fulfill some but not all
-    else if (totalFulfillable > 0) {
-      return 'PARTIAL';
-    } 
-    // UNFULFILLED: Cannot fulfill any
-    else {
-      return 'UNFULFILLED';
-    }
-  }
-
   private generateNotes(item: any, memo: any, availableInventory: any[]): string {
     const allSuggestions = this.getAllAvailableInventory(availableInventory, item.quantity_plan);
-    const totalFulfillable = allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
-    const totalAvailable = allSuggestions.reduce((sum, suggestion) => sum + suggestion.available_quantity, 0);
-    const requiredQuantity = item.quantity_plan;
-    
-    // Check for partial pick scenario
-    const hasPartialPick = allSuggestions.some(suggestion => 
-      suggestion.available_quantity > suggestion.quantity_ready_to_pick
+    const totalFulfillable = allSuggestions.reduce(
+      (sum, suggestion) => sum + suggestion.quantity_ready_to_pick,
+      0,
     );
-    
+    const totalAvailable = allSuggestions.reduce(
+      (sum, suggestion) => sum + suggestion.available_quantity,
+      0,
+    );
+    const requiredQuantity = item.quantity_plan;
+
+    // Check for partial pick scenario
+    const hasPartialPick = allSuggestions.some(
+      (suggestion) => suggestion.available_quantity > suggestion.quantity_ready_to_pick,
+    );
+
     // Partial pick scenario - inventory available but only partially ready (CHECK FIRST)
     if (hasPartialPick) {
       return `Item tersedia dengan partial pick. Tersedia: ${totalAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
@@ -796,15 +793,15 @@ export class PickingSuggestionService {
     // Exact match - perfect fulfillment
     else if (totalFulfillable === requiredQuantity) {
       return `Item tersedia dengan jumlah yang tepat. Total tersedia: ${totalFulfillable} ${item.uom}`;
-    } 
+    }
     // More than required available
     else if (totalFulfillable > requiredQuantity) {
       return `Item tersedia dengan jumlah berlebih. Total tersedia: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
-    } 
+    }
     // Partial availability
     else if (totalFulfillable > 0) {
       return `Item tersedia sebagian. Tersedia: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
-    } 
+    }
     // No inventory available
     else {
       return `Item tidak tersedia di inventory. Dibutuhkan: ${requiredQuantity} ${item.uom}`;

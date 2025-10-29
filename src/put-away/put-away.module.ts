@@ -9,15 +9,14 @@ import { MasterWarehouseBinModule } from 'src/master-warehouse-bin/master-wareho
 import { MasterPalletModule } from 'src/master-pallet/master-pallet.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PutAwayTransaction]),
-  InventoryTrackingModule,
-  MasterWarehouseBinModule,
-  MasterPalletModule
+  imports: [
+    TypeOrmModule.forFeature([PutAwayTransaction]),
+    InventoryTrackingModule,
+    MasterWarehouseBinModule,
+    MasterPalletModule,
   ],
   controllers: [PutAwayController],
-  providers: [ PutAwayService, PutAwayRepository ],
+  providers: [PutAwayService, PutAwayRepository],
   exports: [PutAwayService],
 })
 export class PutAwayModule {}
-
-

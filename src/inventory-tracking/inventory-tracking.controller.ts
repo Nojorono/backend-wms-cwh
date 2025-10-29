@@ -1,11 +1,21 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiQuery, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiQuery,
+  ApiParam,
+} from '@nestjs/swagger';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
-import { InventoryTracking, ProgressionStatus } from '../core/domain/entities/inventory-tracking.entity';
+import {
+  InventoryTracking,
+  ProgressionStatus,
+} from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryAutoSuggestionService } from './auto-suggestion.service';
-
 
 @ApiTags('Inventory Tracking')
 @Controller('inventory-tracking')
@@ -32,7 +42,9 @@ export class InventoryTrackingController {
   }
 
   @Post('create-or-update-with-inbound-check')
-  @ApiOperation({ summary: 'Create or update inventory tracking with inbound_id duplication check' })
+  @ApiOperation({
+    summary: 'Create or update inventory tracking with inbound_id duplication check',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -41,26 +53,29 @@ export class InventoryTrackingController {
         warehouse_sub_id: { type: 'string', example: 'warehouse-sub-uuid' },
         warehouse_id: { type: 'string', example: 'warehouse-uuid' },
         inventory_status: { type: 'string', example: 'CHECKED' },
-        inbound_id: { type: 'string', example: 'inbound-uuid' }
+        inbound_id: { type: 'string', example: 'inbound-uuid' },
       },
-      required: ['pallet_id', 'warehouse_sub_id', 'warehouse_id', 'inventory_status']
-    }
+      required: ['pallet_id', 'warehouse_sub_id', 'warehouse_id', 'inventory_status'],
+    },
   })
   @ApiResponse({ status: 201, description: 'Created or Updated', type: InventoryTracking })
   @ApiResponse({ status: 400, description: 'Bad Request - Duplicate inbound_id found' })
-  createOrUpdateWithInboundCheck(@Body() body: {
-    pallet_id: string;
-    warehouse_sub_id: string;
-    warehouse_id: string;
-    inventory_status: string;
-    inbound_id?: string;
-  }) {
+  createOrUpdateWithInboundCheck(
+    @Body()
+    body: {
+      pallet_id: string;
+      warehouse_sub_id: string;
+      warehouse_id: string;
+      inventory_status: string;
+      inbound_id?: string;
+    },
+  ) {
     return this.service.createOrUpdateInventoryTrackingWithInboundCheck(
       body.pallet_id,
       body.warehouse_sub_id,
       body.warehouse_id,
       body.inventory_status,
-      body.inbound_id
+      body.inbound_id,
     );
   }
 
@@ -81,7 +96,7 @@ export class InventoryTrackingController {
     @Query('warehouse_bin_id') warehouse_bin_id?: string,
   ) {
     return this.service.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
-  } 
+  }
 
   @Get('history/:pallet_id')
   @ApiOperation({ summary: 'Get inventory tracking history by pallet id' })
@@ -102,16 +117,26 @@ export class InventoryTrackingController {
   @Get('check-inbound/:inbound_id')
   @ApiOperation({ summary: 'Check if history exists for inbound_id' })
   @ApiParam({ name: 'inbound_id', description: 'Inbound transaction ID' })
-  @ApiResponse({ status: 200, description: 'OK', schema: { type: 'object', properties: { exists: { type: 'boolean' }, history: { type: 'object' } } } })
+  @ApiResponse({
+    status: 200,
+    description: 'OK',
+    schema: {
+      type: 'object',
+      properties: { exists: { type: 'boolean' }, history: { type: 'object' } },
+    },
+  })
   checkInboundId(@Param('inbound_id') inbound_id: string) {
     return this.service.findHistoryByInboundId(inbound_id);
   }
 
   @Get('validate-pallet/:pallet_code')
-  @ApiOperation({ summary: 'Validate if pallet can be used for inventory tracking (only pallets that are outbound done can be reused)' })
+  @ApiOperation({
+    summary:
+      'Validate if pallet can be used for inventory tracking (only pallets that are outbound done can be reused)',
+  })
   @ApiParam({ name: 'pallet_code', description: 'Pallet Code to validate' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Validation result',
     schema: {
       type: 'object',
@@ -122,7 +147,10 @@ export class InventoryTrackingController {
           type: 'object',
           properties: {
             success: { type: 'boolean', example: true },
-            message: { type: 'string', example: 'Pallet dapat digunakan untuk inventory tracking.' },
+            message: {
+              type: 'string',
+              example: 'Pallet dapat digunakan untuk inventory tracking.',
+            },
             pallet_code: { type: 'string', example: 'PAL-001' },
             pallet_id: { type: 'string', example: 'pallet-uuid' },
             is_available: { type: 'boolean', example: true },
@@ -134,27 +162,30 @@ export class InventoryTrackingController {
                 is_active: { type: 'boolean', example: true },
                 is_full: { type: 'boolean', example: false },
                 current_quantity: { type: 'number', example: 0 },
-                capacity: { type: 'number', example: 100 }
-              }
+                capacity: { type: 'number', example: 100 },
+              },
             },
             existing_tracking: { type: 'object', nullable: true },
             can_create: { type: 'boolean', example: true },
-            reasons: { type: 'array', items: { type: 'string' }, example: [] }
-          }
+            reasons: { type: 'array', items: { type: 'string' }, example: [] },
+          },
         },
         timestamp: { type: 'string', example: '2025-10-15T03:01:44.715Z' },
-        path: { type: 'string', example: '/inventory-tracking/validate-pallet/PAL-001' }
-      }
-    }
+        path: { type: 'string', example: '/inventory-tracking/validate-pallet/PAL-001' },
+      },
+    },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Bad Request - Pallet cannot be used',
     schema: {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Pallet tidak dapat digunakan: Pallet tidak aktif, Pallet sudah penuh' },
+        message: {
+          type: 'string',
+          example: 'Pallet tidak dapat digunakan: Pallet tidak aktif, Pallet sudah penuh',
+        },
         statusCode: { type: 'number', example: 400 },
         data: {
           type: 'object',
@@ -170,16 +201,20 @@ export class InventoryTrackingController {
                 is_active: { type: 'boolean', example: false },
                 is_full: { type: 'boolean', example: true },
                 current_quantity: { type: 'number', example: 100 },
-                capacity: { type: 'number', example: 100 }
-              }
+                capacity: { type: 'number', example: 100 },
+              },
             },
             existing_tracking: { type: 'object', nullable: true },
             can_create: { type: 'boolean', example: false },
-            reasons: { type: 'array', items: { type: 'string' }, example: ['Pallet tidak aktif', 'Pallet sudah penuh'] }
-          }
-        }
-      }
-    }
+            reasons: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Pallet tidak aktif', 'Pallet sudah penuh'],
+            },
+          },
+        },
+      },
+    },
   })
   async validatePallet(@Param('pallet_code') pallet_code: string) {
     return this.service.validatePallet(pallet_code);
@@ -207,20 +242,20 @@ export class InventoryTrackingController {
     schema: {
       type: 'object',
       properties: {
-        progression_status: { 
-          type: 'string', 
+        progression_status: {
+          type: 'string',
           enum: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'],
-          example: 'IN_PROGRESS'
-        }
+          example: 'IN_PROGRESS',
+        },
       },
-      required: ['progression_status']
-    }
+      required: ['progression_status'],
+    },
   })
   @ApiResponse({ status: 200, description: 'Progression status updated', type: InventoryTracking })
   @ApiResponse({ status: 404, description: 'Inventory tracking not found' })
   updateProgressionStatus(
-    @Param('id') id: string, 
-    @Body() body: { progression_status: ProgressionStatus }
+    @Param('id') id: string,
+    @Body() body: { progression_status: ProgressionStatus },
   ) {
     return this.service.updateProgressionStatus(id, body.progression_status);
   }
@@ -251,8 +286,8 @@ export class InventoryTrackingController {
   @Get('item/:item_id')
   @ApiOperation({ summary: 'Get inventory tracking by item ID' })
   @ApiParam({ name: 'item_id', description: 'Item ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Inventory tracking records for specific item',
     schema: {
       type: 'array',
@@ -277,10 +312,10 @@ export class InventoryTrackingController {
           warehouse_sub_name: { type: 'string' },
           bin_name: { type: 'string' },
           bin_code: { type: 'string' },
-          pallet_utilization: { type: 'number' }
-        }
-      }
-    }
+          pallet_utilization: { type: 'number' },
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 404,
@@ -298,5 +333,3 @@ export class InventoryTrackingController {
     return this.service.findByItemId(item_id);
   }
 }
-
-

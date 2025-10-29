@@ -14,16 +14,19 @@ import { InventoryTrackingModule } from 'src/inventory-tracking/inventory-tracki
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TransactionScanInbound, MasterPallet, MasterItem, MasterWarehouseSub]), 
+    TypeOrmModule.forFeature([
+      TransactionScanInbound,
+      MasterPallet,
+      MasterItem,
+      MasterWarehouseSub,
+    ]),
     MasterPalletModule,
     MasterItemModule,
     MasterWarehouseSubModule,
-    InventoryTrackingModule
+    InventoryTrackingModule,
   ],
   controllers: [TransactionScanInboundController],
-  providers: [TransactionScanInboundService, TransactionScanInboundRepository ],
+  providers: [TransactionScanInboundService, TransactionScanInboundRepository],
   exports: [TransactionScanInboundService],
 })
 export class TransactionScanInboundModule {}
-
-

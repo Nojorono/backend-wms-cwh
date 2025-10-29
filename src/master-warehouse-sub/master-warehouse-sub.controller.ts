@@ -9,25 +9,20 @@ import {
   ParseIntPipe,
   Query,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MasterWarehouseSubService } from './master-warehouse-sub.service';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
-import { MasterWarehouseSub, WarehouseSubStagingType } from '../core/domain/entities/master-warehouse-sub.entity';
+import {
+  MasterWarehouseSub,
+  WarehouseSubStagingType,
+} from '../core/domain/entities/master-warehouse-sub.entity';
 
 @ApiTags('Master Warehouse Sub')
 @Controller('master-warehouse-sub')
 @ApiBearerAuth('JWT-auth')
 export class MasterWarehouseSubController {
-  constructor(
-    private readonly masterWarehouseSubService: MasterWarehouseSubService,
-  ) {}
+  constructor(private readonly masterWarehouseSubService: MasterWarehouseSubService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Warehouse Sub' })
@@ -98,9 +93,7 @@ export class MasterWarehouseSubController {
     type: [MasterWarehouseSub],
   })
   @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findByOrganizationId(
-    @Param('organization_id', ParseIntPipe) organization_id: number,
-  ) {
+  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
     return this.masterWarehouseSubService.findByOrganizationId(organization_id);
   }
 
@@ -127,10 +120,7 @@ export class MasterWarehouseSubController {
     @Param('id') id: string,
     @Body() updateMasterWarehouseSubDto: UpdateMasterWarehouseSubDto,
   ) {
-    return this.masterWarehouseSubService.update(
-      id,
-      updateMasterWarehouseSubDto,
-    );
+    return this.masterWarehouseSubService.update(id, updateMasterWarehouseSubDto);
   }
 
   @Delete(':id')

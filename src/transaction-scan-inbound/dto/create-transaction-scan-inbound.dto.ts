@@ -13,7 +13,7 @@ export class CreateTransactionScanInboundDto {
   @IsNumber()
   @Type(() => Number)
   week_number: number;
-  
+
   @ApiProperty({ example: 'uuid-inbound-123' })
   @IsString()
   inbound_id: string;
@@ -64,7 +64,6 @@ export class CreateTransactionScanInboundDto {
 }
 
 export class CreateTransactionScanInboundDtoPallet {
-
   @ApiProperty({ example: '2025-01-01' })
   @IsDate()
   @Type(() => Date)
@@ -118,8 +117,3 @@ export class CreateTransactionScanInboundDtoPallet {
   @IsString()
   inspection_by?: string;
 }
-
-
-
-
-

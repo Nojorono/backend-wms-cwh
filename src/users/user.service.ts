@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRepository } from './user.repository';
@@ -21,13 +17,9 @@ export class UserService {
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.repository.findByUsername(
-      createUserDto.username,
-    );
+    const existingUser = await this.repository.findByUsername(createUserDto.username);
     if (existingUser) {
-      throw new ConflictException(
-        `User with username ${createUserDto.username} already exists`,
-      );
+      throw new ConflictException(`User with username ${createUserDto.username} already exists`);
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
@@ -86,13 +78,9 @@ export class UserService {
     const user = await this.findOne(id);
 
     if (updateUserDto.username && updateUserDto.username !== user.username) {
-      const existingUser = await this.repository.findByUsername(
-        updateUserDto.username,
-      );
+      const existingUser = await this.repository.findByUsername(updateUserDto.username);
       if (existingUser) {
-        throw new ConflictException(
-          `User with username ${updateUserDto.username} already exists`,
-        );
+        throw new ConflictException(`User with username ${updateUserDto.username} already exists`);
       }
     }
 
@@ -128,8 +116,7 @@ export class UserService {
           organizationId: updateUserDto.organizationId,
         });
 
-        const savedUserDetail =
-          await this.userDetailRepository.save(userDetail);
+        const savedUserDetail = await this.userDetailRepository.save(userDetail);
         await this.repository.updateUserDetailId(id, savedUserDetail.id);
       }
     }

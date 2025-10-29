@@ -1,20 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { MasterWeekService } from './master-week.service';
 import { CreateMasterWeekDto } from './dto/create-master-week.dto';
 import { UpdateMasterWeekDto } from './dto/update-master-week.dto';
@@ -24,9 +9,7 @@ import { MasterWeek } from '../core/domain/entities/master-week.entity';
 @Controller('master-week')
 @ApiBearerAuth('JWT-auth')
 export class MasterWeekController {
-  constructor(
-    private readonly masterWeekService: MasterWeekService,
-  ) {}
+  constructor(private readonly masterWeekService: MasterWeekService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Week' })
@@ -109,10 +92,7 @@ export class MasterWeekController {
     status: 409,
     description: 'Week with this code already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterWeekDto: UpdateMasterWeekDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterWeekDto: UpdateMasterWeekDto) {
     return this.masterWeekService.update(id, updateMasterWeekDto);
   }
 
@@ -126,5 +106,4 @@ export class MasterWeekController {
   remove(@Param('id') id: string) {
     return this.masterWeekService.remove(id);
   }
-
 }

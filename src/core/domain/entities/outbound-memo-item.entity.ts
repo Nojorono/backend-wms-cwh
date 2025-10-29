@@ -14,7 +14,7 @@ export class OutboundMemoItem extends BaseEntity {
 
   @Column({ nullable: true })
   item_id: string;
-  
+
   @ManyToOne(() => MasterItem, (item) => item.id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'item_id' })
   item: MasterItem;

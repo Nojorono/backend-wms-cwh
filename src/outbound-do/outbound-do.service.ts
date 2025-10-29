@@ -7,9 +7,7 @@ import { OutboundDoStatus } from '../core/domain/entities/outbound-do.entity';
 
 @Injectable()
 export class OutboundDoService {
-  constructor(
-    private readonly repository: OutboundDoRepository,
-  ) {}
+  constructor(private readonly repository: OutboundDoRepository) {}
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
     // Validasi delivery_date tidak boleh di masa lalu
@@ -31,13 +29,13 @@ export class OutboundDoService {
     }
 
     // Validasi sequence numbers harus unique dan positif
-    const sequences = data.outbound_memo_ids.map(item => item.sequence);
+    const sequences = data.outbound_memo_ids.map((item) => item.sequence);
     const uniqueSequences = new Set(sequences);
     if (sequences.length !== uniqueSequences.size) {
       throw new BadRequestException('Sequence numbers must be unique');
     }
-    
-    if (sequences.some(seq => seq <= 0)) {
+
+    if (sequences.some((seq) => seq <= 0)) {
       throw new BadRequestException('Sequence numbers must be positive');
     }
 
@@ -92,7 +90,7 @@ export class OutboundDoService {
 
   async remove(id: string): Promise<void> {
     const existing = await this.repository.findOne(id);
-    
+
     // Validasi tidak bisa delete jika status sudah COMPLETED
     if (existing.status === OutboundDoStatus.COMPLETED) {
       throw new BadRequestException('Tidak dapat menghapus outbound DO yang sudah COMPLETED');
@@ -112,11 +110,14 @@ export class OutboundDoService {
   async updateStatus(id: string, status: OutboundDoStatus): Promise<OutboundDo> {
     const existing = await this.repository.findOne(id);
     this.validateStatusTransition(existing.status, status);
-    
+
     return this.repository.update(id, { status } as UpdateOutboundDoDto);
   }
 
-  private validateStatusTransition(currentStatus: OutboundDoStatus, newStatus: OutboundDoStatus): void {
+  private validateStatusTransition(
+    currentStatus: OutboundDoStatus,
+    newStatus: OutboundDoStatus,
+  ): void {
     const validTransitions: Record<OutboundDoStatus, OutboundDoStatus[]> = {
       [OutboundDoStatus.PENDING]: [OutboundDoStatus.IN_PROGRESS, OutboundDoStatus.CANCELLED],
       [OutboundDoStatus.IN_PROGRESS]: [OutboundDoStatus.COMPLETED, OutboundDoStatus.CANCELLED],
@@ -125,7 +126,9 @@ export class OutboundDoService {
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {
-      throw new BadRequestException(`Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`);
+      throw new BadRequestException(
+        `Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`,
+      );
     }
   }
 

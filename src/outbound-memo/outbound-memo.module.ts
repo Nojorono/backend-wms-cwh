@@ -7,9 +7,7 @@ import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([OutboundMemo, OutboundMemoItem]),
-  ],
+  imports: [TypeOrmModule.forFeature([OutboundMemo, OutboundMemoItem])],
   controllers: [OutboundMemoController],
   providers: [OutboundMemoService, OutboundMemoRepository],
   exports: [OutboundMemoService, OutboundMemoRepository],
