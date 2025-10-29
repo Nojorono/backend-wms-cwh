@@ -53,33 +53,56 @@ export class UserManageController {
   @ApiQuery({ name: 'search', required: false, description: 'Search term for name, phone, or role name' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Items per page', example: 10 })
-  @ApiQuery({ name: 'sortBy', required: false, description: 'Field to sort by', example: 'created_at' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Field to sort by', example: 'createdAt' })
   @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order', enum: ['asc', 'desc'] })
   @ApiResponse({
     status: 200,
     description: 'Return all users or paginated results.',
     schema: {
-      type: 'object',
-      properties: {
-        data: {
+      oneOf: [
+        {
           type: 'array',
           items: { $ref: '#/components/schemas/UserManage' }
         },
-        total: { type: 'number', description: 'Total number of users' },
-        page: { type: 'number', description: 'Current page number' },
-        limit: { type: 'number', description: 'Items per page' },
-        totalPages: { type: 'number', description: 'Total number of pages' }
-      }
+        {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/UserManage' }
+            },
+            total: { type: 'number', description: 'Total number of users' },
+            page: { type: 'number', description: 'Current page number' },
+            limit: { type: 'number', description: 'Items per page' },
+            totalPages: { type: 'number', description: 'Total number of pages' }
+          }
+        }
+      ]
     }
   })
   findAll(@Query() paginationDto: UserManagePaginationDto) {
-    // If no pagination parameters provided, return all users
-    if (!paginationDto.search && !paginationDto.page && !paginationDto.limit) {
-      return this.userManageService.findAll();
+    // Check if any pagination parameters are provided
+    const hasPaginationParams = paginationDto.search || paginationDto.page || paginationDto.limit || 
+                               paginationDto.sortBy || paginationDto.sortOrder;
+    
+    if (hasPaginationParams) {
+      return this.userManageService.findAllWithPagination(paginationDto);
     }
     
-    return this.userManageService.findAllWithPagination(paginationDto);
+    return this.userManageService.findAll();
   }
+
+  @Get('all')
+  @ApiOperation({ summary: 'Get all users (alternative endpoint)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all users.',
+    type: [UserManage],
+  })
+  findAllUsers() {
+    return this.userManageService.findAll();
+  }
+
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a user by ID' })
