@@ -44,7 +44,7 @@ export class InboundController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List all inbounds with pagination' })
+  @ApiOperation({ summary: 'List all inbounds or search with pagination' })
   @ApiFlexiblePaginationQuery([
     {
       name: 'status',
@@ -52,9 +52,40 @@ export class InboundController {
       example: 'CREATED',
     },
   ])
-  @ApiResponse({ status: 200, type: PaginatedResponseDto<Inbound> })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all inbounds or paginated results.',
+    schema: {
+      oneOf: [
+        {
+          type: 'array',
+          items: { $ref: '#/components/schemas/Inbound' }
+        },
+        { $ref: '#/components/schemas/PaginatedResponseDto' }
+      ]
+    }
+  })
   findAll(@Query() paginationQuery: InboundPaginationQueryDto) {
-    return this.service.findAllPaginated(paginationQuery);
+    // Check if any pagination parameters are provided
+    const hasPaginationParams = paginationQuery.search || paginationQuery.page || paginationQuery.limit || 
+                               paginationQuery.sortBy || paginationQuery.sortOrder || paginationQuery.status;
+    
+    if (hasPaginationParams) {
+      return this.service.findAllPaginated(paginationQuery);
+    }
+    
+    return this.service.findAll();
+  }
+
+  @Get('all')
+  @ApiOperation({ summary: 'Get all inbounds (alternative endpoint)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all inbounds.',
+    type: [Inbound],
+  })
+  findAllInbounds() {
+    return this.service.findAll();
   }
 
   @Get('inspection')

@@ -22,6 +22,7 @@ import { CreateUserManageDto } from './dto/create-user-manage.dto';
 import { UpdateUserManageDto } from './dto/update-user-manage.dto';
 import { UserManagePaginationDto } from './dto/user-manage-pagination.dto';
 import { UserManage } from '../core/domain/entities/user-manage.entity';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @ApiTags('User Management')
 @Controller('user-manage')
@@ -64,19 +65,7 @@ export class UserManageController {
           type: 'array',
           items: { $ref: '#/components/schemas/UserManage' }
         },
-        {
-          type: 'object',
-          properties: {
-            data: {
-              type: 'array',
-              items: { $ref: '#/components/schemas/UserManage' }
-            },
-            total: { type: 'number', description: 'Total number of users' },
-            page: { type: 'number', description: 'Current page number' },
-            limit: { type: 'number', description: 'Items per page' },
-            totalPages: { type: 'number', description: 'Total number of pages' }
-          }
-        }
+        { $ref: '#/components/schemas/PaginatedResponseDto' }
       ]
     }
   })

@@ -12,8 +12,8 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ResponseInterf
 
     return next.handle().pipe(
       map((data) => {
-        // Check if data is already a paginated response (has data, total, page, limit properties)
-        if (data && typeof data === 'object' && 'data' in data && 'total' in data && 'page' in data && 'limit' in data) {
+        // Check if data is already a paginated response (has data and meta properties)
+        if (data && typeof data === 'object' && 'data' in data && 'meta' in data) {
           // For paginated responses, return the data directly without extra wrapping
           return {
             success: true,

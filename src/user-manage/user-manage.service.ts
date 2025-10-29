@@ -9,10 +9,15 @@ import { CreateUserManageDto } from './dto/create-user-manage.dto';
 import { UpdateUserManageDto } from './dto/update-user-manage.dto';
 import { UserManagePaginationDto } from './dto/user-manage-pagination.dto';
 import { UserManage } from '../core/domain/entities/user-manage.entity';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 
 @Injectable()
 export class UserManageService {
-  constructor(private readonly repository: UserManageRepository) {}
+  constructor(
+    private readonly repository: UserManageRepository,
+    private readonly paginationService: PaginationService,
+  ) {}
 
   async create(createUserManageDto: CreateUserManageDto): Promise<UserManage> {
     const { phone } = createUserManageDto;
@@ -34,19 +39,14 @@ export class UserManageService {
     return await this.repository.findAll();
   }
 
-  async findAllWithPagination(paginationDto: UserManagePaginationDto): Promise<{
-    data: UserManage[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
+  async findAllWithPagination(paginationDto: UserManagePaginationDto): Promise<PaginatedResponseDto<UserManage>> {
     const result = await this.repository.findAllWithFilters(paginationDto);
     
-    return {
-      ...result,
-      totalPages: Math.ceil(result.total / result.limit),
-    };
+    return this.paginationService.createPaginatedResponse(
+      result.data,
+      paginationDto,
+      result.total,
+    );
   }
 
   async findOne(id: string): Promise<UserManage> {
