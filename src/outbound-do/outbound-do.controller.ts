@@ -23,6 +23,7 @@ import { PickingSuggestionService } from './picking-suggestion.service';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoResponseDto } from './dto/outbound-do-response.dto';
+import { PickingSuggestionsResponseDto } from './dto/picking-suggestions-response.dto';
 import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbound-do.entity';
 
 @ApiTags('Outbound DO')
@@ -228,115 +229,13 @@ export class OutboundDoController {
     return this.outboundDoService.remove(id);
   }
 
-  @Get(':id/picking-suggestions')
-  @ApiOperation({ summary: 'Get picking suggestions for outbound DO' })
-  @ApiParam({ name: 'id', description: 'ID outbound DO' })
-  @ApiResponse({
-    status: 200,
-    description: 'Picking suggestions untuk outbound DO',
-    schema: {
-      type: 'array',
-      description: 'Array of picking suggestions untuk setiap item',
-      items: {
-        type: 'object',
-        properties: {
-          memo_id: { type: 'string' },
-          item_id: { type: 'string' },
-          item_name: { type: 'string' },
-          item_code: { type: 'string' },
-          required_quantity: { type: 'number' },
-          available_quantity: { type: 'number' },
-          suggested_bins: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                bin_id: { type: 'string' },
-                bin_code: { type: 'string' },
-                quantity_to_pick: { type: 'number' },
-                warehouse_name: { type: 'string' },
-                warehouse_sub_name: { type: 'string' },
-                bin_name: { type: 'string' },
-                week_number: { type: 'number' },
-                production_date: { type: 'string' },
-                pallet_id: { type: 'string' },
-                pallet_code: { type: 'string' },
-                pallet_utilization: { type: 'number' }
-              }
-            }
-          },
-          total_suggested_quantity: { type: 'number' },
-          status: { type: 'string', enum: ['FULFILLED', 'PARTIAL', 'UNFULFILLED'] },
-          notes: { type: 'string' }
-        }
-      }
-    }
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Outbound DO tidak ditemukan',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Outbound DO not found' },
-        statusCode: { type: 'number', example: 404 },
-      },
-    },
-  })
-  async getPickingSuggestions(@Param('id') id: string) {
-    return this.pickingSuggestionService.getPickingSuggestionsForOutboundDo(id);
-  }
-
   @Get('memo/:memoId/picking-suggestions')
   @ApiOperation({ summary: 'Get picking suggestions for specific memo' })
   @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
   @ApiResponse({
     status: 200,
     description: 'Picking suggestions untuk memo tertentu',
-    schema: {
-      type: 'array',
-      description: 'Array of picking suggestions untuk memo items',
-      items: {
-        type: 'object',
-        properties: {
-          memo_id: { type: 'string' },
-          item_id: { type: 'string' },
-          item_name: { type: 'string' },
-          item_code: { type: 'string' },
-          required_quantity: { type: 'number' },
-          available_quantity: { type: 'number' },
-          suggested_locations: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                bin_id: { type: 'string' },
-                bin_code: { type: 'string' },
-                quantity_to_pick: { type: 'number' },
-                warehouse_name: { type: 'string' },
-                warehouse_sub_name: { type: 'string' },
-                bin_name: { type: 'string' },
-                week_number: { type: 'number' },
-                production_date: { type: 'string' },
-                pallet_id: { type: 'string' },
-                pallet_code: { type: 'string' },
-                pallet_utilization: { type: 'number' },
-                zone: { type: 'string' },
-                place: { type: 'string' },
-                search_level: { type: 'string', enum: ['BIN_LEVEL', 'SUB_LEVEL', 'WAREHOUSE_LEVEL'], description: 'Level pencarian inventory (fleksibel)' },
-                location_type: { type: 'string', enum: ['BIN', 'WAREHOUSE_SUB', 'WAREHOUSE'], description: 'Tipe lokasi inventory (fleksibel)' },
-                location_priority: { type: 'number', description: 'Prioritas lokasi (1=bin, 2=sub, 3=warehouse)' },
-                age_seconds: { type: 'number', description: 'Usia inventory dalam detik untuk FIFO' }
-              }
-            }
-          },
-          total_suggested_quantity: { type: 'number' },
-          status: { type: 'string', enum: ['FULFILLED', 'PARTIAL', 'UNFULFILLED'] },
-          notes: { type: 'string' }
-        }
-      }
-    }
+    type: PickingSuggestionsResponseDto
   })
   @ApiResponse({
     status: 404,

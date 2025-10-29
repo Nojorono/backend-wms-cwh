@@ -9,6 +9,8 @@ import { MasterItem } from '../core/domain/entities/master-item.entity';
 import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
 import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
 import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
+import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
+import { PickingSuggestionLocationDto } from './dto/picking-suggestion-location.dto';
 
 @Injectable()
 export class PickingSuggestionService {
@@ -31,7 +33,7 @@ export class PickingSuggestionService {
     private readonly warehouseRepository: Repository<MasterWarehouse>,
   ) {}
 
-  async getPickingSuggestionsForOutboundDo(outboundDoId: string): Promise<any> {
+  async getPickingSuggestionsForOutboundDo(outboundDoId: string): Promise<PickingSuggestionDto[]> {
     // Validate outboundDoId before proceeding
     if (!outboundDoId || outboundDoId.trim() === '') {
       throw new Error('Outbound DO ID is required');
@@ -166,8 +168,8 @@ export class PickingSuggestionService {
     return outboundDo;
   }
 
-  private async generatePickingSuggestionsForMemo(memo: any): Promise<any[]> {
-    const suggestions: any[] = [];
+  private async generatePickingSuggestionsForMemo(memo: any): Promise<PickingSuggestionDto[]> {
+    const suggestions: PickingSuggestionDto[] = [];
 
     // Calculate priority for each item and sort by priority
     const itemsWithPriority = memo.items.map(item => ({
@@ -194,7 +196,6 @@ export class PickingSuggestionService {
           required_quantity: item.quantity_plan,
           suggested_locations: this.getAllAvailableInventory(availableInventory, item.quantity_plan),
           total_suggested_quantity: this.calculateTotalSuggestedQuantity(availableInventory, item.quantity_plan),
-          status: this.determineFulfillmentStatus(availableInventory, item.quantity_plan),
           priority: item.priority,
           notes: this.generateNotes(item, memo, availableInventory),
         };
@@ -210,7 +211,6 @@ export class PickingSuggestionService {
           available_quantity: 0,
           suggested_locations: [],
           total_suggested_quantity: 0,
-          status: 'UNFULFILLED',
           priority: item.priority,
           notes: `Item tidak tersedia di inventory. Dibutuhkan: ${item.quantity_plan} ${item.uom}`,
         };
@@ -356,7 +356,6 @@ export class PickingSuggestionService {
 
   private async debugInventorySearch(itemId: string): Promise<void> {
     try {
-      console.log(`Still no results found for item ${itemId}, showing all inventory tracking records for debugging...`);
       
       // Try simple query first without complex joins
       const simpleQuery = this.inventoryTrackingRepository
@@ -377,7 +376,6 @@ export class PickingSuggestionService {
         .limit(10);
 
       const simpleResults = await simpleQuery.getRawMany();
-      console.log(`Debug - Found ${simpleResults.length} simple inventory tracking records:`, simpleResults);
       
       // Try with pallet join if simple query works
       if (simpleResults.length > 0) {
@@ -410,7 +408,6 @@ export class PickingSuggestionService {
         .limit(10);
 
         const debugResults = await debugQuery.getRawMany();
-        console.log(`Debug - Found ${debugResults.length} detailed inventory tracking records:`, debugResults);
       }
     } catch (error) {
       console.warn('debugInventorySearch failed:', error.message);
@@ -585,11 +582,11 @@ export class PickingSuggestionService {
     return Math.max(0, efficiency);
   }
 
-  async getPickingSuggestionsByMemo(memoId: string): Promise<any> {
+  async getPickingSuggestionsByMemo(memoId: string): Promise<PickingSuggestionDto[]> {
     // Validate memoId before proceeding
     if (!memoId || memoId.trim() === '') {
       console.warn('getPickingSuggestionsByMemo: memoId is empty or null');
-      return null;
+      return [];
     }
 
     const query = `
@@ -617,7 +614,7 @@ export class PickingSuggestionService {
     try {
     const results = await this.outboundMemoRepository.query(query, [memoId]) as any[];
     
-    if (results.length === 0) return null;
+    if (results.length === 0) return [];
 
     const memo = {
       id: results[0].memo_id,
@@ -641,7 +638,7 @@ export class PickingSuggestionService {
     } catch (error) {
       console.error('Error in getPickingSuggestionsByMemo:', error);
       console.error('Query parameters:', { memoId });
-      return null;
+      return [];
     }
   }
 
@@ -656,67 +653,79 @@ export class PickingSuggestionService {
     }
   }
 
-  private getAllAvailableInventory(availableInventory: any[], requiredQuantity: number): any[] {
-    // Return all available inventory that can contribute to fulfilling the required quantity
-    const allSuggestions: any[] = [];
-    let remainingQuantity = requiredQuantity;
+  private getAllAvailableInventory(availableInventory: any[], requiredQuantity: number): PickingSuggestionLocationDto[] {
+    // Group inventory by bin level for global suggestions
+    const binGroups = new Map();
     
-    // Sort inventory by priority: exact match > location priority > FIFO > age > quantity
-    const sortedInventory = [...availableInventory].sort((a, b) => {
-      // 1. Exact match priority
-      const aExactMatch = a.quantity === requiredQuantity ? 1 : 0;
-      const bExactMatch = b.quantity === requiredQuantity ? 1 : 0;
-      if (aExactMatch !== bExactMatch) {
-        return bExactMatch - aExactMatch;
+    // Group inventory by bin (warehouse_bin_id) or sub-warehouse (warehouse_sub_id) if no bin
+    for (const inv of availableInventory) {
+      const binKey = inv.warehouse_bin_id || `sub_${inv.it_warehouse_sub_id}`;
+      
+      
+      if (!binGroups.has(binKey)) {
+        binGroups.set(binKey, {
+          warehouse_name: inv.warehouse_name,
+          warehouse_sub_name: inv.warehouse_sub_name,
+          warehouse_sub_code: inv.warehouse_sub_code,
+          warehouse_sub_id: inv.it_warehouse_sub_id,
+          bin_id: inv.it_warehouse_bin_id || 'N/A',
+          bin_name: inv.bin_name || 'N/A',
+          bin_code: inv.bin_code || 'N/A',
+          search_level: inv.search_level,
+          location_type: inv.location_type,
+          location_priority: inv.location_priority,
+          place: this.getLocationPlace(inv),
+          total_quantity: 0,
+          items: []
+        });
       }
       
-      // 2. Location priority (bin > sub > warehouse)
+      const group = binGroups.get(binKey);
+      group.total_quantity += inv.quantity;
+      group.items.push(inv);
+    }
+    
+    // Convert to array and sort by priority
+    const sortedBins = Array.from(binGroups.values()).sort((a, b) => {
+      // 1. Location priority (bin > sub > warehouse)
       if (a.location_priority !== b.location_priority) {
         return a.location_priority - b.location_priority;
       }
       
-      // 3. FIFO: older inventory first
-      if (a.week_number !== b.week_number) {
-        return a.week_number - b.week_number;
-      }
-      
-      // 4. Age: older first
-      if (a.age_seconds !== b.age_seconds) {
-        return parseFloat(b.age_seconds) - parseFloat(a.age_seconds);
-      }
-      
-      // 5. Quantity: higher quantity first
-      return b.quantity - a.quantity;
+      // 2. Total quantity (higher first)
+      return b.total_quantity - a.total_quantity;
     });
     
-    // Add all inventory that can contribute to fulfilling the requirement
-    for (const inv of sortedInventory) {
+    // Generate suggestions for each bin
+    const allSuggestions: any[] = [];
+    let remainingQuantity = requiredQuantity;
+    
+    for (const bin of sortedBins) {
       if (remainingQuantity <= 0) break;
       
-      const quantityToTake = Math.min(inv.quantity, remainingQuantity);
+      const quantityToTake = Math.min(bin.total_quantity, remainingQuantity);
+      
+      // Find the most representative item for status and other details
+      const representativeItem = bin.items[0];
       
       allSuggestions.push({
-        available_quantity: inv.quantity,
+        available_quantity: bin.total_quantity,
         quantity_ready_to_pick: quantityToTake,
-        uom: inv.pth_uom || 'DUS',
-        inventory_progression_status: inv.it_progression_status,
-        inventory_status: inv.it_inventory_status,
-        inventory_tracking_id: inv.inventory_tracking_id,
-        warehouse_sub_name: inv.warehouse_sub_name,
-        warehouse_sub_code: inv.warehouse_sub_code,
-        warehouse_sub_id: inv.it_warehouse_sub_id,
-        warehouse_bin_id: inv.warehouse_bin_id,
-        bin_name: inv.bin_name || 'N/A',
-        bin_code: inv.bin_code || 'N/A',
-        search_level: inv.search_level,
-        location_type: inv.location_type,
-        location_priority: inv.location_priority,
-        pallet_id: inv.it_pallet_id,
-        pallet_code: inv.p_pallet_code || 'N/A',
-        pallet_utilization: inv.pallet_utilization || '0.00',
-        week_number: inv.week_number,
-        production_date: inv.production_date,
-        place: this.getLocationPlace(inv)
+        uom: representativeItem.pth_uom || 'DUS',
+        warehouse_name: bin.warehouse_name,
+        warehouse_sub_name: bin.warehouse_sub_name,
+        warehouse_sub_code: bin.warehouse_sub_code,
+        warehouse_sub_id: bin.warehouse_sub_id,
+        warehouse_bin_id: bin.warehouse_bin_id,
+        bin_id: bin.bin_id,
+        bin_name: bin.bin_name,
+        bin_code: bin.bin_code,
+        search_level: bin.search_level,
+        location_type: bin.location_type,
+        location_priority: bin.location_priority,
+        week_number: representativeItem.pth_week_number,
+        production_date: representativeItem.production_date,
+        place: bin.place
       });
       
       remainingQuantity -= quantityToTake;
@@ -731,7 +740,6 @@ export class PickingSuggestionService {
   }
 
   private determineFulfillmentStatus(availableInventory: any[], requiredQuantity: number): string {
-    console.log('availableInventory', availableInventory);
     
     // Get all available inventory that can contribute to fulfilling the requirement
     const allSuggestions = this.getAllAvailableInventory(availableInventory, requiredQuantity);
@@ -747,16 +755,6 @@ export class PickingSuggestionService {
     const hasPartialPick = allSuggestions.some(suggestion => 
       suggestion.available_quantity > suggestion.quantity_ready_to_pick
     );
-    
-    console.log('Status calculation:', {
-      totalFulfillable,
-      requiredQuantity,
-      hasPartialPick,
-      allSuggestions: allSuggestions.map(s => ({
-        available_quantity: s.available_quantity,
-        quantity_ready_to_pick: s.quantity_ready_to_pick
-      }))
-    });
     
     // PARTIAL PICK: Check for partial pick scenario first (available_quantity > quantity_ready_to_pick)
     if (hasPartialPick) {
@@ -790,17 +788,6 @@ export class PickingSuggestionService {
     const hasPartialPick = allSuggestions.some(suggestion => 
       suggestion.available_quantity > suggestion.quantity_ready_to_pick
     );
-    
-    console.log('Notes calculation:', {
-      totalFulfillable,
-      totalAvailable,
-      requiredQuantity,
-      hasPartialPick,
-      allSuggestions: allSuggestions.map(s => ({
-        available_quantity: s.available_quantity,
-        quantity_ready_to_pick: s.quantity_ready_to_pick
-      }))
-    });
     
     // Partial pick scenario - inventory available but only partially ready (CHECK FIRST)
     if (hasPartialPick) {
