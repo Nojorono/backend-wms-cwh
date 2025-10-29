@@ -29,6 +29,7 @@ import { OutboundMemoModule } from './outbound-memo/outbound-memo.module';
 import { OutboundDoModule } from './outbound-do/outbound-do.module';
 import { TransactionPickingModule } from './transaction-picking/transaction-picking.module';
 import { AssignedPickingModule } from './assigned-picking/assigned-picking.module';
+import { UserManageModule } from './user-manage/user-manage.module';
 import { S3Module } from './infrastructure/modules/s3.module';
 
 @Module({
@@ -75,6 +76,7 @@ import { S3Module } from './infrastructure/modules/s3.module';
     OutboundDoModule,
     TransactionPickingModule,
     AssignedPickingModule,
+    UserManageModule,
     S3Module,
   ],
   providers: [
