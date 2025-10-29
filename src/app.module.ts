@@ -55,6 +55,7 @@ import { S3Module } from './infrastructure/modules/s3.module';
     RolePermissionModule,
     MenuModule,
     UserModule,
+    UserManageModule,
     MasterVehicleModule,
     MasterUomModule,
     MasterPalletModule,
@@ -76,7 +77,6 @@ import { S3Module } from './infrastructure/modules/s3.module';
     OutboundDoModule,
     TransactionPickingModule,
     AssignedPickingModule,
-    UserManageModule,
     S3Module,
   ],
   providers: [
