@@ -6,7 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  Query,
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
@@ -15,7 +14,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
-  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { TransactionPickingService } from './transaction-picking.service';
@@ -169,23 +167,6 @@ export class TransactionPickingController {
     return {
       success: true,
       message: 'Data transaction picking berdasarkan status berhasil diambil',
-      data: result,
-    };
-  }
-
-  @Get('pallet/:palletId')
-  @ApiOperation({ summary: 'Get transaction picking by pallet ID' })
-  @ApiParam({ name: 'palletId', description: 'ID pallet' })
-  @ApiResponse({
-    status: 200,
-    description: 'Daftar transaction picking berdasarkan pallet',
-    type: [PickingTransaction],
-  })
-  async findByPalletId(@Param('palletId') palletId: string) {
-    const result = await this.service.findByPalletId(palletId);
-    return {
-      success: true,
-      message: 'Data transaction picking berdasarkan pallet berhasil diambil',
       data: result,
     };
   }

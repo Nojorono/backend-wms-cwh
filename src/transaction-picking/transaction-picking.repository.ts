@@ -21,10 +21,8 @@ export class TransactionPickingRepository {
       relations: [
         'memo',
         'item',
-        'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -36,10 +34,8 @@ export class TransactionPickingRepository {
       relations: [
         'memo',
         'item',
-        'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource',
       ],
     });
   }
@@ -63,10 +59,8 @@ export class TransactionPickingRepository {
       relations: [
         'memo',
         'item',
-        'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -78,25 +72,8 @@ export class TransactionPickingRepository {
       relations: [
         'memo',
         'item',
-        'inventoryTracking',
         'sourceWarehouseSub',
         'sourceBin',
-        'palletSource',
-      ],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async findByPalletId(palletId: string): Promise<PickingTransaction[]> {
-    return this.repository.find({
-      where: { pallet_source_id: palletId },
-      relations: [
-        'memo',
-        'item',
-        'inventoryTracking',
-        'sourceWarehouseSub',
-        'sourceBin',
-        'palletSource',
       ],
       order: { createdAt: 'DESC' },
     });
