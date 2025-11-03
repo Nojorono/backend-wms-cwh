@@ -226,6 +226,53 @@ export class OutboundDoController {
     return this.outboundDoService.remove(id);
   }
 
+  @Get('item/:itemId/picking-suggestions')
+  @ApiOperation({ summary: 'Get picking suggestions for specific item' })
+  @ApiParam({ name: 'itemId', description: 'ID item' })
+  @ApiResponse({
+    status: 200,
+    description: 'Picking suggestions untuk item tertentu',
+    schema: {
+      type: 'object',
+      properties: {
+        item_id: { type: 'string', example: 'uuid-item-1' },
+        item_name: { type: 'string', example: 'CLAS MILD - 16' },
+        item_code: { type: 'string', example: 'RK.CLM.160000' },
+        total_available_quantity: { type: 'number', example: 500 },
+        suggested_locations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              warehouse_name: { type: 'string', example: 'Warehouse A' },
+              warehouse_sub_name: { type: 'string', example: 'Sub A1' },
+              bin_name: { type: 'string', example: 'Bin A1-01' },
+              available_quantity: { type: 'number', example: 100 },
+              quantity_ready_to_pick: { type: 'number', example: 100 },
+              uom: { type: 'string', example: 'DUS' },
+            },
+          },
+        },
+        notes: { type: 'string', example: 'Item tersedia dengan total 500 unit di 5 lokasi' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Item tidak ditemukan',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Item not found' },
+        statusCode: { type: 'number', example: 404 },
+      },
+    },
+  })
+  async getPickingSuggestionsByItemId(@Param('itemId') itemId: string) {
+    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId);
+  }
+
   @Get('memo/:memoId/picking-suggestions')
   @ApiOperation({ summary: 'Get picking suggestions for specific memo' })
   @ApiParam({ name: 'memoId', description: 'ID outbound memo' })

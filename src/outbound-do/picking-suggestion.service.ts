@@ -807,4 +807,48 @@ export class PickingSuggestionService {
       return `Item tidak tersedia di inventory. Dibutuhkan: ${requiredQuantity} ${item.uom}`;
     }
   }
+
+  async getPickingSuggestionsByItemId(itemId: string): Promise<any> {
+    // Validate itemId before proceeding
+    if (!itemId || itemId.trim() === '') {
+      throw new Error('Item ID is required');
+    }
+
+    if (!this.isValidUUID(itemId)) {
+      throw new Error('Item ID is not a valid UUID');
+    }
+
+    // Get item details
+    const item = await this.itemRepository.findOne({ where: { id: itemId } });
+    if (!item) {
+      throw new Error('Item not found');
+    }
+
+    // Find all available inventory for this item
+    const availableInventory = await this.findAvailableInventoryForItem(itemId, 0);
+
+    if (availableInventory.length === 0) {
+      return {
+        item_id: itemId,
+        item_name: item.description,
+        item_code: item.item_number,
+        total_available_quantity: 0,
+        suggested_locations: [],
+        notes: 'Item tidak tersedia di inventory',
+      };
+    }
+
+    // Get all available inventory grouped by location
+    const totalQuantity = availableInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+    const locations = this.getAllAvailableInventory(availableInventory, totalQuantity);
+
+    return {
+      item_id: itemId,
+      item_name: item.description,
+      item_code: item.item_number,
+      total_available_quantity: totalQuantity,
+      suggested_locations: locations,
+      notes: `Item tersedia dengan total ${totalQuantity} unit di ${locations.length} lokasi`,
+    };
+  }
 }
