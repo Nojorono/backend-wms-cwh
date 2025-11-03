@@ -341,6 +341,7 @@ export class PickingSuggestionService {
         .andWhere('it.inventory_status IN (:...statuses)', {
           statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED'],
         })
+        .andWhere('pth.status_inventory = :statusInventory', { statusInventory: 'READY' })
         .andWhere('pth.new_quantity > 0')
         .andWhere('(it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)')
         .andWhere('pth.item_id IS NOT NULL')
@@ -354,6 +355,7 @@ export class PickingSuggestionService {
             .from('transaction_pallet_history', 'pth2')
             .where('pth2.item_id = pth.item_id')
             .andWhere('pth2.pallet_id = pth.pallet_id')
+            .andWhere('pth2.status_inventory = :statusInventory')
             .getQuery();
           return `pth.created_at = ${subQuery}`;
         })
