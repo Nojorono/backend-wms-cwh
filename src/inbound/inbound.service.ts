@@ -4,7 +4,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Inbound } from '../core/domain/entities/inbound.entity';
 import { InboundRepository } from './repositories/inbound.repository';
 import { InboundDoRepository } from './repositories/inbound-do.repository';
@@ -19,6 +19,8 @@ import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection
 import { InboundItem, InspectionStatus } from '../core/domain/entities/inbound-item.entity';
 import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 import { InboundStatus } from 'src/core/domain/entities/inbound.entity';
+import { PalletTransactionHistory, StatusInventory } from 'src/core/domain/entities/transaction-pallet-history.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class InboundService {
@@ -28,6 +30,8 @@ export class InboundService {
     private readonly inboundItemRepo: InboundItemRepository,
     private readonly dataSource: DataSource,
     private readonly paginationService: PaginationService,
+    @InjectRepository(PalletTransactionHistory)
+    private readonly palletTransactionHistoryRepository: Repository<PalletTransactionHistory>,
   ) {}
 
   private async generateSequentialInboundNumber(now: Date): Promise<string> {
@@ -622,5 +626,25 @@ export class InboundService {
       });
     }
     return updateSaldo;
+  }
+
+  async integrationToOracle(id: string): Promise<Inbound> {
+    const inbound = await this.findOne(id);
+    if (!inbound) {
+      throw new NotFoundException('Inbound not found');
+    }
+
+    // update pallet history status inventory to READY
+    const palletHistories = await this.palletTransactionHistoryRepository.find({
+      where: {
+        inbound_id: id,
+      },
+    });
+    for (const palletHistory of palletHistories) {
+      await this.palletTransactionHistoryRepository.update(palletHistory.id, {
+        status_inventory: StatusInventory.READY,
+      });
+    }
+    return inbound;
   }
 }

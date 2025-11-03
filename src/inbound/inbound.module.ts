@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Inbound } from 'src/core/domain/entities/inbound.entity';
 import { InboundDo } from 'src/core/domain/entities/inbound-do.entity';
 import { InboundItem } from 'src/core/domain/entities/inbound-item.entity';
+import { PalletTransactionHistory } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { InboundController } from 'src/inbound/inbound.controller';
 import { InboundService } from 'src/inbound/inbound.service';
 import { InboundRepository } from 'src/inbound/repositories/inbound.repository';
@@ -16,7 +17,7 @@ import { DoValidationIntegrationService } from './integration/do-validation.inte
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Inbound, InboundDo, InboundItem]),
+    TypeOrmModule.forFeature([Inbound, InboundDo, InboundItem, PalletTransactionHistory]),
     ClientsModule.registerAsync([
       {
         name: 'DO_VALIDATION_SERVICE',

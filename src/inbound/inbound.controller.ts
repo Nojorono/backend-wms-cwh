@@ -159,4 +159,12 @@ export class InboundController {
   sequentialStatus(@Param('id') id: string) {
     return this.service.sequentialStatus(id);
   }
+
+  // integration to oracle by inbound id
+  @Post('integration-to-oracle/:id')
+  @ApiOperation({ summary: 'Integration to oracle by inbound id' })
+  @ApiResponse({ status: 200, type: Inbound })
+  integrationToOracle(@Param('id') id: string) {
+    return this.service.integrationToOracle(id);
+  }
 }
