@@ -33,6 +33,9 @@ export class InboundItem extends BaseEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quantity_inspection: number;
 
+  @Column({ nullable: true })
+  uom_inspection: string;
+
   @Column({ nullable: true, default: InspectionStatus.PENDING })
   inspection_status: InspectionStatus;
 
