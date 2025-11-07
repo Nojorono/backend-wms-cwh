@@ -31,6 +31,7 @@ import { TransactionPickingModule } from './transaction-picking/transaction-pick
 import { AssignedPickingModule } from './assigned-picking/assigned-picking.module';
 import { UserManageModule } from './user-manage/user-manage.module';
 import { S3Module } from './infrastructure/modules/s3.module';
+import { CustomerModule } from './customer/customer.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { S3Module } from './infrastructure/modules/s3.module';
     TransactionPickingModule,
     AssignedPickingModule,
     S3Module,
+    CustomerModule,
   ],
   providers: [
     {
