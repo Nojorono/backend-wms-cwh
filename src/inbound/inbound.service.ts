@@ -610,21 +610,19 @@ export class InboundService {
     const updateSaldo = await this.inboundItemRepo.bulkUpdateSaldoInspection(updates);
     // find all inbound item by inbound_do_id
     const inboundItems = await this.inboundItemRepo.findAllByInboundDo(payload.inbound_do_id);
-    let isAllApproved = true;
-    for (const item of inboundItems) {
-      if (item.inspection_status === InspectionStatus.PENDING) {
-        isAllApproved = false;
-      }
-    }
-    if (isAllApproved) {
-      await this.inboundDoRepo.update(payload.inbound_do_id, {
-        integration_status: IntegrationStatus.READY,
-      });
-    } else {
-      await this.inboundDoRepo.update(payload.inbound_do_id, {
-        integration_status: IntegrationStatus.PENDING,
-      });
-    }
+
+    const shouldBeReady =
+      inboundItems.length > 0 &&
+      inboundItems.every(
+        (item) => item.inspection_status === InspectionStatus.APPROVED,
+      );
+
+    const targetStatus = shouldBeReady ? IntegrationStatus.READY : IntegrationStatus.PENDING;
+
+    await this.inboundDoRepo.update(payload.inbound_do_id, {
+      integration_status: targetStatus,
+    });
+
     return updateSaldo;
   }
 
