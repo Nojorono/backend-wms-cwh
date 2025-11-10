@@ -92,7 +92,7 @@ export class OutboundMemoRepository {
     const where: Partial<OutboundMemo> = { status: status as OutboundMemoStatus };
 
     if (status === OutboundMemoStatus.APPROVED) {
-      where.has_do = true;
+      where.has_do = false;
     }
 
     return await this.outboundMemoRepository.find({
