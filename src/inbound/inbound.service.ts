@@ -643,6 +643,11 @@ export class InboundService {
         status_inventory: StatusInventory.READY,
       });
     }
+
+    // update inbound status to READY_INTEGRATION
+    await this.inboundRepo.update(id, {
+      status: InboundStatus.INTEGRATED,
+    });
     return inbound;
   }
 }
