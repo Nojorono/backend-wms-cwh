@@ -25,6 +25,7 @@ export class TransactionPickingRepository {
         'item',
         'sourceWarehouseSub',
         'sourceBin',
+        'transactionScanPicking',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -49,6 +50,7 @@ export class TransactionPickingRepository {
       .leftJoinAndSelect('transaction.item', 'item')
       .leftJoinAndSelect('transaction.sourceWarehouseSub', 'sourceWarehouseSub')
       .leftJoinAndSelect('transaction.sourceBin', 'sourceBin')
+      .leftJoinAndSelect('transaction.transactionScanPicking', 'transactionScanPicking')
       .where('transaction.deletedAt IS NULL');
 
     if (status) {
@@ -97,6 +99,7 @@ export class TransactionPickingRepository {
         'item',
         'sourceWarehouseSub',
         'sourceBin',
+        'transactionScanPicking',
       ],
     });
   }
@@ -123,6 +126,7 @@ export class TransactionPickingRepository {
         'item',
         'sourceWarehouseSub',
         'sourceBin',
+        'transactionScanPicking',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -137,6 +141,7 @@ export class TransactionPickingRepository {
         'item',
         'sourceWarehouseSub',
         'sourceBin',
+        'transactionScanPicking',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -151,6 +156,7 @@ export class TransactionPickingRepository {
         'item',
         'sourceWarehouseSub',
         'sourceBin',
+        'transactionScanPicking',
       ],
       order: { createdAt: 'DESC' },
     });

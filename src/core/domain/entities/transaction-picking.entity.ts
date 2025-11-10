@@ -1,10 +1,11 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
 import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { OutboundMemo } from './outbound-memo.entity';
 import { MasterItem } from './master-item.entity';
 import { OutboundDo } from './outbound-do.entity';
+import { ScanPickingTransaction } from './transaction-scan-picking.entity';
 
 export enum Status {
   PENDING = 'PENDING',
@@ -59,4 +60,7 @@ export class PickingTransaction extends BaseEntity {
 
   @Column({ nullable: true, default: Status.PENDING })
   status: Status;
+
+  @OneToMany(() => ScanPickingTransaction, (scanPicking) => scanPicking.transactionPicking)
+  transactionScanPicking: ScanPickingTransaction[];
 }
