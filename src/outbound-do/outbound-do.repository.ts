@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
 import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
@@ -47,6 +47,11 @@ export class OutboundDoRepository {
 
           if (!memo) {
             throw new BadRequestException(`Outbound memo with ID ${memoItem.memo_id} not found`);
+          }
+
+          if (!memo.has_do) {
+            await this.outboundMemoRepository.update(memo.id, { has_do: true });
+            memo.has_do = true;
           }
 
           outboundMemos.push(memo);
@@ -100,6 +105,11 @@ export class OutboundDoRepository {
   async update(id: string, data: UpdateOutboundDoDto): Promise<OutboundDo> {
     const existing = await this.findOne(id);
 
+    const previousMemoIds =
+      existing.memo_id && existing.memo_id.length > 0
+        ? [...existing.memo_id]
+        : existing.outbound_memos?.map((memo) => memo.id) ?? [];
+
     const { outbound_memo_ids, ...outboundDoData } = data;
 
     // Update outbound do
@@ -130,6 +140,7 @@ export class OutboundDoRepository {
           // Sort by sequence to process in order
           const sortedMemos = [...outbound_memo_ids].sort((a, b) => a.sequence - b.sequence);
 
+          const updatedMemoIds = sortedMemos.map((item) => item.memo_id);
           for (const memoItem of sortedMemos) {
             try {
               console.log(`Updating memo ${memoItem.memo_id} with sequence ${memoItem.sequence}`);
@@ -142,6 +153,11 @@ export class OutboundDoRepository {
                 throw new BadRequestException(
                   `Outbound memo with ID ${memoItem.memo_id} not found`,
                 );
+              }
+
+              if (!memo.has_do) {
+                await this.outboundMemoRepository.update(memo.id, { has_do: true });
+                memo.has_do = true;
               }
 
               outboundMemos.push(memo);
@@ -160,9 +176,25 @@ export class OutboundDoRepository {
           }
 
           outboundDo.outbound_memos = outboundMemos;
+          const updatedMemoIdSet = new Set(updatedMemoIds);
+          const memoIdsToDetach = previousMemoIds.filter(
+            (memoId) => !updatedMemoIdSet.has(memoId),
+          );
+          if (memoIdsToDetach.length > 0) {
+            await this.outboundMemoRepository.update(
+              { id: In(memoIdsToDetach) },
+              { has_do: false },
+            );
+          }
         } else {
           outboundDo.outbound_memos = [];
           outboundDo.memo_sequence = [];
+          if (previousMemoIds.length > 0) {
+            await this.outboundMemoRepository.update(
+              { id: In(previousMemoIds) },
+              { has_do: false },
+            );
+          }
         }
         await this.outboundDoRepository.save(outboundDo);
       }

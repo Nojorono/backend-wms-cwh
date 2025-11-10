@@ -35,6 +35,9 @@ export class OutboundMemo extends BaseEntity {
   @Column({ nullable: true })
   notes: string;
 
+  @Column({ nullable: true, default: false })
+  has_do: boolean;
+
   @OneToMany(() => OutboundMemoItem, (outboundMemoItem) => outboundMemoItem.outbound_memo)
   outbound_memo_items: OutboundMemoItem[];
 
