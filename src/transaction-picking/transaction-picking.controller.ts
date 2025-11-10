@@ -1,13 +1,14 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
-  HttpStatus,
+  Get,
   HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +21,8 @@ import { TransactionPickingService } from './transaction-picking.service';
 import { CreateTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
+import { PaginationQueryDto } from '../core/dto/pagination.dto';
+import { ApiPaginationQuery } from '../core/decorators/pagination.decorator';
 
 @ApiTags('Transaction Picking')
 @Controller('transaction-picking')
@@ -49,18 +52,44 @@ export class TransactionPickingController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all transaction picking' })
+  @ApiOperation({ summary: 'Get all transaction picking with pagination' })
+  @ApiPaginationQuery()
   @ApiResponse({
     status: 200,
     description: 'Daftar transaction picking',
-    type: [PickingTransaction],
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Data transaction picking berhasil diambil',
+        },
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/PickingTransaction' },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            page: { type: 'number', example: 1 },
+            limit: { type: 'number', example: 10 },
+            total: { type: 'number', example: 100 },
+            totalPages: { type: 'number', example: 10 },
+            hasNextPage: { type: 'boolean', example: true },
+            hasPreviousPage: { type: 'boolean', example: false },
+          },
+        },
+      },
+    },
   })
-  async findAll() {
-    const result = await this.service.findAll();
+  async findAll(@Query() paginationQuery: PaginationQueryDto) {
+    const result = await this.service.findAll(paginationQuery);
     return {
       success: true,
       message: 'Data transaction picking berhasil diambil',
-      data: result,
+      data: result.data,
+      meta: result.meta,
     };
   }
 

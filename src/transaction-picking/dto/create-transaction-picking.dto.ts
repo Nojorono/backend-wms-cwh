@@ -3,6 +3,11 @@ import { IsNotEmpty, IsString, IsNumber, IsOptional, IsEnum } from 'class-valida
 import { Status } from '../../core/domain/entities/transaction-picking.entity';
 
 export class CreateTransactionPickingDto {
+  @ApiProperty({ description: 'ID outbound do' })
+  @IsNotEmpty()
+  @IsString()
+  do_id: string;
+
   @ApiProperty({ description: 'ID outbound memo' })
   @IsNotEmpty()
   @IsString()

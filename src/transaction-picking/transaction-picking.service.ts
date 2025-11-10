@@ -3,10 +3,15 @@ import { TransactionPickingRepository } from './transaction-picking.repository';
 import { CreateTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
+import { PaginationQueryDto, PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 
 @Injectable()
 export class TransactionPickingService {
-  constructor(private readonly repository: TransactionPickingRepository) {}
+  constructor(
+    private readonly repository: TransactionPickingRepository,
+    private readonly paginationService: PaginationService,
+  ) {}
 
   async create(data: CreateTransactionPickingDto): Promise<PickingTransaction> {
     // Validasi quantity harus positif
@@ -17,8 +22,19 @@ export class TransactionPickingService {
     return this.repository.create(data);
   }
 
-  async findAll(): Promise<PickingTransaction[]> {
-    return this.repository.findAll();
+  async findAll(
+    paginationQuery: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<PickingTransaction>> {
+    const normalizedQuery: PaginationQueryDto = {
+      ...paginationQuery,
+      page: paginationQuery.page ?? 1,
+      limit: paginationQuery.limit ?? 10,
+      sortOrder: paginationQuery.sortOrder ?? 'DESC',
+    };
+
+    const { data, total } = await this.repository.findAllPaginated(normalizedQuery);
+
+    return this.paginationService.createPaginatedResponse(data, normalizedQuery, total);
   }
 
   async findOne(id: string): Promise<PickingTransaction> {
@@ -66,6 +82,10 @@ export class TransactionPickingService {
 
   async findByMemoId(memoId: string): Promise<PickingTransaction[]> {
     return this.repository.findByMemoId(memoId);
+  }
+
+  async findByDoId(doId: string): Promise<PickingTransaction[]> {
+    return this.repository.findByDoId(doId);
   }
 
   async findByStatus(status: string): Promise<PickingTransaction[]> {

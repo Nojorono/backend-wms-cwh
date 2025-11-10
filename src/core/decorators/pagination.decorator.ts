@@ -22,14 +22,12 @@ export function ApiPaginationQuery() {
       required: false,
       type: String,
       description: 'Search term',
-      example: 'search term',
     }),
     ApiQuery({
       name: 'sortBy',
       required: false,
       type: String,
       description: 'Sort field',
-      example: 'createdAt',
     }),
     ApiQuery({
       name: 'sortOrder',
@@ -44,7 +42,6 @@ export function ApiPaginationQuery() {
       required: false,
       type: String,
       description: 'Status filter',
-      example: 'CREATED',
     }),
   );
 }

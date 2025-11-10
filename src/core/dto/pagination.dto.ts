@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsPositive, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PaginationQueryDto {
@@ -29,17 +29,9 @@ export class PaginationQueryDto {
   @Max(100)
   limit?: number = 10;
 
-  @ApiPropertyOptional({
-    description: 'Search term',
-    example: 'search term',
-  })
   @IsOptional()
   search?: string;
 
-  @ApiPropertyOptional({
-    description: 'Sort field',
-    example: 'createdAt',
-  })
   @IsOptional()
   sortBy?: string;
 
@@ -52,10 +44,6 @@ export class PaginationQueryDto {
   @IsOptional()
   sortOrder?: 'ASC' | 'DESC' = 'DESC';
 
-  @ApiPropertyOptional({
-    description: 'Status filter',
-    example: 'CREATED',
-  })
   @IsOptional()
   status?: string;
 }
