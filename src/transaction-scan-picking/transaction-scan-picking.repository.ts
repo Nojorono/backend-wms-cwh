@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
+import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';
 
@@ -19,7 +19,10 @@ export class TransactionScanPickingRepository {
   ) {}
 
   async create(data: CreateTransactionScanPickingDto): Promise<ScanPickingTransaction> {
-    const entity = this.repository.create(data);
+    const entity = this.repository.create({
+      ...data,
+      status: ScanPickingStatus.PENDING,
+    });
     return this.repository.save(entity);
   }
 
@@ -59,7 +62,11 @@ export class TransactionScanPickingRepository {
       throw new NotFoundException('Transaction scan picking tidak ditemukan');
     }
 
-    await this.repository.update(id, data);
+    await this.repository.update(id, {
+      ...data,
+      status: data.status as ScanPickingStatus,
+      inspection_by: data.inspection_by,
+    });
 
     const updated = await this.findOne(id);
     if (!updated) {
