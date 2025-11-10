@@ -205,6 +205,10 @@ export class OutboundDoRepository {
 
   async remove(id: string): Promise<void> {
     const existing = await this.findOne(id);
+    if (existing.outbound_memos && existing.outbound_memos.length > 0) {
+      const memoIds = existing.outbound_memos.map((memo) => memo.id);
+      await this.outboundMemoRepository.update({ id: In(memoIds) }, { has_do: false });
+    }
     await this.outboundDoRepository.delete(id);
   }
 

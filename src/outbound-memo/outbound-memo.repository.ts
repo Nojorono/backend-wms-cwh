@@ -89,8 +89,14 @@ export class OutboundMemoRepository {
   }
 
   async findByStatus(status: string): Promise<OutboundMemo[]> {
+    const where: Partial<OutboundMemo> = { status: status as OutboundMemoStatus };
+
+    if (status === OutboundMemoStatus.APPROVED) {
+      where.has_do = true;
+    }
+
     return await this.outboundMemoRepository.find({
-      where: { status: status as any },
+      where,
       relations: ['outbound_memo_items', 'outbound_memo_items.item'],
       order: { createdAt: 'DESC' },
     });
