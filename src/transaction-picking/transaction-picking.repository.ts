@@ -164,4 +164,12 @@ export class TransactionPickingRepository {
     }
     return result;
   }
+
+  async detachMemo(memoId: string): Promise<void> {
+    await this.repository.update(memoId, { memo_id: undefined });
+  }
+
+  async detachDo(doId: string): Promise<void> {
+    await this.repository.update(doId, { do_id: undefined, memo_id: undefined });
+  }
 }

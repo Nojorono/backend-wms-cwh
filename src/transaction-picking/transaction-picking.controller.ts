@@ -224,4 +224,34 @@ export class TransactionPickingController {
       data: result,
     };
   }
+  // detach memo from transaction picking
+  @Patch('memo/:memoId/detach')
+  @ApiOperation({ summary: 'Detach memo from transaction picking' })
+  @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
+  @ApiResponse({
+    status: 204,
+    description: 'Memo berhasil dilepas dari transaction picking',
+  })
+  async detachMemo(@Param('memoId') memoId: string) {
+    await this.service.detachMemo(memoId);
+    return {
+      success: true,
+      message: 'Memo berhasil dilepas dari transaction picking',
+    };
+  }
+  // detach do from transaction picking
+  @Patch('do/:doId/detach')
+  @ApiOperation({ summary: 'Detach do from transaction picking' })
+  @ApiParam({ name: 'doId', description: 'ID outbound do' })
+  @ApiResponse({
+    status: 204,
+    description: 'Do berhasil dilepas dari transaction picking',
+  })
+  async detachDo(@Param('doId') doId: string) {
+    await this.service.detachDo(doId);
+    return {
+      success: true,
+      message: 'Do berhasil dilepas dari transaction picking',
+    };
+  }
 }

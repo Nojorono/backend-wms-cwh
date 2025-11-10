@@ -116,4 +116,12 @@ export class TransactionPickingService {
       );
     }
   }
+
+  async detachMemo(memoId: string): Promise<void> {
+    return this.repository.detachMemo(memoId);
+  }
+
+  async detachDo(doId: string): Promise<void> {
+    return this.repository.detachDo(doId);
+  }
 }
