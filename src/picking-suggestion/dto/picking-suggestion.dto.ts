@@ -27,10 +27,22 @@ export class PickingSuggestionDto {
   item_code: string;
 
   @ApiProperty({
-    description: 'Required quantity for this item',
+    description: 'Total required quantity from memo',
     example: 100,
   })
   required_quantity: number;
+
+  @ApiProperty({
+    description: 'Quantity already assigned to transaction picking (PENDING + COMPLETED)',
+    example: 20,
+  })
+  already_picked_quantity: number;
+
+  @ApiProperty({
+    description: 'Remaining quantity still needed (required - already_picked)',
+    example: 80,
+  })
+  remaining_quantity_needed: number;
 
   @ApiProperty({
     description: 'Suggested picking locations for this item',

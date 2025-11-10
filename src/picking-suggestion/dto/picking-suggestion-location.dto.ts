@@ -2,8 +2,20 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class PickingSuggestionLocationDto {
   @ApiProperty({
-    description: 'Available quantity in this location',
-    example: 24,
+    description: 'Total quantity in pallet history (before reservations)',
+    example: 150,
+  })
+  total_quantity: number;
+
+  @ApiProperty({
+    description: 'Quantity reserved by pending transaction picking',
+    example: 0,
+  })
+  reserved_quantity: number;
+
+  @ApiProperty({
+    description: 'Available quantity after reservations (total - reserved)',
+    example: 150,
   })
   available_quantity: number;
 

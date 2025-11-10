@@ -29,6 +29,7 @@ export class PickingTransaction extends BaseEntity {
   @JoinColumn({ name: 'memo_id' })
   memo: OutboundMemo;
 
+  @Column({ nullable: true })
   item_id: string;
 
   @ManyToOne(() => MasterItem, (item) => item.id)

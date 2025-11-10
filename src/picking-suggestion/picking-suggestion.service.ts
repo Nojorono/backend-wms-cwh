@@ -134,10 +134,14 @@ export class PickingSuggestionService {
         continue;
       }
 
+      // Calculate how much is already assigned to transaction-picking for this memo item
+      const alreadyPicked = await this.getAlreadyPickedQuantity(memo.id, item.item_id);
+      const remainingRequired = Math.max(0, item.quantity_plan - alreadyPicked);
+
       // Find available inventory for this item
       const availableInventory = await this.findAvailableInventoryForItem(
         item.item_id,
-        item.quantity_plan,
+        remainingRequired,
       );
 
       if (availableInventory.length > 0) {
@@ -147,16 +151,18 @@ export class PickingSuggestionService {
           item_name: item.item_name,
           item_code: item.item_code,
           required_quantity: item.quantity_plan,
+          already_picked_quantity: alreadyPicked,
+          remaining_quantity_needed: remainingRequired,
           suggested_locations: this.getAllAvailableInventory(
             availableInventory,
-            item.quantity_plan,
+            remainingRequired,
           ),
           total_suggested_quantity: this.calculateTotalSuggestedQuantity(
             availableInventory,
-            item.quantity_plan,
+            remainingRequired,
           ),
           priority: item.priority,
-          notes: this.generateNotes(item, memo, availableInventory),
+          notes: this.generateNotes(item, memo, availableInventory, alreadyPicked),
         };
         suggestions.push(suggestion as any);
       } else {
@@ -167,11 +173,15 @@ export class PickingSuggestionService {
           item_name: item.item_name,
           item_code: item.item_code,
           required_quantity: item.quantity_plan,
+          already_picked_quantity: alreadyPicked,
+          remaining_quantity_needed: remainingRequired,
           available_quantity: 0,
           suggested_locations: [],
           total_suggested_quantity: 0,
           priority: item.priority,
-          notes: `Item tidak tersedia di inventory. Dibutuhkan: ${item.quantity_plan} ${item.uom}`,
+          notes: alreadyPicked > 0 
+            ? `Item sudah di-pick: ${alreadyPicked} ${item.uom}. Sisa kebutuhan: ${remainingRequired} ${item.uom}. Tidak tersedia di inventory.`
+            : `Item tidak tersedia di inventory. Dibutuhkan: ${item.quantity_plan} ${item.uom}`,
         };
         suggestions.push(suggestion as any);
       }
@@ -494,8 +504,8 @@ export class PickingSuggestionService {
           warehouse_name: inv.warehouse_name,
           warehouse_sub_name: inv.warehouse_sub_name,
           warehouse_sub_code: inv.warehouse_sub_code,
-          warehouse_sub_id: inv.it_warehouse_sub_id,
-          bin_id: inv.it_warehouse_bin_id || 'N/A',
+          warehouse_sub_id: inv.warehouse_sub_id,
+          bin_id: inv.warehouse_bin_id || 'N/A',
           bin_name: inv.bin_name || 'N/A',
           bin_code: inv.bin_code || 'N/A',
           search_level: inv.search_level,
@@ -503,12 +513,16 @@ export class PickingSuggestionService {
           location_priority: inv.location_priority,
           place: this.getLocationPlace(inv),
           total_quantity: 0,
+          reserved_quantity: 0,
+          available_quantity: 0,
           items: [],
         });
       }
 
       const group = binGroups.get(binKey);
-      group.total_quantity += inv.quantity;
+      group.total_quantity += parseFloat(inv.quantity || 0);
+      group.reserved_quantity += parseFloat(inv.reserved_quantity || 0);
+      group.available_quantity += parseFloat(inv.available_quantity || 0);
       group.items.push(inv);
     }
 
@@ -530,15 +544,21 @@ export class PickingSuggestionService {
     for (const bin of sortedBins) {
       if (remainingQuantity <= 0) break;
 
-      const quantityToTake = Math.min(bin.total_quantity, remainingQuantity);
+      // Use available_quantity (after reservations) instead of total_quantity
+      const quantityToTake = Math.min(bin.available_quantity, remainingQuantity);
+
+      // Skip if no available quantity after reservations
+      if (quantityToTake <= 0) continue;
 
       // Find the most representative item for status and other details
       const representativeItem = bin.items[0];
 
       allSuggestions.push({
-        available_quantity: bin.total_quantity,
+        total_quantity: bin.total_quantity,
+        reserved_quantity: bin.reserved_quantity,
+        available_quantity: bin.available_quantity,
         quantity_ready_to_pick: quantityToTake,
-        uom: representativeItem.pth_uom || 'DUS',
+        uom: representativeItem.uom || representativeItem.pth_uom || 'DUS',
         warehouse_name: bin.warehouse_name,
         warehouse_sub_name: bin.warehouse_sub_name,
         warehouse_sub_code: bin.warehouse_sub_code,
@@ -550,7 +570,7 @@ export class PickingSuggestionService {
         search_level: bin.search_level,
         location_type: bin.location_type,
         location_priority: bin.location_priority,
-        week_number: representativeItem.pth_week_number,
+        week_number: representativeItem.week_number || representativeItem.pth_week_number,
         production_date: representativeItem.production_date,
         place: bin.place,
       });
@@ -569,8 +589,13 @@ export class PickingSuggestionService {
     return allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
   }
 
-  private generateNotes(item: any, memo: any, availableInventory: any[]): string {
-    const allSuggestions = this.getAllAvailableInventory(availableInventory, item.quantity_plan);
+  private async getAlreadyPickedQuantity(memoId: string, itemId: string): Promise<number> {
+    return await this.repository.getAlreadyPickedQuantityForMemoItem(memoId, itemId);
+  }
+
+  private generateNotes(item: any, memo: any, availableInventory: any[], alreadyPicked: number = 0): string {
+    const remainingRequired = Math.max(0, item.quantity_plan - alreadyPicked);
+    const allSuggestions = this.getAllAvailableInventory(availableInventory, remainingRequired);
     const totalFulfillable = allSuggestions.reduce(
       (sum, suggestion) => sum + suggestion.quantity_ready_to_pick,
       0,
@@ -579,7 +604,13 @@ export class PickingSuggestionService {
       (sum, suggestion) => sum + suggestion.available_quantity,
       0,
     );
-    const requiredQuantity = item.quantity_plan;
+
+    // Build note with context about existing pickings
+    let note = '';
+    
+    if (alreadyPicked > 0) {
+      note = `Sudah di-pick: ${alreadyPicked} ${item.uom}. Sisa: ${remainingRequired} ${item.uom}. `;
+    }
 
     // Check for partial pick scenario
     const hasPartialPick = allSuggestions.some(
@@ -588,24 +619,26 @@ export class PickingSuggestionService {
 
     // Partial pick scenario - inventory available but only partially ready (CHECK FIRST)
     if (hasPartialPick) {
-      return `Item tersedia dengan partial pick. Tersedia: ${totalAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
+      note += `Item tersedia dengan partial pick. Tersedia: ${totalAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}`;
     }
     // Exact match - perfect fulfillment
-    else if (totalFulfillable === requiredQuantity) {
-      return `Item tersedia dengan jumlah yang tepat. Total tersedia: ${totalFulfillable} ${item.uom}`;
+    else if (totalFulfillable === remainingRequired) {
+      note += `Item tersedia dengan jumlah yang tepat. Total tersedia: ${totalFulfillable} ${item.uom}`;
     }
     // More than required available
-    else if (totalFulfillable > requiredQuantity) {
-      return `Item tersedia dengan jumlah berlebih. Total tersedia: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
+    else if (totalFulfillable > remainingRequired) {
+      note += `Item tersedia dengan jumlah berlebih. Total tersedia: ${totalFulfillable} ${item.uom}`;
     }
     // Partial availability
     else if (totalFulfillable > 0) {
-      return `Item tersedia sebagian. Tersedia: ${totalFulfillable} ${item.uom}, Dibutuhkan: ${requiredQuantity} ${item.uom}`;
+      note += `Item tersedia sebagian. Tersedia: ${totalFulfillable} ${item.uom}, Masih kurang: ${remainingRequired - totalFulfillable} ${item.uom}`;
     }
     // No inventory available
     else {
-      return `Item tidak tersedia di inventory. Dibutuhkan: ${requiredQuantity} ${item.uom}`;
+      note += `Item tidak tersedia di inventory`;
     }
+
+    return note;
   }
 
   async getPickingSuggestionsByItemId(itemId: string): Promise<any> {

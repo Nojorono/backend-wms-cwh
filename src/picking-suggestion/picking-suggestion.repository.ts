@@ -80,83 +80,118 @@ export class PickingSuggestionRepository {
   }
 
   async searchInventoryWithPalletHistory(itemId: string): Promise<any[]> {
-    const queryBuilder = this.inventoryTrackingRepository
-      .createQueryBuilder('it')
-      .leftJoin('it.pallet', 'p', 'it.pallet_id = p.id')
-      .leftJoin('transaction_pallet_history', 'pth', 'p.id = pth.pallet_id')
-      .leftJoin('it.warehouse', 'w')
-      .leftJoin('it.warehouseSub', 'ws')
-      .leftJoin('it.warehouseBin', 'wb')
-      .select([
-        'it.id as inventory_tracking_id',
-        'it.pallet_id',
-        'p.pallet_code',
-        'it.warehouse_id',
-        'it.warehouse_sub_id',
-        'it.warehouse_bin_id',
-        'it.inventory_date',
-        'it.inventory_status',
-        'it.progression_status',
-        'pth.week_number',
-        'pth.production_date',
-        'pth.item_id',
-        'pth.new_quantity as quantity',
-        'pth.uom',
-        'pth.created_at as pallet_history_created_at',
-        'w.name as warehouse_name',
-        'w.description as warehouse_description',
-        'ws.name as warehouse_sub_name',
-        'ws.code as warehouse_sub_code',
-        'ws.description as warehouse_sub_description',
-        'wb.name as bin_name',
-        'wb.code as bin_code',
-        'wb.description as bin_description',
-        'ROUND((pth.new_quantity::numeric / p.capacity::numeric) * 100, 2) as pallet_utilization',
-        `CASE 
+    // Use raw SQL to include reserved quantity calculation
+    const query = `
+      SELECT 
+        it.id as inventory_tracking_id,
+        it.pallet_id,
+        p.pallet_code,
+        it.warehouse_id,
+        it.warehouse_sub_id,
+        it.warehouse_bin_id,
+        it.inventory_date,
+        it.inventory_status,
+        it.progression_status,
+        pth.week_number,
+        pth.production_date,
+        pth.item_id,
+        pth.new_quantity as quantity,
+        pth.uom,
+        pth.created_at as pallet_history_created_at,
+        w.name as warehouse_name,
+        w.description as warehouse_description,
+        ws.name as warehouse_sub_name,
+        ws.code as warehouse_sub_code,
+        ws.description as warehouse_sub_description,
+        wb.name as bin_name,
+        wb.code as bin_code,
+        wb.description as bin_description,
+        ROUND((pth.new_quantity::numeric / p.capacity::numeric) * 100, 2) as pallet_utilization,
+        CASE 
           WHEN it.warehouse_bin_id IS NOT NULL THEN 'BIN_LEVEL'
           WHEN it.warehouse_sub_id IS NOT NULL THEN 'SUB_LEVEL'
           ELSE 'WAREHOUSE_LEVEL'
-        END as search_level`,
-        `CASE 
+        END as search_level,
+        CASE 
           WHEN it.warehouse_bin_id IS NOT NULL THEN 'BIN'
           WHEN it.warehouse_sub_id IS NOT NULL THEN 'WAREHOUSE_SUB'
           ELSE 'WAREHOUSE'
-        END as location_type`,
-        `CASE 
+        END as location_type,
+        CASE 
           WHEN it.warehouse_bin_id IS NOT NULL THEN 1
           WHEN it.warehouse_sub_id IS NOT NULL THEN 2
           ELSE 3
-        END as location_priority`,
-        'EXTRACT(EPOCH FROM (NOW() - it.inventory_date)) as age_seconds',
-      ])
-      .where('pth.item_id = :itemId', { itemId })
-      .andWhere('it.inventory_status IN (:...statuses)', {
-        statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED'],
-      })
-      .andWhere('pth.status_inventory = :statusInventory', { statusInventory: 'READY' })
-      .andWhere('pth.new_quantity > 0')
-      .andWhere('(it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)')
-      .andWhere('pth.item_id IS NOT NULL')
-      .andWhere('it.pallet_id IS NOT NULL')
-      .andWhere('pth.pallet_id IS NOT NULL')
-      .andWhere('p.id IS NOT NULL')
-      .andWhere((qb) => {
-        const subQuery = qb
-          .subQuery()
-          .select('MAX(pth2.created_at)')
-          .from('transaction_pallet_history', 'pth2')
-          .where('pth2.item_id = pth.item_id')
-          .andWhere('pth2.pallet_id = pth.pallet_id')
-          .andWhere('pth2.status_inventory = :statusInventory')
-          .getQuery();
-        return `pth.created_at = ${subQuery}`;
-      })
-      .orderBy('location_priority', 'ASC')
-      .addOrderBy('it.inventory_date', 'ASC')
-      .addOrderBy('pth.production_date', 'ASC')
-      .addOrderBy('pth.new_quantity', 'DESC');
+        END as location_priority,
+        EXTRACT(EPOCH FROM (NOW() - it.inventory_date)) as age_seconds,
+        -- Calculate reserved quantity from pending transaction_picking
+        COALESCE((
+          SELECT SUM(tp.quantity)
+          FROM transaction_picking tp
+          WHERE tp.item_id::text = pth.item_id::text
+            AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
+            AND (
+              (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
+              (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
+            )
+            AND tp.status::text = 'PENDING'
+            AND tp.deleted_at IS NULL
+        ), 0) as reserved_quantity,
+        -- Calculate actual available quantity (total - reserved)
+        pth.new_quantity - COALESCE((
+          SELECT SUM(tp.quantity)
+          FROM transaction_picking tp
+          WHERE tp.item_id::text = pth.item_id::text
+            AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
+            AND (
+              (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
+              (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
+            )
+            AND tp.status::text = 'PENDING'
+            AND tp.deleted_at IS NULL
+        ), 0) as available_quantity
+      FROM transaction_pallet_history pth
+      INNER JOIN inventory_tracking it ON it.pallet_id = pth.pallet_id
+      LEFT JOIN m_pallet p ON p.id = pth.pallet_id
+      LEFT JOIN m_warehouse w ON w.id = it.warehouse_id
+      LEFT JOIN m_warehouse_sub ws ON ws.id = it.warehouse_sub_id
+      LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
+      WHERE pth.item_id = $1
+        AND pth.status_inventory = 'READY'
+        AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED')
+        AND pth.new_quantity > 0
+        AND (it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)
+        AND pth.item_id IS NOT NULL
+        AND it.pallet_id IS NOT NULL
+        AND pth.pallet_id IS NOT NULL
+        AND p.id IS NOT NULL
+        AND pth.created_at = (
+          SELECT MAX(pth2.created_at)
+          FROM transaction_pallet_history pth2
+          WHERE pth2.pallet_id = pth.pallet_id
+            AND pth2.item_id = pth.item_id
+            AND pth2.status_inventory = 'READY'
+        )
+        -- Only show locations with available quantity after reservations
+        AND pth.new_quantity > COALESCE((
+          SELECT SUM(tp.quantity)
+          FROM transaction_picking tp
+          WHERE tp.item_id::text = pth.item_id::text
+            AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
+            AND (
+              (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
+              (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
+            )
+            AND tp.status::text = 'PENDING'
+            AND tp.deleted_at IS NULL
+        ), 0)
+      ORDER BY 
+        location_priority ASC,
+        it.inventory_date ASC,
+        pth.production_date ASC,
+        pth.new_quantity DESC
+    `;
 
-    return await queryBuilder.getRawMany();
+    return await this.inventoryTrackingRepository.query(query, [itemId]);
   }
 
   async debugInventorySimpleQuery(): Promise<any[]> {
@@ -215,5 +250,20 @@ export class PickingSuggestionRepository {
   async findItemById(itemId: string): Promise<MasterItem | null> {
     return await this.itemRepository.findOne({ where: { id: itemId } });
   }
+
+  async getAlreadyPickedQuantityForMemoItem(memoId: string, itemId: string): Promise<number> {
+    const query = `
+      SELECT COALESCE(SUM(tp.quantity), 0) as total_picked
+      FROM transaction_picking tp
+      WHERE tp.memo_id::text = $1
+        AND tp.item_id::text = $2
+        AND tp.status IN ('PENDING', 'COMPLETED')
+        AND tp.deleted_at IS NULL
+    `;
+
+    const result = await this.outboundDoRepository.query(query, [memoId, itemId]);
+    return parseInt(result[0]?.total_picked || '0', 10);
+  }
 }
+
 
