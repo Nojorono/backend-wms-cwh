@@ -1,5 +1,5 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { PickingSuggestionService } from './picking-suggestion.service';
 import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
 
@@ -22,14 +22,7 @@ export class PickingSuggestionController {
     description: 'Outbound DO not found',
   })
   async getPickingSuggestionsForOutboundDo(@Param('outboundDoId') outboundDoId: string) {
-    const suggestions = await this.pickingSuggestionService.getPickingSuggestionsForOutboundDo(
-      outboundDoId,
-    );
-    return {
-      success: true,
-      message: 'Picking suggestions berhasil diambil',
-      data: suggestions,
-    };
+    return this.pickingSuggestionService.getPickingSuggestionsForOutboundDo(outboundDoId);
   }
 
   @Get('memo/:memoId')
@@ -45,12 +38,7 @@ export class PickingSuggestionController {
     description: 'Memo not found',
   })
   async getPickingSuggestionsByMemo(@Param('memoId') memoId: string) {
-    const suggestions = await this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId);
-    return {
-      success: true,
-      message: 'Picking suggestions berhasil diambil',
-      data: suggestions,
-    };
+    return this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId);
   }
 
   @Get('item/:itemId')
@@ -65,12 +53,7 @@ export class PickingSuggestionController {
     description: 'Item not found',
   })
   async getPickingSuggestionsByItemId(@Param('itemId') itemId: string) {
-    const suggestions = await this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId);
-    return {
-      success: true,
-      message: 'Picking suggestions berhasil diambil',
-      data: suggestions,
-    };
+    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId);
   }
 }
 
