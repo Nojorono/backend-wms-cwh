@@ -19,11 +19,9 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { OutboundDoService } from './outbound-do.service';
-import { PickingSuggestionService } from './picking-suggestion.service';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoResponseDto } from './dto/outbound-do-response.dto';
-import { PickingSuggestionsResponseDto } from './dto/picking-suggestions-response.dto';
 import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbound-do.entity';
 
 @ApiTags('Outbound DO')
@@ -32,7 +30,6 @@ import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbou
 export class OutboundDoController {
   constructor(
     private readonly outboundDoService: OutboundDoService,
-    private readonly pickingSuggestionService: PickingSuggestionService,
   ) {}
 
   @Post()
@@ -224,77 +221,6 @@ export class OutboundDoController {
   })
   async remove(@Param('id') id: string) {
     return this.outboundDoService.remove(id);
-  }
-
-  @Get('item/:itemId/picking-suggestions')
-  @ApiOperation({ summary: 'Get picking suggestions for specific item' })
-  @ApiParam({ name: 'itemId', description: 'ID item' })
-  @ApiResponse({
-    status: 200,
-    description: 'Picking suggestions untuk item tertentu',
-    schema: {
-      type: 'object',
-      properties: {
-        item_id: { type: 'string', example: 'uuid-item-1' },
-        item_name: { type: 'string', example: 'CLAS MILD - 16' },
-        item_code: { type: 'string', example: 'RK.CLM.160000' },
-        total_available_quantity: { type: 'number', example: 500 },
-        suggested_locations: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              warehouse_name: { type: 'string', example: 'Warehouse A' },
-              warehouse_sub_name: { type: 'string', example: 'Sub A1' },
-              bin_name: { type: 'string', example: 'Bin A1-01' },
-              available_quantity: { type: 'number', example: 100 },
-              quantity_ready_to_pick: { type: 'number', example: 100 },
-              uom: { type: 'string', example: 'DUS' },
-            },
-          },
-        },
-        notes: { type: 'string', example: 'Item tersedia dengan total 500 unit di 5 lokasi' },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Item tidak ditemukan',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Item not found' },
-        statusCode: { type: 'number', example: 404 },
-      },
-    },
-  })
-  async getPickingSuggestionsByItemId(@Param('itemId') itemId: string) {
-    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId);
-  }
-
-  @Get('memo/:memoId/picking-suggestions')
-  @ApiOperation({ summary: 'Get picking suggestions for specific memo' })
-  @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
-  @ApiResponse({
-    status: 200,
-    description: 'Picking suggestions untuk memo tertentu',
-    type: PickingSuggestionsResponseDto,
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Outbound memo tidak ditemukan',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Outbound memo not found' },
-        statusCode: { type: 'number', example: 404 },
-      },
-    },
-  })
-  async getPickingSuggestionsByMemo(@Param('memoId') memoId: string) {
-    return this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId);
   }
 
   @Get(':id/memo-sequence')

@@ -33,6 +33,7 @@ import { UserManageModule } from './user-manage/user-manage.module';
 import { S3Module } from './infrastructure/modules/s3.module';
 import { CustomerModule } from './customer/customer.module';
 import { TransactionScanPickingModule } from './transaction-scan-picking/transaction-scan-picking.module';
+import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { TransactionScanPickingModule } from './transaction-scan-picking/transac
     S3Module,
     CustomerModule,
     TransactionScanPickingModule,
+    PickingSuggestionModule,
   ],
   providers: [
     {
