@@ -32,6 +32,7 @@ import { AssignedPickingModule } from './assigned-picking/assigned-picking.modul
 import { UserManageModule } from './user-manage/user-manage.module';
 import { S3Module } from './infrastructure/modules/s3.module';
 import { CustomerModule } from './customer/customer.module';
+import { TransactionScanPickingModule } from './transaction-scan-picking/transaction-scan-picking.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { CustomerModule } from './customer/customer.module';
     AssignedPickingModule,
     S3Module,
     CustomerModule,
+    TransactionScanPickingModule,
   ],
   providers: [
     {

@@ -38,6 +38,11 @@ export class CreateTransactionPickingDto {
   @IsString()
   uom?: string;
 
+  @ApiProperty({ example: 1 })
+  @IsNotEmpty()
+  @IsNumber()
+  week_number: number;
+
   @ApiProperty({
     description: 'Status picking',
     enum: Status,

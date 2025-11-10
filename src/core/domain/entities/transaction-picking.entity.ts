@@ -54,6 +54,9 @@ export class PickingTransaction extends BaseEntity {
   @Column({ nullable: true })
   uom: string;
 
+  @Column({ nullable: true })
+  week_number: number;
+
   @Column({ nullable: true, default: Status.PENDING })
   status: Status;
 }
