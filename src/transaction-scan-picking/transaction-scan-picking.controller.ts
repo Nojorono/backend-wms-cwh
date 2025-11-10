@@ -148,5 +148,23 @@ export class TransactionScanPickingController {
       message: 'Transaction scan picking berhasil dihapus',
     };
   }
+  // inspect transaction scan picking
+  @Patch(':id/inspection-approved')
+  @ApiOperation({ summary: 'Inspection approved transaction scan picking' })
+  @ApiParam({ name: 'id', description: 'ID transaction scan picking' })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction scan picking berhasil diinspeksi',
+    type: ScanPickingTransaction,
+  })
+  @ApiQuery({ name: 'inspection_by', required: true, type: String })
+  async inspectionApproved(@Param('id') id: string, @Query('inspection_by') inspection_by: string) {
+    const result = await this.service.inspectionApproved(id, inspection_by);
+    return {
+      success: true,
+      message: 'Transaction scan picking berhasil diinspeksi',
+      data: result,
+    };
+  }
 }
 

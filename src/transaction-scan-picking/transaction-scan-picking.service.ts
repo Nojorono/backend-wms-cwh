@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { TransactionScanPickingRepository } from './transaction-scan-picking.repository';
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';
-import { ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
+import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 
@@ -86,6 +86,14 @@ export class TransactionScanPickingService {
     await this.repository.remove(id);
   }
 
+  async inspectionApproved(id: string, inspection_by: string): Promise<ScanPickingTransaction> {
+    const existing = await this.findOne(id);
+    if (!existing) {
+      throw new NotFoundException('Transaction scan picking tidak ditemukan');
+    }
+    return this.repository.update(id, { status: ScanPickingStatus.INSPECTION, inspection_by: inspection_by });
+  }
+  
   private async validatePallets(palletIds: Array<string | undefined>): Promise<void> {
     const uniqueIds = Array.from(new Set(palletIds.filter((id): id is string => Boolean(id))));
     await Promise.all(uniqueIds.map((id) => this.masterPalletService.findOne(id)));

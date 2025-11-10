@@ -3,6 +3,12 @@ import { BaseEntity } from './base.entity';
 import { PickingTransaction } from './transaction-picking.entity';
 import { MasterPallet } from './master-pallet.entity';
 
+export enum ScanPickingStatus {
+  PENDING = 'PENDING',
+  INSPECTION = 'INSPECTION',
+  INSPECTION_APPROVED = 'INSPECTION_APPROVED',
+}
+
 @Entity('transaction_scan_picking')
 export class ScanPickingTransaction extends BaseEntity {
   @Column({ nullable: true })
@@ -46,7 +52,7 @@ export class ScanPickingTransaction extends BaseEntity {
   week_number: number;
 
   @Column({ nullable: true })
-  status: string;
+  status: ScanPickingStatus;
 
   @Column({ nullable: true })
   inspection_by: string;
