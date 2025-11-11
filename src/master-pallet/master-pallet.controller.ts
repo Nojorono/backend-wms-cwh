@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
@@ -10,10 +10,15 @@ import {
   UpdatePalletQuantityDto,
 } from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
+import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
+import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
 
 @ApiTags('Master Pallet')
 @Controller('master-pallet')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(PalletQuantityHistoryResponseDto, PaginatedResponseDto)
 export class MasterPalletController {
   constructor(private readonly masterPalletService: MasterPalletService) {}
 
@@ -99,13 +104,47 @@ export class MasterPalletController {
 
   @Get('by-code/:palletCode/quantity-history')
   @ApiOperation({ summary: 'Get pallet quantity history by pallet code' })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'operation_type',
+      description: 'Filter berdasarkan tipe operasi kuantitas',
+      enum: Object.values(QuantityOperationType),
+      required: false,
+    },
+  ])
   @ApiResponse({
     status: 200,
     description: 'Return pallet quantity history.',
-    type: [PalletQuantityHistoryResponseDto],
+    schema: {
+      oneOf: [
+        {
+          type: 'array',
+          items: { $ref: '#/components/schemas/PalletQuantityHistoryResponseDto' },
+        },
+        { $ref: '#/components/schemas/PaginatedResponseDtoOfPalletQuantityHistoryResponseDto' },
+      ],
+    },
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  getQuantityHistoryByPalletCode(@Param('palletCode') palletCode: string) {
+  getQuantityHistoryByPalletCode(
+    @Param('palletCode') palletCode: string,
+    @Query() paginationQuery: PalletHistoryPaginationDto,
+  ) {
+    const hasPaginationParams =
+      paginationQuery.page ||
+      paginationQuery.limit ||
+      paginationQuery.search ||
+      paginationQuery.sortBy ||
+      paginationQuery.sortOrder ||
+      paginationQuery.operation_type;
+
+    if (hasPaginationParams) {
+      return this.masterPalletService.getQuantityHistoryByPalletCodePaginated(
+        palletCode,
+        paginationQuery,
+      );
+    }
+
     return this.masterPalletService.getQuantityHistoryByPalletCode(palletCode);
   }
 

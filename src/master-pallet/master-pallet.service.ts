@@ -22,6 +22,9 @@ import {
 } from '../core/domain/entities/transaction-pallet-history.entity';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
+import { PaginationService } from '../core/services/pagination.service';
+import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @Injectable()
 export class MasterPalletService {
@@ -30,6 +33,7 @@ export class MasterPalletService {
     private readonly barcodeService: BarcodeService,
     @InjectRepository(PalletTransactionHistory)
     private readonly transactionHistoryRepository: Repository<PalletTransactionHistory>,
+    private readonly paginationService: PaginationService,
   ) {}
 
   async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
@@ -299,7 +303,7 @@ export class MasterPalletService {
       id: record.id,
       pallet_id: record.pallet_id,
       item_id: record.item_id,
-      item_name: record.item.sku,
+      item_name: record.item?.sku,
       previous_quantity: record.previous_quantity,
       quantity_change: record.quantity_change,
       new_quantity: record.new_quantity,
@@ -313,6 +317,79 @@ export class MasterPalletService {
       production_date: record.production_date,
       week_number: record.week_number,
     }));
+  }
+
+  async getQuantityHistoryPaginated(
+    palletId: string,
+    paginationDto: PalletHistoryPaginationDto,
+  ): Promise<PaginatedResponseDto<PalletQuantityHistoryResponseDto>> {
+    const { page = 1, limit = 10, search, sortBy, sortOrder = 'DESC', operation_type } =
+      paginationDto;
+
+    const qb = this.transactionHistoryRepository
+      .createQueryBuilder('history')
+      .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id::uuid')
+      .where('history.pallet_id = :palletId', { palletId });
+
+    if (operation_type) {
+      qb.andWhere('history.operation_type = :operationType', {
+        operationType: operation_type,
+      });
+    }
+
+    if (search) {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      qb.andWhere(
+        `(
+          LOWER(history.reference_id) LIKE :search OR
+          LOWER(history.reference_type) LIKE :search OR
+          LOWER(history.notes) LIKE :search OR
+          LOWER(item.sku) LIKE :search
+        )`,
+        { search: searchTerm },
+      );
+    }
+
+    const sortableFields: Record<string, string> = {
+      createdAt: 'history.createdAt',
+      updatedAt: 'history.updatedAt',
+      quantity_change: 'history.quantity_change',
+      new_quantity: 'history.new_quantity',
+      previous_quantity: 'history.previous_quantity',
+      operation_type: 'history.operation_type',
+    };
+
+    const defaultOrderField = 'history.createdAt';
+    const orderField =
+      sortBy && sortableFields[sortBy] ? sortableFields[sortBy] : defaultOrderField;
+    const orderDirection = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    qb.orderBy(orderField, orderDirection);
+
+    const [entities, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const data = entities.map((record: any) => ({
+      id: record.id,
+      pallet_id: record.pallet_id,
+      item_id: record.item_id,
+      item_name: record.item?.sku,
+      previous_quantity: record.previous_quantity,
+      quantity_change: record.quantity_change,
+      new_quantity: record.new_quantity,
+      operation_type: record.operation_type,
+      reference_id: record.reference_id,
+      reference_type: record.reference_type,
+      notes: record.notes,
+      user_id: record.user_id,
+      uom: record.uom,
+      createdAt: record.createdAt,
+      production_date: record.production_date,
+      week_number: record.week_number,
+    }));
+
+    return this.paginationService.createPaginatedResponse(data, paginationDto, total);
   }
 
   async getItemQuantityHistory(
@@ -398,6 +475,18 @@ export class MasterPalletService {
     }
 
     return this.getQuantityHistory(pallet.id);
+  }
+
+  async getQuantityHistoryByPalletCodePaginated(
+    palletCode: string,
+    paginationDto: PalletHistoryPaginationDto,
+  ): Promise<PaginatedResponseDto<PalletQuantityHistoryResponseDto>> {
+    const pallet = await this.repository.findByPalletCode(palletCode);
+    if (!pallet) {
+      throw new NotFoundException(`Pallet with code ${palletCode} not found`);
+    }
+
+    return this.getQuantityHistoryPaginated(pallet.id, paginationDto);
   }
 
   async getItemQuantityHistoryByPalletCode(
