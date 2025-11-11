@@ -11,18 +11,20 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import {
-  ApiTags,
+  ApiBearerAuth,
   ApiOperation,
-  ApiResponse,
   ApiParam,
   ApiQuery,
-  ApiBearerAuth,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
 import { OutboundMemoService } from './outbound-memo.service';
 import { CreateOutboundMemoDto } from './dto/create-outbound-memo.dto';
 import { UpdateOutboundMemoDto } from './dto/update-outbound-memo.dto';
 import { OutboundMemoResponseDto } from './dto/outbound-memo-response.dto';
 import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
+import { OutboundMemoPaginationDto } from './dto/outbound-memo-pagination.dto';
+import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 
 @ApiTags('Outbound Memo')
 @Controller('outbound-memo')
@@ -56,21 +58,43 @@ export class OutboundMemoController {
 
   @Get()
   @ApiOperation({ summary: 'Dapatkan semua outbound memo' })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: OutboundMemoStatus,
-    description: 'Filter berdasarkan status',
-  })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'status',
+      description: 'Filter outbound memo berdasarkan status',
+      enum: Object.values(OutboundMemoStatus),
+      example: OutboundMemoStatus.PENDING,
+    },
+    {
+      name: 'has_do',
+      description: 'Filter outbound memo berdasarkan apakah sudah memiliki outbound DO',
+      example: false,
+      type: Boolean,
+    },
+  ])
   @ApiResponse({
     status: 200,
     description: 'Daftar outbound memo',
     type: [OutboundMemoResponseDto],
   })
-  async findAll(@Query('status') status?: string) {
-    if (status) {
-      return this.outboundMemoService.findByStatus(status);
+  async findAll(@Query() paginationQuery: OutboundMemoPaginationDto) {
+    const hasPaginationParams =
+      paginationQuery.page ||
+      paginationQuery.limit ||
+      paginationQuery.search ||
+      paginationQuery.sortBy ||
+      paginationQuery.sortOrder ||
+      paginationQuery.status ||
+      paginationQuery.has_do !== undefined;
+
+    if (hasPaginationParams) {
+      return this.outboundMemoService.findAllPaginated(paginationQuery);
     }
+
+    if (paginationQuery.status) {
+      return this.outboundMemoService.findByStatus(paginationQuery.status);
+    }
+
     return this.outboundMemoService.findAll();
   }
 

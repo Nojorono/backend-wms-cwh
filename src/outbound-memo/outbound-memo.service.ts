@@ -4,10 +4,16 @@ import { CreateOutboundMemoDto } from './dto/create-outbound-memo.dto';
 import { UpdateOutboundMemoDto } from './dto/update-outbound-memo.dto';
 import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
+import { PaginationService } from '../core/services/pagination.service';
+import { OutboundMemoPaginationDto } from './dto/outbound-memo-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @Injectable()
 export class OutboundMemoService {
-  constructor(private readonly repository: OutboundMemoRepository) {}
+  constructor(
+    private readonly repository: OutboundMemoRepository,
+    private readonly paginationService: PaginationService,
+  ) {}
 
   async create(data: CreateOutboundMemoDto): Promise<OutboundMemo> {
     // Validasi delivery_date tidak boleh di masa lalu
@@ -34,6 +40,17 @@ export class OutboundMemoService {
 
   async findAll(): Promise<OutboundMemo[]> {
     return this.repository.findAll();
+  }
+
+  async findAllPaginated(
+    paginationDto: OutboundMemoPaginationDto,
+  ): Promise<PaginatedResponseDto<OutboundMemo>> {
+    const result = await this.repository.findAllPaginated(paginationDto);
+    return this.paginationService.createPaginatedResponse(
+      result.data,
+      paginationDto,
+      result.total,
+    );
   }
 
   async findOne(id: string): Promise<OutboundMemo> {

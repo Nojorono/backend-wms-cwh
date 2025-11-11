@@ -5,6 +5,7 @@ import { OutboundMemo, OutboundMemoStatus } from '../core/domain/entities/outbou
 import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.entity';
 import { CreateOutboundMemoDto } from './dto/create-outbound-memo.dto';
 import { UpdateOutboundMemoDto } from './dto/update-outbound-memo.dto';
+import { OutboundMemoPaginationDto } from './dto/outbound-memo-pagination.dto';
 
 @Injectable()
 export class OutboundMemoRepository {
@@ -100,5 +101,64 @@ export class OutboundMemoRepository {
       relations: ['outbound_memo_items', 'outbound_memo_items.item'],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findAllPaginated(
+    paginationDto: OutboundMemoPaginationDto,
+  ): Promise<{ data: OutboundMemo[]; total: number }> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy,
+      sortOrder = 'DESC',
+      status,
+      has_do,
+    } = paginationDto;
+
+    const qb = this.outboundMemoRepository
+      .createQueryBuilder('memo')
+      .leftJoinAndSelect('memo.outbound_memo_items', 'items')
+      .leftJoinAndSelect('items.item', 'item');
+
+    if (status) {
+      qb.andWhere('memo.status = :status', { status });
+      if (status === OutboundMemoStatus.APPROVED) {
+        qb.andWhere('memo.has_do = false');
+      }
+    }
+
+    if (has_do !== undefined) {
+      qb.andWhere('memo.has_do = :has_do', { has_do });
+    }
+
+    if (search) {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(memo.requestor) LIKE :search OR LOWER(memo.origin) LIKE :search OR LOWER(memo.destination) LIKE :search OR LOWER(memo.ship_to) LIKE :search)',
+        { search: searchTerm },
+      );
+    }
+
+    const sortableFields: Record<string, string> = {
+      createdAt: 'memo.createdAt',
+      updatedAt: 'memo.updatedAt',
+      delivery_date: 'memo.delivery_date',
+      requestor: 'memo.requestor',
+      status: 'memo.status',
+    };
+
+    const orderField =
+      sortBy && sortableFields[sortBy] ? sortableFields[sortBy] : 'memo.createdAt';
+    const orderDirection = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
+    qb.orderBy(orderField, orderDirection);
+
+    const [entities, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data: entities, total };
   }
 }
