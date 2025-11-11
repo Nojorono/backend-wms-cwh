@@ -5,6 +5,7 @@ import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
 import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
+import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 
 @Injectable()
 export class OutboundDoRepository {
@@ -232,6 +233,65 @@ export class OutboundDoRepository {
 
     // Add sequence information to each memo
     return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+  }
+
+  async findAllPaginated(
+    paginationDto: OutboundDoPaginationDto,
+  ): Promise<{ data: OutboundDo[]; total: number }> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy,
+      sortOrder = 'DESC',
+      status,
+      outbound_type,
+    } = paginationDto;
+
+    const qb = this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos');
+
+    if (status) {
+      qb.andWhere('outbound_do.status = :status', { status });
+    }
+
+    if (outbound_type) {
+      qb.andWhere('outbound_do.outbound_type = :outbound_type', { outbound_type });
+    }
+
+    if (search) {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(outbound_do.outbound_do_number) LIKE :search OR LOWER(outbound_do.driver_name) LIKE :search OR LOWER(outbound_do.driver_phone) LIKE :search)',
+        { search: searchTerm },
+      );
+    }
+
+    const sortableFields: Record<string, string> = {
+      createdAt: 'outbound_do.createdAt',
+      updatedAt: 'outbound_do.updatedAt',
+      delivery_date: 'outbound_do.delivery_date',
+      outbound_do_number: 'outbound_do.outbound_do_number',
+      status: 'outbound_do.status',
+      outbound_type: 'outbound_do.outbound_type',
+      driver_name: 'outbound_do.driver_name',
+    };
+
+    const orderField =
+      sortBy && sortableFields[sortBy] ? sortableFields[sortBy] : 'outbound_do.createdAt';
+    const orderDirection = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
+    qb.orderBy(orderField, orderDirection);
+
+    const [entities, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const data = entities.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+
+    return { data, total };
   }
 
   private addSequenceToMemos(outboundDo: OutboundDo): OutboundDo {

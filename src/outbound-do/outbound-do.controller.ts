@@ -15,7 +15,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
-  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { OutboundDoService } from './outbound-do.service';
@@ -23,6 +22,8 @@ import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoResponseDto } from './dto/outbound-do-response.dto';
 import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbound-do.entity';
+import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
+import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 
 @ApiTags('Outbound DO')
 @Controller('outbound-do')
@@ -70,30 +71,39 @@ export class OutboundDoController {
 
   @Get()
   @ApiOperation({ summary: 'Dapatkan semua outbound DO' })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: OutboundDoStatus,
-    description: 'Filter berdasarkan status',
-  })
-  @ApiQuery({
-    name: 'outbound_type',
-    required: false,
-    enum: OutboundDoType,
-    description: 'Filter berdasarkan tipe outbound',
-  })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'status',
+      description: 'Filter outbound DO berdasarkan status',
+      enum: Object.values(OutboundDoStatus),
+      example: OutboundDoStatus.PENDING,
+    },
+    {
+      name: 'outbound_type',
+      description: 'Filter outbound DO berdasarkan tipe outbound',
+      enum: Object.values(OutboundDoType),
+      example: OutboundDoType.SUBDIST,
+    },
+  ])
   @ApiResponse({
     status: 200,
     description: 'Daftar outbound DO',
     type: [OutboundDoResponseDto],
   })
-  async findAll(@Query('status') status?: string, @Query('outbound_type') outbound_type?: string) {
-    if (status) {
-      return this.outboundDoService.findByStatus(status);
+  async findAll(@Query() paginationQuery: OutboundDoPaginationDto) {
+    const hasPaginationParams =
+      paginationQuery.page ||
+      paginationQuery.limit ||
+      paginationQuery.search ||
+      paginationQuery.sortBy ||
+      paginationQuery.sortOrder ||
+      paginationQuery.status ||
+      paginationQuery.outbound_type;
+
+    if (hasPaginationParams) {
+      return this.outboundDoService.findAllPaginated(paginationQuery);
     }
-    if (outbound_type) {
-      return this.outboundDoService.findByOutboundType(outbound_type);
-    }
+
     return this.outboundDoService.findAll();
   }
 

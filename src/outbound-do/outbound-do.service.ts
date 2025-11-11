@@ -2,12 +2,17 @@ import { Injectable, BadRequestException, ConflictException } from '@nestjs/comm
 import { OutboundDoRepository } from './outbound-do.repository';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
-import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
-import { OutboundDoStatus } from '../core/domain/entities/outbound-do.entity';
+import { OutboundDo, OutboundDoStatus } from '../core/domain/entities/outbound-do.entity';
+import { PaginationService } from '../core/services/pagination.service';
+import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @Injectable()
 export class OutboundDoService {
-  constructor(private readonly repository: OutboundDoRepository) {}
+  constructor(
+    private readonly repository: OutboundDoRepository,
+    private readonly paginationService: PaginationService,
+  ) {}
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
     // Validasi delivery_date tidak boleh di masa lalu
@@ -49,6 +54,17 @@ export class OutboundDoService {
 
   async findAll(): Promise<OutboundDo[]> {
     return this.repository.findAll();
+  }
+
+  async findAllPaginated(
+    paginationDto: OutboundDoPaginationDto,
+  ): Promise<PaginatedResponseDto<OutboundDo>> {
+    const result = await this.repository.findAllPaginated(paginationDto);
+    return this.paginationService.createPaginatedResponse(
+      result.data,
+      paginationDto,
+      result.total,
+    );
   }
 
   async findOne(id: string): Promise<OutboundDo> {
