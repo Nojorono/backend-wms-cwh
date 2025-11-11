@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CreatePutAwayDto, UpdatePutAwayDto } from './dto/create-put-away.dto';
 import { CreateManyPutAwayDto } from './dto/create-many-put-away.dto';
 import { PutAwayTransaction } from '../core/domain/entities/transaction-put-away.entity';
 import { PutAwayService } from './put-away.service';
+import { PutAwayPaginationDto } from './dto/put-away-pagination.dto';
+import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { Status } from '../core/domain/entities/transaction-put-away.entity';
 
 @ApiTags('Put Away')
 @Controller('put-away')
@@ -27,8 +30,42 @@ export class PutAwayController {
 
   @Get()
   @ApiOperation({ summary: 'Get all put away records' })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'status',
+      description: 'Filter put away berdasarkan status',
+      enum: Object.values(Status),
+      example: Status.PENDING,
+    },
+    {
+      name: 'forklift_driver_id',
+      type: String,
+      description: 'Filter berdasarkan forklift driver ID',
+      example: 'uuid-driver-1',
+    },
+    {
+      name: 'driver_name',
+      type: String,
+      description: 'Filter berdasarkan nama driver',
+      example: 'John Doe',
+    },
+  ])
   @ApiResponse({ status: 200, description: 'OK', type: [PutAwayTransaction] })
-  findAll() {
+  findAll(@Query() paginationQuery: PutAwayPaginationDto) {
+    const hasPaginationParams =
+      paginationQuery.page ||
+      paginationQuery.limit ||
+      paginationQuery.search ||
+      paginationQuery.sortBy ||
+      paginationQuery.sortOrder ||
+      paginationQuery.status ||
+      paginationQuery.forklift_driver_id ||
+      paginationQuery.driver_name;
+
+    if (hasPaginationParams) {
+      return this.service.findAllPaginated(paginationQuery);
+    }
+
     return this.service.findAll();
   }
 

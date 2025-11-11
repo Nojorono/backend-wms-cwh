@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { PutAwayTransaction, Status } from 'src/core/domain/entities/transaction-put-away.entity';
 import { CreatePutAwayDto, UpdatePutAwayDto } from './dto/create-put-away.dto';
 import { MasterWarehouseBin } from 'src/core/domain/entities/master-warehouse-bin.entity';
+import { PutAwayPaginationDto } from './dto/put-away-pagination.dto';
 
 @Injectable()
 export class PutAwayRepository {
@@ -37,6 +38,90 @@ export class PutAwayRepository {
       .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub');
 
     return await queryBuilder.getMany();
+  }
+
+  async findAllPaginated(
+    paginationDto: PutAwayPaginationDto,
+  ): Promise<{ data: PutAwayTransaction[]; total: number }> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      sortBy,
+      sortOrder = 'DESC',
+      status,
+      forklift_driver_id,
+      driver_name,
+    } = paginationDto;
+
+    const qb = this.repository
+      .createQueryBuilder('pta')
+      .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
+      .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
+      .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
+      .leftJoinAndMapOne(
+        'pta.destinationBin',
+        MasterWarehouseBin,
+        'destinationBin',
+        'destinationBin.id = pta.destination_bin_id',
+      )
+      .leftJoinAndSelect('destinationBin.warehouseSub', 'destinationBinWarehouseSub');
+
+    if (status) {
+      qb.andWhere('pta.status = :status', { status });
+    }
+
+    if (forklift_driver_id) {
+      qb.andWhere('pta.forklift_driver_id = :forklift_driver_id', { forklift_driver_id });
+    }
+
+    if (driver_name) {
+      qb.andWhere('LOWER(pta.driver_name) LIKE :driverName', {
+        driverName: `%${driver_name.toLowerCase()}%`,
+      });
+    }
+
+    if (search) {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      qb.andWhere(
+        `
+        (
+          LOWER(pta.driver_name) LIKE :search OR
+          LOWER(pta.driver_phone) LIKE :search OR
+          LOWER(pta.notes) LIKE :search OR
+          LOWER(destinationBin.code) LIKE :search OR
+          LOWER(destinationBin.name) LIKE :search
+        )
+      `,
+        { search: searchTerm },
+      );
+    }
+
+    const sortableFields: Record<string, string> = {
+      createdAt: 'pta.createdAt',
+      updatedAt: 'pta.updatedAt',
+      status: 'pta.status',
+      driver_name: 'pta.driver_name',
+    };
+
+    const defaultOrderField = 'pta.createdAt';
+    const orderField =
+      sortBy && sortableFields[sortBy] ? sortableFields[sortBy] : defaultOrderField;
+    const orderDirection = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+
+    if (orderField.includes('.')) {
+      const [alias, property] = orderField.split('.');
+      qb.orderBy(`${alias}.${property}`, orderDirection);
+    } else {
+      qb.orderBy(orderField, orderDirection);
+    }
+
+    const [entities, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data: entities, total };
   }
 
   async findOne(id: string): Promise<PutAwayTransaction | null> {

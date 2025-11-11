@@ -7,6 +7,7 @@ import { PutAwayTransaction } from 'src/core/domain/entities/transaction-put-awa
 import { InventoryTrackingModule } from 'src/inventory-tracking/inventory-tracking.module';
 import { MasterWarehouseBinModule } from 'src/master-warehouse-bin/master-warehouse-bin.module';
 import { MasterPalletModule } from 'src/master-pallet/master-pallet.module';
+import { PaginationModule } from 'src/core/modules/pagination.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { MasterPalletModule } from 'src/master-pallet/master-pallet.module';
     InventoryTrackingModule,
     MasterWarehouseBinModule,
     MasterPalletModule,
+    PaginationModule,
   ],
   controllers: [PutAwayController],
   providers: [PutAwayService, PutAwayRepository],

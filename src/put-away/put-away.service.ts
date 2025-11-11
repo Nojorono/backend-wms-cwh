@@ -7,6 +7,9 @@ import { InventoryTrackingService } from 'src/inventory-tracking/inventory-track
 import { MasterWarehouseBinService } from 'src/master-warehouse-bin/master-warehouse-bin.service';
 import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
 import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
+import { PutAwayPaginationDto } from './dto/put-away-pagination.dto';
+import { PaginationService } from 'src/core/services/pagination.service';
+import { PaginatedResponseDto } from 'src/core/dto/pagination.dto';
 
 @Injectable()
 export class PutAwayService {
@@ -15,6 +18,7 @@ export class PutAwayService {
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly warehouseBinService: MasterWarehouseBinService,
     private readonly masterPalletService: MasterPalletService,
+    private readonly paginationService: PaginationService,
   ) {}
 
   async create(dto: CreatePutAwayDto): Promise<PutAwayTransaction> {
@@ -49,26 +53,16 @@ export class PutAwayService {
 
   async findAll(): Promise<PutAwayTransaction[]> {
     const entities = await this.repository.findAll();
-
-    // Get current items and quantity from pallet for each entity
-    for (const entity of entities) {
-      if (entity.inventoryTracking?.pallet_id) {
-        try {
-          const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(
-            entity.inventoryTracking.pallet_id,
-          );
-          (entity as any).palletItems = palletItems;
-        } catch (error) {
-          console.warn(
-            `Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`,
-            error.message,
-          );
-          (entity as any).palletItems = [];
-        }
-      }
-    }
-
+    await this.populatePalletItems(entities);
     return entities;
+  }
+
+  async findAllPaginated(
+    paginationDto: PutAwayPaginationDto,
+  ): Promise<PaginatedResponseDto<PutAwayTransaction>> {
+    const result = await this.repository.findAllPaginated(paginationDto);
+    await this.populatePalletItems(result.data);
+    return this.paginationService.createPaginatedResponse(result.data, paginationDto, result.total);
   }
 
   async findOne(id: string): Promise<PutAwayTransaction> {
@@ -78,20 +72,7 @@ export class PutAwayService {
     }
 
     // Get current items and quantity from pallet
-    if (entity.inventoryTracking?.pallet_id) {
-      try {
-        const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(
-          entity.inventoryTracking.pallet_id,
-        );
-        (entity as any).palletItems = palletItems;
-      } catch (error) {
-        console.warn(
-          `Failed to get pallet items for pallet ${entity.inventoryTracking.pallet_id}:`,
-          error.message,
-        );
-        (entity as any).palletItems = [];
-      }
-    }
+    await this.populatePalletItems([entity]);
 
     return entity;
   }
@@ -145,5 +126,24 @@ export class PutAwayService {
       progression_status: ProgressionStatus.COMPLETED,
     });
     return updated;
+  }
+
+  private async populatePalletItems(entities: PutAwayTransaction[]): Promise<void> {
+    for (const entity of entities) {
+      if (entity.inventoryTracking?.pallet_id) {
+        try {
+          const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(
+            entity.inventoryTracking.pallet_id,
+          );
+          (entity as any).palletItems = palletItems;
+        } catch (error) {
+          console.warn(
+            `Failed to get pallet items for pallet ${entity.inventoryTracking?.pallet_id}:`,
+            error.message,
+          );
+          (entity as any).palletItems = [];
+        }
+      }
+    }
   }
 }
