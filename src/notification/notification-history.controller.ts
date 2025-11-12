@@ -159,6 +159,37 @@ export class NotificationHistoryController {
     };
   }
 
+  @Get('by-recipient/:userId')
+  @ApiOperation({ summary: 'Get all notifications for a specific recipient (user)' })
+  @ApiParam({ name: 'userId', description: 'User ID (recipient)' })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'unreadOnly',
+      required: false,
+      type: Boolean,
+      description: 'Filter unread only',
+    },
+  ])
+  @ApiResponse({
+    status: 200,
+    description: 'Notifications retrieved successfully',
+    type: PaginatedResponseDto<NotificationHistoryResponseDto>,
+  })
+  async findByRecipient(
+    @Param('userId') userId: string,
+    @Query() query: NotificationHistoryQueryDto,
+  ) {
+    // Set userId filter
+    const queryWithUser = { ...query, userId };
+    const result = await this.service.findAll(queryWithUser);
+    return {
+      success: true,
+      message: 'Notifikasi untuk recipient berhasil diambil',
+      data: result.data,
+      meta: result.meta,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get notification history detail' })
   @ApiParam({ name: 'id', description: 'Notification ID' })
