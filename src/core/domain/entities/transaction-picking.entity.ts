@@ -51,6 +51,19 @@ export class PickingTransaction extends BaseEntity {
   sourceBin: MasterWarehouseBin;
 
   @Column({ nullable: true })
+  destination_warehouse_sub_id: string;
+
+  @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id)
+  @JoinColumn({ name: 'destination_warehouse_sub_id' })
+  destinationWarehouseSub: MasterWarehouseSub;
+
+  destination_bin_id: string;
+
+  @ManyToOne(() => MasterWarehouseBin, (warehouseBin) => warehouseBin.id)
+  @JoinColumn({ name: 'destination_bin_id' })
+  destinationBin: MasterWarehouseBin;
+
+  @Column({ nullable: true })
   quantity: number;
 
   @Column({ nullable: true })

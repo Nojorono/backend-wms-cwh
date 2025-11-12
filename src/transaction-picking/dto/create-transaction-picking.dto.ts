@@ -28,6 +28,16 @@ export class CreateTransactionPickingDto {
   @IsString()
   source_bin_id?: string;
 
+  @ApiProperty({ description: 'ID warehouse sub tujuan', required: false })
+  @IsOptional()
+  @IsString()
+  destination_warehouse_sub_id?: string;
+
+  @ApiProperty({ description: 'ID bin tujuan', required: false })
+  @IsOptional()
+  @IsString()
+  destination_bin_id?: string;
+
   @ApiProperty({ description: 'Quantity yang di-pick' })
   @IsNotEmpty()
   @IsNumber()
