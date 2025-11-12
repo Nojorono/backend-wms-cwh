@@ -49,6 +49,9 @@ export class PalletTransactionHistory extends BaseEntity {
   inbound_id: string;
 
   @Column({ nullable: true })
+  outbound_do_id: string;
+
+  @Column({ nullable: true })
   reference_id: string;
 
   @Column({ nullable: true })
