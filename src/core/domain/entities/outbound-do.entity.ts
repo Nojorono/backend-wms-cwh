@@ -5,6 +5,7 @@ import { OutboundMemo } from './outbound-memo.entity';
 export enum OutboundDoStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
+  APPROVED = 'APPROVED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }

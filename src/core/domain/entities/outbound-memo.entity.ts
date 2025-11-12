@@ -7,7 +7,6 @@ import { PickingTransaction } from './transaction-picking.entity';
 export enum OutboundMemoStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
   CANCELLED = 'CANCELLED',
   COMPLETED = 'COMPLETED',
 }
