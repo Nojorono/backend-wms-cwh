@@ -445,7 +445,6 @@ export class TransactionScanInboundService {
           userId: sample.user_id,
           username: sample.user_name,
           rooms,
-          
         });
       }
     }

@@ -61,12 +61,44 @@ export class NotificationService {
     }
 
     const roomArray = Array.isArray(rooms) ? rooms : [rooms];
-    
+
+    // Get all socket IDs in role rooms and extract user IDs from their data
+    const roleRoomRecipients: string[] = [];
+    for (const room of roomArray) {
+      if (room.startsWith('role:')) {
+        try {
+          const sockets = await this.server.in(room).fetchSockets();
+          sockets.forEach((socket) => {
+            // Extract userId from socket.data if available
+            if (socket.data?.userId) {
+              roleRoomRecipients.push(socket.data.userId);
+            }
+          });
+        } catch (error) {
+          this.logger.warn(`Failed to fetch sockets for room ${room}: ${error.message}`);
+        }
+      }
+    }
+
+    const recipients = Array.from(
+      new Set([
+        ...(notification.recipients || []),
+        ...roleRoomRecipients,
+      ]),
+    );
+
+    const payload: BaseNotificationDto = {
+      ...notification,
+      rooms: Array.from(
+        new Set([...(notification.rooms || []), ...roomArray]),
+      ),
+      recipients,
+    };
+
     // Save to history
     try {
       await this.historyRepository.create({
-        ...notification,
-        rooms: roomArray,
+        ...payload,
         isBroadcast: false,
       });
     } catch (error) {
@@ -74,7 +106,7 @@ export class NotificationService {
     }
 
     roomArray.forEach((room) => {
-      this.server.to(room).emit('notification', notification);
+      this.server.to(room).emit('notification', payload);
       this.logger.log(`Sent notification to room ${room}: ${notification.type}`);
     });
   }
@@ -88,17 +120,28 @@ export class NotificationService {
       return;
     }
 
+    const recipients = Array.from(
+      new Set([
+        ...(notification.recipients || []),
+        clientId,
+      ]),
+    );
+
+    const payload: BaseNotificationDto = {
+      ...notification,
+      recipients,
+    };
+
     try {
       await this.historyRepository.create({
-        ...notification,
-        recipients: [clientId],
+        ...payload,
         isBroadcast: false,
       });
     } catch (error) {
       this.logger.error(`Failed to save notification to history: ${error.message}`);
     }
 
-    this.server.to(clientId).emit('notification', notification);
+    this.server.to(clientId).emit('notification', payload);
     this.logger.log(`Sent notification to client ${clientId}: ${notification.type}`);
   }
 
@@ -111,9 +154,19 @@ export class NotificationService {
       return;
     }
 
+    // If notification has userId, add to recipients
+    const recipients = notification.userId 
+      ? Array.from(new Set([...(notification.recipients || []), notification.userId]))
+      : notification.recipients;
+
+    const payload: BaseNotificationDto = {
+      ...notification,
+      recipients,
+    };
+
     try {
       await this.historyRepository.create({
-        ...notification,
+        ...payload,
         isBroadcast: false,
       });
     } catch (error) {
@@ -121,7 +174,7 @@ export class NotificationService {
     }
 
     const room = `notification_type:${notification.type}`;
-    this.server.to(room).emit('notification', notification);
+    this.server.to(room).emit('notification', payload);
     this.logger.log(`Sent notification to type room ${room}`);
   }
 

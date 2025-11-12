@@ -188,6 +188,14 @@ export class BaseNotificationDto {
   @IsArray()
   rooms?: string[];
 
+  @ApiPropertyOptional({
+    description: 'Specific recipients (user UUIDs only, no prefix)',
+    example: ['550e8400-e29b-41d4-a716-446655440000', '660e8400-e29b-41d4-a716-446655440001'],
+  })
+  @IsOptional()
+  @IsArray()
+  recipients?: string[];
+
 }
 
 // Specific notification DTOs for different entities

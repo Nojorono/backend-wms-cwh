@@ -81,6 +81,13 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   ) {
     const { room } = data;
     client.join(room);
+    
+    // If joining a user room, store userId in socket.data for recipient tracking
+    if (room.startsWith('user_')) {
+      const userId = room.replace(/^user_/, '');
+      client.data.userId = userId;
+    }
+    
     this.logger.log(`Client ${client.id} joined room: ${room}`);
     
     return {

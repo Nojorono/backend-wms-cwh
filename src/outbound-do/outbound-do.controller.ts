@@ -73,13 +73,13 @@ export class OutboundDoController {
   @ApiOperation({ summary: 'Dapatkan semua outbound DO' })
   @ApiFlexiblePaginationQuery([
     {
-      name: 'status',
+    name: 'status',
       description: 'Filter outbound DO berdasarkan status',
       enum: Object.values(OutboundDoStatus),
       example: OutboundDoStatus.PENDING,
     },
     {
-      name: 'outbound_type',
+    name: 'outbound_type',
       description: 'Filter outbound DO berdasarkan tipe outbound',
       enum: Object.values(OutboundDoType),
       example: OutboundDoType.SUBDIST,
