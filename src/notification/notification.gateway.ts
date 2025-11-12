@@ -8,13 +8,13 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { JoinRoomDto, LeaveRoomDto, JoinRolesDto, LeaveRolesDto } from './dto/websocket.dto';
 
 @WebSocketGateway({
   cors: {
-    origin: '*', // Configure this based on your frontend URL in production
+    origin: '*',
     credentials: true,
   },
   namespace: '/notifications',

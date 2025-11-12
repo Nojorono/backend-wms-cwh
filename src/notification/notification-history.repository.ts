@@ -68,12 +68,15 @@ export class NotificationHistoryRepository {
       .createQueryBuilder('notification')
       .where('notification.deletedAt IS NULL');
 
-    // Filter by user ID (check both user_id and recipients array)
+    // Filter by user ID (check both user_id and recipients)
+    // Note: recipients is simple-array (stored as comma-separated TEXT)
     if (userId) {
       queryBuilder.andWhere(
         new Brackets((qb) => {
           qb.where('notification.user_id = :userId', { userId })
-            .orWhere(':userId = ANY(notification.recipients)', { userId });
+            .orWhere("notification.recipients LIKE :recipientPattern", { 
+              recipientPattern: `%${userId}%` 
+            });
         }),
       );
     }
