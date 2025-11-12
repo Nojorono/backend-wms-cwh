@@ -148,11 +148,9 @@ export class OutboundMemoService {
     const validTransitions: Record<OutboundMemoStatus, OutboundMemoStatus[]> = {
       [OutboundMemoStatus.PENDING]: [
         OutboundMemoStatus.APPROVED,
-        OutboundMemoStatus.REJECTED,
         OutboundMemoStatus.CANCELLED,
       ],
       [OutboundMemoStatus.APPROVED]: [OutboundMemoStatus.CANCELLED, OutboundMemoStatus.COMPLETED],
-      [OutboundMemoStatus.REJECTED]: [OutboundMemoStatus.PENDING],
       [OutboundMemoStatus.CANCELLED]: [],
       [OutboundMemoStatus.COMPLETED]: [],
     };

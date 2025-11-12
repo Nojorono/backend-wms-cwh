@@ -236,15 +236,15 @@ export class OutboundMemoController {
     return this.outboundMemoService.updateStatus(id, OutboundMemoStatus.APPROVED);
   }
 
-  @Post(':id/rejected')
+  @Post(':id/cancelled')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Rejected outbound memo' })
+  @ApiOperation({ summary: 'Batal outbound memo' })
   @ApiParam({ name: 'id', description: 'ID outbound memo' })
   @ApiResponse({
     status: 200,
-    description: 'Outbound memo berhasil direjected',
+    description: 'Outbound memo berhasil dibatalkan',
   })
   async rejected(@Param('id') id: string) {
-    return this.outboundMemoService.updateStatus(id, OutboundMemoStatus.REJECTED);
+    return this.outboundMemoService.updateStatus(id, OutboundMemoStatus.CANCELLED);
   }
 }

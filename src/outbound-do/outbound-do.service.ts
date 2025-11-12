@@ -135,8 +135,9 @@ export class OutboundDoService {
     newStatus: OutboundDoStatus,
   ): void {
     const validTransitions: Record<OutboundDoStatus, OutboundDoStatus[]> = {
-      [OutboundDoStatus.PENDING]: [OutboundDoStatus.IN_PROGRESS, OutboundDoStatus.CANCELLED],
+      [OutboundDoStatus.PENDING]: [OutboundDoStatus.IN_PROGRESS, OutboundDoStatus.CANCELLED, OutboundDoStatus.APPROVED, OutboundDoStatus.COMPLETED],
       [OutboundDoStatus.IN_PROGRESS]: [OutboundDoStatus.COMPLETED, OutboundDoStatus.CANCELLED],
+      [OutboundDoStatus.APPROVED]: [OutboundDoStatus.COMPLETED, OutboundDoStatus.CANCELLED],
       [OutboundDoStatus.COMPLETED]: [],
       [OutboundDoStatus.CANCELLED]: [],
     };
