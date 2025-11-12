@@ -2,6 +2,7 @@ import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { PickingTransaction } from './transaction-picking.entity';
 import { MasterPallet } from './master-pallet.entity';
+import { MasterItem } from './master-item.entity';
 
 export enum ScanPickingStatus {
   PENDING = 'PENDING',
@@ -38,6 +39,13 @@ export class ScanPickingTransaction extends BaseEntity {
   @ManyToOne(() => MasterPallet, (pallet) => pallet.id)
   @JoinColumn({ name: 'pallet_switch_id' })
   palletSwitch: MasterPallet;
+
+  @Column({ nullable: true })
+  item_id: string;
+
+  @ManyToOne(() => MasterItem, (item) => item.id)
+  @JoinColumn({ name: 'item_id' })
+  item: MasterItem;
 
   @Column({ nullable: true })
   quantity_picked: number;

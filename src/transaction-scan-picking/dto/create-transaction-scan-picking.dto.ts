@@ -34,6 +34,14 @@ export class CreateTransactionScanPickingDto {
   @IsString()
   pallet_switch_id?: string;
 
+  @ApiPropertyOptional({
+    description: 'ID item',
+    example: 'uuid-item-123',
+  })
+  @IsOptional()
+  @IsString()
+  item_id?: string;
+
   @ApiProperty({
     description: 'Jumlah yang dipicking dari pallet sumber',
     example: 120,
