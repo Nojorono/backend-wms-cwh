@@ -14,6 +14,7 @@ import { MasterItemService } from 'src/master-item/master-item.service';
 import { MasterWarehouseSubService } from 'src/master-warehouse-sub/master-warehouse-sub.service';
 import { QuantityOperationType } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
+import { NotificationService } from 'src/notification/notification.service';
 import { UpdateResult } from 'typeorm';
 
 @Injectable()
@@ -24,6 +25,7 @@ export class TransactionScanInboundService {
     private readonly itemService: MasterItemService,
     private readonly warehouseSubService: MasterWarehouseSubService,
     private readonly inventoryTrackingService: InventoryTrackingService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async create(data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
@@ -137,6 +139,25 @@ export class TransactionScanInboundService {
         'INSPECTION_COMPLETED',
         existing.inbound_id,
       );
+
+      const rooms = [
+        existing.inbound_id ? `inbound:${existing.inbound_id}` : null,
+        warehouseSub.warehouse_id ? `warehouse_${warehouseSub.warehouse_id}` : null,
+        existing.m_warehouse_sub_id ? `warehouse_sub_${existing.m_warehouse_sub_id}` : null,
+        existing.user_id ? `user_${existing.user_id}` : null,
+        'role:SUPERVISOR',
+        'role:HELPER',
+      ].filter((room): room is string => Boolean(room));
+
+      this.notificationService.notifyInboundInspectionApproved({
+        inboundId: existing.inbound_id,
+        inboundNumber: existing.inbound_id,
+        palletId: existing.pallet_id,
+        warehouseId: warehouseSub.warehouse_id,
+        warehouseSubId: existing.m_warehouse_sub_id,
+        approvedBy: inspection_by,
+        rooms,
+      });
     }
     return updated;
   }
@@ -371,14 +392,13 @@ export class TransactionScanInboundService {
     status: ScanInboundStatus,
     inspection_by: string,
   ): Promise<UpdateResult> {
+    const records = await Promise.all(dto.ids.map((id) => this.findOne(id)));
+
     if (status === ScanInboundStatus.COMPLETED) {
-      for (const id of dto.ids) {
-        const existing = await this.findOne(id);
-        if (!existing) throw new NotFoundException('Transaction scan inbound not found');
+      for (const existing of records) {
         const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
         if (!warehouseSub) throw new NotFoundException('Warehouse sub not found');
 
-        // createOrUpdateInventoryTracking now automatically detects location changes
         await this.inventoryTrackingService.createOrUpdateInventoryTracking(
           existing.pallet_id,
           existing.m_warehouse_sub_id,
@@ -388,6 +408,48 @@ export class TransactionScanInboundService {
         );
       }
     }
+
+    if (status === ScanInboundStatus.PENDING) {
+      const groupedByInbound = new Map<string, TransactionScanInbound[]>();
+
+      records.forEach((record) => {
+        const key = record.inbound_id ?? record.id;
+        const group = groupedByInbound.get(key) ?? [];
+        group.push(record);
+        groupedByInbound.set(key, group);
+      });
+
+      for (const [inboundId, group] of groupedByInbound.entries()) {
+        const sample = group[0];
+
+        let warehouseSubId = sample.m_warehouse_sub_id;
+        let warehouseId: string | undefined;
+
+        if (warehouseSubId) {
+          try {
+            const warehouseSub = await this.warehouseSubService.findOne(warehouseSubId);
+            warehouseId = warehouseSub?.warehouse_id;
+          } catch (error) {
+            // ignore lookup errors; notification will proceed without warehouse context
+          }
+        }
+
+        const rooms = [
+          'role:WH_STAFF',
+        ].filter((room): room is string => Boolean(room));
+
+        this.notificationService.notifyInboundInspectionReady({
+          inboundId,
+          inboundNumber: inboundId,
+          totalItems: group.length,
+          userId: sample.user_id,
+          username: sample.user_name,
+          rooms,
+          
+        });
+      }
+    }
+
     return this.repository.updateManyStatusTo(dto, status, inspection_by);
   }
 

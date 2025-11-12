@@ -34,6 +34,7 @@ import { S3Module } from './infrastructure/modules/s3.module';
 import { CustomerModule } from './customer/customer.module';
 import { TransactionScanPickingModule } from './transaction-scan-picking/transaction-scan-picking.module';
 import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion
     CustomerModule,
     TransactionScanPickingModule,
     PickingSuggestionModule,
+    NotificationModule,
   ],
   providers: [
     {

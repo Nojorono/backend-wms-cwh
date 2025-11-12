@@ -7,12 +7,14 @@ import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity
 import { PaginationService } from '../core/services/pagination.service';
 import { OutboundMemoPaginationDto } from './dto/outbound-memo-pagination.dto';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class OutboundMemoService {
   constructor(
     private readonly repository: OutboundMemoRepository,
     private readonly paginationService: PaginationService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async create(data: CreateOutboundMemoDto): Promise<OutboundMemo> {
@@ -79,11 +81,28 @@ export class OutboundMemoService {
     }
 
     // Validasi status transition
+    let statusChangedToApproved = false;
     if (data.status && existing.status !== data.status) {
       this.validateStatusTransition(existing.status, data.status);
+      statusChangedToApproved =
+        data.status === OutboundMemoStatus.APPROVED &&
+        existing.status !== OutboundMemoStatus.APPROVED;
     }
 
-    return this.repository.update(id, data);
+    const updated = await this.repository.update(id, data);
+
+    if (statusChangedToApproved) {
+      this.notificationService.notifyOutboundMemoApproved({
+        memoId: updated.id,
+        requestor: updated.requestor || 'Unknown',
+        rooms: [
+          `memo:${updated.id}`,
+          'role:SUPERVISOR',
+        ],
+      });
+    }
+
+    return updated;
   }
 
   async remove(id: string): Promise<void> {
@@ -105,7 +124,21 @@ export class OutboundMemoService {
     const existing = await this.repository.findOne(id);
     this.validateStatusTransition(existing.status, status);
 
-    return this.repository.update(id, { status } as UpdateOutboundMemoDto);
+    const updated = await this.repository.update(id, { status } as UpdateOutboundMemoDto);
+
+    if (status === OutboundMemoStatus.APPROVED && existing.status !== OutboundMemoStatus.APPROVED) {
+      this.notificationService.notifyOutboundMemoApproved({
+        memoId: updated.id,
+        requestor: updated.requestor || 'Unknown',
+        rooms: [
+          `memo:${updated.id}`,
+          'role:WAREHOUSE_MANAGER',
+          'role:PICKER_LEAD',
+        ],
+      });
+    }
+
+    return updated;
   }
 
   private validateStatusTransition(
