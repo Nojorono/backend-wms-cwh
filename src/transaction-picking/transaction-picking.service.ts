@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { TransactionPickingRepository } from './transaction-picking.repository';
-import { CreateTransactionPickingDto } from './dto/create-transaction-picking.dto';
+import { CreateTransactionPickingDto, CreateManyTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
 import { PaginationQueryDto, PaginatedResponseDto } from '../core/dto/pagination.dto';
@@ -20,6 +20,20 @@ export class TransactionPickingService {
     }
 
     return this.repository.create(data);
+  }
+
+  async createMany(dto: CreateManyTransactionPickingDto): Promise<PickingTransaction[]> {
+    if (!dto.data || dto.data.length === 0) {
+      throw new BadRequestException('Minimal 1 data picking');
+    }
+
+    dto.data.forEach((item) => {
+      if (item.quantity <= 0) {
+        throw new BadRequestException('Quantity harus lebih dari 0');
+      }
+    });
+
+    return this.repository.createMany(dto.data);
   }
 
   async findAll(

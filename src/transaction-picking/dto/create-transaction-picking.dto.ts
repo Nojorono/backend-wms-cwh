@@ -63,3 +63,12 @@ export class CreateTransactionPickingDto {
   @IsEnum(Status)
   status?: Status;
 }
+
+export class CreateManyTransactionPickingDto {
+  @ApiProperty({
+    description: 'Array of transaction picking to create',
+    type: [CreateTransactionPickingDto],
+  })
+  @IsNotEmpty()
+  data: CreateTransactionPickingDto[];
+}

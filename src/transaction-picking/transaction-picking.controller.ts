@@ -18,7 +18,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { TransactionPickingService } from './transaction-picking.service';
-import { CreateTransactionPickingDto } from './dto/create-transaction-picking.dto';
+import { CreateTransactionPickingDto, CreateManyTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
 import { PaginationQueryDto } from '../core/dto/pagination.dto';
@@ -44,6 +44,27 @@ export class TransactionPickingController {
   })
   async create(@Body() createTransactionPickingDto: CreateTransactionPickingDto) {
     const result = await this.service.create(createTransactionPickingDto);
+    return {
+      success: true,
+      message: 'Transaction picking berhasil dibuat',
+      data: result,
+    };
+  }
+
+  @Post('bulk')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create multiple transaction picking' })
+  @ApiResponse({
+    status: 201,
+    description: 'Transaction picking berhasil dibuat',
+    type: [PickingTransaction],
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - data tidak valid',
+  })
+  async createMany(@Body() dto: CreateManyTransactionPickingDto) {
+    const result = await this.service.createMany(dto);
     return {
       success: true,
       message: 'Transaction picking berhasil dibuat',

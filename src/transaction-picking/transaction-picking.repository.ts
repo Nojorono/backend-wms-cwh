@@ -17,6 +17,11 @@ export class TransactionPickingRepository {
     return this.repository.save(pickingTransaction);
   }
 
+  async createMany(data: CreateTransactionPickingDto[]): Promise<PickingTransaction[]> {
+    const entities = this.repository.create(data);
+    return this.repository.save(entities);
+  }
+
   async findAll(): Promise<PickingTransaction[]> {
     return this.repository.find({
       relations: [
