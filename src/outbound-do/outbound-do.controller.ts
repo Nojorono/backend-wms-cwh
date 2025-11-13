@@ -264,4 +264,17 @@ export class OutboundDoController {
   async getMemoSequence(@Param('id') id: string) {
     return this.outboundDoService.getMemoSequence(id);
   }
+
+  // find by assigned user id
+  @Get('assigned-user/:userId')
+  @ApiOperation({ summary: 'Dapatkan outbound DO berdasarkan ID user yang ditugaskan' })
+  @ApiParam({ name: 'userId', description: 'ID user yang ditugaskan' })
+  @ApiResponse({
+    status: 200,
+    description: 'Outbound DO berhasil ditemukan',
+    type: [OutboundDoResponseDto],
+  })
+  async findByAssignedUserId(@Param('userId') userId: string) {
+    return this.outboundDoService.findByAssignedUserId(userId);
+  }
 }

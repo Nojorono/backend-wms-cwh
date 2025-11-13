@@ -341,4 +341,21 @@ export class OutboundDoRepository {
 
     return this.addSequenceToMemos(outboundDo);
   }
+
+  async findByAssignedUserId(userId: string): Promise<OutboundDo[]> {
+    const outboundDos = await this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .innerJoin('outbound_do.outbound_memos', 'outbound_memos')
+      .innerJoin('outbound_memos.assigned_pickings', 'assigned_pickings')
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos_select')
+      .leftJoinAndSelect('outbound_memos_select.outbound_memo_items', 'outbound_memo_items')
+      .leftJoinAndSelect('outbound_memos_select.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('outbound_memos_select.assigned_pickings', 'assigned_pickings_select')
+      .where('assigned_pickings.picking_user_id = :userId', { userId })
+      .andWhere('outbound_do.deletedAt IS NULL')
+      .distinct(true)
+      .getMany();
+
+    return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+  }
 }

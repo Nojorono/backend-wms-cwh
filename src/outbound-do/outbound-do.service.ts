@@ -158,4 +158,8 @@ export class OutboundDoService {
   async getMemoSequence(outboundDoId: string): Promise<{ memoId: string; sequence: number }[]> {
     return this.repository.getMemoSequence(outboundDoId);
   }
+
+  async findByAssignedUserId(userId: string): Promise<OutboundDo[]> {
+    return this.repository.findByAssignedUserId(userId);
+  }
 }
