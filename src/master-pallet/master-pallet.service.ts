@@ -255,6 +255,7 @@ export class MasterPalletService {
       new_quantity: newItemQuantity,
       operation_type: updateQuantityDto.operation_type,
       inbound_id: updateQuantityDto.inbound_id,
+      outbound_do_id: updateQuantityDto.outbound_do_id,
       reference_id: updateQuantityDto.reference_id,
       reference_type: updateQuantityDto.reference_type,
       notes: updateQuantityDto.notes,
@@ -596,6 +597,7 @@ export class MasterPalletService {
     new_quantity: number;
     operation_type: QuantityOperationType;
     inbound_id?: string;
+    outbound_do_id?: string;
     reference_id?: string;
     reference_type?: string;
     notes?: string;

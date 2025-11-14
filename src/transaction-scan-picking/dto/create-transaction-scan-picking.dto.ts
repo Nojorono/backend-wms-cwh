@@ -91,5 +91,21 @@ export class CreateTransactionScanPickingDto {
   @IsOptional()
   @IsString()
   inspection_by?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID user yang melakukan operasi',
+    example: 'uuid-user-123',
+  })
+  @IsOptional()
+  @IsString()
+  user_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Nama user yang melakukan operasi',
+    example: 'John Doe',
+  })
+  @IsOptional()
+  @IsString()
+  user_name?: string;
 }
 

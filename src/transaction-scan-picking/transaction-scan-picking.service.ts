@@ -30,6 +30,7 @@ export class TransactionScanPickingService {
     const itemId = data.item_id || transactionPicking.item_id;
     const uom = data.uom || transactionPicking.uom;
     const weekNumber = data.week_number || transactionPicking.week_number;
+    const outboundDoId = transactionPicking.do_id;
 
     if (!itemId) {
       throw new BadRequestException('item_id is required (either in request or from transaction_picking)');
@@ -58,6 +59,8 @@ export class TransactionScanPickingService {
         operation_type: QuantityOperationType.PICK,
         uom: uom,
         week_number: weekNumber,
+        outbound_do_id: outboundDoId,
+        user_id: data.user_id,
         reference_id: data.transaction_picking_id,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Picked ${data.quantity_picked} from source pallet for transaction scan picking`,
@@ -72,6 +75,8 @@ export class TransactionScanPickingService {
         operation_type: QuantityOperationType.ADD,
         uom: uom,
         week_number: weekNumber,
+        outbound_do_id: outboundDoId,
+        user_id: data.user_id,
         reference_id: data.transaction_picking_id,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Switched ${quantitySwitch} to switch pallet from transaction scan picking`,
@@ -87,6 +92,8 @@ export class TransactionScanPickingService {
         operation_type: QuantityOperationType.ADD,
         uom: uom,
         week_number: weekNumber,
+        outbound_do_id: outboundDoId,
+        user_id: data.user_id,
         reference_id: data.transaction_picking_id,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Added ${data.quantity_picked} to destination pallet from transaction scan picking`,
@@ -140,6 +147,7 @@ export class TransactionScanPickingService {
     const itemId = data.item_id || existing.item_id || transactionPicking.item_id;
     const uom = data.uom || existing.uom || transactionPicking.uom;
     const weekNumber = data.week_number ?? existing.week_number ?? transactionPicking.week_number;
+    const outboundDoId = transactionPicking.do_id;
 
     if (!itemId) {
       throw new BadRequestException('item_id is required (either in request or from transaction_picking)');
@@ -180,8 +188,11 @@ export class TransactionScanPickingService {
         );
       }
 
+      // Get user_id from data or existing (if stored)
+      const userId = data.user_id ?? (existing as any).user_id;
+
       // Revert existing pallet operations
-      await this.revertPalletOperations(existing, itemId, uom, weekNumber, transactionPickingId);
+      await this.revertPalletOperations(existing, itemId, uom, weekNumber, transactionPickingId, outboundDoId, userId);
 
       // Apply new pallet operations based on updated data
       const newPalletSourceId = data.pallet_source_id ?? existing.pallet_source_id;
@@ -199,6 +210,8 @@ export class TransactionScanPickingService {
           operation_type: QuantityOperationType.PICK,
           uom: uom,
           week_number: weekNumber,
+          outbound_do_id: outboundDoId,
+          user_id: userId,
           reference_id: transactionPickingId,
           reference_type: 'TRANSACTION_SCAN_PICKING',
           notes: `Picked ${quantityPicked} from source pallet for transaction scan picking (updated)`,
@@ -213,6 +226,8 @@ export class TransactionScanPickingService {
           operation_type: QuantityOperationType.ADD,
           uom: uom,
           week_number: weekNumber,
+          outbound_do_id: outboundDoId,
+          user_id: userId,
           reference_id: transactionPickingId,
           reference_type: 'TRANSACTION_SCAN_PICKING',
           notes: `Switched ${quantitySwitch} to switch pallet from transaction scan picking (updated)`,
@@ -227,6 +242,8 @@ export class TransactionScanPickingService {
           operation_type: QuantityOperationType.ADD,
           uom: uom,
           week_number: weekNumber,
+          outbound_do_id: outboundDoId,
+          user_id: userId,
           reference_id: transactionPickingId,
           reference_type: 'TRANSACTION_SCAN_PICKING',
           notes: `Added ${quantityPicked} to destination pallet from transaction scan picking (updated)`,
@@ -247,13 +264,17 @@ export class TransactionScanPickingService {
     const itemId = existing.item_id || transactionPicking.item_id;
     const uom = existing.uom || transactionPicking.uom;
     const weekNumber = existing.week_number ?? transactionPicking.week_number;
+    const outboundDoId = transactionPicking.do_id;
 
     if (!itemId) {
       throw new BadRequestException('item_id is required to revert pallet operations');
     }
 
+    // Get user_id from existing (if stored)
+    const userId = (existing as any).user_id;
+
     // Revert all pallet operations
-    await this.revertPalletOperations(existing, itemId, uom, weekNumber, existing.transaction_picking_id);
+    await this.revertPalletOperations(existing, itemId, uom, weekNumber, existing.transaction_picking_id, outboundDoId, userId);
 
     // Remove the transaction scan picking record
     await this.repository.remove(id);
@@ -273,6 +294,8 @@ export class TransactionScanPickingService {
     uom: string | undefined,
     weekNumber: number | undefined,
     transactionPickingId: string,
+    outboundDoId: string | undefined,
+    userId?: string | undefined,
   ): Promise<void> {
     // Check if source and use pallets were the same
     const wasSamePallet = existing.pallet_source_id && existing.pallet_use_id && existing.pallet_source_id === existing.pallet_use_id;
@@ -285,6 +308,8 @@ export class TransactionScanPickingService {
         operation_type: QuantityOperationType.ADD,
         uom: uom,
         week_number: weekNumber,
+        outbound_do_id: outboundDoId,
+        user_id: userId,
         reference_id: transactionPickingId,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Reverted: Added back ${existing.quantity_picked} to source pallet`,
@@ -300,6 +325,8 @@ export class TransactionScanPickingService {
         operation_type: QuantityOperationType.REMOVE,
         uom: uom,
         week_number: weekNumber,
+        outbound_do_id: outboundDoId,
+        user_id: userId,
         reference_id: transactionPickingId,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Reverted: Removed ${quantitySwitch} from switch pallet`,
@@ -314,6 +341,8 @@ export class TransactionScanPickingService {
         operation_type: QuantityOperationType.REMOVE,
         uom: uom,
         week_number: weekNumber,
+        outbound_do_id: outboundDoId,
+        user_id: userId,
         reference_id: transactionPickingId,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Reverted: Removed ${existing.quantity_picked} from destination pallet`,

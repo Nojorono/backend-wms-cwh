@@ -63,5 +63,11 @@ export class ScanPickingTransaction extends BaseEntity {
   status: ScanPickingStatus;
 
   @Column({ nullable: true })
+  user_id: string;
+
+  @Column({ nullable: true })
+  user_name: string;
+
+  @Column({ nullable: true })
   inspection_by: string;
 }
