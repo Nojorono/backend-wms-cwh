@@ -2,27 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
-import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
-import { MasterItem } from '../core/domain/entities/master-item.entity';
-import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
-import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
-import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
 
 @Injectable()
 export class InventoryAutoSuggestionService {
   constructor(
     @InjectRepository(InventoryTracking)
     private readonly inventoryTrackingRepository: Repository<InventoryTracking>,
-    @InjectRepository(MasterPallet)
-    private readonly palletRepository: Repository<MasterPallet>,
-    @InjectRepository(MasterItem)
-    private readonly itemRepository: Repository<MasterItem>,
-    @InjectRepository(MasterWarehouse)
-    private readonly warehouseRepository: Repository<MasterWarehouse>,
-    @InjectRepository(MasterWarehouseSub)
-    private readonly warehouseSubRepository: Repository<MasterWarehouseSub>,
-    @InjectRepository(MasterWarehouseBin)
-    private readonly warehouseBinRepository: Repository<MasterWarehouseBin>,
   ) {}
 
   // Auto suggestion untuk IN operations
