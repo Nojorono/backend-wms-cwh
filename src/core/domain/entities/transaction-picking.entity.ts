@@ -57,6 +57,7 @@ export class PickingTransaction extends BaseEntity {
   @JoinColumn({ name: 'destination_warehouse_sub_id' })
   destinationWarehouseSub: MasterWarehouseSub;
 
+  @Column({ nullable: true })
   destination_bin_id: string;
 
   @ManyToOne(() => MasterWarehouseBin, (warehouseBin) => warehouseBin.id)
