@@ -35,6 +35,7 @@ import { CustomerModule } from './customer/customer.module';
 import { TransactionScanPickingModule } from './transaction-scan-picking/transaction-scan-picking.module';
 import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion.module';
 import { NotificationModule } from './notification/notification.module';
+import { InventoryMovementModule } from './inventory-movement/inventory-movement.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { NotificationModule } from './notification/notification.module';
     TransactionScanPickingModule,
     PickingSuggestionModule,
     NotificationModule,
+    InventoryMovementModule,
   ],
   providers: [
     {

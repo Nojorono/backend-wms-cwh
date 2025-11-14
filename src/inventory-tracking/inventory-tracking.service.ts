@@ -118,6 +118,14 @@ export class InventoryTrackingService {
     return entity;
   }
 
+  async findOneByPalletId(palletId: string): Promise<InventoryTracking> {
+    const entity = await this.repository.findOneByPalletId(palletId);
+    if (!entity) {
+      throw new NotFoundException(`InventoryTracking with pallet ID ${palletId} not found`);
+    }
+    return entity;
+  }
+
   async update(id: string, dto: UpdateInventoryTrackingDto): Promise<InventoryTracking> {
     // Validasi status jika ada
     if (dto.inventory_status) {
