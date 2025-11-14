@@ -20,7 +20,6 @@ import {
   PalletTransactionHistory,
   QuantityOperationType,
 } from '../core/domain/entities/transaction-pallet-history.entity';
-import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 import { PaginationService } from '../core/services/pagination.service';
 import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
@@ -30,7 +29,6 @@ import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 export class MasterPalletService {
   constructor(
     private readonly repository: MasterPalletRepository,
-    private readonly barcodeService: BarcodeService,
     @InjectRepository(PalletTransactionHistory)
     private readonly transactionHistoryRepository: Repository<PalletTransactionHistory>,
     private readonly paginationService: PaginationService,
@@ -45,22 +43,6 @@ export class MasterPalletService {
         `Pallet with pallet code ${createMasterPalletDto.pallet_code} already exists`,
       );
     }
-
-    // const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
-    //   bcid: 'qrcode',
-    //   text: `${createMasterPalletDto.pallet_code}`,
-    //   scale: 3,
-    //   height: 250,
-    //   width: 250,
-    //   bucket: 'wms',
-    //   prefix: 'pallet',
-    //   extension: 'png',
-    //   acl: 'public-read',
-    //   metadata: {
-    //     pallet_code: createMasterPalletDto.pallet_code,
-    //     pallet_capacity: createMasterPalletDto.capacity?.toString() || '0',
-    //   } as Record<string, string>,
-    // });
 
     const pallet = await this.repository.create({
       ...createMasterPalletDto,
@@ -113,24 +95,6 @@ export class MasterPalletService {
       (updateMasterPalletDto.pallet_code &&
         updateMasterPalletDto.pallet_code !== pallet.pallet_code)
     ) {
-      // await this.barcodeService.deleteBarcodeImage(pallet.qr_image_url);
-      // const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode(
-      //   {
-      //     bcid: 'qrcode',
-      //     text: `${updateMasterPalletDto.pallet_code}`,
-      //     scale: 3,
-      //     height: 250,
-      //     width: 250,
-      //     bucket: 'wms',
-      //     prefix: 'pallet',
-      //     extension: 'png',
-      //     acl: 'public-read',
-      //     metadata: {
-      //       pallet_code: updateMasterPalletDto.pallet_code,
-      //       pallet_capacity: updateMasterPalletDto.capacity?.toString() || '0',
-      //     } as Record<string, string>,
-      //   },
-      // );
       updateMasterPalletDto.qr_image_url = '';
     }
     const updatedPallet = await this.repository.update(id, updateMasterPalletDto);
@@ -188,6 +152,16 @@ export class MasterPalletService {
         throw new BadRequestException('Quantity to add must be non-negative');
       }
     }
+    if (updateQuantityDto.operation_type === QuantityOperationType.PICK) {
+      if (updateQuantityDto.quantity < 0) {
+        throw new BadRequestException('Quantity to pick must be non-negative');
+      }
+      if (updateQuantityDto.quantity > currentItemQuantity) {
+        throw new BadRequestException(
+          `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+        );
+      }
+    }
     if (updateQuantityDto.operation_type === QuantityOperationType.REMOVE) {
       if (updateQuantityDto.quantity < 0) {
         throw new BadRequestException('Quantity to remove must be non-negative');
@@ -216,6 +190,15 @@ export class MasterPalletService {
       case QuantityOperationType.ADD:
         newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
         quantityChange = updateQuantityDto.quantity;
+        break;
+      case QuantityOperationType.PICK:
+        newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
+        quantityChange = -updateQuantityDto.quantity;
+        if (updateQuantityDto.quantity > currentItemQuantity) {
+          throw new BadRequestException(
+            `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+          );
+        }
         break;
       case QuantityOperationType.REMOVE:
         newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
