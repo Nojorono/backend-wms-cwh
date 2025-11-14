@@ -21,6 +21,9 @@ import {
   QuantityOperationType,
 } from '../core/domain/entities/transaction-pallet-history.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
+import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
+import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
 import { PaginationService } from '../core/services/pagination.service';
 import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
@@ -31,6 +34,8 @@ export class MasterPalletService {
     private readonly repository: MasterPalletRepository,
     @InjectRepository(PalletTransactionHistory)
     private readonly transactionHistoryRepository: Repository<PalletTransactionHistory>,
+    @InjectRepository(InventoryTracking)
+    private readonly inventoryTrackingRepository: Repository<InventoryTracking>,
     private readonly paginationService: PaginationService,
   ) {}
 
@@ -435,6 +440,15 @@ export class MasterPalletService {
 
     const results = await qb.getMany();
 
+    // Get latest inventory tracking for the pallet to get location
+    const latestInventory = await this.inventoryTrackingRepository
+      .createQueryBuilder('inventory')
+      .leftJoinAndMapOne('inventory.warehouseSub', MasterWarehouseSub, 'warehouseSub', 'warehouseSub.id = inventory.warehouse_sub_id')
+      .leftJoinAndMapOne('inventory.warehouseBin', MasterWarehouseBin, 'warehouseBin', 'warehouseBin.id = inventory.warehouse_bin_id')
+      .where('inventory.pallet_id = :palletId', { palletId })
+      .orderBy('inventory.createdAt', 'DESC')
+      .getOne();
+
     return results
       .filter((history: any) => history.new_quantity > 0) // Filter out items with quantity 0
       .map((history: any) => ({
@@ -446,6 +460,10 @@ export class MasterPalletService {
         last_updated: history.createdAt,
         production_date: history.production_date,
         week_number: history.week_number,
+        warehouse_sub_id: latestInventory?.warehouse_sub_id,
+        warehouse_sub_name: latestInventory?.warehouseSub?.code,
+        warehouse_bin_id: latestInventory?.warehouse_bin_id,
+        warehouse_bin_name: latestInventory?.warehouseBin?.code,
       }));
   }
 

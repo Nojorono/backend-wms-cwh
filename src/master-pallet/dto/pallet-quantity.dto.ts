@@ -149,6 +149,18 @@ export class PalletItemQuantityDto {
   @IsOptional()
   @IsNumber()
   week_number?: number;
+
+  @ApiPropertyOptional({ example: 'uuid-warehouse-sub-123', description: 'Warehouse sub ID' })
+  warehouse_sub_id?: string;
+
+  @ApiPropertyOptional({ example: 'Zone A', description: 'Warehouse sub name/code' })
+  warehouse_sub_name?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-bin-123', description: 'Warehouse bin ID' })
+  warehouse_bin_id?: string;
+
+  @ApiPropertyOptional({ example: 'BIN-001', description: 'Warehouse bin name/code' })
+  warehouse_bin_name?: string;
 }
 
 export class PalletCapacityValidationDto {
