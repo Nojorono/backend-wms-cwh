@@ -7,10 +7,16 @@ import {
   ProgressionStatus,
 } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingHistory } from '../core/domain/entities/inventory-tracking-history.entity';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 
 @Injectable()
 export class InventoryTrackingService {
-  constructor(private readonly repository: InventoryTrackingRepository) {}
+  constructor(
+    private readonly repository: InventoryTrackingRepository,
+    private readonly paginationService: PaginationService,
+  ) {}
 
   // Validasi status yang diperbolehkan
   private validateInventoryStatus(status: string): void {
@@ -66,6 +72,30 @@ export class InventoryTrackingService {
 
   async findAll(): Promise<InventoryTracking[]> {
     return this.repository.findAll();
+  }
+
+  async findAllPaginated(
+    paginationQuery: InventoryTrackingPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<InventoryTracking>> {
+    const filters = {
+      inventory_status: paginationQuery.inventory_status,
+      warehouse_id: paginationQuery.warehouse_id,
+      warehouse_sub_id: paginationQuery.warehouse_sub_id,
+      warehouse_bin_id: paginationQuery.warehouse_bin_id,
+      pallet_id: paginationQuery.pallet_id,
+      progression_status: paginationQuery.progression_status,
+    };
+
+    const { data, total } = await this.repository.findAllPaginated(
+      filters,
+      paginationQuery.page,
+      paginationQuery.limit,
+      paginationQuery.search,
+      paginationQuery.sortBy,
+      paginationQuery.sortOrder,
+    );
+
+    return this.paginationService.createPaginatedResponse(data, paginationQuery, total);
   }
 
   async findAllByWarehouse(warehouse_sub_id, warehouse_bin_id): Promise<InventoryTracking[]> {

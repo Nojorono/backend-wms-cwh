@@ -7,6 +7,7 @@ import {
   ApiBody,
   ApiQuery,
   ApiParam,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
@@ -16,6 +17,9 @@ import {
 } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryAutoSuggestionService } from './auto-suggestion.service';
+import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
+import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @ApiTags('Inventory Tracking')
 @Controller('inventory-tracking')
@@ -80,9 +84,71 @@ export class InventoryTrackingController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all inventory tracking records' })
-  @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
-  findAll() {
+  @ApiOperation({ summary: 'List all inventory tracking records or search with pagination' })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'inventory_status',
+      description: 'Filter by inventory status',
+      example: 'IN_INVENTORY',
+    },
+    {
+      name: 'warehouse_id',
+      description: 'Filter by warehouse ID',
+      example: 'uuid-warehouse-123',
+    },
+    {
+      name: 'warehouse_sub_id',
+      description: 'Filter by warehouse sub ID',
+      example: 'uuid-warehouse-sub-123',
+    },
+    {
+      name: 'warehouse_bin_id',
+      description: 'Filter by warehouse bin ID',
+      example: 'uuid-warehouse-bin-123',
+    },
+    {
+      name: 'pallet_id',
+      description: 'Filter by pallet ID',
+      example: 'uuid-pallet-123',
+    },
+    {
+      name: 'progression_status',
+      description: 'Filter by progression status',
+      example: 'IN_PROGRESS',
+    },
+  ])
+  @ApiResponse({
+    status: 200,
+    description: 'Return all inventory tracking records or paginated results.',
+    schema: {
+      oneOf: [
+        {
+          type: 'array',
+          items: { $ref: '#/components/schemas/InventoryTracking' },
+        },
+        { $ref: '#/components/schemas/PaginatedResponseDto' },
+      ],
+    },
+  })
+  findAll(@Query() paginationQuery: InventoryTrackingPaginationQueryDto) {
+    // Check if any pagination parameters are provided
+    const hasPaginationParams =
+      paginationQuery.search ||
+      paginationQuery.page ||
+      paginationQuery.limit ||
+      paginationQuery.sortBy ||
+      paginationQuery.sortOrder ||
+      paginationQuery.inventory_status ||
+      paginationQuery.warehouse_id ||
+      paginationQuery.warehouse_sub_id ||
+      paginationQuery.warehouse_bin_id ||
+      paginationQuery.pallet_id ||
+      paginationQuery.progression_status;
+
+    if (hasPaginationParams) {
+      return this.service.findAllPaginated(paginationQuery);
+    }
+
     return this.service.findAll();
   }
 

@@ -64,6 +64,97 @@ export class InventoryTrackingRepository {
     });
   }
 
+  async findAllPaginated(
+    filters: {
+      inventory_status?: string;
+      warehouse_id?: string;
+      warehouse_sub_id?: string;
+      warehouse_bin_id?: string;
+      pallet_id?: string;
+      progression_status?: string;
+    },
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    sortBy: string = 'createdAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ): Promise<{ data: InventoryTracking[]; total: number }> {
+    const queryBuilder = this.repository.createQueryBuilder('inventory');
+
+    // Apply filters
+    if (filters.inventory_status) {
+      queryBuilder.andWhere('inventory.inventory_status = :inventory_status', {
+        inventory_status: filters.inventory_status,
+      });
+    }
+
+    if (filters.warehouse_id) {
+      queryBuilder.andWhere('inventory.warehouse_id = :warehouse_id', {
+        warehouse_id: filters.warehouse_id,
+      });
+    }
+
+    if (filters.warehouse_sub_id) {
+      queryBuilder.andWhere('inventory.warehouse_sub_id = :warehouse_sub_id', {
+        warehouse_sub_id: filters.warehouse_sub_id,
+      });
+    }
+
+    if (filters.warehouse_bin_id) {
+      queryBuilder.andWhere('inventory.warehouse_bin_id = :warehouse_bin_id', {
+        warehouse_bin_id: filters.warehouse_bin_id,
+      });
+    }
+
+    if (filters.pallet_id) {
+      queryBuilder.andWhere('inventory.pallet_id = :pallet_id', {
+        pallet_id: filters.pallet_id,
+      });
+    }
+
+    if (filters.progression_status) {
+      queryBuilder.andWhere('inventory.progression_status = :progression_status', {
+        progression_status: filters.progression_status,
+      });
+    }
+
+    // Apply search
+    if (search) {
+      queryBuilder.andWhere(
+        '(inventory.inventory_note ILIKE :search OR inventory.inventory_status ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    // Get total count before pagination
+    const total = await queryBuilder.getCount();
+
+    // Define sortable fields mapping
+    const sortableFields: Record<string, string> = {
+      createdAt: 'inventory.createdAt',
+      updatedAt: 'inventory.updatedAt',
+      inventory_date: 'inventory.inventory_date',
+      inventory_status: 'inventory.inventory_status',
+      progression_status: 'inventory.progression_status',
+    };
+
+    const defaultOrderField = 'inventory.createdAt';
+    const orderField = sortBy && sortableFields[sortBy] ? sortableFields[sortBy] : defaultOrderField;
+
+    // Apply joins and pagination
+    const data = await queryBuilder
+      .leftJoinAndSelect('inventory.pallet', 'pallet')
+      .leftJoinAndSelect('inventory.warehouse', 'warehouse')
+      .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
+      .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin')
+      .orderBy(orderField, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, total };
+  }
+
   async findAllByWarehouse(
     warehouse_sub_id?: string,
     warehouse_bin_id?: string,

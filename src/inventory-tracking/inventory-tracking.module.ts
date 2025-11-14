@@ -11,6 +11,7 @@ import { InventoryTrackingController } from './inventory-tracking.controller';
 import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
 import { InventoryAutoSuggestionService } from './auto-suggestion.service';
+import { PaginationService } from '../core/services/pagination.service';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { InventoryAutoSuggestionService } from './auto-suggestion.service';
     InventoryTrackingService,
     InventoryTrackingRepository,
     InventoryAutoSuggestionService,
+    PaginationService,
   ],
   exports: [InventoryTrackingService, InventoryAutoSuggestionService],
 })
