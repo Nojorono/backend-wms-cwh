@@ -45,7 +45,11 @@ export class TransactionScanPickingService {
       );
     }
 
+    // Check if source and use pallets are the same
+    const isSamePallet = data.pallet_source_id && data.pallet_use_id && data.pallet_source_id === data.pallet_use_id;
+
     // Update pallet quantities if pallets are provided
+    // Always perform PICK operation from source pallet
     if (data.pallet_source_id && data.quantity_picked > 0) {
       // Pick total quantity from source pallet
       await this.masterPalletService.updateQuantity(data.pallet_source_id, {
@@ -74,7 +78,8 @@ export class TransactionScanPickingService {
       });
     }
 
-    if (data.pallet_use_id && data.quantity_picked > 0) {
+    // Only add to use pallet if it's different from source pallet
+    if (data.pallet_use_id && data.quantity_picked > 0 && !isSamePallet) {
       // Add remaining quantity to destination pallet (pallet_use_id)
       await this.masterPalletService.updateQuantity(data.pallet_use_id, {
         item_id: itemId,
@@ -183,7 +188,10 @@ export class TransactionScanPickingService {
       const newPalletUseId = data.pallet_use_id ?? existing.pallet_use_id;
       const newPalletSwitchId = data.pallet_switch_id ?? existing.pallet_switch_id;
 
-      // Apply new source pallet operation
+      // Check if source and use pallets are the same
+      const isSamePallet = newPalletSourceId && newPalletUseId && newPalletSourceId === newPalletUseId;
+
+      // Always perform PICK operation from source pallet
       if (newPalletSourceId && quantityPicked > 0) {
         await this.masterPalletService.updateQuantity(newPalletSourceId, {
           item_id: itemId,
@@ -211,8 +219,8 @@ export class TransactionScanPickingService {
         });
       }
 
-      // Apply new use pallet operation
-      if (newPalletUseId && quantityPicked > 0) {
+      // Only add to use pallet if it's different from source pallet
+      if (newPalletUseId && quantityPicked > 0 && !isSamePallet) {
         await this.masterPalletService.updateQuantity(newPalletUseId, {
           item_id: itemId,
           quantity: quantityPicked,
@@ -266,7 +274,10 @@ export class TransactionScanPickingService {
     weekNumber: number | undefined,
     transactionPickingId: string,
   ): Promise<void> {
-    // Revert source pallet: Add back the picked quantity (reverse PICK)
+    // Check if source and use pallets were the same
+    const wasSamePallet = existing.pallet_source_id && existing.pallet_use_id && existing.pallet_source_id === existing.pallet_use_id;
+
+    // Always revert PICK operation: Add back the picked quantity to source pallet
     if (existing.pallet_source_id && existing.quantity_picked > 0) {
       await this.masterPalletService.updateQuantity(existing.pallet_source_id, {
         item_id: itemId,
@@ -295,8 +306,8 @@ export class TransactionScanPickingService {
       });
     }
 
-    // Revert use pallet: Remove the added quantity (reverse ADD)
-    if (existing.pallet_use_id && existing.quantity_picked > 0) {
+    // Only revert use pallet if it was different from source pallet (ADD operation was performed)
+    if (existing.pallet_use_id && existing.quantity_picked > 0 && !wasSamePallet) {
       await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
         item_id: itemId,
         quantity: existing.quantity_picked,
