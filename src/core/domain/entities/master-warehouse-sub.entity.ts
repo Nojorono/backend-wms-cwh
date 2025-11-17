@@ -33,6 +33,9 @@ export class MasterWarehouseSub extends BaseEntity {
   @Column({ nullable: true, name: 'is_staging' })
   is_staging: WarehouseSubStagingType;
 
+  @Column({ nullable: true, name: 'is_good_stock' , default: true })
+  is_good_stock: boolean;
+
   @OneToMany(() => InventoryTracking, (inventoryTracking) => inventoryTracking.warehouseSub)
   inventory_trackings: InventoryTracking[];
 }
