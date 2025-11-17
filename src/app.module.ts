@@ -36,6 +36,7 @@ import { TransactionScanPickingModule } from './transaction-scan-picking/transac
 import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion.module';
 import { NotificationModule } from './notification/notification.module';
 import { InventoryMovementModule } from './inventory-movement/inventory-movement.module';
+import { MoveOrderModule } from './move-order/move-order.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { InventoryMovementModule } from './inventory-movement/inventory-movement
     PickingSuggestionModule,
     NotificationModule,
     InventoryMovementModule,
+    MoveOrderModule,
   ],
   providers: [
     {
