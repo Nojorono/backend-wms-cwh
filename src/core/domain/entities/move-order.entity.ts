@@ -4,7 +4,7 @@ import { MoveOrderItem } from './move-order-item.entity';
 
 
 export enum MoveOrderType {
-  TRANSFER_SELISIH = 'TRANSFER_SELISIH',
+  TRANSFER_DIFFERENCE = 'TRANSFER_DIFFERENCE',
   GOOD_TO_BAD = 'GOOD_TO_BAD',
 }
 

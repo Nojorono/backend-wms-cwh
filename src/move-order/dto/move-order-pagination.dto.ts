@@ -16,7 +16,7 @@ export class MoveOrderPaginationQueryDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({
     description: 'Filter move orders by type',
     enum: MoveOrderType,
-    example: MoveOrderType.TRANSFER_SELISIH,
+    example: MoveOrderType.TRANSFER_DIFFERENCE,
   })
   @IsOptional()
   @IsEnum(MoveOrderType, { message: 'type must be a valid MoveOrderType' })

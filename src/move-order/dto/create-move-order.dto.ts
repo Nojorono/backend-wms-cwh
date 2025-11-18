@@ -78,7 +78,7 @@ export class CreateMoveOrderDto {
   @ApiProperty({
     description: 'Type of move order',
     enum: MoveOrderType,
-    example: MoveOrderType.TRANSFER_SELISIH,
+    example: MoveOrderType.TRANSFER_DIFFERENCE,
   })
   @IsEnum(MoveOrderType, { message: 'move_order_type must be a valid MoveOrderType' })
   move_order_type: MoveOrderType;
