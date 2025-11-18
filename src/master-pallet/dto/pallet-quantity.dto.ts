@@ -184,3 +184,50 @@ export class PalletCapacityValidationDto {
   @ApiProperty({ example: 0.75, description: 'Capacity utilization percentage' })
   utilization_percentage: number;
 }
+
+export class UpdatePalletItemStockDto {
+  @ApiProperty({ 
+    example: 10, 
+    description: 'New quantity for the item on the pallet (will adjust to this value)' 
+  })
+  @IsNumber()
+  @Min(0)
+  quantity: number;
+
+  @ApiPropertyOptional({ example: 'PCS', description: 'Unit of measure for the item' })
+  @IsOptional()
+  @IsString()
+  uom?: string;
+
+  @ApiPropertyOptional({ 
+    example: '2025-01-01',
+    description: 'Production date of the item lot' 
+  })
+  @IsOptional()
+  @IsDate()
+  production_date?: Date;
+
+  @ApiPropertyOptional({ 
+    example: 42,
+    description: 'Production week number associated with the lot' 
+  })
+  @IsOptional()
+  @IsNumber()
+  week_number?: number;
+
+  @ApiPropertyOptional({
+    example: 'Stock adjustment for inventory correction',
+    description: 'Notes about the stock adjustment operation',
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiPropertyOptional({
+    example: 'uuid-user-123',
+    description: 'User who performed the stock adjustment',
+  })
+  @IsOptional()
+  @IsString()
+  user_id?: string;
+}

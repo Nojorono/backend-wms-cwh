@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels, ApiBody } from '@nestjs/swagger';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
@@ -8,6 +8,7 @@ import {
   PalletCapacityValidationDto,
   PalletItemQuantityDto,
   UpdatePalletQuantityDto,
+  UpdatePalletItemStockDto,
 } from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
@@ -18,7 +19,7 @@ import { QuantityOperationType } from '../core/domain/entities/transaction-palle
 @ApiTags('Master Pallet')
 @Controller('master-pallet')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(PalletQuantityHistoryResponseDto, PaginatedResponseDto)
+@ApiExtraModels(PalletQuantityHistoryResponseDto, PaginatedResponseDto, UpdatePalletItemStockDto)
 export class MasterPalletController {
   constructor(private readonly masterPalletService: MasterPalletService) {}
 
@@ -158,6 +159,43 @@ export class MasterPalletController {
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
   getPalletItemLatestQuantityByPalletCode(@Param('palletCode') palletCode: string) {
     return this.masterPalletService.getPalletItemLatestQuantityByPalletCode(palletCode);
+  }
+
+  @Patch('by-code/:palletCode/item/:itemId/quantity')
+  @ApiOperation({ 
+    summary: 'Update quantity for specific item on pallet by pallet code and item ID',
+    description: 'Direct stock adjustment for pallet item. This endpoint adjusts the item quantity to the specified value. Only quantity is required. Operation type is automatically set to ADJUST.'
+  })
+  @ApiBody({ type: UpdatePalletItemStockDto })
+  @ApiResponse({
+    status: 200,
+    description: 'The quantity for item on pallet has been successfully updated.',
+    type: MasterPallet,
+  })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  @ApiResponse({ status: 400, description: 'Invalid request body or validation error.' })
+  updateItemQuantityByPalletCode(
+    @Param('palletCode') palletCode: string,
+    @Param('itemId') itemId: string,
+    @Body() stockDto: UpdatePalletItemStockDto,
+  ) {
+    // Map to UpdatePalletQuantityDto for service call
+    // Automatically use ADJUST operation type for stock adjustments
+    const updateQuantityDto: UpdatePalletQuantityDto = {
+      item_id: itemId,
+      quantity: stockDto.quantity,
+      operation_type: QuantityOperationType.ADJUST,
+      uom: stockDto.uom,
+      production_date: stockDto.production_date,
+      week_number: stockDto.week_number,
+      notes: stockDto.notes,
+      user_id: stockDto.user_id,
+      reference_type: 'STOCK_ADJUSTMENT',
+      // Explicitly exclude inbound/outbound references
+      inbound_id: undefined,
+      outbound_do_id: undefined,
+    };
+    return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
   }
 
   @Get('by-code/:palletCode/item/:itemId/history')

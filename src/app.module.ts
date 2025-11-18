@@ -37,6 +37,7 @@ import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion
 import { NotificationModule } from './notification/notification.module';
 import { InventoryMovementModule } from './inventory-movement/inventory-movement.module';
 import { MoveOrderModule } from './move-order/move-order.module';
+import { StockAdjustmentApprovalModule } from './stock-adjustment-approval/stock-adjustment-approval.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { MoveOrderModule } from './move-order/move-order.module';
     NotificationModule,
     InventoryMovementModule,
     MoveOrderModule,
+    StockAdjustmentApprovalModule,
   ],
   providers: [
     {
