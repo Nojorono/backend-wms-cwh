@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { FindOptionsWhere, Repository, SelectQueryBuilder } from 'typeorm';
 import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';

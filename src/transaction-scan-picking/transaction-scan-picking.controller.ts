@@ -166,5 +166,22 @@ export class TransactionScanPickingController {
       data: result,
     };
   }
+
+  // ready to inspection
+  @Patch(':memoId/ready-to-inspection')
+  @ApiOperation({ summary: 'Ready to inspection transaction scan picking' })
+  @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction scan picking berhasil di-ready to inspection',
+  })
+  async readyToInspection(@Param('memoId') memoId: string) {
+    const result = await this.service.readyToInspection(memoId);
+    return {
+      success: true,
+      message: 'Transaction scan picking berhasil di-ready to inspection',
+      data: result,
+    };
+  }
 }
 

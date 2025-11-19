@@ -117,11 +117,17 @@ export class TransactionPickingService {
     return this.repository.updateStatus(id, status);
   }
 
+  async findAllByMemoId(memoId: string): Promise<PickingTransaction[]> {
+    return this.repository.findByMemoId(memoId);
+  }
+
   private validateStatusTransition(currentStatus: Status, newStatus: Status): void {
     const validTransitions: Record<Status, Status[]> = {
-      [Status.PENDING]: [Status.COMPLETED, Status.CANCELLED],
+      [Status.PENDING]: [Status.COMPLETED, Status.CANCELLED, Status.INSPECTION],
       [Status.COMPLETED]: [],
       [Status.CANCELLED]: [Status.PENDING],
+      [Status.INSPECTION]: [Status.INSPECTION_APPROVED],
+      [Status.INSPECTION_APPROVED]: [Status.COMPLETED],
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {

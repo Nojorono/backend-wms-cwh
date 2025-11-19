@@ -6,6 +6,7 @@ import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entiti
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
+import { Status as TransactionPickingStatus } from '../core/domain/entities/transaction-picking.entity';
 
 @Injectable()
 export class TransactionScanPickingService {
@@ -368,5 +369,49 @@ export class TransactionScanPickingService {
       throw new BadRequestException('quantity_switch tidak boleh bernilai negatif');
     }
   }
-}
 
+  async readyToInspection(memoId: string): Promise<ScanPickingTransaction[]> {
+    const transactionPickings = await this.transactionPickingService.findAllByMemoId(memoId);
+
+    if (!transactionPickings || transactionPickings.length === 0) {
+      throw new NotFoundException('Transaction picking tidak ditemukan untuk memo ini');
+    }
+
+    const updatedScans: ScanPickingTransaction[] = [];
+
+    for (const picking of transactionPickings) {
+      // Update Transaction Picking status to INSPECTION
+      if (picking.status !== TransactionPickingStatus.INSPECTION) {
+        await this.transactionPickingService.updateStatus(picking.id, TransactionPickingStatus.INSPECTION);
+      }
+
+      // Update associated scan picking transactions to INSPECTION
+      const scanTransactions = await this.repository.findAll({
+        transactionPickingId: picking.id,
+      });
+
+      if (scanTransactions.length === 0) {
+        continue;
+      }
+
+      for (const scan of scanTransactions) {
+        if (scan.status === ScanPickingStatus.INSPECTION) {
+          updatedScans.push(scan);
+          continue;
+        }
+
+        const updated = await this.repository.update(scan.id, {
+          status: ScanPickingStatus.INSPECTION,
+        } as UpdateTransactionScanPickingDto);
+
+        updatedScans.push(updated);
+      }
+    }
+
+    if (updatedScans.length === 0) {
+      throw new NotFoundException('Transaction scan picking tidak ditemukan untuk memo ini');
+    }
+
+    return updatedScans;
+  }
+}
