@@ -505,7 +505,7 @@ export class MasterPalletService {
         uom: history.uom,
         last_updated: history.createdAt,
         production_date: history.production_date,
-        week_number: history.week_number,
+        week_number: history.week_number ?? pallet.currentWeekNumber ?? undefined,
         warehouse_sub_id: latestInventory?.warehouse_sub_id,
         warehouse_sub_name: latestInventory?.warehouseSub?.code,
         warehouse_bin_id: latestInventory?.warehouse_bin_id,
