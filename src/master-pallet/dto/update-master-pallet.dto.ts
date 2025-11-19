@@ -27,11 +27,6 @@ export class UpdateMasterPalletDto {
   @IsOptional()
   isFull?: boolean;
 
-  @ApiProperty({ example: 'https://example.com/pallet.png', required: false })
-  @IsString()
-  @IsOptional()
-  qr_image_url?: string;
-
   @ApiProperty({ example: 'DUS', required: false })
   @IsString()
   @IsOptional()

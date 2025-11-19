@@ -51,7 +51,6 @@ export class MasterPalletService {
 
     const pallet = await this.repository.create({
       ...createMasterPalletDto,
-      qr_image_url: '',
     });
 
     return pallet;
@@ -100,7 +99,6 @@ export class MasterPalletService {
       (updateMasterPalletDto.pallet_code &&
         updateMasterPalletDto.pallet_code !== pallet.pallet_code)
     ) {
-      updateMasterPalletDto.qr_image_url = '';
     }
     const updatedPallet = await this.repository.update(id, updateMasterPalletDto);
     if (!updatedPallet) {
