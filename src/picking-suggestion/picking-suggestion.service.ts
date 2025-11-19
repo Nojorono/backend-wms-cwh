@@ -142,6 +142,7 @@ export class PickingSuggestionService {
       const availableInventory = await this.findAvailableInventoryForItem(
         item.item_id,
         remainingRequired,
+        item.uom,
       );
 
       if (availableInventory.length > 0) {
@@ -194,6 +195,7 @@ export class PickingSuggestionService {
   private async findAvailableInventoryForItem(
     itemId: string,
     requiredQuantity: number,
+    uom?: string,
   ): Promise<any[]> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
@@ -209,7 +211,7 @@ export class PickingSuggestionService {
 
     try {
       // Try multiple search strategies in order of preference
-      const searchStrategies = [() => this.searchInventoryWithPalletHistory(itemId)];
+      const searchStrategies = [() => this.searchInventoryWithPalletHistory(itemId, uom)];
 
       let results: any[] = [];
 
@@ -228,7 +230,7 @@ export class PickingSuggestionService {
 
       // Debug if no results found
       if (results.length === 0) {
-        await this.debugInventorySearch(itemId);
+        await this.debugInventorySearch(itemId, uom);
       }
 
       // Filter and sort results
@@ -240,16 +242,16 @@ export class PickingSuggestionService {
     }
   }
 
-  private async searchInventoryWithPalletHistory(itemId: string): Promise<any[]> {
+  private async searchInventoryWithPalletHistory(itemId: string, uom?: string): Promise<any[]> {
     try {
-      return await this.repository.searchInventoryWithPalletHistory(itemId);
+      return await this.repository.searchInventoryWithPalletHistory(itemId, uom);
     } catch (error) {
       console.warn('searchInventoryWithPalletHistory failed:', error.message);
       return [];
     }
   }
 
-  private async debugInventorySearch(itemId: string): Promise<void> {
+  private async debugInventorySearch(itemId: string, uom?: string): Promise<void> {
     try {
       const simpleResults = await this.repository.debugInventorySimpleQuery();
 
@@ -641,7 +643,7 @@ export class PickingSuggestionService {
     return note;
   }
 
-  async getPickingSuggestionsByItemId(itemId: string): Promise<any> {
+  async getPickingSuggestionsByItemId(itemId: string, uom?: string): Promise<any> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
       throw new Error('Item ID is required');
@@ -658,7 +660,8 @@ export class PickingSuggestionService {
     }
 
     // Find all available inventory for this item
-    const availableInventory = await this.findAvailableInventoryForItem(itemId, 0);
+    const preferredUom = uom || undefined;
+    const availableInventory = await this.findAvailableInventoryForItem(itemId, 0, preferredUom);
 
     if (availableInventory.length === 0) {
       return {
@@ -667,7 +670,9 @@ export class PickingSuggestionService {
         item_code: item.item_number,
         total_available_quantity: 0,
         suggested_locations: [],
-        notes: 'Item tidak tersedia di inventory',
+        notes: preferredUom
+          ? `Item tidak tersedia di inventory untuk UOM ${preferredUom}`
+          : 'Item tidak tersedia di inventory',
       };
     }
 
@@ -681,7 +686,9 @@ export class PickingSuggestionService {
       item_code: item.item_number,
       total_available_quantity: totalQuantity,
       suggested_locations: locations,
-      notes: `Item tersedia dengan total ${totalQuantity} unit di ${locations.length} lokasi`,
+      notes: preferredUom
+        ? `Item tersedia dengan total ${totalQuantity} ${preferredUom} di ${locations.length} lokasi`
+        : `Item tersedia dengan total ${totalQuantity} unit di ${locations.length} lokasi`,
     };
   }
 }

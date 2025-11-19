@@ -1,5 +1,5 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { PickingSuggestionService } from './picking-suggestion.service';
 import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
 
@@ -44,6 +44,12 @@ export class PickingSuggestionController {
   @Get('item/:itemId')
   @ApiOperation({ summary: 'Get picking suggestions for an item' })
   @ApiParam({ name: 'itemId', description: 'Item ID' })
+  @ApiQuery({
+    name: 'uom',
+    required: false,
+    description: 'Filter available inventory by item UOM',
+    example: 'PCS',
+  })
   @ApiResponse({
     status: 200,
     description: 'Picking suggestions generated successfully',
@@ -52,8 +58,11 @@ export class PickingSuggestionController {
     status: 404,
     description: 'Item not found',
   })
-  async getPickingSuggestionsByItemId(@Param('itemId') itemId: string) {
-    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId);
+  async getPickingSuggestionsByItemId(
+    @Param('itemId') itemId: string,
+    @Query('uom') uom?: string,
+  ) {
+    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId, uom);
   }
 }
 

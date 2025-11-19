@@ -79,7 +79,7 @@ export class PickingSuggestionRepository {
     return await this.outboundMemoRepository.query(query, [memoId]);
   }
 
-  async searchInventoryWithPalletHistory(itemId: string): Promise<any[]> {
+  async searchInventoryWithPalletHistory(itemId: string, uom?: string): Promise<any[]> {
     // Use raw SQL to include reserved quantity calculation
     const query = `
       SELECT 
@@ -156,6 +156,7 @@ export class PickingSuggestionRepository {
       LEFT JOIN m_warehouse_sub ws ON ws.id = it.warehouse_sub_id
       LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
       WHERE pth.item_id = $1
+        AND ($2::text IS NULL OR pth.uom::text = $2::text)
         AND pth.status_inventory = 'READY'
         AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED')
         AND pth.new_quantity > 0
@@ -191,7 +192,7 @@ export class PickingSuggestionRepository {
         pth.new_quantity DESC
     `;
 
-    return await this.inventoryTrackingRepository.query(query, [itemId]);
+    return await this.inventoryTrackingRepository.query(query, [itemId, uom ?? null]);
   }
 
   async debugInventorySimpleQuery(): Promise<any[]> {
