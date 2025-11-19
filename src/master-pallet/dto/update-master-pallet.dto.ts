@@ -41,4 +41,9 @@ export class UpdateMasterPalletDto {
   @IsNumber()
   @IsOptional()
   currentQuantity?: number;
+
+  @ApiProperty({ example: 0, required: false })
+  @IsNumber()
+  @IsOptional()
+  currentWeekNumber?: number;
 }

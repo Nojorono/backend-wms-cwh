@@ -233,9 +233,21 @@ export class MasterPalletService {
       );
     }
 
+    let updatedWeekNumber = pallet.currentWeekNumber ?? 0;
+
+    const hasWeekInput =
+      updateQuantityDto.week_number !== undefined && updateQuantityDto.week_number !== null;
+
+    if (newTotalQuantity === 0) {
+      updatedWeekNumber = 0;
+    } else if (hasWeekInput) {
+      updatedWeekNumber = updateQuantityDto.week_number as number;
+    }
+
     const updatedPallet = await this.repository.update(palletId, {
       currentQuantity: newTotalQuantity,
       isFull: newTotalQuantity >= pallet.capacity,
+      currentWeekNumber: updatedWeekNumber,
     });
 
     if (!updatedPallet) {
@@ -451,7 +463,6 @@ export class MasterPalletService {
       .getOne();
 
     return results
-      .filter((history: any) => history.new_quantity > 0) // Filter out items with quantity 0
       .map((history: any) => ({
         id: palletId,
         item_id: history.item_id,

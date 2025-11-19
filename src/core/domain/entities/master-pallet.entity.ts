@@ -13,9 +13,6 @@ export class MasterPallet extends BaseEntity {
   @Column({ nullable: true })
   capacity: number;
 
-  @Column({ nullable: true })
-  qr_image_url: string;
-
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
@@ -27,6 +24,9 @@ export class MasterPallet extends BaseEntity {
 
   @Column({ name: 'current_quantity', type: 'int', default: 0 })
   currentQuantity: number;
+
+  @Column({ name: 'current_week_number', type: 'int', default: 0 })
+  currentWeekNumber: number;
 
   @OneToMany(() => PalletTransactionHistory, (history) => history.pallet)
   transactionHistory: PalletTransactionHistory[];

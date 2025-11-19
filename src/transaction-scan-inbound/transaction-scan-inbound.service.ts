@@ -59,30 +59,14 @@ export class TransactionScanInboundService {
       if (!warehouseSub) throw new BadRequestException('Warehouse sub not found');
     }
 
-    // Validasi week_number untuk pallet yang sama
-    const existingItemsInPallet = await this.repository.findItemsInPalletWithDifferentWeek(
-      pallet.id,
-      data.week_number,
-    );
-    if (existingItemsInPallet.length > 0) {
-      const differentWeekItems = existingItemsInPallet.filter(
-        (item) => item.week_number !== data.week_number,
-      );
-      if (differentWeekItems.length > 0) {
-        throw new BadRequestException(
-          `Pallet sudah berisi item dengan week ${differentWeekItems[0].week_number}. Tidak dapat menambahkan item dengan week ${data.week_number}`,
-        );
-      }
-    }
+    // Validasi week_number menggunakan currentWeekNumber pada pallet
+    const palletWeekNumber = pallet.currentWeekNumber;
+    const hasWeekConfigured =
+      palletWeekNumber !== null && palletWeekNumber !== undefined && palletWeekNumber !== 0;
 
-    // Validasi untuk inbound yang sama
-    const findExistPalletSameWeek = await this.repository.findExistPallet(
-      data.inbound_id,
-      pallet.id,
-    );
-    if (findExistPalletSameWeek && findExistPalletSameWeek.week_number !== data.week_number) {
+    if (hasWeekConfigured && palletWeekNumber !== data.week_number) {
       throw new BadRequestException(
-        'Item dalam pallet harus memiliki week yang sama dengan item yang sudah ada di inbound ini',
+        `Pallet sudah berisi item dengan week ${palletWeekNumber}. Tidak dapat menambahkan item dengan week ${data.week_number}`,
       );
     }
 
