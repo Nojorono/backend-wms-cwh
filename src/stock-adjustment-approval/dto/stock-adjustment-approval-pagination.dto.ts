@@ -1,17 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
 import { BasePaginationQueryDto } from '../../core/dto/base-pagination.dto';
-import { StockAdjustmentApprovalStatus } from '../../core/domain/entities/stock-adjustment-approval.entity';
+import { ApprovalStatus } from '../../core/domain/entities/approval.entity';
 
 export class StockAdjustmentApprovalPaginationDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({
     description: 'Filter approval requests by status',
-    enum: StockAdjustmentApprovalStatus,
-    example: StockAdjustmentApprovalStatus.PENDING,
+    enum: ApprovalStatus,
+    example: ApprovalStatus.PENDING,
   })
   @IsOptional()
-  @IsEnum(StockAdjustmentApprovalStatus, { message: 'status must be a valid StockAdjustmentApprovalStatus' })
-  status?: StockAdjustmentApprovalStatus;
+  @IsEnum(ApprovalStatus, { message: 'status must be a valid ApprovalStatus' })
+  status?: ApprovalStatus;
 
   @ApiPropertyOptional({
     description: 'Filter by pallet ID',

@@ -1,12 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { StockAdjustmentApproval, StockAdjustmentApprovalStatus } from '../../core/domain/entities/stock-adjustment-approval.entity';
-import { CreateStockAdjustmentApprovalDto } from '../dto/create-stock-adjustment-approval.dto';
-import { UpdateStockAdjustmentApprovalDto } from '../dto/update-stock-adjustment-approval.dto';
+import { StockAdjustmentApproval } from '../../core/domain/entities/stock-adjustment-approval.entity';
+import { ApprovalStatus } from '../../core/domain/entities/approval.entity';
 
 export interface StockAdjustmentApprovalFilters {
-  status?: StockAdjustmentApprovalStatus;
+  status?: ApprovalStatus;
   pallet_id?: string;
   item_id?: string;
   search?: string;
@@ -23,6 +22,10 @@ export class StockAdjustmentApprovalRepository {
 
   private withRelations(queryBuilder: SelectQueryBuilder<StockAdjustmentApproval>): SelectQueryBuilder<StockAdjustmentApproval> {
     return queryBuilder
+      .leftJoinAndSelect('stock_adjustment_approval.approval', 'approval')
+      .leftJoinAndSelect('approval.approval_setup', 'approval_setup')
+      .leftJoinAndSelect('approval_setup.approval_levels', 'approval_levels')
+      .leftJoinAndSelect('approval_levels.role', 'role')
       .leftJoinAndSelect('stock_adjustment_approval.pallet', 'pallet')
       .leftJoinAndSelect('stock_adjustment_approval.item', 'item')
       .leftJoinAndSelect('stock_adjustment_approval.target_pallet', 'target_pallet');
@@ -37,7 +40,7 @@ export class StockAdjustmentApprovalRepository {
     }
 
     if (filters.status) {
-      queryBuilder.andWhere('stock_adjustment_approval.status = :status', { status: filters.status });
+      queryBuilder.andWhere('approval.status = :status', { status: filters.status });
     }
 
     if (filters.pallet_id) {
@@ -50,7 +53,7 @@ export class StockAdjustmentApprovalRepository {
 
     if (filters.search) {
       queryBuilder.andWhere(
-        '(stock_adjustment_approval.reason ILIKE :search OR stock_adjustment_approval.notes ILIKE :search)',
+        '(approval.reason ILIKE :search OR approval.notes ILIKE :search)',
         { search: `%${filters.search}%` },
       );
     }

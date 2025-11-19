@@ -38,6 +38,8 @@ import { NotificationModule } from './notification/notification.module';
 import { InventoryMovementModule } from './inventory-movement/inventory-movement.module';
 import { MoveOrderModule } from './move-order/move-order.module';
 import { StockAdjustmentApprovalModule } from './stock-adjustment-approval/stock-adjustment-approval.module';
+import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
+import { ApprovalModule } from './approval/approval.module';
 
 @Module({
   imports: [
@@ -92,6 +94,8 @@ import { StockAdjustmentApprovalModule } from './stock-adjustment-approval/stock
     InventoryMovementModule,
     MoveOrderModule,
     StockAdjustmentApprovalModule,
+    ApprovalSetupModule,
+    ApprovalModule,
   ],
   providers: [
     {

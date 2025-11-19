@@ -1,17 +1,18 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { MasterPallet } from './master-pallet.entity';
 import { MasterItem } from './master-item.entity';
-
-export enum StockAdjustmentApprovalStatus {
-  PENDING = 'PENDING',
-  APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-  CANCELLED = 'CANCELLED',
-}
+import { Approval } from './approval.entity';
 
 @Entity('stock_adjustment_approval')
 export class StockAdjustmentApproval extends BaseEntity {
+  @Column({ nullable: true })
+  approval_id: string;
+
+  @OneToOne(() => Approval, { nullable: true })
+  @JoinColumn({ name: 'approval_id' })
+  approval: Approval;
+
   @Column({ nullable: true })
   pallet_id: string;
 
@@ -40,33 +41,6 @@ export class StockAdjustmentApproval extends BaseEntity {
 
   @Column({ nullable: true, type: 'int' })
   week_number: number;
-
-  @Column({ nullable: true, type: 'enum', enum: StockAdjustmentApprovalStatus, default: StockAdjustmentApprovalStatus.PENDING })
-  status: StockAdjustmentApprovalStatus;
-
-  @Column({ nullable: true })
-  reason: string;
-
-  @Column({ nullable: true })
-  requested_by: string;
-
-  @Column({ nullable: true })
-  approved_by: string;
-
-  @Column({ nullable: true })
-  approved_at: Date;
-
-  @Column({ nullable: true })
-  rejected_by: string;
-
-  @Column({ nullable: true })
-  rejected_at: Date;
-
-  @Column({ nullable: true })
-  rejection_reason: string;
-
-  @Column({ nullable: true })
-  notes: string;
 
   @Column({ nullable: true })
   target_pallet_id: string;

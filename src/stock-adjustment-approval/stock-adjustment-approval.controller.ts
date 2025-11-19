@@ -113,8 +113,12 @@ export class StockAdjustmentApprovalController {
   @ApiResponse({ status: 200, type: StockAdjustmentApproval })
   @ApiResponse({ status: 400, description: 'Request is not pending' })
   @ApiResponse({ status: 404, description: 'Approval request not found' })
-  cancel(@Param('id') id: string) {
-    return this.service.cancel(id);
+  cancel(
+    @Param('id') id: string,
+    @Query('cancelled_by') cancelledBy?: string,
+    @Query('reason') reason?: string,
+  ) {
+    return this.service.cancel(id, cancelledBy, reason);
   }
 
   @Delete(':id')
