@@ -437,6 +437,18 @@ export class MasterPalletService {
       throw new NotFoundException(`Pallet with ID ${palletId} not found`);
     }
 
+    // Auto-reset week number when pallet has no quantity
+    const currentQuantity = pallet.currentQuantity ?? 0;
+    const currentWeekNumber = pallet.currentWeekNumber ?? 0;
+    if (currentQuantity === 0 && currentWeekNumber !== 0) {
+      await this.repository.update(palletId, {
+        currentWeekNumber: 0,
+        isFull: false,
+      });
+      pallet.currentWeekNumber = 0;
+      pallet.isFull = false;
+    }
+
     const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
       .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id::uuid')
