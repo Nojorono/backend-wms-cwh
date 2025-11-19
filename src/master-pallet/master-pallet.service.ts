@@ -434,6 +434,11 @@ export class MasterPalletService {
   }
 
   async getPalletItemLatestQuantity(palletId: string): Promise<PalletItemQuantityDto[]> {
+    const pallet = await this.repository.findOne(palletId);
+    if (!pallet) {
+      throw new NotFoundException(`Pallet with ID ${palletId} not found`);
+    }
+
     const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
       .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id::uuid')
@@ -461,6 +466,25 @@ export class MasterPalletService {
       .where('inventory.pallet_id = :palletId', { palletId })
       .orderBy('inventory.createdAt', 'DESC')
       .getOne();
+
+    if (results.length === 0) {
+      return [
+        {
+          id: palletId,
+          item_id: undefined,
+          item_name: undefined,
+          current_quantity: pallet.currentQuantity ?? 0,
+          uom: pallet.uom ?? '',
+          last_updated: pallet.updatedAt ?? pallet.createdAt ?? new Date(),
+          production_date: undefined,
+          week_number: pallet.currentWeekNumber || undefined,
+          warehouse_sub_id: latestInventory?.warehouse_sub_id,
+          warehouse_sub_name: latestInventory?.warehouseSub?.code,
+          warehouse_bin_id: latestInventory?.warehouse_bin_id,
+          warehouse_bin_name: latestInventory?.warehouseBin?.code,
+        },
+      ];
+    }
 
     return results
       .map((history: any) => ({

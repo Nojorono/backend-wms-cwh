@@ -130,8 +130,15 @@ export class PalletQuantityHistoryResponseDto {
 }
 
 export class PalletItemQuantityDto {
-  @ApiProperty({ example: 'uuid-item-123' })
-  item_id: string;
+  @ApiPropertyOptional({ example: 'uuid-pallet-123' })
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-item-123' })
+  @IsOptional()
+  @IsString()
+  item_id?: string;
 
   @ApiPropertyOptional({ example: 'JAZY-KRETEK', description: 'Item name/SKU' })
   item_name?: string;
