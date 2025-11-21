@@ -370,7 +370,11 @@ export class TransactionScanPickingService {
     }
   }
 
-  async updateManyStatusTo(transactionPickingId: string, status: ScanPickingStatus): Promise<ScanPickingTransaction[]> {
+  async updateManyStatusTo(
+    transactionPickingId: string,
+    status: ScanPickingStatus,
+    inspection_by?: string,
+  ): Promise<ScanPickingTransaction[]> {
     const updatedScans: ScanPickingTransaction[] = [];
 
     // Update associated scan picking transactions to the specified status
@@ -388,9 +392,16 @@ export class TransactionScanPickingService {
         continue;
       }
 
-      const updated = await this.repository.update(scan.id, {
+      const updateData: UpdateTransactionScanPickingDto = {
         status: status,
-      } as UpdateTransactionScanPickingDto);
+      };
+
+      // Include inspection_by when status is INSPECTION_APPROVED
+      if (status === ScanPickingStatus.INSPECTION_APPROVED && inspection_by) {
+        updateData.inspection_by = inspection_by;
+      }
+
+      const updated = await this.repository.update(scan.id, updateData);
 
       updatedScans.push(updated);
     }

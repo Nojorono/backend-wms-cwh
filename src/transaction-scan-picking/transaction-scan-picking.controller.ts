@@ -171,9 +171,14 @@ export class TransactionScanPickingController {
   @ApiOperation({ summary: 'Update many status to PENDING or INSPECTION_APPROVED' })
   @ApiParam({ name: 'transactionPickingId', description: 'ID transaction picking' })
   @ApiParam({ name: 'status', description: 'Status to update', enum: ScanPickingStatus })
+  @ApiQuery({ name: 'inspection_by', required: false, type: String, description: 'User yang melakukan inspeksi' })
   @ApiResponse({  type: [ScanPickingTransaction], description: 'Transaction scan picking berhasil diupdate' })
-  async updateManyStatusTo(@Param('transactionPickingId') transactionPickingId: string, @Param('status') status: ScanPickingStatus) {
-    const result = await this.service.updateManyStatusTo(transactionPickingId, status);
+  async updateManyStatusTo(
+    @Param('transactionPickingId') transactionPickingId: string,
+    @Param('status') status: ScanPickingStatus,
+    @Query('inspection_by') inspection_by?: string,
+  ) {
+    const result = await this.service.updateManyStatusTo(transactionPickingId, status, inspection_by);
     return {
       success: true,
       message: 'Transaction scan picking berhasil diupdate',
