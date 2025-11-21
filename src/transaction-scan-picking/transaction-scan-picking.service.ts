@@ -286,7 +286,7 @@ export class TransactionScanPickingService {
     if (!existing) {
       throw new NotFoundException('Transaction scan picking tidak ditemukan');
     }
-    return this.repository.update(id, { status: ScanPickingStatus.INSPECTION, inspection_by: inspection_by });
+    return this.repository.update(id, { status: ScanPickingStatus.INSPECTION_APPROVED, inspection_by: inspection_by });
   }
   
   private async revertPalletOperations(
@@ -370,46 +370,29 @@ export class TransactionScanPickingService {
     }
   }
 
-  async readyToInspection(memoId: string): Promise<ScanPickingTransaction[]> {
-    const transactionPickings = await this.transactionPickingService.findAllByMemoId(memoId);
-
-    if (!transactionPickings || transactionPickings.length === 0) {
-      throw new NotFoundException('Transaction picking tidak ditemukan untuk memo ini');
-    }
-
+  async updateManyStatusTo(transactionPickingId: string, status: ScanPickingStatus): Promise<ScanPickingTransaction[]> {
     const updatedScans: ScanPickingTransaction[] = [];
 
-    for (const picking of transactionPickings) {
-      // Update Transaction Picking status to INSPECTION
-      if (picking.status !== TransactionPickingStatus.INSPECTION) {
-        await this.transactionPickingService.updateStatus(picking.id, TransactionPickingStatus.INSPECTION);
-      }
+    // Update associated scan picking transactions to the specified status
+    const scanTransactions = await this.repository.findAll({
+      transactionPickingId: transactionPickingId,
+    });
+    
+    if (scanTransactions.length === 0) {
+      throw new NotFoundException('Transaction scan picking tidak ditemukan untuk memo ini');
+    }
 
-      // Update associated scan picking transactions to INSPECTION
-      const scanTransactions = await this.repository.findAll({
-        transactionPickingId: picking.id,
-      });
-
-      if (scanTransactions.length === 0) {
+    for (const scan of scanTransactions) {
+      if (scan.status === status) {
+        updatedScans.push(scan);
         continue;
       }
 
-      for (const scan of scanTransactions) {
-        if (scan.status === ScanPickingStatus.INSPECTION) {
-          updatedScans.push(scan);
-          continue;
-        }
+      const updated = await this.repository.update(scan.id, {
+        status: status,
+      } as UpdateTransactionScanPickingDto);
 
-        const updated = await this.repository.update(scan.id, {
-          status: ScanPickingStatus.INSPECTION,
-        } as UpdateTransactionScanPickingDto);
-
-        updatedScans.push(updated);
-      }
-    }
-
-    if (updatedScans.length === 0) {
-      throw new NotFoundException('Transaction scan picking tidak ditemukan untuk memo ini');
+      updatedScans.push(updated);
     }
 
     return updatedScans;

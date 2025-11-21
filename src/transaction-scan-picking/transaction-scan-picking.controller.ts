@@ -21,7 +21,7 @@ import {
 import { TransactionScanPickingService } from './transaction-scan-picking.service';
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';
-import { ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
+import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
 
 @ApiTags('Transaction Scan Picking')
 @Controller('transaction-scan-picking')
@@ -167,19 +167,16 @@ export class TransactionScanPickingController {
     };
   }
 
-  // ready to inspection
-  @Patch(':memoId/ready-to-inspection')
-  @ApiOperation({ summary: 'Ready to inspection transaction scan picking' })
-  @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
-  @ApiResponse({
-    status: 200,
-    description: 'Transaction scan picking berhasil di-ready to inspection',
-  })
-  async readyToInspection(@Param('memoId') memoId: string) {
-    const result = await this.service.readyToInspection(memoId);
+  @Post(':transactionPickingId/:status')
+  @ApiOperation({ summary: 'Update many status to PENDING or INSPECTION_APPROVED' })
+  @ApiParam({ name: 'transactionPickingId', description: 'ID transaction picking' })
+  @ApiParam({ name: 'status', description: 'Status to update', enum: ScanPickingStatus })
+  @ApiResponse({  type: [ScanPickingTransaction], description: 'Transaction scan picking berhasil diupdate' })
+  async updateManyStatusTo(@Param('transactionPickingId') transactionPickingId: string, @Param('status') status: ScanPickingStatus) {
+    const result = await this.service.updateManyStatusTo(transactionPickingId, status);
     return {
       success: true,
-      message: 'Transaction scan picking berhasil di-ready to inspection',
+      message: 'Transaction scan picking berhasil diupdate',
       data: result,
     };
   }
