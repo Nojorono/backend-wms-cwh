@@ -70,11 +70,13 @@ export class AssignedPickingRepository {
   async checkExistingAssignment(
     memoId: string,
     pickingUserId: string,
+    pickingName?: string,
   ): Promise<AssignedPicking | null> {
     return this.repository.findOne({
       where: {
         memo_id: memoId,
         picking_user_id: pickingUserId,
+        picking_name: pickingName ?? undefined,
       },
       relations: ['memo'],
     });

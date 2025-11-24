@@ -18,6 +18,7 @@ export class AssignedPickingService {
     const existingAssignment = await this.repository.checkExistingAssignment(
       data.memo_id,
       data.picking_user_id,
+      data.picking_name,
     );
 
     if (existingAssignment) {
@@ -62,10 +63,12 @@ export class AssignedPickingService {
     if (data.memo_id || data.picking_user_id) {
       const memoId = data.memo_id || existing.memo_id;
       const pickingUserId = data.picking_user_id || existing.picking_user_id;
-
+      const pickingName = data.picking_name || existing.picking_name;
+      
       const existingAssignment = await this.repository.checkExistingAssignment(
         memoId,
         pickingUserId,
+        pickingName,
       );
       if (existingAssignment && existingAssignment.id !== id) {
         throw new ConflictException('User sudah ditugaskan untuk memo ini');
@@ -129,6 +132,7 @@ export class AssignedPickingService {
     const existingAssignment = await this.repository.checkExistingAssignment(
       existing.memo_id,
       newPickingUserId,
+      newPickingName,
     );
 
     if (existingAssignment && existingAssignment.id !== id) {
