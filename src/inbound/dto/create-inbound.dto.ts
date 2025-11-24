@@ -14,8 +14,6 @@ import {
   MinLength,
   MaxLength,
   Matches,
-  IsPhoneNumber,
-  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InboundStatus } from '../../core/domain/entities/inbound.entity';
@@ -81,7 +79,6 @@ export class CreateInboundDoDto {
   @ApiPropertyOptional({ example: 's3://bucket/path/to/attachment.pdf' })
   @IsOptional()
   @IsString({ message: 'attachment must be a string' })
-  @IsUrl({}, { message: 'attachment must be a valid URL' })
   attachment?: string;
 
   @ApiPropertyOptional({ example: 'PO-123' })
