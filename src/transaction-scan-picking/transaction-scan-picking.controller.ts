@@ -33,12 +33,7 @@ export class TransactionScanPickingController {
   @ApiOperation({ summary: 'Create transaction scan picking' })
   @ApiResponse({ status: 201, description: 'Transaction scan picking created', type: ScanPickingTransaction })
   async create(@Body() dto: CreateTransactionScanPickingDto) {
-    const result = await this.service.create(dto);
-    return {
-      success: true,
-      message: 'Transaction scan picking berhasil dibuat',
-      data: result,
-    };
+    return await this.service.create(dto);
   }
 
   @Get()
@@ -71,12 +66,7 @@ export class TransactionScanPickingController {
     @Query('status') status?: string,
     @Query('pallet_id') pallet_id?: string,
   ) {
-    const result = await this.service.findAll(transaction_picking_id, status, pallet_id);
-    return {
-      success: true,
-      message: 'Data transaction scan picking berhasil diambil',
-      data: result,
-    };
+      return await this.service.findAll(transaction_picking_id, status, pallet_id);
   }
 
   @Get('picking/:transactionPickingId')
@@ -88,12 +78,7 @@ export class TransactionScanPickingController {
     type: [ScanPickingTransaction],
   })
   async findByTransactionPicking(@Param('transactionPickingId') transactionPickingId: string) {
-    const result = await this.service.findByTransactionPickingId(transactionPickingId);
-    return {
-      success: true,
-      message: 'Data transaction scan picking berdasarkan transaction picking berhasil diambil',
-      data: result,
-    };
+    return await this.service.findByTransactionPickingId(transactionPickingId);
   }
 
   @Get(':id')
@@ -105,12 +90,7 @@ export class TransactionScanPickingController {
     type: ScanPickingTransaction,
   })
   async findOne(@Param('id') id: string) {
-    const result = await this.service.findOne(id);
-    return {
-      success: true,
-      message: 'Detail transaction scan picking berhasil diambil',
-      data: result,
-    };
+    return await this.service.findOne(id);
   }
 
   @Patch(':id')
@@ -125,12 +105,7 @@ export class TransactionScanPickingController {
     @Param('id') id: string,
     @Body() dto: UpdateTransactionScanPickingDto,
   ) {
-    const result = await this.service.update(id, dto);
-    return {
-      success: true,
-      message: 'Transaction scan picking berhasil diupdate',
-      data: result,
-    };
+    return await this.service.update(id, dto);
   }
 
   @Delete(':id')
@@ -142,11 +117,7 @@ export class TransactionScanPickingController {
     description: 'Transaction scan picking berhasil dihapus',
   })
   async remove(@Param('id') id: string) {
-    await this.service.remove(id);
-    return {
-      success: true,
-      message: 'Transaction scan picking berhasil dihapus',
-    };
+    return await this.service.remove(id);
   }
   // inspect transaction scan picking
   @Patch(':id/inspection-approved')
@@ -159,12 +130,7 @@ export class TransactionScanPickingController {
   })
   @ApiQuery({ name: 'inspection_by', required: true, type: String })
   async inspectionApproved(@Param('id') id: string, @Query('inspection_by') inspection_by: string) {
-    const result = await this.service.inspectionApproved(id, inspection_by);
-    return {
-      success: true,
-      message: 'Transaction scan picking berhasil diinspeksi',
-      data: result,
-    };
+    return await this.service.inspectionApproved(id, inspection_by);
   }
 
   @Post(':transactionPickingId/:status')
@@ -178,12 +144,7 @@ export class TransactionScanPickingController {
     @Param('status') status: ScanPickingStatus,
     @Query('inspection_by') inspection_by?: string,
   ) {
-    const result = await this.service.updateManyStatusTo(transactionPickingId, status, inspection_by);
-    return {
-      success: true,
-      message: 'Transaction scan picking berhasil diupdate',
-      data: result,
-    };
+    return await this.service.updateManyStatusTo(transactionPickingId, status, inspection_by);
   }
 }
 
