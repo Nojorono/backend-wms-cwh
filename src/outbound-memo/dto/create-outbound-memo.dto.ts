@@ -9,7 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OutboundMemoStatus } from '../../core/domain/entities/outbound-memo.entity';
+import { OutboundMemoStatus, OutboundMemoType } from '../../core/domain/entities/outbound-memo.entity';
 
 export class CreateOutboundMemoItemDto {
   @ApiProperty({ example: 'uuid-item-123' })
@@ -48,6 +48,10 @@ export class CreateOutboundMemoDto {
   @IsDate()
   @Type(() => Date)
   delivery_date: Date;
+
+  @ApiProperty({ enum: OutboundMemoType, example: OutboundMemoType.SUBDIST })
+  @IsEnum(OutboundMemoType)
+  type: OutboundMemoType; // SUBDIST or AMO
 
   @ApiPropertyOptional({ example: 'Catatan pengiriman' })
   @IsOptional()

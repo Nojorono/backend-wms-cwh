@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { BasePaginationQueryDto } from '../../core/dto/base-pagination.dto';
-import { OutboundMemoStatus } from '../../core/domain/entities/outbound-memo.entity';
+import { OutboundMemoStatus, OutboundMemoType } from '../../core/domain/entities/outbound-memo.entity';
 
 export class OutboundMemoPaginationDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({
@@ -30,6 +30,15 @@ export class OutboundMemoPaginationDto extends BasePaginationQueryDto {
   })
   @IsBoolean()
   has_do?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter outbound memo berdasarkan type',
+    enum: OutboundMemoType,
+    example: OutboundMemoType.SUBDIST,
+  })
+  @IsOptional()
+  @IsEnum(OutboundMemoType)
+  type?: OutboundMemoType; // SUBDIST or AMO
 }
 
 

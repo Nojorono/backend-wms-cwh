@@ -6,7 +6,6 @@ import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entiti
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
-import { Status as TransactionPickingStatus } from '../core/domain/entities/transaction-picking.entity';
 
 @Injectable()
 export class TransactionScanPickingService {

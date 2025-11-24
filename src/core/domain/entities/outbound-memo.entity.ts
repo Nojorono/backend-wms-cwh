@@ -11,6 +11,11 @@ export enum OutboundMemoStatus {
   COMPLETED = 'COMPLETED',
 }
 
+export enum OutboundMemoType {
+  SUBDIST = 'SUBDIST',
+  AMO = 'AMO',
+}
+
 @Entity('outbound_memo')
 export class OutboundMemo extends BaseEntity {
   @Column({ nullable: true })
@@ -30,6 +35,9 @@ export class OutboundMemo extends BaseEntity {
 
   @Column({ nullable: true })
   status: OutboundMemoStatus;
+
+  @Column({ nullable: true })
+  type: OutboundMemoType;
 
   @Column({ nullable: true })
   notes: string;
