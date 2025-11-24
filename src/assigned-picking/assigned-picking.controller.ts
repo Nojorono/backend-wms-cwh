@@ -46,12 +46,7 @@ export class AssignedPickingController {
     description: 'Conflict - user sudah ditugaskan untuk memo ini',
   })
   async create(@Body() createAssignedPickingDto: CreateAssignedPickingDto) {
-    const result = await this.service.create(createAssignedPickingDto);
-    return {
-      success: true,
-      message: 'Assigned picking berhasil dibuat',
-      data: result,
-    };
+    return await this.service.create(createAssignedPickingDto);
   }
 
   @Get()
@@ -62,12 +57,7 @@ export class AssignedPickingController {
     type: [AssignedPicking],
   })
   async findAll() {
-    const result = await this.service.findAll();
-    return {
-      success: true,
-      message: 'Data assigned picking berhasil diambil',
-      data: result,
-    };
+    return await this.service.findAll();
   }
 
   @Get(':id')
@@ -83,12 +73,7 @@ export class AssignedPickingController {
     description: 'Assigned picking tidak ditemukan',
   })
   async findOne(@Param('id') id: string) {
-    const result = await this.service.findOne(id);
-    return {
-      success: true,
-      message: 'Detail assigned picking berhasil diambil',
-      data: result,
-    };
+    return await this.service.findOne(id);
   }
 
   @Patch(':id')
@@ -115,12 +100,7 @@ export class AssignedPickingController {
     @Param('id') id: string,
     @Body() updateAssignedPickingDto: UpdateAssignedPickingDto,
   ) {
-    const result = await this.service.update(id, updateAssignedPickingDto);
-    return {
-      success: true,
-      message: 'Assigned picking berhasil diupdate',
-      data: result,
-    };
+    return await this.service.update(id, updateAssignedPickingDto);
   }
 
   @Delete(':id')
@@ -136,11 +116,7 @@ export class AssignedPickingController {
     description: 'Assigned picking tidak ditemukan',
   })
   async remove(@Param('id') id: string) {
-    await this.service.remove(id);
-    return {
-      success: true,
-      message: 'Assigned picking berhasil dihapus',
-    };
+    return await this.service.remove(id);
   }
 
   @Get('memo/:memoId')
@@ -152,12 +128,7 @@ export class AssignedPickingController {
     type: [AssignedPicking],
   })
   async findByMemoId(@Param('memoId') memoId: string) {
-    const result = await this.service.findByMemoId(memoId);
-    return {
-      success: true,
-      message: 'Data assigned picking berdasarkan memo berhasil diambil',
-      data: result,
-    };
+    return await this.service.findByMemoId(memoId);
   }
 
   @Get('user/:pickingUserId')
@@ -169,12 +140,7 @@ export class AssignedPickingController {
     type: [AssignedPicking],
   })
   async findByPickingUserId(@Param('pickingUserId') pickingUserId: string) {
-    const result = await this.service.findByPickingUserId(pickingUserId);
-    return {
-      success: true,
-      message: 'Data assigned picking berdasarkan user berhasil diambil',
-      data: result,
-    };
+    return await this.service.findByPickingUserId(pickingUserId);
   }
 
   @Get('name/:pickingName')
@@ -186,12 +152,7 @@ export class AssignedPickingController {
     type: [AssignedPicking],
   })
   async findByPickingName(@Param('pickingName') pickingName: string) {
-    const result = await this.service.findByPickingName(pickingName);
-    return {
-      success: true,
-      message: 'Data assigned picking berdasarkan nama berhasil diambil',
-      data: result,
-    };
+    return await this.service.findByPickingName(pickingName);
   }
 
   @Get('check/:memoId/:pickingUserId')
@@ -219,12 +180,7 @@ export class AssignedPickingController {
     @Param('memoId') memoId: string,
     @Param('pickingUserId') pickingUserId: string,
   ) {
-    const exists = await this.service.checkAssignmentExists(memoId, pickingUserId);
-    return {
-      success: true,
-      message: 'Status assignment berhasil diperiksa',
-      data: { exists },
-    };
+    return await this.service.checkAssignmentExists(memoId, pickingUserId);
   }
 
   @Patch(':id/reassign')
@@ -256,16 +212,11 @@ export class AssignedPickingController {
       picking_phone?: string;
     },
   ) {
-    const result = await this.service.reassignPicking(
+    return await this.service.reassignPicking(
       id,
       reassignData.picking_user_id,
       reassignData.picking_name,
       reassignData.picking_phone,
     );
-    return {
-      success: true,
-      message: 'Assigned picking berhasil di-reassign',
-      data: result,
-    };
   }
 }
