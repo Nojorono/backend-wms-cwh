@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OutboundMemoStatus, OutboundMemoType } from '../../core/domain/entities/outbound-memo.entity';
+import { TransformDate } from '../../core/utils/date-transformer.util';
 
 export class CreateOutboundMemoItemDto {
   @ApiProperty({ example: 'uuid-item-123' })
@@ -44,9 +45,10 @@ export class CreateOutboundMemoDto {
   @IsString()
   destination: string;
 
-  @ApiProperty({ example: '2025-01-15' })
+  @ApiProperty({ example: '2025-01-15T00:00:00.000Z' })
   @IsDate()
   @Type(() => Date)
+  @TransformDate()
   delivery_date: Date;
 
   @ApiProperty({ enum: OutboundMemoType, example: OutboundMemoType.SUBDIST })

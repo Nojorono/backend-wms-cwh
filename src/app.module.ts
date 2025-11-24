@@ -57,6 +57,10 @@ import { ApprovalModule } from './approval/approval.module';
         database: configService.get('DB_DATABASE', 'wms_db'),
         entities: [join(__dirname, 'core', 'domain', 'entities', '*.entity.{ts,js}')],
         synchronize: false,
+        extra: {
+          // PostgreSQL connection options for timezone handling
+          timezone: 'UTC', // Ensure PostgreSQL connection uses UTC
+        },
       }),
       inject: [ConfigService],
     }),

@@ -13,4 +13,8 @@ export const getTypeOrmConfig = (configService: ConfigService): TypeOrmModuleOpt
   migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
   synchronize: false,
   logging: true,
+  extra: {
+    // PostgreSQL connection options for timezone handling
+    timezone: 'UTC', // Ensure PostgreSQL connection uses UTC
+  },
 });
