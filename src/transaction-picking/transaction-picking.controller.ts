@@ -70,6 +70,7 @@ export class TransactionPickingController {
       message: 'Transaction picking berhasil dibuat',
       data: result,
     };
+    
   }
 
   @Get()
@@ -196,12 +197,7 @@ export class TransactionPickingController {
     type: [PickingTransaction],
   })
   async findByMemoId(@Param('memoId') memoId: string) {
-    const result = await this.service.findByMemoId(memoId);
-    return {
-      success: true,
-      message: 'Data transaction picking berdasarkan memo berhasil diambil',
-      data: result,
-    };
+    return await this.service.findByMemoId(memoId);
   }
 
   @Get('status/:status')
@@ -213,12 +209,7 @@ export class TransactionPickingController {
     type: [PickingTransaction],
   })
   async findByStatus(@Param('status') status: string) {
-    const result = await this.service.findByStatus(status);
-    return {
-      success: true,
-      message: 'Data transaction picking berdasarkan status berhasil diambil',
-      data: result,
-    };
+    return await this.service.findByStatus(status);
   }
 
   @Patch(':id/status')
@@ -238,12 +229,7 @@ export class TransactionPickingController {
     description: 'Transaction picking tidak ditemukan',
   })
   async updateStatus(@Param('id') id: string, @Body('status') status: Status) {
-    const result = await this.service.updateStatus(id, status);
-    return {
-      success: true,
-      message: 'Status transaction picking berhasil diupdate',
-      data: result,
-    };
+    return await this.service.updateStatus(id, status);
   }
   // detach memo from transaction picking
   @Patch('memo/:memoId/detach')
@@ -254,11 +240,7 @@ export class TransactionPickingController {
     description: 'Memo berhasil dilepas dari transaction picking',
   })
   async detachMemo(@Param('memoId') memoId: string) {
-    await this.service.detachMemo(memoId);
-    return {
-      success: true,
-      message: 'Memo berhasil dilepas dari transaction picking',
-    };
+    return await this.service.detachMemo(memoId);
   }
   // detach do from transaction picking
   @Patch('do/:doId/detach')
@@ -269,10 +251,6 @@ export class TransactionPickingController {
     description: 'Do berhasil dilepas dari transaction picking',
   })
   async detachDo(@Param('doId') doId: string) {
-    await this.service.detachDo(doId);
-    return {
-      success: true,
-      message: 'Do berhasil dilepas dari transaction picking',
-    };
+    return await this.service.detachDo(doId);
   }
 }
