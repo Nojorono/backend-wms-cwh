@@ -114,6 +114,7 @@ export class OutboundMemoRepository {
       sortOrder = 'DESC',
       status,
       has_do,
+      type,
     } = paginationDto;
 
     const qb = this.outboundMemoRepository
@@ -130,6 +131,10 @@ export class OutboundMemoRepository {
 
     if (has_do !== undefined) {
       qb.andWhere('memo.has_do = :has_do', { has_do });
+    }
+
+    if (type) {
+      qb.andWhere('memo.type = :type', { type });
     }
 
     if (search) {

@@ -85,7 +85,8 @@ export class OutboundMemoController {
       paginationQuery.sortBy ||
       paginationQuery.sortOrder ||
       paginationQuery.status ||
-      paginationQuery.has_do !== undefined;
+      paginationQuery.has_do !== undefined ||
+      paginationQuery.type !== undefined;
 
     if (hasPaginationParams) {
       return this.outboundMemoService.findAllPaginated(paginationQuery);
