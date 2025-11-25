@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { OutboundMemoRepository } from './outbound-memo.repository';
 import { CreateOutboundMemoDto } from './dto/create-outbound-memo.dto';
 import { UpdateOutboundMemoDto } from './dto/update-outbound-memo.dto';
@@ -34,6 +34,17 @@ export class OutboundMemoService {
     for (const item of data.outbound_memo_items) {
       if (item.quantity_plan <= 0) {
         throw new BadRequestException('Quantity plan harus lebih dari 0');
+      }
+    }
+
+    // Generate outbound memo number if not provided
+    if (!data.outbound_memo_number) {
+      data.outbound_memo_number = await this.generateOutboundMemoNumber();
+    } else {
+      // Validasi outbound_memo_number harus unique jika diberikan manual
+      const existingMemo = await this.repository.findByOutboundMemoNumber(data.outbound_memo_number);
+      if (existingMemo) {
+        throw new ConflictException('Outbound memo number sudah digunakan');
       }
     }
 
@@ -160,5 +171,9 @@ export class OutboundMemoService {
         `Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`,
       );
     }
+  }
+
+  private async generateOutboundMemoNumber(): Promise<string> {
+    return await this.repository.getNextOutboundMemoNumberForDate(new Date());
   }
 }

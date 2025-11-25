@@ -29,6 +29,11 @@ export class CreateOutboundMemoItemDto {
 }
 
 export class CreateOutboundMemoDto {
+  @ApiProperty({ example: 'OM-2025-001' })
+  @IsOptional()
+  @IsString()
+  outbound_memo_number?: string;
+
   @ApiProperty({ example: 'John Doe' })
   @IsString()
   requestor: string;

@@ -1,4 +1,4 @@
-import { Entity, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OutboundMemoItem } from './outbound-memo-item.entity';
 import { AssignedPicking } from './assigned-picking.entity';
@@ -18,6 +18,9 @@ export enum OutboundMemoType {
 
 @Entity('outbound_memo')
 export class OutboundMemo extends BaseEntity {
+  @Column({ nullable: true, unique: true })
+  outbound_memo_number: string;
+
   @Column({ nullable: true })
   requestor: string;
 

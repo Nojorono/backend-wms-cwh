@@ -161,4 +161,33 @@ export class OutboundMemoRepository {
 
     return { data: entities, total };
   }
+
+  async getNextOutboundMemoNumberForDate(date: Date): Promise<string> {
+    const y = date.getFullYear().toString();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    const prefix = `OM-${y}${m}${d}-`;
+    const row = await this.outboundMemoRepository
+      .createQueryBuilder('memo')
+      .select('memo.outbound_memo_number', 'num')
+      .where('memo.outbound_memo_number LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('memo.outbound_memo_number', 'DESC')
+      .limit(1)
+      .getRawOne<{ num?: string }>();
+    let seq = 1;
+    if (row?.num && row.num.startsWith(prefix)) {
+      const tail = row.num.substring(prefix.length);
+      const parsed = parseInt(tail, 10);
+      if (!Number.isNaN(parsed)) {
+        seq = parsed + 1;
+      }
+    }
+    return `${prefix}${seq.toString().padStart(4, '0')}`;
+  }
+
+  async findByOutboundMemoNumber(outbound_memo_number: string): Promise<OutboundMemo | null> {
+    return await this.outboundMemoRepository.findOne({
+      where: { outbound_memo_number },
+    });
+  }
 }
