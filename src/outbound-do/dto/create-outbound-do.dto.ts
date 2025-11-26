@@ -24,9 +24,10 @@ export class OutboundMemoItemDto {
 }
 
 export class CreateOutboundDoDto {
-  @ApiProperty({ example: 'DO-2025-001' })
+  @ApiPropertyOptional({ example: 'DO-2025-001', description: 'Auto-generated if not provided' })
+  @IsOptional()
   @IsString()
-  outbound_do_number: string;
+  outbound_do_number?: string;
 
   @ApiProperty({ example: 'JNE Express' })
   @IsString()

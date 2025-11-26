@@ -358,4 +358,27 @@ export class OutboundDoRepository {
 
     return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
   }
+
+  async getNextOutboundDoNumberForDate(date: Date): Promise<string> {
+    const y = date.getFullYear().toString();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    const prefix = `DO-${y}${m}${d}-`;
+    const row = await this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .select('outbound_do.outbound_do_number', 'num')
+      .where('outbound_do.outbound_do_number LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('outbound_do.outbound_do_number', 'DESC')
+      .limit(1)
+      .getRawOne<{ num?: string }>();
+    let seq = 1;
+    if (row?.num && row.num.startsWith(prefix)) {
+      const tail = row.num.substring(prefix.length);
+      const parsed = parseInt(tail, 10);
+      if (!Number.isNaN(parsed)) {
+        seq = parsed + 1;
+      }
+    }
+    return `${prefix}${seq.toString().padStart(4, '0')}`;
+  }
 }

@@ -22,10 +22,17 @@ export class OutboundDoService {
       throw new BadRequestException('Delivery date tidak boleh di masa lalu');
     }
 
-    // Validasi outbound_do_number harus unique
-    const existingDo = await this.repository.findByOutboundDoNumber(data.outbound_do_number);
-    if (existingDo) {
-      throw new ConflictException('Outbound DO number sudah digunakan');
+    // Generate outbound_do_number jika tidak provided
+    if (!data.outbound_do_number) {
+      data.outbound_do_number = await this.repository.getNextOutboundDoNumberForDate(
+        data.delivery_date,
+      );
+    } else {
+      // Validasi outbound_do_number harus unique jika provided
+      const existingDo = await this.repository.findByOutboundDoNumber(data.outbound_do_number);
+      if (existingDo) {
+        throw new ConflictException('Outbound DO number sudah digunakan');
+      }
     }
 
     // Validasi minimal 1 outbound memo
