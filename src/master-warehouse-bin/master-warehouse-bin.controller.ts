@@ -98,49 +98,4 @@ export class MasterWarehouseBinController {
     return this.masterWarehouseBinService.remove(id);
   }
 
-  @Get('suggestion/put-away')
-  @ApiOperation({
-    summary:
-      'Get pallets in staging areas with smart suggested destination bin and zone based on same items/weeks',
-  })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Returns each staging pallet with intelligent suggestions based on item and week matching formula',
-    schema: {
-      type: 'object',
-      properties: {
-        palletSuggestions: {
-          type: 'array',
-          description: 'Array of intelligent pallet suggestions with item/week matching',
-          items: {
-            type: 'object',
-            properties: {
-              stagingPallet: {
-                type: 'object',
-                description: 'Pallet currently in staging area with INSPECTION_APPROVED status',
-              },
-              suggestedBin: {
-                type: 'object',
-                description:
-                  'Smart suggested destination bin (prioritizes bins with same items/weeks)',
-              },
-              suggestedZone: {
-                type: 'object',
-                description:
-                  'Smart suggested destination zone (prioritizes zones with same items/weeks)',
-              },
-              palletItems: {
-                type: 'array',
-                description: 'Items and weeks contained in this pallet',
-              },
-            },
-          },
-        },
-      },
-    },
-  })
-  getStagingPalletsWithSuggestions() {
-    return this.masterWarehouseBinService.getStagingPalletsWithSuggestions();
-  }
 }

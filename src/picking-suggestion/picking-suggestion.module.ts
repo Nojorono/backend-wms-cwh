@@ -10,6 +10,10 @@ import { InventoryTracking } from '../core/domain/entities/inventory-tracking.en
 import { MasterItem } from '../core/domain/entities/master-item.entity';
 import { PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
 import { PickingTransaction } from '../core/domain/entities/transaction-picking.entity';
+import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
+import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
+import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
+import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 
 @Module({
   imports: [
@@ -20,7 +24,11 @@ import { PickingTransaction } from '../core/domain/entities/transaction-picking.
       MasterItem,
       PalletTransactionHistory,
       PickingTransaction,
+      MasterWarehouseBin,
+      MasterWarehouseSub,
+      TransactionScanInbound,
     ]),
+    MasterPalletModule,
   ],
   controllers: [PickingSuggestionController],
   providers: [PickingSuggestionService, PickingSuggestionRepository, InventoryReservationService],

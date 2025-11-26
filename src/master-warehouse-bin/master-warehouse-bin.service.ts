@@ -59,14 +59,4 @@ export class MasterWarehouseBinService {
     await this.repository.remove(id);
   }
 
-  async getStagingPalletsWithSuggestions(): Promise<{
-    palletSuggestions: Array<{
-      stagingPallet: any;
-      suggestedBin: MasterWarehouseBin;
-      suggestedZone: any;
-      palletItems: any[];
-    }>;
-  }> {
-    return await this.repository.getStagingPalletsWithSuggestions();
-  }
 }

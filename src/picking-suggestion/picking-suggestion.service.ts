@@ -1,11 +1,31 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
 import { PickingSuggestionLocationDto } from './dto/picking-suggestion-location.dto';
 import { PickingSuggestionRepository } from './picking-suggestion.repository';
+import {
+  InventoryTracking,
+  ProgressionStatus,
+} from '../core/domain/entities/inventory-tracking.entity';
+import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
+import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
+import { MasterPalletService } from '../master-pallet/master-pallet.service';
+import { PalletItemQuantityDto } from '../master-pallet/dto/pallet-quantity.dto';
+import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
 
 @Injectable()
 export class PickingSuggestionService {
-  constructor(private readonly repository: PickingSuggestionRepository) {}
+  constructor(
+    private readonly repository: PickingSuggestionRepository,
+    private readonly masterPalletService: MasterPalletService,
+    @InjectRepository(InventoryTracking)
+    private readonly inventoryTrackingRepository: Repository<InventoryTracking>,
+    @InjectRepository(MasterWarehouseBin)
+    private readonly masterWarehouseBinRepository: Repository<MasterWarehouseBin>,
+    @InjectRepository(MasterWarehouseSub)
+    private readonly masterWarehouseSubRepository: Repository<MasterWarehouseSub>,
+  ) {}
 
   async getPickingSuggestionsForOutboundDo(outboundDoId: string): Promise<PickingSuggestionDto[]> {
     // Validate outboundDoId before proceeding
@@ -690,6 +710,226 @@ export class PickingSuggestionService {
         ? `Item tersedia dengan total ${totalQuantity} ${preferredUom} di ${locations.length} lokasi`
         : `Item tersedia dengan total ${totalQuantity} unit di ${locations.length} lokasi`,
     };
+  }
+
+  async getPutAwaySuggestions(): Promise<{
+    palletSuggestions: Array<{
+      stagingPallet: InventoryTracking;
+      suggestedBin: MasterWarehouseBin;
+      suggestedZone: MasterWarehouseSub;
+      palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
+    }>;
+  }> {
+    const stagingPallets = await this.inventoryTrackingRepository
+      .createQueryBuilder('tracking')
+      .leftJoinAndSelect('tracking.pallet', 'pallet')
+      .leftJoinAndSelect('tracking.warehouseSub', 'warehouseSub')
+      .leftJoinAndSelect('tracking.warehouse', 'warehouse')
+      .leftJoinAndSelect('tracking.warehouseBin', 'warehouseBin')
+      .where('warehouseSub.is_staging = :staging', { staging: 'INBOUND' })
+      .andWhere('tracking.progression_status = :progression_status', {
+        progression_status: ProgressionStatus.NOT_STARTED,
+      })
+      .andWhere('tracking.inventory_status = :inventory_status', {
+        inventory_status: 'INSPECTION_COMPLETED',
+      })
+      .getMany();
+
+    if (stagingPallets.length === 0) {
+      return { palletSuggestions: [] };
+    }
+
+    const palletIds = stagingPallets.map((sp) => sp.pallet_id).filter(Boolean);
+    const allPalletItems: Array<PalletItemQuantityDto & { pallet_id: string }> = [];
+
+    for (const palletId of palletIds) {
+      if (!palletId) continue;
+      try {
+        const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
+        const itemsWithPalletId = palletItems.map((item) => ({
+          ...item,
+          pallet_id: palletId,
+        }));
+        allPalletItems.push(...itemsWithPalletId);
+      } catch (error) {
+        console.warn(`Failed to fetch items for pallet ${palletId}:`, error.message);
+      }
+    }
+
+    const availableBins = await this.masterWarehouseBinRepository
+      .createQueryBuilder('bin')
+      .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
+      .leftJoin('bin.inventory_trackings', 'tracking')
+      .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
+      .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', {
+        staging: 'INBOUND',
+      })
+      .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
+        status: 'IN_INVENTORY',
+      })
+      .groupBy(
+        'bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging',
+      )
+      .having('COUNT(DISTINCT tracking.pallet_id) < bin.capacity_pallet')
+      .orderBy('(bin.capacity_pallet - COUNT(DISTINCT tracking.pallet_id))', 'DESC')
+      .getMany();
+
+    const availableZones = await this.masterWarehouseSubRepository
+      .createQueryBuilder('zone')
+      .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
+      .where('zone.is_staging IS NULL OR zone.is_staging != :staging', { staging: 'INBOUND' })
+      .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
+      .having('COUNT(bin.id) > 0')
+      .orderBy('zone.name', 'ASC')
+      .getMany();
+
+    const palletSuggestions: Array<{
+      stagingPallet: InventoryTracking;
+      suggestedBin: MasterWarehouseBin;
+      suggestedZone: MasterWarehouseSub;
+      palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
+    }> = [];
+
+    const usedBinIds = new Set<string>();
+    const usedZoneIds = new Set<string>();
+
+    for (const stagingPallet of stagingPallets) {
+      const palletItems = allPalletItems.filter(
+        (item) => item.pallet_id === stagingPallet.pallet_id,
+      );
+      const itemIds = palletItems.map((item) => item.item_id).filter(Boolean);
+      const weekNumbers = palletItems.map((item) => item.week_number).filter(Boolean);
+
+      const groupKey = `${itemIds.sort().join(',')}-${weekNumbers.sort().join(',')}`;
+      const existingSuggestion = palletSuggestions.find((suggestion) => {
+        const suggestionItems = suggestion.palletItems;
+        const suggestionItemIds = suggestionItems.map((item) => item.item_id).filter(Boolean);
+        const suggestionWeekNumbers = suggestionItems
+          .map((item) => item.week_number)
+          .filter(Boolean);
+        const suggestionGroupKey = `${suggestionItemIds.sort().join(',')}-${suggestionWeekNumbers.sort().join(',')}`;
+        return suggestionGroupKey === groupKey;
+      });
+
+      if (existingSuggestion) {
+        palletSuggestions.push({
+          stagingPallet,
+          suggestedBin: existingSuggestion.suggestedBin,
+          suggestedZone: existingSuggestion.suggestedZone,
+          palletItems,
+        });
+        continue;
+      }
+
+      let matchingBinsForSameItem: MasterWarehouseBin[] = [];
+
+      if (itemIds.length > 0 || weekNumbers.length > 0) {
+        let query = this.masterWarehouseBinRepository
+          .createQueryBuilder('bin')
+          .leftJoin('bin.inventory_trackings', 'tracking')
+          .leftJoin('tracking.pallet', 'pallet')
+          .leftJoin(TransactionScanInbound, 'scan', 'scan.pallet_id = pallet.id')
+          .leftJoin('bin.warehouseSub', 'warehouseSub')
+          .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
+          .addSelect('COUNT(scan.id)', 'matching_items_count')
+          .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', {
+            staging: 'INBOUND',
+          })
+          .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
+            status: 'IN_INVENTORY',
+          })
+          .groupBy(
+            'bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging',
+          )
+          .having('COUNT(DISTINCT tracking.pallet_id) < bin.capacity_pallet');
+
+        if (itemIds.length > 0 && weekNumbers.length > 0) {
+          query = query.andWhere(
+            '(scan.item_id IN (:...itemIds) OR scan.week_number IN (:...weekNumbers))',
+            { itemIds, weekNumbers },
+          );
+        } else if (itemIds.length > 0) {
+          query = query.andWhere('scan.item_id IN (:...itemIds)', { itemIds });
+        } else if (weekNumbers.length > 0) {
+          query = query.andWhere('scan.week_number IN (:...weekNumbers)', { weekNumbers });
+        }
+
+        matchingBinsForSameItem = await query
+          .orderBy('COUNT(scan.id)', 'DESC')
+          .addOrderBy('(bin.capacity_pallet - COUNT(DISTINCT tracking.pallet_id))', 'DESC')
+          .limit(3)
+          .getMany();
+      }
+
+      let suggestedBin: MasterWarehouseBin | undefined;
+      let suggestedZone: MasterWarehouseSub | undefined;
+
+      if (matchingBinsForSameItem.length > 0) {
+        suggestedBin = matchingBinsForSameItem.find((bin) => !usedBinIds.has(bin.id));
+        if (suggestedBin) {
+          suggestedZone = availableZones.find(
+            (zone) => zone.id === suggestedBin?.warehouse_sub_id,
+          ) as MasterWarehouseSub;
+        }
+      }
+
+      if (!suggestedBin) {
+        const emptyBins = await this.masterWarehouseBinRepository
+          .createQueryBuilder('bin')
+          .leftJoin('bin.warehouseSub', 'warehouseSub')
+          .leftJoin('bin.inventory_trackings', 'tracking')
+          .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
+          .where('bin.capacity_pallet > 0')
+          .andWhere('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', {
+            staging: 'INBOUND',
+          })
+          .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
+            status: 'IN_INVENTORY',
+          })
+          .groupBy(
+            'bin.id, bin.name, bin.code, bin.capacity_pallet, bin.current_pallet, warehouseSub.id, warehouseSub.name, warehouseSub.code, warehouseSub.is_staging',
+          )
+          .having('COUNT(DISTINCT tracking.pallet_id) = 0')
+          .orderBy('bin.capacity_pallet', 'DESC')
+          .limit(5)
+          .getMany();
+
+        suggestedBin = emptyBins.find((bin) => !usedBinIds.has(bin.id));
+        if (suggestedBin) {
+          suggestedZone = availableZones.find(
+            (zone) => zone.id === suggestedBin?.warehouse_sub_id,
+          ) as MasterWarehouseSub;
+        }
+      }
+
+      if (!suggestedBin) {
+        suggestedBin = availableBins.find((bin) => !usedBinIds.has(bin.id));
+        if (suggestedBin) {
+          suggestedZone = availableZones.find(
+            (zone) => zone.id === suggestedBin?.warehouse_sub_id,
+          ) as MasterWarehouseSub;
+        }
+      }
+
+      if (!suggestedZone) {
+        suggestedZone = availableZones.find((zone) => !usedZoneIds.has(zone.id)) as
+          | MasterWarehouseSub
+          | undefined;
+      }
+
+      if (suggestedBin && suggestedZone) {
+        palletSuggestions.push({
+          stagingPallet,
+          suggestedBin,
+          suggestedZone,
+          palletItems,
+        });
+        usedBinIds.add(suggestedBin.id);
+        usedZoneIds.add(suggestedZone.id);
+      }
+    }
+
+    return { palletSuggestions };
   }
 }
 
