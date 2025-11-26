@@ -78,10 +78,15 @@ export class OutboundDoRepository {
   }
 
   async findAll(): Promise<OutboundDo[]> {
-    const outboundDos = await this.outboundDoRepository.find({
-      relations: ['outbound_memos'],
-      order: { createdAt: 'DESC' },
-    });
+    const outboundDos = await this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
+      .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings')
+      .orderBy('outbound_do.createdAt', 'DESC')
+      .distinct(true)
+      .getMany();
 
     // Add sequence information to each memo in all outbound DOs
     return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
@@ -250,7 +255,10 @@ export class OutboundDoRepository {
 
     const qb = this.outboundDoRepository
       .createQueryBuilder('outbound_do')
-      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos');
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
+      .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings');
 
     if (status) {
       qb.andWhere('outbound_do.status = :status', { status });
