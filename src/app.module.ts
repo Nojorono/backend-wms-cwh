@@ -40,6 +40,7 @@ import { MoveOrderModule } from './move-order/move-order.module';
 import { StockAdjustmentApprovalModule } from './stock-adjustment-approval/stock-adjustment-approval.module';
 import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
 import { ApprovalModule } from './approval/approval.module';
+import { UsersActivityModule } from './users-activity/users-activity.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { ApprovalModule } from './approval/approval.module';
     StockAdjustmentApprovalModule,
     ApprovalSetupModule,
     ApprovalModule,
+    UsersActivityModule,
   ],
   providers: [
     {

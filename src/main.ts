@@ -1,9 +1,11 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './core/interceptors/response.interceptor';
 import { HttpExceptionFilter } from './core/filters/http-exception.filter';
+import { AuditLogInterceptor } from './core/interceptors/audit-log.interceptor';
+import { UsersActivityService } from './users-activity/users-activity.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -17,11 +19,18 @@ async function bootstrap() {
     }),
   );
 
+  // Get services from app context for interceptors and filters
+  const usersActivityService = app.get(UsersActivityService);
+  const reflector = app.get(Reflector);
+
   // Global interceptors
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(
+    new ResponseInterceptor(),
+    new AuditLogInterceptor(usersActivityService, reflector),
+  );
 
   // Global filters
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new HttpExceptionFilter(usersActivityService));
 
   // Enable CORS
   app.enableCors();
