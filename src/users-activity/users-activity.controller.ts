@@ -8,15 +8,16 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersActivityService } from './users-activity.service';
 import { CreateUsersActivityDto } from './dto/create-users-activity.dto';
 import { UsersActivityPaginationDto } from './dto/users-activity-pagination.dto';
 import { UsersActivity, UserActivityAction } from '../core/domain/entities/users-activity.entity';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
-@ApiTags('Users Activity')
-@Controller('users-activity')
+@ApiTags('User Activity')
+@Controller('user-activity')
+@ApiBearerAuth('JWT-auth')
 export class UsersActivityController {
   constructor(private readonly usersActivityService: UsersActivityService) {}
 
