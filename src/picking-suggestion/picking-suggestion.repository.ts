@@ -159,6 +159,7 @@ export class PickingSuggestionRepository {
         AND ($2::text IS NULL OR pth.uom::text = $2::text)
         AND pth.status_inventory = 'READY'
         AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED')
+        AND it.progression_status NOT IN ('IN_PROGRESS')
         AND pth.new_quantity > 0
         AND (it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)
         AND pth.item_id IS NOT NULL
