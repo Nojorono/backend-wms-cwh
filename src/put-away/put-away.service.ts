@@ -36,9 +36,22 @@ export class PutAwayService {
   }
 
   async createMany(dto: CreateManyPutAwayDto): Promise<PutAwayTransaction[]> {
-    const putAwayTransactions = await this.repository.createMany(dto.data);
+    const cleanedData = dto.data.map((item) => ({
+      ...item,
+      driver_name: item.driver_name?.trim() || undefined,
+      driver_phone: item.driver_phone?.trim() || undefined,
+      notes: item.notes?.trim() || undefined,
+      status: item.status ?? Status.PENDING,
+      uom: item.uom?.trim() || undefined,
+      week_number: item.week_number ?? undefined,
+      production_date: item.production_date ? new Date(item.production_date).toISOString() : undefined,
+      inbound_id: item.inbound_id?.trim() || undefined,
+      forklift_driver_id: item.forklift_driver_id?.trim() || undefined,
+      destination_bin_id: item.destination_bin_id?.trim() || undefined,
+    }));
 
-    // Update progression status to IN_PROGRESS for all created putaway transactions
+    const putAwayTransactions = await this.repository.createMany(cleanedData);
+
     for (const transaction of putAwayTransactions) {
       if (transaction.inventory_tracking_id) {
         await this.inventoryTrackingService.updateProgressionStatus(

@@ -54,9 +54,9 @@ export class CreatePutAwayDto {
   week_number?: number;
 
   @ApiProperty({ example: '2025-01-01' })
-  @IsDate()
+  @IsString()
   @IsOptional()
-  production_date?: Date;
+  production_date?: string;
 
   @ApiProperty({ example: 'uuid-inbound-123' })
   @IsString()
