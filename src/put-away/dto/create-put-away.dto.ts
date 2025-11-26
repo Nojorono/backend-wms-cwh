@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDate, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Status } from 'src/core/domain/entities/transaction-put-away.entity';
 
@@ -37,6 +37,31 @@ export class CreatePutAwayDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({ example: 'PCS' })
+  @IsString()
+  @IsOptional()
+  uom?: string;
+
+  @ApiProperty({ example: 10 })
+  @IsNumber()
+  @IsOptional()
+  quantity?: number;
+
+  @ApiProperty({ example: 1 })
+  @IsNumber()
+  @IsOptional()
+  week_number?: number;
+
+  @ApiProperty({ example: '2025-01-01' })
+  @IsDate()
+  @IsOptional()
+  production_date?: Date;
+
+  @ApiProperty({ example: 'uuid-inbound-123' })
+  @IsString()
+  @IsOptional()
+  inbound_id?: string;
 }
 
 export class UpdatePutAwayDto extends PartialType(CreatePutAwayDto) {}

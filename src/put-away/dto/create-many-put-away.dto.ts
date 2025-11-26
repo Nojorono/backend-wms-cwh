@@ -16,6 +16,11 @@ export class CreateManyPutAwayDto {
         driver_phone: '081234567890',
         status: 'PENDING',
         notes: 'Put away item 1',
+        uom: 'PCS',
+        quantity: 10,
+        week_number: 1,
+        production_date: '2025-01-01',
+        inbound_id: 'uuid-inbound-1',
       },
       {
         inventory_tracking_id: 'uuid-inventory-2',
@@ -25,6 +30,11 @@ export class CreateManyPutAwayDto {
         driver_phone: '081234567891',
         status: 'PENDING',
         notes: 'Put away item 2',
+        uom: 'PCS',
+        quantity: 10,
+        week_number: 1,
+        production_date: '2025-01-01',
+        inbound_id: 'uuid-inbound-2',
       },
     ],
   })

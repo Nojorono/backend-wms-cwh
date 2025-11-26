@@ -3,6 +3,7 @@ import { BaseEntity } from './base.entity';
 import { InventoryTracking } from './inventory-tracking.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
 import { User } from './user.entity';
+import { Inbound } from './inbound.entity';
 
 export enum Status {
   PENDING = 'PENDING',
@@ -46,4 +47,24 @@ export class PutAwayTransaction extends BaseEntity {
 
   @Column({ nullable: true })
   notes: string;
+
+  @Column({ nullable: true })
+  uom: string;
+
+  @Column({ nullable: true })
+  quantity: number;
+
+  @Column({ nullable: true })
+  week_number: number;
+
+  @Column({ nullable: true })
+  production_date: Date;
+
+  @Column({ nullable: true })
+  inbound_id: string;
+
+  @ManyToOne(() => Inbound, (inbound) => inbound.id, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'inbound_id' })
+  inbound: Inbound;
+
 }
