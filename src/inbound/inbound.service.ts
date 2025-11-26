@@ -638,6 +638,11 @@ export class InboundService {
         inbound_id: id,
       },
     });
+
+    if (palletHistories.length === 0) {
+      throw new BadRequestException('Pallet history not found');
+    }
+
     for (const palletHistory of palletHistories) {
       await this.palletTransactionHistoryRepository.update(palletHistory.id, {
         status_inventory: StatusInventory.READY,
