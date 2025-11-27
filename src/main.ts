@@ -19,18 +19,18 @@ async function bootstrap() {
     }),
   );
 
-  // Get services from app context for interceptors and filters
-  const usersActivityService = app.get(UsersActivityService);
-  const reflector = app.get(Reflector);
+  // // Get services from app context for interceptors and filters
+  // const usersActivityService = app.get(UsersActivityService);
+  // const reflector = app.get(Reflector);
 
-  // Global interceptors
-  app.useGlobalInterceptors(
-    new ResponseInterceptor(),
-    new AuditLogInterceptor(usersActivityService, reflector),
-  );
+  // // Global interceptors
+  // app.useGlobalInterceptors(
+  //   new ResponseInterceptor(),
+  //   new AuditLogInterceptor(usersActivityService, reflector),
+  // );
 
-  // Global filters
-  app.useGlobalFilters(new HttpExceptionFilter(usersActivityService));
+  // // Global filters
+  // app.useGlobalFilters(new HttpExceptionFilter(usersActivityService));
 
   // Enable CORS
   app.enableCors();

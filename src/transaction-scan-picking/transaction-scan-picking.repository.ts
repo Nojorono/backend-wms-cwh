@@ -21,7 +21,7 @@ export class TransactionScanPickingRepository {
   async create(data: CreateTransactionScanPickingDto): Promise<ScanPickingTransaction> {
     const entity = this.repository.create({
       ...data,
-      status: ScanPickingStatus.PENDING,
+      status: ScanPickingStatus.OPEN,
     });
     return this.repository.save(entity);
   }
