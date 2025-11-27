@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -22,6 +23,7 @@ import { TransactionScanPickingService } from './transaction-scan-picking.servic
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';
 import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
+import { UpdateStatusDto } from './dto/update-status.dto';
 
 @ApiTags('Transaction Scan Picking')
 @Controller('transaction-scan-picking')
@@ -93,6 +95,19 @@ export class TransactionScanPickingController {
     return await this.service.findOne(id);
   }
 
+  // complete transaction scan picking - must be before @Patch(':id') to avoid route conflicts
+  @Patch('update-status')
+  @ApiOperation({ summary: 'Update status for multiple transaction scan picking' })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction scan picking berhasil diupdate',
+    type: [ScanPickingTransaction],
+  })
+  @ApiBody({ type: UpdateStatusDto })
+  async updateStatus(@Body() dto: UpdateStatusDto) {
+    return await this.service.updateManyStatus(dto);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update transaction scan picking' })
   @ApiParam({ name: 'id', description: 'ID transaction scan picking' })
@@ -147,4 +162,3 @@ export class TransactionScanPickingController {
     return await this.service.updateManyStatusTo(transactionPickingId, status, inspection_by);
   }
 }
-

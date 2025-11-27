@@ -6,6 +6,7 @@ import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entiti
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
+import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Injectable()
 export class TransactionScanPickingService {
@@ -405,6 +406,18 @@ export class TransactionScanPickingService {
       updatedScans.push(updated);
     }
 
+    return updatedScans;
+  }
+
+  async updateManyStatus(dto: UpdateStatusDto): Promise<ScanPickingTransaction[]> {
+    const updatedScans: ScanPickingTransaction[] = [];
+    for (const transactionScanPickingId of dto.ids) {
+      const updated = await this.repository.update(transactionScanPickingId, { status: dto.status });
+      if (dto.status === ScanPickingStatus.INSPECTION_APPROVED && dto.inspection_by) {
+        updated.inspection_by = dto.inspection_by;
+      }
+      updatedScans.push(updated);
+    }
     return updatedScans;
   }
 }
