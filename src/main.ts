@@ -24,10 +24,10 @@ async function bootstrap() {
   // const reflector = app.get(Reflector);
 
   // // Global interceptors
-  // app.useGlobalInterceptors(
-  //   new ResponseInterceptor(),
-  //   new AuditLogInterceptor(usersActivityService, reflector),
-  // );
+  app.useGlobalInterceptors(
+    new ResponseInterceptor(),
+    // new AuditLogInterceptor(usersActivityService, reflector),
+  );
 
   // // Global filters
   // app.useGlobalFilters(new HttpExceptionFilter(usersActivityService));
