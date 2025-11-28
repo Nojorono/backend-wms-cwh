@@ -7,6 +7,7 @@ import { MasterItem } from './master-item.entity';
 export enum ScanPickingStatus {
   OPEN = 'OPEN',
   PENDING = 'PENDING',
+  INSPECTION = 'INSPECTION',
   INSPECTION_APPROVED = 'INSPECTION_APPROVED',
 }
 
