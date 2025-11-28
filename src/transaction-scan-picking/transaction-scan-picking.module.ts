@@ -6,12 +6,16 @@ import { TransactionScanPickingRepository } from './transaction-scan-picking.rep
 import { ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
 import { TransactionPickingModule } from '../transaction-picking/transaction-picking.module';
 import { MasterPalletModule } from '../master-pallet/master-pallet.module';
+import { InventoryTrackingModule } from '../inventory-tracking/inventory-tracking.module';
+import { MasterWarehouseBinModule } from '../master-warehouse-bin/master-warehouse-bin.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ScanPickingTransaction]),
     TransactionPickingModule,
     MasterPalletModule,
+    InventoryTrackingModule,
+    MasterWarehouseBinModule,
   ],
   controllers: [TransactionScanPickingController],
   providers: [TransactionScanPickingService, TransactionScanPickingRepository],
