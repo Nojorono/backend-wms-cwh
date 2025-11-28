@@ -88,21 +88,41 @@ export class TransactionScanPickingService {
       });
     }
 
-    // Only add to use pallet if it's different from source pallet
-    if (data.pallet_use_id && data.quantity_picked > 0 && !isSamePallet) {
-      // Add remaining quantity to destination pallet (pallet_use_id)
-      await this.masterPalletService.updateQuantity(data.pallet_use_id, {
-        item_id: itemId,
-        quantity: data.quantity_picked,
-        operation_type: QuantityOperationType.ADD,
-        uom: uom,
-        week_number: weekNumber,
-        outbound_do_id: outboundDoId,
-        user_id: data.user_id,
-        reference_id: data.transaction_picking_id,
-        reference_type: 'TRANSACTION_SCAN_PICKING',
-        notes: `Added ${data.quantity_picked} to destination pallet from transaction scan picking`,
-      });
+    // Handle use pallet quantity
+    if (data.pallet_use_id && data.quantity_picked > 0) {
+      if (isSamePallet) {
+        // If source and use are the same pallet, add back the remaining quantity
+        // (quantity_picked - quantity_switch) stays on the same pallet
+        const remainingQuantity = data.quantity_picked - quantitySwitch;
+        if (remainingQuantity > 0) {
+          await this.masterPalletService.updateQuantity(data.pallet_use_id, {
+            item_id: itemId,
+            quantity: remainingQuantity,
+            operation_type: QuantityOperationType.ADD,
+            uom: uom,
+            week_number: weekNumber,
+            outbound_do_id: outboundDoId,
+            user_id: data.user_id,
+            reference_id: data.transaction_picking_id,
+            reference_type: 'TRANSACTION_SCAN_PICKING',
+            notes: `Added back ${remainingQuantity} to same pallet (remaining after switch)`,
+          });
+        }
+      } else {
+        // If use pallet is different from source, add full quantity_picked to use pallet
+        await this.masterPalletService.updateQuantity(data.pallet_use_id, {
+          item_id: itemId,
+          quantity: data.quantity_picked,
+          operation_type: QuantityOperationType.ADD,
+          uom: uom,
+          week_number: weekNumber,
+          outbound_do_id: outboundDoId,
+          user_id: data.user_id,
+          reference_id: data.transaction_picking_id,
+          reference_type: 'TRANSACTION_SCAN_PICKING',
+          notes: `Added ${data.quantity_picked} to destination pallet from transaction scan picking`,
+        });
+      }
     }
 
     // Move inventory tracking for pallets
@@ -250,20 +270,41 @@ export class TransactionScanPickingService {
         });
       }
 
-      // Only add to use pallet if it's different from source pallet
-      if (newPalletUseId && quantityPicked > 0 && !isSamePallet) {
-        await this.masterPalletService.updateQuantity(newPalletUseId, {
-          item_id: itemId,
-          quantity: quantityPicked,
-          operation_type: QuantityOperationType.ADD,
-          uom: uom,
-          week_number: weekNumber,
-          outbound_do_id: outboundDoId,
-          user_id: userId,
-          reference_id: transactionPickingId,
-          reference_type: 'TRANSACTION_SCAN_PICKING',
-          notes: `Added ${quantityPicked} to destination pallet from transaction scan picking (updated)`,
-        });
+      // Handle use pallet quantity
+      if (newPalletUseId && quantityPicked > 0) {
+        if (isSamePallet) {
+          // If source and use are the same pallet, add back the remaining quantity
+          // (quantity_picked - quantity_switch) stays on the same pallet
+          const remainingQuantity = quantityPicked - quantitySwitch;
+          if (remainingQuantity > 0) {
+            await this.masterPalletService.updateQuantity(newPalletUseId, {
+              item_id: itemId,
+              quantity: remainingQuantity,
+              operation_type: QuantityOperationType.ADD,
+              uom: uom,
+              week_number: weekNumber,
+              outbound_do_id: outboundDoId,
+              user_id: userId,
+              reference_id: transactionPickingId,
+              reference_type: 'TRANSACTION_SCAN_PICKING',
+              notes: `Added back ${remainingQuantity} to same pallet (remaining after switch) - updated`,
+            });
+          }
+        } else {
+          // If use pallet is different from source, add full quantity_picked to use pallet
+          await this.masterPalletService.updateQuantity(newPalletUseId, {
+            item_id: itemId,
+            quantity: quantityPicked,
+            operation_type: QuantityOperationType.ADD,
+            uom: uom,
+            week_number: weekNumber,
+            outbound_do_id: outboundDoId,
+            user_id: userId,
+            reference_id: transactionPickingId,
+            reference_type: 'TRANSACTION_SCAN_PICKING',
+            notes: `Added ${quantityPicked} to destination pallet from transaction scan picking (updated)`,
+          });
+        }
       }
 
       // Move inventory tracking for updated pallets
@@ -363,20 +404,41 @@ export class TransactionScanPickingService {
       });
     }
 
-    // Only revert use pallet if it was different from source pallet (ADD operation was performed)
-    if (existing.pallet_use_id && existing.quantity_picked > 0 && !wasSamePallet) {
-      await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
-        item_id: itemId,
-        quantity: existing.quantity_picked,
-        operation_type: QuantityOperationType.REMOVE,
-        uom: uom,
-        week_number: weekNumber,
-        outbound_do_id: outboundDoId,
-        user_id: userId,
-        reference_id: transactionPickingId,
-        reference_type: 'TRANSACTION_SCAN_PICKING',
-        notes: `Reverted: Removed ${existing.quantity_picked} from destination pallet`,
-      });
+    // Revert use pallet operations
+    if (existing.pallet_use_id && existing.quantity_picked > 0) {
+      if (wasSamePallet) {
+        // If source and use were the same pallet, remove the remaining quantity that was added back
+        const quantitySwitch = existing.quantity_switch || 0;
+        const remainingQuantity = existing.quantity_picked - quantitySwitch;
+        if (remainingQuantity > 0) {
+          await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
+            item_id: itemId,
+            quantity: remainingQuantity,
+            operation_type: QuantityOperationType.REMOVE,
+            uom: uom,
+            week_number: weekNumber,
+            outbound_do_id: outboundDoId,
+            user_id: userId,
+            reference_id: transactionPickingId,
+            reference_type: 'TRANSACTION_SCAN_PICKING',
+            notes: `Reverted: Removed ${remainingQuantity} from same pallet (remaining after switch)`,
+          });
+        }
+      } else {
+        // If use pallet was different from source, remove the full quantity_picked
+        await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
+          item_id: itemId,
+          quantity: existing.quantity_picked,
+          operation_type: QuantityOperationType.REMOVE,
+          uom: uom,
+          week_number: weekNumber,
+          outbound_do_id: outboundDoId,
+          user_id: userId,
+          reference_id: transactionPickingId,
+          reference_type: 'TRANSACTION_SCAN_PICKING',
+          notes: `Reverted: Removed ${existing.quantity_picked} from destination pallet`,
+        });
+      }
     }
 
     // Revert inventory tracking
@@ -438,7 +500,16 @@ export class TransactionScanPickingService {
       if (palletUseId && quantityPicked > 0 && !isSamePallet && destinationWarehouseSubId && destinationWarehouseId) {
         try {
           // Check if use pallet already has inventory tracking
-          const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(palletUseId);
+          let usePalletTracking;
+          try {
+            usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(palletUseId);
+          } catch (error) {
+            // If not found, we'll create a new one
+            if (!(error instanceof NotFoundException)) {
+              throw error;
+            }
+            usePalletTracking = null;
+          }
           
           if (usePalletTracking) {
             // Update existing tracking
@@ -476,36 +547,80 @@ export class TransactionScanPickingService {
       }
 
       // Move inventory tracking to switch pallet if provided
-      if (palletSwitchId && quantitySwitch > 0 && destinationWarehouseSubId && destinationWarehouseId) {
+      if (palletSwitchId && quantitySwitch > 0) {
         try {
+          // Get source pallet location for new inventory tracking if needed
+          let sourceWarehouseSubId: string | undefined;
+          let sourceBinId: string | undefined;
+          let sourceWarehouseId: string | undefined;
+
+          if (palletSourceId) {
+            try {
+              const sourceTracking = await this.inventoryTrackingService.findOneByPalletId(palletSourceId);
+              if (sourceTracking) {
+                sourceWarehouseSubId = sourceTracking.warehouse_sub_id;
+                sourceBinId = sourceTracking.warehouse_bin_id;
+                sourceWarehouseId = sourceTracking.warehouse_id;
+              }
+            } catch (error) {
+              // If source pallet doesn't have tracking, use destination location
+              if (error instanceof NotFoundException) {
+                sourceWarehouseSubId = destinationWarehouseSubId;
+                sourceBinId = destinationBinId;
+                sourceWarehouseId = destinationWarehouseId;
+              } else {
+                throw error;
+              }
+            }
+          }
+
+          // Use source location if available, otherwise use destination location
+          const finalWarehouseSubId = sourceWarehouseSubId || destinationWarehouseSubId;
+          const finalBinId = sourceBinId || destinationBinId;
+          const finalWarehouseId = sourceWarehouseId || destinationWarehouseId;
+
+          if (!finalWarehouseSubId || !finalWarehouseId) {
+            console.warn(`Cannot create inventory tracking for switch pallet ${palletSwitchId}: missing warehouse information`);
+            return;
+          }
+
           // Check if switch pallet already has inventory tracking
-          const switchPalletTracking = await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
+          let switchPalletTracking;
+          try {
+            switchPalletTracking = await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
+          } catch (error) {
+            // If not found, we'll create a new one
+            if (!(error instanceof NotFoundException)) {
+              throw error;
+            }
+            switchPalletTracking = null;
+          }
           
           if (switchPalletTracking) {
             // Update existing tracking
             await this.inventoryTrackingService.update(switchPalletTracking.id, {
-              warehouse_sub_id: destinationWarehouseSubId,
-              warehouse_bin_id: destinationBinId,
-              warehouse_id: destinationWarehouseId,
+              warehouse_sub_id: finalWarehouseSubId,
+              warehouse_bin_id: finalBinId,
+              warehouse_id: finalWarehouseId,
               inventory_status: 'IN_INVENTORY',
               inventory_note: `Switched ${quantitySwitch} from source pallet via transaction scan picking`,
               inventory_date: new Date(),
             });
           } else {
-            // Create new tracking for switch pallet
+            // Create new tracking for switch pallet using source pallet location
             await this.inventoryTrackingService.createOrUpdateInventoryTracking(
               palletSwitchId,
-              destinationWarehouseSubId,
-              destinationWarehouseId,
+              finalWarehouseSubId,
+              finalWarehouseId,
               'IN_INVENTORY',
             );
             
             // Update bin if provided
-            if (destinationBinId) {
+            if (finalBinId) {
               const tracking = await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
               if (tracking) {
                 await this.inventoryTrackingService.update(tracking.id, {
-                  warehouse_bin_id: destinationBinId,
+                  warehouse_bin_id: finalBinId,
                 });
               }
             }
