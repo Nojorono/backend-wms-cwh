@@ -187,10 +187,10 @@ export class TransactionPickingRepository {
   }
 
   async detachMemo(memoId: string): Promise<void> {
-    await this.repository.update(memoId, { memo_id: undefined });
+    await this.repository.update({ memo_id: memoId }, { memo_id: null as any });
   }
 
   async detachDo(doId: string): Promise<void> {
-    await this.repository.update(doId, { do_id: undefined, memo_id: undefined });
+    await this.repository.update({ do_id: doId }, { do_id: null as any, memo_id: null as any });
   }
 }
