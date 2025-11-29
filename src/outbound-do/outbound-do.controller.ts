@@ -9,13 +9,16 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiQuery,
   ApiBearerAuth,
+  ApiBody,
 } from '@nestjs/swagger';
 import { OutboundDoService } from './outbound-do.service';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
@@ -167,33 +170,6 @@ export class OutboundDoController {
     return this.outboundDoService.update(id, updateOutboundDoDto);
   }
 
-  @Patch(':id/status')
-  @ApiOperation({ summary: 'Update status outbound DO' })
-  @ApiParam({ name: 'id', description: 'ID outbound DO' })
-  @ApiResponse({
-    status: 200,
-    description: 'Status outbound DO berhasil diupdate',
-    type: OutboundDoResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Status transition tidak valid',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        message: {
-          type: 'string',
-          example: 'Tidak dapat mengubah status dari COMPLETED ke PENDING',
-        },
-        statusCode: { type: 'number', example: 400 },
-      },
-    },
-  })
-  async updateStatus(@Param('id') id: string, @Body('status') status: OutboundDoStatus) {
-    return this.outboundDoService.updateStatus(id, status);
-  }
-
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Hapus outbound DO' })
@@ -276,5 +252,50 @@ export class OutboundDoController {
   })
   async findByAssignedUserId(@Param('userId') userId: string) {
     return this.outboundDoService.findByAssignedUserId(userId);
+  }
+
+  // detach memo from outbound do
+  @Patch(':id/detach-memo')
+  @ApiOperation({ 
+    summary: 'Detach memo from outbound DO',
+    description: 'Jika memoId tidak disediakan, semua memo akan dilepas dari outbound DO'
+  })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiQuery({ 
+    name: 'memoId', 
+    description: 'ID memo yang akan dilepas (opsional, jika tidak disediakan semua memo akan dilepas)', 
+    required: false 
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Memo berhasil dilepas dari outbound DO',
+    type: OutboundDoResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Memo ID tidak valid atau memo tidak ditemukan dalam outbound DO',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Memo not found in outbound DO' },
+        statusCode: { type: 'number', example: 400 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Outbound DO tidak ditemukan',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Outbound DO not found' },
+        statusCode: { type: 'number', example: 404 },
+      },
+    },
+  })
+  async detachMemo(@Param('id') id: string, @Query('memoId') memoId?: string) {
+    return this.outboundDoService.removeMemo(id, memoId);
   }
 }

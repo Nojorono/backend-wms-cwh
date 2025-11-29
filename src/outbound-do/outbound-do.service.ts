@@ -169,4 +169,8 @@ export class OutboundDoService {
   async findByAssignedUserId(userId: string): Promise<OutboundDo[]> {
     return this.repository.findByAssignedUserId(userId);
   }
+
+  async removeMemo(id: string, memoId?: string): Promise<OutboundDo> {
+    return this.repository.removeMemo(id, memoId);
+  }
 }
