@@ -193,4 +193,12 @@ export class TransactionPickingRepository {
   async detachDo(doId: string): Promise<void> {
     await this.repository.update({ do_id: doId }, { do_id: null as any, memo_id: null as any });
   }
+
+  async attachMemo(transactionIds: string[], memoId: string): Promise<void> {
+    await this.repository.update(transactionIds, { memo_id: memoId });
+  }
+
+  async attachDo(transactionIds: string[], doId: string): Promise<void> {
+    await this.repository.update(transactionIds, { do_id: doId });
+  }
 }

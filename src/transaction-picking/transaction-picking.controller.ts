@@ -20,6 +20,8 @@ import {
 import { TransactionPickingService } from './transaction-picking.service';
 import { CreateTransactionPickingDto, CreateManyTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
+import { AttachMemoDto } from './dto/attach-memo.dto';
+import { AttachDoDto } from './dto/attach-do.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
 import { PaginationQueryDto } from '../core/dto/pagination.dto';
 import { ApiPaginationQuery } from '../core/decorators/pagination.decorator';
@@ -252,5 +254,29 @@ export class TransactionPickingController {
   })
   async detachDo(@Param('doId') doId: string) {
     return await this.service.detachDo(doId);
+  }
+  // attach memo to transaction picking
+  @Patch('memo/:memoId/attach')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Attach memo to transaction picking' })
+  @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
+  @ApiResponse({
+    status: 204,
+    description: 'Memo berhasil diattach ke transaction picking',
+  })
+  async attachMemo(@Param('memoId') memoId: string, @Body() attachMemoDto: AttachMemoDto) {
+    return await this.service.attachMemo(attachMemoDto.transactionIds, memoId);
+  }
+  // attach do to transaction picking
+  @Patch('do/:doId/attach')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Attach do to transaction picking' })
+  @ApiParam({ name: 'doId', description: 'ID outbound do' })
+  @ApiResponse({
+    status: 204,
+    description: 'Do berhasil diattach ke transaction picking',
+  })
+  async attachDo(@Param('doId') doId: string, @Body() attachDoDto: AttachDoDto) {
+    return await this.service.attachDo(attachDoDto.transactionIds, doId);
   }
 }

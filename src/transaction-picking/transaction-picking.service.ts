@@ -144,4 +144,36 @@ export class TransactionPickingService {
   async detachDo(doId: string): Promise<void> {
     return this.repository.detachDo(doId);
   }
+
+  async attachMemo(transactionIds: string[], memoId: string): Promise<void> {
+    if (!transactionIds || transactionIds.length === 0) {
+      throw new BadRequestException('Minimal 1 transaction ID harus disediakan');
+    }
+
+    // Validasi semua transaction IDs ada
+    for (const transactionId of transactionIds) {
+      const transaction = await this.repository.findOne(transactionId);
+      if (!transaction) {
+        throw new NotFoundException(`Transaction picking dengan ID ${transactionId} tidak ditemukan`);
+      }
+    }
+
+    return this.repository.attachMemo(transactionIds, memoId);
+  }
+
+  async attachDo(transactionIds: string[], doId: string): Promise<void> {
+    if (!transactionIds || transactionIds.length === 0) {
+      throw new BadRequestException('Minimal 1 transaction ID harus disediakan');
+    }
+
+    // Validasi semua transaction IDs ada
+    for (const transactionId of transactionIds) {
+      const transaction = await this.repository.findOne(transactionId);
+      if (!transaction) {
+        throw new NotFoundException(`Transaction picking dengan ID ${transactionId} tidak ditemukan`);
+      }
+    }
+
+    return this.repository.attachDo(transactionIds, doId);
+  }
 }
