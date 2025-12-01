@@ -171,6 +171,75 @@ export class OutboundDoService {
   }
 
   async removeMemo(id: string, memoId?: string): Promise<OutboundDo> {
-    return this.repository.removeMemo(id, memoId);
+    const outboundDo = await this.repository.findOne(id);
+
+    // If memoId is not provided, remove all memos
+    if (!memoId) {
+      const memoIds = await this.repository.removeAllMemosFromOutboundDo(id);
+      await this.repository.updateMultipleMemosHasDo(memoIds, false);
+      return this.repository.findOne(id);
+    }
+
+    // Remove specific memo
+    // Check if memo exists in the outbound DO
+    const memoIndex = outboundDo.memo_id?.indexOf(memoId) ?? -1;
+    const memoExistsInRelation = outboundDo.outbound_memos?.some((memo) => memo.id === memoId) ?? false;
+
+    if (memoIndex === -1 && !memoExistsInRelation) {
+      throw new BadRequestException('Memo not found in outbound DO');
+    }
+
+    // Remove memo from outbound DO
+    const updatedOutboundDo = await this.repository.removeMemoFromOutboundDo(id, memoId);
+
+    // Update the memo's has_do flag to false
+    await this.repository.updateMemoHasDo(memoId, false);
+
+    return updatedOutboundDo;
+  }
+
+  async attachMemo(id: string, memoId: string, sequence?: number): Promise<OutboundDo> {
+    // Get outbound DO
+    const outboundDo = await this.repository.findOne(id);
+
+    // Check if memo already exists
+    const memoIndex = outboundDo.memo_id?.indexOf(memoId) ?? -1;
+    if (memoIndex !== -1) {
+      throw new BadRequestException('Memo already attached to outbound DO');
+    }
+
+    // Verify memo exists
+    const memo = await this.repository.findMemoById(memoId);
+    if (!memo) {
+      throw new BadRequestException(`Outbound memo with ID ${memoId} not found`);
+    }
+
+    // Calculate sequence if not provided
+    let newSequence = sequence;
+    if (!newSequence) {
+      const existingSequences = outboundDo.memo_sequence || [];
+      newSequence = existingSequences.length > 0 ? Math.max(...existingSequences) + 1 : 1;
+    }
+
+    // Validate sequence is unique
+    const existingSequences = outboundDo.memo_sequence || [];
+    if (existingSequences.includes(newSequence)) {
+      throw new BadRequestException(
+        `Sequence ${newSequence} already exists. Please provide a unique sequence.`,
+      );
+    }
+
+    // Validate sequence is positive
+    if (newSequence <= 0) {
+      throw new BadRequestException('Sequence must be positive');
+    }
+
+    // Update memo's has_do flag if needed
+    if (!memo.has_do) {
+      await this.repository.updateMemoHasDo(memoId, true);
+    }
+
+    // Add memo to outbound DO
+    return this.repository.addMemoToOutboundDo(id, memoId, newSequence, memo);
   }
 }

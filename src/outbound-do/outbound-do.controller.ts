@@ -298,4 +298,53 @@ export class OutboundDoController {
   async detachMemo(@Param('id') id: string, @Query('memoId') memoId?: string) {
     return this.outboundDoService.removeMemo(id, memoId);
   }
+
+  // attach memo to outbound do
+  @Patch(':id/attach-memo')
+  @ApiOperation({ summary: 'Attach memo to outbound DO' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiQuery({ name: 'memoId', description: 'ID memo yang akan ditambahkan' })
+  @ApiQuery({ 
+    name: 'sequence', 
+    description: 'Sequence number untuk memo (opsional, akan auto-increment jika tidak disediakan)', 
+    required: false,
+    type: Number
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Memo berhasil ditambahkan ke outbound DO',
+    type: OutboundDoResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Memo sudah terattach atau data tidak valid',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Memo already attached to outbound DO' },
+        statusCode: { type: 'number', example: 400 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Outbound DO atau memo tidak ditemukan',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Outbound DO not found' },
+        statusCode: { type: 'number', example: 404 },
+      },
+    },
+  })
+  async attachMemo(
+    @Param('id') id: string, 
+    @Query('memoId') memoId: string,
+    @Query('sequence') sequence?: number
+  ) {
+    const sequenceNumber = sequence ? Number(sequence) : undefined;
+    return this.outboundDoService.attachMemo(id, memoId, sequenceNumber);
+  }
 }

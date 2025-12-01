@@ -390,43 +390,28 @@ export class OutboundDoRepository {
     return `${prefix}${seq.toString().padStart(4, '0')}`;
   }
 
-  async removeMemo(id: string, memoId?: string): Promise<OutboundDo> {
+  async removeAllMemosFromOutboundDo(id: string): Promise<string[]> {
     const outboundDo = await this.findOne(id);
 
-    // If memoId is not provided, remove all memos
-    if (!memoId) {
-      // Get all memo IDs before removing
-      const memoIds =
-        outboundDo.memo_id && outboundDo.memo_id.length > 0
-          ? [...outboundDo.memo_id]
-          : outboundDo.outbound_memos?.map((memo) => memo.id) ?? [];
+    // Get all memo IDs before removing
+    const memoIds =
+      outboundDo.memo_id && outboundDo.memo_id.length > 0
+        ? [...outboundDo.memo_id]
+        : outboundDo.outbound_memos?.map((memo) => memo.id) ?? [];
 
-      // Clear the relationship
-      outboundDo.outbound_memos = [];
-      outboundDo.memo_id = [];
-      outboundDo.memo_sequence = [];
+    // Clear the relationship
+    outboundDo.outbound_memos = [];
+    outboundDo.memo_id = [];
+    outboundDo.memo_sequence = [];
 
-      // Save the outbound DO
-      await this.outboundDoRepository.save(outboundDo);
+    // Save the outbound DO
+    await this.outboundDoRepository.save(outboundDo);
 
-      // Update all memos' has_do flag to false
-      if (memoIds.length > 0) {
-        await this.outboundMemoRepository.update({ id: In(memoIds) }, { has_do: false });
-      }
+    return memoIds;
+  }
 
-      return this.findOne(id);
-    }
-
-    // Remove specific memo
-    // Check if memo exists in the outbound DO
-    const memoIndex = outboundDo.memo_id?.indexOf(memoId) ?? -1;
-    if (memoIndex === -1) {
-      // Also check in the relationship
-      const memoExists = outboundDo.outbound_memos?.some((memo) => memo.id === memoId);
-      if (!memoExists) {
-        throw new BadRequestException('Memo not found in outbound DO');
-      }
-    }
+  async removeMemoFromOutboundDo(id: string, memoId: string): Promise<OutboundDo> {
+    const outboundDo = await this.findOne(id);
 
     // Remove memo from arrays
     if (outboundDo.memo_id && outboundDo.memo_id.length > 0) {
@@ -447,9 +432,54 @@ export class OutboundDoRepository {
     // Save the outbound DO
     await this.outboundDoRepository.save(outboundDo);
 
-    // Update the memo's has_do flag to false
-    await this.outboundMemoRepository.update({ id: memoId }, { has_do: false });
-
     return this.findOne(id);
+  }
+
+  async updateMultipleMemosHasDo(memoIds: string[], hasDo: boolean): Promise<void> {
+    if (memoIds.length > 0) {
+      await this.outboundMemoRepository.update({ id: In(memoIds) }, { has_do: hasDo });
+    }
+  }
+
+  async findMemoById(memoId: string): Promise<OutboundMemo | null> {
+    return this.outboundMemoRepository.findOne({
+      where: { id: memoId },
+    });
+  }
+
+  async addMemoToOutboundDo(
+    outboundDoId: string,
+    memoId: string,
+    sequence: number,
+    memo: OutboundMemo,
+  ): Promise<OutboundDo> {
+    const outboundDo = await this.findOne(outboundDoId);
+
+    // Initialize arrays if needed
+    if (!outboundDo.memo_id) {
+      outboundDo.memo_id = [];
+    }
+    if (!outboundDo.memo_sequence) {
+      outboundDo.memo_sequence = [];
+    }
+    if (!outboundDo.outbound_memos) {
+      outboundDo.outbound_memos = [];
+    }
+
+    // Add memo to arrays
+    outboundDo.memo_id.push(memoId);
+    outboundDo.memo_sequence.push(sequence);
+
+    // Add memo to relationship
+    outboundDo.outbound_memos.push(memo);
+
+    // Save the outbound DO
+    await this.outboundDoRepository.save(outboundDo);
+
+    return this.findOne(outboundDoId);
+  }
+
+  async updateMemoHasDo(memoId: string, hasDo: boolean): Promise<void> {
+    await this.outboundMemoRepository.update({ id: memoId }, { has_do: hasDo });
   }
 }
