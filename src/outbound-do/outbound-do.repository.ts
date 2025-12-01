@@ -355,10 +355,15 @@ export class OutboundDoRepository {
   }
 
   async findOneWithMemoSequence(id: string): Promise<OutboundDo> {
-    const outboundDo = await this.outboundDoRepository.findOne({
-      where: { id },
-      relations: ['outbound_memos'],
-    });
+    const outboundDo = await this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
+      .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
+      .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings')
+      .where('outbound_do.id = :id', { id })
+      .getOne();
 
     if (!outboundDo) {
       throw new NotFoundException('Outbound DO not found');
