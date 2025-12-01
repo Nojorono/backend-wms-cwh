@@ -72,8 +72,8 @@ export class OutboundMemoController {
       type: Boolean,
     },
     {
-      name: 'has_transaction_scan_picking',
-      description: 'Filter outbound memo yang memiliki transaction scan picking (true/false)',
+      name: 'has_transaction_picking',
+      description: 'Filter outbound memo yang memiliki transaction picking (true/false)',
       type: Boolean,
       example: true,
     },
@@ -93,7 +93,7 @@ export class OutboundMemoController {
       paginationQuery.status ||
       paginationQuery.has_do !== undefined ||
       paginationQuery.type !== undefined ||
-      paginationQuery.has_transaction_scan_picking !== undefined;
+      paginationQuery.has_transaction_picking !== undefined;
 
     if (hasPaginationParams) {
       return this.outboundMemoService.findAllPaginated(paginationQuery);

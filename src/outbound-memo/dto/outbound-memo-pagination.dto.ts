@@ -41,7 +41,7 @@ export class OutboundMemoPaginationDto extends BasePaginationQueryDto {
   type?: OutboundMemoType; // SUBDIST or AMO
 
   @ApiPropertyOptional({
-    description: 'Filter outbound memo yang memiliki transaction scan picking',
+    description: 'Filter outbound memo yang memiliki transaction picking',
     type: Boolean,
     example: true,
   })
@@ -56,7 +56,7 @@ export class OutboundMemoPaginationDto extends BasePaginationQueryDto {
     }
     return value;
   })
-  has_transaction_scan_picking?: boolean;
+  has_transaction_picking?: boolean;
 }
 
 

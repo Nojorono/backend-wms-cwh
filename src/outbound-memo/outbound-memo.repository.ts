@@ -115,7 +115,7 @@ export class OutboundMemoRepository {
       status,
       has_do,
       type,
-      has_transaction_scan_picking,
+      has_transaction_picking,
     } = paginationDto;
 
     const qb = this.outboundMemoRepository
@@ -140,17 +140,13 @@ export class OutboundMemoRepository {
       qb.andWhere('memo.type = :type', { type });
     }
 
-    if (has_transaction_scan_picking !== undefined) {
-      if (has_transaction_scan_picking) {
-        // Filter for outbound memos that have at least one transaction scan picking
-        qb.andWhere(
-          'EXISTS (SELECT 1 FROM transaction_scan_picking tsp INNER JOIN transaction_picking tp ON tsp.transaction_picking_id = tp.id WHERE tp.memo_id = memo.id)',
-        );
+    if (has_transaction_picking !== undefined) {
+      if (has_transaction_picking) {
+        // Filter for outbound memos that have at least one transaction picking
+        qb.andWhere('transaction_pickings.id IS NOT NULL');
       } else {
-        // Filter for outbound memos that don't have any transaction scan picking
-        qb.andWhere(
-          'NOT EXISTS (SELECT 1 FROM transaction_scan_picking tsp INNER JOIN transaction_picking tp ON tsp.transaction_picking_id = tp.id WHERE tp.memo_id = memo.id)',
-        );
+        // Filter for outbound memos that don't have any transaction picking
+        qb.andWhere('transaction_pickings.id IS NULL');
       }
     }
 
