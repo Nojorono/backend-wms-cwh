@@ -83,6 +83,7 @@ export class OutboundDoRepository {
       .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
       .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
       .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
       .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings')
       .orderBy('outbound_do.createdAt', 'DESC')
       .distinct(true)
@@ -251,6 +252,7 @@ export class OutboundDoRepository {
       sortOrder = 'DESC',
       status,
       outbound_type,
+      has_transaction_scan_picking,
     } = paginationDto;
 
     const qb = this.outboundDoRepository
@@ -258,6 +260,7 @@ export class OutboundDoRepository {
       .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
       .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
       .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
       .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings');
 
     if (status) {
@@ -266,6 +269,20 @@ export class OutboundDoRepository {
 
     if (outbound_type) {
       qb.andWhere('outbound_do.outbound_type = :outbound_type', { outbound_type });
+    }
+
+    if (has_transaction_scan_picking !== undefined) {
+      if (has_transaction_scan_picking) {
+        // Filter for outbound DOs that have at least one transaction scan picking
+        qb.andWhere(
+          'EXISTS (SELECT 1 FROM transaction_scan_picking tsp INNER JOIN transaction_picking tp ON tsp.transaction_picking_id = tp.id INNER JOIN outbound_memo om ON tp.memo_id = om.id INNER JOIN outbound_do_memo odm ON om.id = odm.outbound_memo_id WHERE odm.outbound_do_id = outbound_do.id)',
+        );
+      } else {
+        // Filter for outbound DOs that don't have any transaction scan picking
+        qb.andWhere(
+          'NOT EXISTS (SELECT 1 FROM transaction_scan_picking tsp INNER JOIN transaction_picking tp ON tsp.transaction_picking_id = tp.id INNER JOIN outbound_memo om ON tp.memo_id = om.id INNER JOIN outbound_do_memo odm ON om.id = odm.outbound_memo_id WHERE odm.outbound_do_id = outbound_do.id)',
+        );
+      }
     }
 
     if (search) {
@@ -358,6 +375,7 @@ export class OutboundDoRepository {
       .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos_select')
       .leftJoinAndSelect('outbound_memos_select.outbound_memo_items', 'outbound_memo_items')
       .leftJoinAndSelect('outbound_memos_select.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
       .leftJoinAndSelect('outbound_memos_select.assigned_pickings', 'assigned_pickings_select')
       .where('assigned_pickings.picking_user_id = :userId', { userId })
       .andWhere('outbound_do.deletedAt IS NULL')

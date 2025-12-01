@@ -71,6 +71,12 @@ export class OutboundMemoController {
       example: false,
       type: Boolean,
     },
+    {
+      name: 'has_transaction_scan_picking',
+      description: 'Filter outbound memo yang memiliki transaction scan picking (true/false)',
+      type: Boolean,
+      example: true,
+    },
   ])
   @ApiResponse({
     status: 200,
@@ -86,7 +92,8 @@ export class OutboundMemoController {
       paginationQuery.sortOrder ||
       paginationQuery.status ||
       paginationQuery.has_do !== undefined ||
-      paginationQuery.type !== undefined;
+      paginationQuery.type !== undefined ||
+      paginationQuery.has_transaction_scan_picking !== undefined;
 
     if (hasPaginationParams) {
       return this.outboundMemoService.findAllPaginated(paginationQuery);

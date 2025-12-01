@@ -87,6 +87,12 @@ export class OutboundDoController {
       enum: Object.values(OutboundDoType),
       example: OutboundDoType.SUBDIST,
     },
+    {
+    name: 'has_transaction_scan_picking',
+      description: 'Filter outbound DO yang memiliki transaction scan picking (true/false)',
+      type: Boolean,
+      example: true,
+    },
   ])
   @ApiResponse({
     status: 200,
@@ -101,7 +107,8 @@ export class OutboundDoController {
       paginationQuery.sortBy ||
       paginationQuery.sortOrder ||
       paginationQuery.status ||
-      paginationQuery.outbound_type;
+      paginationQuery.outbound_type ||
+      paginationQuery.has_transaction_scan_picking !== undefined;
 
     if (hasPaginationParams) {
       return this.outboundDoService.findAllPaginated(paginationQuery);

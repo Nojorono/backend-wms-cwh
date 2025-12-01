@@ -115,12 +115,15 @@ export class OutboundMemoRepository {
       status,
       has_do,
       type,
+      has_transaction_scan_picking,
     } = paginationDto;
 
     const qb = this.outboundMemoRepository
       .createQueryBuilder('memo')
       .leftJoinAndSelect('memo.outbound_memo_items', 'items')
-      .leftJoinAndSelect('items.item', 'item');
+      .leftJoinAndSelect('items.item', 'item')
+      .leftJoinAndSelect('memo.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking');
 
     if (status) {
       qb.andWhere('memo.status = :status', { status });
@@ -135,6 +138,20 @@ export class OutboundMemoRepository {
 
     if (type) {
       qb.andWhere('memo.type = :type', { type });
+    }
+
+    if (has_transaction_scan_picking !== undefined) {
+      if (has_transaction_scan_picking) {
+        // Filter for outbound memos that have at least one transaction scan picking
+        qb.andWhere(
+          'EXISTS (SELECT 1 FROM transaction_scan_picking tsp INNER JOIN transaction_picking tp ON tsp.transaction_picking_id = tp.id WHERE tp.memo_id = memo.id)',
+        );
+      } else {
+        // Filter for outbound memos that don't have any transaction scan picking
+        qb.andWhere(
+          'NOT EXISTS (SELECT 1 FROM transaction_scan_picking tsp INNER JOIN transaction_picking tp ON tsp.transaction_picking_id = tp.id WHERE tp.memo_id = memo.id)',
+        );
+      }
     }
 
     if (search) {
