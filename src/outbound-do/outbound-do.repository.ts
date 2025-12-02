@@ -42,7 +42,7 @@ export class OutboundDoRepository {
         try {
           console.log(`Processing memo ${memoItem.memo_id} with sequence ${memoItem.sequence}`);
 
-          const memo = await this.outboundMemoRepository.findOne({
+          let memo = await this.outboundMemoRepository.findOne({
             where: { id: memoItem.memo_id },
           });
 
@@ -52,7 +52,13 @@ export class OutboundDoRepository {
 
           if (!memo.has_do) {
             await this.outboundMemoRepository.update(memo.id, { has_do: true });
-            memo.has_do = true;
+            // Re-fetch the memo to ensure it has the updated has_do value
+            const updatedMemo = await this.outboundMemoRepository.findOne({
+              where: { id: memoItem.memo_id },
+            });
+            if (updatedMemo) {
+              memo = updatedMemo;
+            }
           }
 
           outboundMemos.push(memo);
@@ -152,7 +158,7 @@ export class OutboundDoRepository {
             try {
               console.log(`Updating memo ${memoItem.memo_id} with sequence ${memoItem.sequence}`);
 
-              const memo = await this.outboundMemoRepository.findOne({
+              let memo = await this.outboundMemoRepository.findOne({
                 where: { id: memoItem.memo_id },
               });
 
@@ -164,7 +170,13 @@ export class OutboundDoRepository {
 
               if (!memo.has_do) {
                 await this.outboundMemoRepository.update(memo.id, { has_do: true });
-                memo.has_do = true;
+                // Re-fetch the memo to ensure it has the updated has_do value
+                const updatedMemo = await this.outboundMemoRepository.findOne({
+                  where: { id: memoItem.memo_id },
+                });
+                if (updatedMemo) {
+                  memo = updatedMemo;
+                }
               }
 
               outboundMemos.push(memo);

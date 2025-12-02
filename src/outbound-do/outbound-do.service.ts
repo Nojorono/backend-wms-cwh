@@ -209,7 +209,7 @@ export class OutboundDoService {
     }
 
     // Verify memo exists
-    const memo = await this.repository.findMemoById(memoId);
+    let memo = await this.repository.findMemoById(memoId);
     if (!memo) {
       throw new BadRequestException(`Outbound memo with ID ${memoId} not found`);
     }
@@ -237,6 +237,11 @@ export class OutboundDoService {
     // Update memo's has_do flag if needed
     if (!memo.has_do) {
       await this.repository.updateMemoHasDo(memoId, true);
+      // Refresh memo to get updated has_do value
+      const updatedMemo = await this.repository.findMemoById(memoId);
+      if (updatedMemo) {
+        memo = updatedMemo;
+      }
     }
 
     // Add memo to outbound DO
