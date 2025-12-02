@@ -21,6 +21,7 @@ import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehous
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
 import { InboundModule } from './inbound/inbound.module';
 import { AssignedHelperModule } from './assigned-helper/assigned-helper.module';
+import { AssignedGateModule } from './assigned-gate/assigned-gate.module';
 import { PaginationModule } from './core/modules/pagination.module';
 import { TransactionScanInboundModule } from './transaction-scan-inbound/transaction-scan-inbound.module';
 import { InventoryTrackingModule } from './inventory-tracking/inventory-tracking.module';
@@ -83,6 +84,7 @@ import { UsersActivityModule } from './users-activity/users-activity.module';
     MasterClassificationItemModule,
     InboundModule,
     AssignedHelperModule,
+    AssignedGateModule,
     PaginationModule,
     TransactionScanInboundModule,
     PutAwayModule,

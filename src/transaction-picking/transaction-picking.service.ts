@@ -4,6 +4,7 @@ import { CreateTransactionPickingDto, CreateManyTransactionPickingDto } from './
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
 import { PaginationQueryDto, PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { TransactionPickingPaginationDto } from './dto/transaction-picking-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 
 @Injectable()
@@ -37,9 +38,9 @@ export class TransactionPickingService {
   }
 
   async findAll(
-    paginationQuery: PaginationQueryDto,
+    paginationQuery: TransactionPickingPaginationDto,
   ): Promise<PaginatedResponseDto<PickingTransaction>> {
-    const normalizedQuery: PaginationQueryDto = {
+    const normalizedQuery: TransactionPickingPaginationDto = {
       ...paginationQuery,
       page: paginationQuery.page ?? 1,
       limit: paginationQuery.limit ?? 10,

@@ -23,7 +23,7 @@ import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dt
 import { AttachMemoDto } from './dto/attach-memo.dto';
 import { AttachDoDto } from './dto/attach-do.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
-import { PaginationQueryDto } from '../core/dto/pagination.dto';
+import { TransactionPickingPaginationDto } from './dto/transaction-picking-pagination.dto';
 import { ApiPaginationQuery } from '../core/decorators/pagination.decorator';
 
 @ApiTags('Transaction Picking')
@@ -107,7 +107,7 @@ export class TransactionPickingController {
       },
     },
   })
-  async findAll(@Query() paginationQuery: PaginationQueryDto) {
+  async findAll(@Query() paginationQuery: TransactionPickingPaginationDto) {
     const result = await this.service.findAll(paginationQuery);
     return {
       success: true,

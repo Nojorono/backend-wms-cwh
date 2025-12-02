@@ -39,7 +39,7 @@ export class TransactionPickingRepository {
   }
 
   async findAllPaginated(
-    paginationQuery: PaginationQueryDto,
+    paginationQuery: PaginationQueryDto & { has_memo_id?: boolean },
   ): Promise<{ data: PickingTransaction[]; total: number }> {
     const {
       page = 1,
@@ -48,6 +48,7 @@ export class TransactionPickingRepository {
       sortBy,
       sortOrder = 'DESC',
       status,
+      has_memo_id,
     } = paginationQuery;
 
     const queryBuilder = this.repository
@@ -62,6 +63,14 @@ export class TransactionPickingRepository {
 
     if (status) {
       queryBuilder.andWhere('transaction.status = :status', { status });
+    }
+
+    if (has_memo_id !== undefined) {
+      if (has_memo_id) {
+        queryBuilder.andWhere('transaction.memo_id IS NOT NULL');
+      } else {
+        queryBuilder.andWhere('transaction.memo_id IS NULL');
+      }
     }
 
     if (search) {
