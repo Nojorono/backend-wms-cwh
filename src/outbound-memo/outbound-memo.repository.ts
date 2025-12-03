@@ -116,6 +116,7 @@ export class OutboundMemoRepository {
       has_do,
       type,
       has_transaction_picking,
+      item_id,
     } = paginationDto;
 
     const qb = this.outboundMemoRepository
@@ -148,6 +149,10 @@ export class OutboundMemoRepository {
         // Filter for outbound memos that don't have any transaction picking
         qb.andWhere('transaction_pickings.id IS NULL');
       }
+    }
+
+    if (item_id) {
+      qb.andWhere('items.item_id = :item_id', { item_id });
     }
 
     if (search) {

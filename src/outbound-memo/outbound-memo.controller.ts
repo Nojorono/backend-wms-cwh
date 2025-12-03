@@ -77,6 +77,12 @@ export class OutboundMemoController {
       type: Boolean,
       example: true,
     },
+    {
+      name: 'item_id',
+      description: 'Filter outbound memo berdasarkan item_id',
+      example: 'uuid-item-id',
+      type: String,
+    },
   ])
   @ApiResponse({
     status: 200,
@@ -93,7 +99,8 @@ export class OutboundMemoController {
       paginationQuery.status ||
       paginationQuery.has_do !== undefined ||
       paginationQuery.type !== undefined ||
-      paginationQuery.has_transaction_picking !== undefined;
+      paginationQuery.has_transaction_picking !== undefined ||
+      paginationQuery.item_id !== undefined;
 
     if (hasPaginationParams) {
       return this.outboundMemoService.findAllPaginated(paginationQuery);

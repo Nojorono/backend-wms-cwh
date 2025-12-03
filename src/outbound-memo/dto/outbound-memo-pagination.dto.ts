@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsOptional, IsEnum, IsBoolean, IsString } from 'class-validator';
 import { BasePaginationQueryDto } from '../../core/dto/base-pagination.dto';
 import { OutboundMemoStatus, OutboundMemoType } from '../../core/domain/entities/outbound-memo.entity';
 
@@ -57,6 +57,14 @@ export class OutboundMemoPaginationDto extends BasePaginationQueryDto {
     return value;
   })
   has_transaction_picking?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter outbound memo berdasarkan item_id',
+    example: 'uuid-item-id',
+  })
+  @IsOptional()
+  @IsString()
+  item_id?: string;
 }
 
 

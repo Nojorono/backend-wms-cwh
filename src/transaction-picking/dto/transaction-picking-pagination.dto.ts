@@ -28,5 +28,13 @@ export class TransactionPickingPaginationDto extends BasePaginationQueryDto {
   })
   @IsBoolean()
   has_memo_id?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter transaction picking berdasarkan item_id',
+    example: 'uuid-item-id',
+  })
+  @IsOptional()
+  @IsString()
+  item_id?: string;
 }
 
