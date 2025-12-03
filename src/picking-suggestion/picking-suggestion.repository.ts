@@ -79,7 +79,15 @@ export class PickingSuggestionRepository {
     return await this.outboundMemoRepository.query(query, [memoId]);
   }
 
-  async searchInventoryWithPalletHistory(itemId: string, uom?: string): Promise<any[]> {
+  async searchInventoryWithPalletHistory(
+    itemId: string,
+    uom?: string,
+    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+  ): Promise<any[]> {
+    // Determine week_number sort direction: FIFO = ASC (smallest first), LIFO = DESC (biggest first)
+    const weekNumberSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
+
+
     // Use raw SQL to include reserved quantity calculation
     const query = `
       SELECT 
@@ -188,6 +196,7 @@ export class PickingSuggestionRepository {
         ), 0)
       ORDER BY 
         location_priority ASC,
+        pth.week_number ${weekNumberSort},
         it.inventory_date ASC,
         pth.production_date ASC,
         pth.new_quantity DESC

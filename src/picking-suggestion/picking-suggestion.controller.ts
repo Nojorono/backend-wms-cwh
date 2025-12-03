@@ -28,6 +28,13 @@ export class PickingSuggestionController {
   @Get('memo/:memoId')
   @ApiOperation({ summary: 'Get picking suggestions for a memo' })
   @ApiParam({ name: 'memoId', description: 'Outbound memo ID' })
+  @ApiQuery({
+    name: 'sortMethod',
+    required: false,
+    description: 'Sorting method for inventory picking: FIFO (First In First Out - smallest week_number) or LIFO (Last In First Out - biggest week_number)',
+    enum: ['FIFO', 'LIFO'],
+    example: 'FIFO',
+  })
   @ApiResponse({
     status: 200,
     description: 'Picking suggestions generated successfully',
@@ -37,8 +44,11 @@ export class PickingSuggestionController {
     status: 404,
     description: 'Memo not found',
   })
-  async getPickingSuggestionsByMemo(@Param('memoId') memoId: string) {
-    return this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId);
+  async getPickingSuggestionsByMemo(
+    @Param('memoId') memoId: string,
+    @Query('sortMethod') sortMethod?: 'FIFO' | 'LIFO',
+  ) {
+    return this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId, sortMethod);
   }
 
   @Get('item/:itemId')

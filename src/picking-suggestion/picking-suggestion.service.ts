@@ -136,7 +136,10 @@ export class PickingSuggestionService {
     return outboundDo;
   }
 
-  private async generatePickingSuggestionsForMemo(memo: any): Promise<PickingSuggestionDto[]> {
+  private async generatePickingSuggestionsForMemo(
+    memo: any,
+    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+  ): Promise<PickingSuggestionDto[]> {
     const suggestions: PickingSuggestionDto[] = [];
 
     // Calculate priority for each item and sort by priority
@@ -163,6 +166,7 @@ export class PickingSuggestionService {
         item.item_id,
         remainingRequired,
         item.uom,
+        sortMethod,
       );
 
       if (availableInventory.length > 0) {
@@ -216,6 +220,7 @@ export class PickingSuggestionService {
     itemId: string,
     requiredQuantity: number,
     uom?: string,
+    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
   ): Promise<any[]> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
@@ -231,7 +236,7 @@ export class PickingSuggestionService {
 
     try {
       // Try multiple search strategies in order of preference
-      const searchStrategies = [() => this.searchInventoryWithPalletHistory(itemId, uom)];
+      const searchStrategies = [() => this.searchInventoryWithPalletHistory(itemId, uom, sortMethod)];
 
       let results: any[] = [];
 
@@ -262,9 +267,13 @@ export class PickingSuggestionService {
     }
   }
 
-  private async searchInventoryWithPalletHistory(itemId: string, uom?: string): Promise<any[]> {
+  private async searchInventoryWithPalletHistory(
+    itemId: string,
+    uom?: string,
+    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+  ): Promise<any[]> {
     try {
-      return await this.repository.searchInventoryWithPalletHistory(itemId, uom);
+      return await this.repository.searchInventoryWithPalletHistory(itemId, uom, sortMethod);
     } catch (error) {
       console.warn('searchInventoryWithPalletHistory failed:', error.message);
       return [];
@@ -459,7 +468,10 @@ export class PickingSuggestionService {
     return Math.max(0, efficiency);
   }
 
-  async getPickingSuggestionsByMemo(memoId: string): Promise<PickingSuggestionDto[]> {
+  async getPickingSuggestionsByMemo(
+    memoId: string,
+    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+  ): Promise<PickingSuggestionDto[]> {
     // Validate memoId before proceeding
     if (!memoId || memoId.trim() === '') {
       console.warn('getPickingSuggestionsByMemo: memoId is empty or null');
@@ -491,10 +503,10 @@ export class PickingSuggestionService {
           })),
       };
 
-      return await this.generatePickingSuggestionsForMemo(memo);
+      return await this.generatePickingSuggestionsForMemo(memo, sortMethod);
     } catch (error) {
       console.error('Error in getPickingSuggestionsByMemo:', error);
-      console.error('Query parameters:', { memoId });
+      console.error('Query parameters:', { memoId, sortMethod });
       return [];
     }
   }
