@@ -83,14 +83,28 @@ export class OutboundDoRepository {
     return this.findOne(savedOutboundDo.id);
   }
 
-  async findAll(): Promise<OutboundDo[]> {
-    const outboundDos = await this.outboundDoRepository
+  private buildQueryWithAllRelations() {
+    return this.outboundDoRepository
       .createQueryBuilder('outbound_do')
       .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
       .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
+      .leftJoinAndSelect('outbound_memo_items.item', 'memo_item')
       .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('transaction_pickings.item', 'picking_item')
+      .leftJoinAndSelect('transaction_pickings.sourceWarehouseSub', 'source_warehouse_sub')
+      .leftJoinAndSelect('transaction_pickings.sourceBin', 'source_bin')
+      .leftJoinAndSelect('transaction_pickings.destinationWarehouseSub', 'destination_warehouse_sub')
+      .leftJoinAndSelect('transaction_pickings.destinationBin', 'destination_bin')
       .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
-      .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings')
+      .leftJoinAndSelect('transaction_scan_picking.item', 'scan_item')
+      .leftJoinAndSelect('transaction_scan_picking.palletSource', 'pallet_source')
+      .leftJoinAndSelect('transaction_scan_picking.palletUse', 'pallet_use')
+      .leftJoinAndSelect('transaction_scan_picking.palletSwitch', 'pallet_switch')
+      .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings');
+  }
+
+  async findAll(): Promise<OutboundDo[]> {
+    const outboundDos = await this.buildQueryWithAllRelations()
       .orderBy('outbound_do.createdAt', 'DESC')
       .distinct(true)
       .getMany();
@@ -100,19 +114,19 @@ export class OutboundDoRepository {
   }
 
   async findOne(id: string): Promise<OutboundDo> {
-    const entity = await this.outboundDoRepository.findOne({
-      where: { id },
-      relations: ['outbound_memos'],
-    });
+    const entity = await this.buildQueryWithAllRelations()
+      .where('outbound_do.id = :id', { id })
+      .getOne();
     if (!entity) throw new NotFoundException('Outbound DO not found');
-    return entity;
+    return this.addSequenceToMemos(entity);
   }
 
   async findByOutboundDoNumber(outbound_do_number: string): Promise<OutboundDo | null> {
-    return await this.outboundDoRepository.findOne({
-      where: { outbound_do_number },
-      relations: ['outbound_memos'],
-    });
+    const entity = await this.buildQueryWithAllRelations()
+      .where('outbound_do.outbound_do_number = :outbound_do_number', { outbound_do_number })
+      .getOne();
+    if (!entity) return null;
+    return this.addSequenceToMemos(entity);
   }
 
   async update(id: string, data: UpdateOutboundDoDto): Promise<OutboundDo> {
@@ -232,22 +246,22 @@ export class OutboundDoRepository {
   }
 
   async findByStatus(status: string): Promise<OutboundDo[]> {
-    const outboundDos = await this.outboundDoRepository.find({
-      where: { status: status as any },
-      relations: ['outbound_memos'],
-      order: { createdAt: 'DESC' },
-    });
+    const outboundDos = await this.buildQueryWithAllRelations()
+      .where('outbound_do.status = :status', { status })
+      .orderBy('outbound_do.createdAt', 'DESC')
+      .distinct(true)
+      .getMany();
 
     // Add sequence information to each memo
     return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
   }
 
   async findByOutboundType(outbound_type: string): Promise<OutboundDo[]> {
-    const outboundDos = await this.outboundDoRepository.find({
-      where: { outbound_type: outbound_type as any },
-      relations: ['outbound_memos'],
-      order: { createdAt: 'DESC' },
-    });
+    const outboundDos = await this.buildQueryWithAllRelations()
+      .where('outbound_do.outbound_type = :outbound_type', { outbound_type })
+      .orderBy('outbound_do.createdAt', 'DESC')
+      .distinct(true)
+      .getMany();
 
     // Add sequence information to each memo
     return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
@@ -267,13 +281,7 @@ export class OutboundDoRepository {
       has_transaction_scan_picking,
     } = paginationDto;
 
-    const qb = this.outboundDoRepository
-      .createQueryBuilder('outbound_do')
-      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
-      .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
-      .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
-      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
-      .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings');
+    const qb = this.buildQueryWithAllRelations();
 
     if (status) {
       qb.andWhere('outbound_do.status = :status', { status });
@@ -367,13 +375,7 @@ export class OutboundDoRepository {
   }
 
   async findOneWithMemoSequence(id: string): Promise<OutboundDo> {
-    const outboundDo = await this.outboundDoRepository
-      .createQueryBuilder('outbound_do')
-      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
-      .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
-      .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
-      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
-      .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings')
+    const outboundDo = await this.buildQueryWithAllRelations()
       .where('outbound_do.id = :id', { id })
       .getOne();
 
@@ -385,15 +387,8 @@ export class OutboundDoRepository {
   }
 
   async findByAssignedUserId(userId: string): Promise<OutboundDo[]> {
-    const outboundDos = await this.outboundDoRepository
-      .createQueryBuilder('outbound_do')
-      .innerJoin('outbound_do.outbound_memos', 'outbound_memos')
+    const outboundDos = await this.buildQueryWithAllRelations()
       .innerJoin('outbound_memos.assigned_pickings', 'assigned_pickings')
-      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos_select')
-      .leftJoinAndSelect('outbound_memos_select.outbound_memo_items', 'outbound_memo_items')
-      .leftJoinAndSelect('outbound_memos_select.transaction_pickings', 'transaction_pickings')
-      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking')
-      .leftJoinAndSelect('outbound_memos_select.assigned_pickings', 'assigned_pickings_select')
       .where('assigned_pickings.picking_user_id = :userId', { userId })
       .andWhere('outbound_do.deletedAt IS NULL')
       .distinct(true)
