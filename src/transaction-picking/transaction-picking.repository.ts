@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
-import { PickingTransaction } from '../core/domain/entities/transaction-picking.entity';
+import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
 import { CreateTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { PaginationQueryDto } from '../core/dto/pagination.dto';
 
@@ -200,12 +200,20 @@ export class TransactionPickingRepository {
     return result;
   }
 
+  async cancelTransaction(id: string): Promise<void> {
+    await this.repository.update(id, { status: Status.CANCELLED });
+  }
+
+  async cancelTransactionByMemoId(memoId: string): Promise<void> {
+    await this.repository.update({ memo_id: memoId }, { status: Status.CANCELLED } as any);
+  }
+
   async detachMemo(memoId: string): Promise<void> {
-    await this.repository.update({ memo_id: memoId }, { memo_id: null as any, do_id: null as any });
+    await this.repository.update({ memo_id: memoId }, { status: Status.CANCELLED});
   }
 
   async detachDo(doId: string): Promise<void> {
-    await this.repository.update({ do_id: doId }, { do_id: null as any, memo_id: null as any });
+    await this.repository.update({ do_id: doId }, { status: Status.CANCELLED });
   }
 
   async attachMemo(transactionIds: string[], memoId: string): Promise<void> {

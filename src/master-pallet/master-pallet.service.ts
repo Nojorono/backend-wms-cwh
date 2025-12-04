@@ -19,6 +19,7 @@ import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import {
   PalletTransactionHistory,
   QuantityOperationType,
+  StatusInventory,
 } from '../core/domain/entities/transaction-pallet-history.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
@@ -273,6 +274,7 @@ export class MasterPalletService {
       uom: updateQuantityDto.uom,
       production_date: productionDateStr,
       week_number: updateQuantityDto.week_number,
+      status_inventory: updateQuantityDto.status_inventory,
     });
 
     return updatedPallet;
@@ -650,6 +652,7 @@ export class MasterPalletService {
     uom?: string;
     production_date?: string;
     week_number?: number;
+    status_inventory?: StatusInventory;
   }): Promise<PalletTransactionHistory> {
     const history = this.transactionHistoryRepository.create(data);
     return await this.transactionHistoryRepository.save(history);

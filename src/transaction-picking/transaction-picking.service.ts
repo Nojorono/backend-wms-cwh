@@ -142,6 +142,14 @@ export class TransactionPickingService {
     return this.repository.detachMemo(memoId);
   }
 
+  async cancelTransaction(transactionId: string): Promise<void> {
+    return this.repository.cancelTransaction(transactionId);
+  }
+
+  async cancelTransactionByMemoId(memoId: string): Promise<void> {
+    return this.repository.cancelTransactionByMemoId(memoId);
+  }
+
   async detachDo(doId: string): Promise<void> {
     return this.repository.detachDo(doId);
   }

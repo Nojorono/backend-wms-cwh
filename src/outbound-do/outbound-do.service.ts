@@ -6,12 +6,15 @@ import { OutboundDo, OutboundDoStatus } from '../core/domain/entities/outbound-d
 import { PaginationService } from '../core/services/pagination.service';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
+import { Status } from '../core/domain/entities/transaction-picking.entity';
 
 @Injectable()
 export class OutboundDoService {
   constructor(
     private readonly repository: OutboundDoRepository,
     private readonly paginationService: PaginationService,
+    private readonly transactionPickingService: TransactionPickingService,
   ) {}
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
@@ -176,6 +179,11 @@ export class OutboundDoService {
     // If memoId is not provided, remove all memos
     if (!memoId) {
       const memoIds = await this.repository.removeAllMemosFromOutboundDo(id);
+      // Cancel all transaction pickings for all memos
+      for (const memoIdToCancel of memoIds) {
+        await this.cancelTransactionPickingsByMemoId(memoIdToCancel);
+      }
+      
       await this.repository.updateMultipleMemosHasDo(memoIds, false);
       return this.repository.findOne(id);
     }
@@ -189,6 +197,9 @@ export class OutboundDoService {
       throw new BadRequestException('Memo not found in outbound DO');
     }
 
+    // Cancel all transaction pickings for this memo
+    await this.cancelTransactionPickingsByMemoId(memoId);
+
     // Remove memo from outbound DO
     const updatedOutboundDo = await this.repository.removeMemoFromOutboundDo(id, memoId);
 
@@ -196,6 +207,10 @@ export class OutboundDoService {
     await this.repository.updateMemoHasDo(memoId, false);
 
     return updatedOutboundDo;
+  }
+
+  private async cancelTransactionPickingsByMemoId(memoId: string): Promise<void> {
+    await this.transactionPickingService.cancelTransactionByMemoId(memoId);
   }
 
   async attachMemo(id: string, memoId: string, sequence?: number): Promise<OutboundDo> {

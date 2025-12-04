@@ -1,6 +1,6 @@
 import { IsString, IsNumber, IsOptional, IsEnum, Min, Max, IsDate } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { QuantityOperationType } from '../../core/domain/entities/transaction-pallet-history.entity';
+import { QuantityOperationType, StatusInventory } from '../../core/domain/entities/transaction-pallet-history.entity';
 
 export class UpdatePalletQuantityDto {
   @ApiProperty({ example: 'uuid-item-123', description: 'Item ID being tracked' })
@@ -73,6 +73,15 @@ export class UpdatePalletQuantityDto {
   @IsOptional()
   @IsNumber()
   week_number?: number;
+
+  @ApiPropertyOptional({
+    enum: StatusInventory,
+    example: StatusInventory.READY,
+    description: 'Status inventory (READY or PENDING)',
+  })
+  @IsOptional()
+  @IsEnum(StatusInventory)
+  status_inventory?: StatusInventory;
 }
 
 export class PalletQuantityHistoryResponseDto {

@@ -5,7 +5,7 @@ import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-p
 import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
-import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
+import { QuantityOperationType, StatusInventory } from '../core/domain/entities/transaction-pallet-history.entity';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseBinService } from '../master-warehouse-bin/master-warehouse-bin.service';
@@ -75,6 +75,7 @@ export class TransactionScanPickingService {
         reference_id: data.transaction_picking_id,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Picked ${data.quantity_picked} from source pallet for transaction scan picking`,
+        status_inventory: StatusInventory.READY,
       });
     }
 
@@ -92,6 +93,7 @@ export class TransactionScanPickingService {
         reference_id: data.transaction_picking_id,
         reference_type: 'TRANSACTION_SCAN_PICKING',
         notes: `Switched ${quantitySwitch} to switch pallet from transaction scan picking`,
+        status_inventory: StatusInventory.READY,
       });
     }
 
@@ -114,6 +116,7 @@ export class TransactionScanPickingService {
             reference_id: data.transaction_picking_id,
             reference_type: 'TRANSACTION_SCAN_PICKING',
             notes: `Added back ${remainingQuantity} to same pallet (remaining after switch)`,
+            status_inventory: StatusInventory.READY,
           });
         }
       } else {
@@ -130,6 +133,7 @@ export class TransactionScanPickingService {
           reference_id: data.transaction_picking_id,
           reference_type: 'TRANSACTION_SCAN_PICKING',
           notes: `Added ${data.quantity_picked} to destination pallet from transaction scan picking`,
+          status_inventory: StatusInventory.READY,
         });
       }
     }
@@ -266,6 +270,7 @@ export class TransactionScanPickingService {
           reference_id: transactionPickingId,
           reference_type: 'TRANSACTION_SCAN_PICKING',
           notes: `Picked ${quantityPicked} from source pallet for transaction scan picking (updated)`,
+          status_inventory: StatusInventory.READY,
         });
       }
 
@@ -283,6 +288,7 @@ export class TransactionScanPickingService {
           reference_id: transactionPickingId,
           reference_type: 'TRANSACTION_SCAN_PICKING',
           notes: `Switched ${quantitySwitch} to switch pallet from transaction scan picking (updated)`,
+          status_inventory: StatusInventory.READY,
         });
       }
 
@@ -305,6 +311,7 @@ export class TransactionScanPickingService {
               reference_id: transactionPickingId,
               reference_type: 'TRANSACTION_SCAN_PICKING',
               notes: `Added back ${remainingQuantity} to same pallet (remaining after switch) - updated`,
+              status_inventory: StatusInventory.READY,
             });
           }
         } else {
@@ -321,6 +328,7 @@ export class TransactionScanPickingService {
             reference_id: transactionPickingId,
             reference_type: 'TRANSACTION_SCAN_PICKING',
             notes: `Added ${quantityPicked} to destination pallet from transaction scan picking (updated)`,
+            status_inventory: StatusInventory.READY,
           });
         }
       }
