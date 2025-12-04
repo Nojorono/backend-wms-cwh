@@ -259,7 +259,7 @@ export class PickingSuggestionService {
       }
 
       // Filter and sort results
-      return this.filterAndSortInventory(results, requiredQuantity);
+      return this.filterAndSortInventory(results, requiredQuantity, sortMethod);
     } catch (error) {
       console.error('Error in findAvailableInventoryForItem:', error);
       console.error('Query parameters:', { itemId, requiredQuantity });
@@ -299,7 +299,11 @@ export class PickingSuggestionService {
     return uuidRegex.test(uuid);
   }
 
-  private filterAndSortInventory(inventory: any[], requiredQuantity: number): any[] {
+  private filterAndSortInventory(
+    inventory: any[],
+    requiredQuantity: number,
+    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+  ): any[] {
     return inventory
       .filter((inv) => {
         // Filter based on quantity and utilization
@@ -313,19 +317,40 @@ export class PickingSuggestionService {
           return a.location_priority - b.location_priority;
         }
 
-        // Secondary sort: FIFO (oldest first)
-        const dateA = new Date(a.inventory_date);
-        const dateB = new Date(b.inventory_date);
-        if (dateA.getTime() !== dateB.getTime()) {
-          return dateA.getTime() - dateB.getTime();
+        // Secondary sort: Week number (FIFO = ASC, LIFO = DESC)
+        if (a.week_number !== b.week_number) {
+          const weekA = a.week_number || 0;
+          const weekB = b.week_number || 0;
+          if (sortMethod === 'LIFO') {
+            return weekB - weekA; // DESC: highest week number first
+          } else {
+            return weekA - weekB; // ASC: lowest week number first
+          }
         }
 
-        // Tertiary sort: Production date
+        // Tertiary sort: Production date (FIFO = ASC, LIFO = DESC)
         if (a.production_date !== b.production_date) {
-          return new Date(a.production_date).getTime() - new Date(b.production_date).getTime();
+          const prodDateA = a.production_date ? new Date(a.production_date).getTime() : 0;
+          const prodDateB = b.production_date ? new Date(b.production_date).getTime() : 0;
+          if (sortMethod === 'LIFO') {
+            return prodDateB - prodDateA; // DESC: most recent first
+          } else {
+            return prodDateA - prodDateB; // ASC: oldest first
+          }
         }
 
-        // Final sort: Quantity (higher first for same date)
+        // Quaternary sort: Inventory date (FIFO = ASC, LIFO = DESC)
+        const dateA = a.inventory_date ? new Date(a.inventory_date).getTime() : 0;
+        const dateB = b.inventory_date ? new Date(b.inventory_date).getTime() : 0;
+        if (dateA !== dateB) {
+          if (sortMethod === 'LIFO') {
+            return dateB - dateA; // DESC: most recent first
+          } else {
+            return dateA - dateB; // ASC: oldest first
+          }
+        }
+
+        // Final sort: Quantity (higher first for same date/week)
         return b.quantity - a.quantity;
       });
   }

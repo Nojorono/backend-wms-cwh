@@ -84,8 +84,9 @@ export class PickingSuggestionRepository {
     uom?: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
   ): Promise<any[]> {
-    // Determine week_number sort direction: FIFO = ASC (smallest first), LIFO = DESC (biggest first)
+    // Determine sort direction: FIFO = ASC (oldest first), LIFO = DESC (newest first)
     const weekNumberSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
+    const dateSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
 
     // Build location priority CASE statement based on sort method
     // LIFO: Priority 1 = staging INBOUND at warehouseSub level (with or without bin)
@@ -232,8 +233,8 @@ export class PickingSuggestionRepository {
       ORDER BY 
         location_priority ASC,
         pth.week_number ${weekNumberSort},
-        it.inventory_date ASC,
-        pth.production_date ASC,
+        pth.production_date ${dateSort},
+        it.inventory_date ${dateSort},
         pth.new_quantity DESC
     `;
 
