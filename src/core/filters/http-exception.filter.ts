@@ -11,6 +11,7 @@ import { Response } from 'express';
 import { ResponseInterface } from '../interfaces/response.interface';
 import { UsersActivityService } from '../../users-activity/users-activity.service';
 import { UserActivityAction, UserActivityStatus } from '../domain/entities/users-activity.entity';
+import { AppLoggerService } from '../../infrastructure/services/logger.service';
 
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -18,6 +19,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     @Optional()
     @Inject(UsersActivityService)
     private readonly usersActivityService?: UsersActivityService,
+    @Optional()
+    @Inject(AppLoggerService)
+    private readonly logger?: AppLoggerService,
   ) {}
 
   catch(exception: HttpException, host: ArgumentsHost) {
@@ -70,8 +74,27 @@ export class HttpExceptionFilter implements ExceptionFilter {
           warehouse_id: user?.warehouse_id,
         })
         .catch((error) => {
-          console.error('Failed to log audit activity in exception filter:', error);
+          if (this.logger) {
+            this.logger.error('Failed to log audit activity in exception filter', error.stack, 'HttpExceptionFilter');
+          } else {
+            console.error('Failed to log audit activity in exception filter:', error);
+          }
         });
+    }
+
+    // Log the exception
+    if (this.logger) {
+      this.logger.logError({
+        message: errorMessage,
+        stack: exception.stack,
+        statusCode: status,
+        context: 'HttpExceptionFilter',
+        request: {
+          method: request.method,
+          url: request.url,
+          body: this.sanitizeRequestData(request.body, request.query, request.params),
+        },
+      });
     }
 
     response.status(status).json(responseBody);
