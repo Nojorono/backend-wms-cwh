@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { InventoryMovement } from '../core/domain/entities/inventory-movement.entity';
 import { InventoryMovementPallet } from '../core/domain/entities/inventory-movement-pallet.entity';
+import { InventoryMovementUser } from '../core/domain/entities/inventory-movment-user.entity';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingHistory } from '../core/domain/entities/inventory-tracking-history.entity';
 import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
@@ -19,6 +20,7 @@ import { PaginationService } from '../core/services/pagination.service';
     TypeOrmModule.forFeature([
       InventoryMovement,
       InventoryMovementPallet,
+      InventoryMovementUser,
       InventoryTracking,
       InventoryTrackingHistory,
       MasterWarehouse,
