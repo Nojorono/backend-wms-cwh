@@ -167,9 +167,11 @@ export class ApprovalService {
             status: ApprovalStatus.PENDING,
           });
         } else {
-          // All levels approved
+          // All levels approved - update current_level to the last level
+          const lastLevel = sortedLevels[sortedLevels.length - 1];
           await this.repository.update(id, {
             approval_history: history,
+            current_level: lastLevel.level,
             status: ApprovalStatus.APPROVED,
           });
         }
