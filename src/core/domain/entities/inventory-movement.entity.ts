@@ -4,6 +4,7 @@ import { MasterWarehouse } from './master-warehouse.entity';
 import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
 import { InventoryMovementPallet } from './inventory-movement-pallet.entity';
+import { InventoryMovementUser } from './inventory-movment-user.entity';
 
 export enum MovementStatus {
   PENDING = 'PENDING',
@@ -14,10 +15,18 @@ export enum MovementStatus {
 
 @Entity('inventory_movement')
 export class InventoryMovement extends BaseEntity {
+  @Column({ nullable: true })
+  movement_number: string;
+
   @OneToMany(() => InventoryMovementPallet, (pallet) => pallet.inventoryMovement, {
     cascade: true,
   })
   pallets: InventoryMovementPallet[];
+
+  @OneToMany(() => InventoryMovementUser, (user) => user.inventoryMovement, {
+    cascade: true,
+  })
+  users: InventoryMovementUser[];
 
   @Column({ nullable: true })
   source_warehouse_id: string;
@@ -65,21 +74,9 @@ export class InventoryMovement extends BaseEntity {
   status: MovementStatus;
 
   @Column({ nullable: true })
-  assigned_user_id: string;
-
-  @Column({ nullable: true })
-  assigned_user_name: string;
-
-  @Column({ nullable: true })
-  movement_date: Date;
-
-  @Column({ nullable: true })
   completed_date: Date;
 
   @Column({ nullable: true })
   notes: string;
-
-  @Column({ nullable: true })
-  moved_by: string;
 }
 

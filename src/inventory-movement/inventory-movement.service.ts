@@ -17,6 +17,7 @@ import { InventoryTrackingAction } from '../core/domain/entities/inventory-track
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InventoryMovementPaginationQueryDto } from './dto/inventory-movement-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
+import { InventoryMovementUser } from '../core/domain/entities/inventory-movment-user.entity';
 
 @Injectable()
 export class InventoryMovementService {
@@ -29,21 +30,31 @@ export class InventoryMovementService {
   ) {}
 
   async create(data: CreateInventoryMovementDto): Promise<InventoryMovement> {
-    // Validate pallet_ids array
-    if (!data.pallet_ids || data.pallet_ids.length === 0) {
-      throw new BadRequestException('At least one pallet_id is required');
+    // Generate movement_number if not provided
+    if (!data.movement_number) {
+      data.movement_number = await this.repository.getNextMovementNumberForDate(new Date());
+    } else {
+      // Validate movement_number must be unique if provided
+      const existingMovement = await this.repository.findByMovementNumber(data.movement_number);
+      if (existingMovement) {
+        throw new ConflictException('Movement number already exists');
+      }
+    }
+
+    // Validate pallets array
+    if (!data.pallets || data.pallets.length === 0) {
+      throw new BadRequestException('At least one pallet is required');
     }
 
     // Get inventory tracking for each pallet
     const inventoryTrackings = await Promise.all(
-      data.pallet_ids.map(async (palletId) => {
+      data.pallets.map(async (palletDto) => {
         // Find inventory tracking by pallet_id
-        return await this.inventoryTrackingService.findOneByPalletId(palletId);
+        return await this.inventoryTrackingService.findOneByPalletId(palletDto.pallet_id);
       }),
     );
 
     // Validate all pallets are in the same source location
-    const firstTracking = inventoryTrackings[0];
     const allSameLocation = inventoryTrackings.every(
       (tracking) =>
         tracking.warehouse_sub_id === data.source_warehouse_sub_id &&
@@ -79,8 +90,17 @@ export class InventoryMovementService {
       return palletRecord;
     });
 
-    // Create movement with pallets
-    const movement = await this.repository.create(data, palletRecords);
+    // Create user records
+    const userRecords = data.users.map((userDto) => {
+      const userRecord = new InventoryMovementUser();
+      userRecord.user_id = userDto.user_id;
+      userRecord.user_name = userDto.user_name;
+      userRecord.user_phone = userDto.user_phone;
+      return userRecord;
+    });
+
+    // Create movement with pallets and users
+    const movement = await this.repository.create(data, palletRecords, userRecords);
 
     return movement;
   }
@@ -94,7 +114,6 @@ export class InventoryMovementService {
   ): Promise<PaginatedResponseDto<InventoryMovement>> {
     const filters = {
       status: paginationQuery.status,
-      assigned_user_id: paginationQuery.assigned_user_id,
       source_warehouse_id: paginationQuery.source_warehouse_id,
       source_warehouse_sub_id: paginationQuery.source_warehouse_sub_id,
       destination_warehouse_id: paginationQuery.destination_warehouse_id,
@@ -181,8 +200,6 @@ export class InventoryMovementService {
     }
 
     const updated = await this.repository.update(movementId, {
-      assigned_user_id: userId,
-      assigned_user_name: userName,
       status: MovementStatus.IN_PROGRESS,
     });
 

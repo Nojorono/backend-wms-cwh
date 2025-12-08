@@ -1,25 +1,95 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsEnum, IsDateString, IsArray, ArrayMinSize } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsEnum, IsArray, ArrayMinSize, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { MovementStatus } from '../../core/domain/entities/inventory-movement.entity';
 
-export class CreateInventoryMovementDto {
+export class CreateInventoryMovementPalletDto {
   @ApiProperty({
-    description: 'Array of pallet IDs to move',
-    type: [String],
-    example: ['uuid-pallet-1', 'uuid-pallet-2'],
+    description: 'ID pallet',
+    type: String,
+    example: 'uuid-pallet-1',
+  })
+  @IsNotEmpty()
+  @IsString()
+  pallet_id: string;
+
+  @ApiProperty({
+    description: 'ID inventory tracking',
+    type: String,
+    example: 'uuid-inventory-tracking-1',
+  })
+  @IsNotEmpty()
+  @IsString()
+  inventory_tracking_id: string;
+}
+
+export class CreateInventoryMovementUserDto {
+  @ApiProperty({
+    description: 'ID user',
+    type: String,
+    example: 'uuid-user-1',
+  })
+  @IsNotEmpty()
+  @IsString()
+  user_id: string;
+
+  @ApiProperty({
+    description: 'Nama user',
+    type: String,
+    example: 'John Doe',
+  })
+  @IsOptional()
+  @IsString()
+  user_name: string;
+
+  @ApiProperty({
+    description: 'Nomor telepon user',
+    type: String,
+    example: '+6281234567890',
+  })
+  @IsOptional()
+  @IsString()
+  user_phone: string;
+}
+
+export class CreateInventoryMovementDto {
+  @ApiPropertyOptional({
+    description: 'Nomor movement (auto-generated if not provided)',
+    type: String,
+    example: 'MOV-20240101-0001',
+  })
+  @IsOptional()
+  @IsString()
+  movement_number?: string;
+
+  @ApiProperty({
+    description: 'Array of pallet objects to move',
+    type: [CreateInventoryMovementPalletDto],
+    example: [
+      { pallet_id: 'uuid-pallet-1', inventory_tracking_id: 'uuid-tracking-1' },
+      { pallet_id: 'uuid-pallet-2', inventory_tracking_id: 'uuid-tracking-2' },
+    ],
   })
   @IsNotEmpty()
   @IsArray()
   @ArrayMinSize(1)
-  @IsString({ each: true })
-  pallet_ids: string[];
+  @ValidateNested({ each: true })
+  @Type(() => CreateInventoryMovementPalletDto)
+  pallets: CreateInventoryMovementPalletDto[];
 
-  @ApiPropertyOptional({
-    description: 'Array of inventory tracking IDs (optional, will be fetched from pallet if not provided)',
-    type: [String],
+  @ApiProperty({
+    description: 'Array of user objects to move',
+    type: [CreateInventoryMovementUserDto],
+    example: [
+      { user_id: 'uuid-user-1', user_name: 'John Doe', user_phone: '+6281234567890' },
+    ],
   })
-  @IsOptional()
-  inventory_tracking_ids?: string[];
+  @IsNotEmpty()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateInventoryMovementUserDto)
+  users: CreateInventoryMovementUserDto[];
 
   @ApiProperty({ description: 'ID warehouse sumber' })
   @IsNotEmpty()
@@ -59,21 +129,6 @@ export class CreateInventoryMovementDto {
   @IsOptional()
   @IsEnum(MovementStatus)
   status?: MovementStatus;
-
-  @ApiPropertyOptional({ description: 'ID user yang ditugaskan untuk melakukan movement' })
-  @IsOptional()
-  @IsString()
-  assigned_user_id?: string;
-
-  @ApiPropertyOptional({ description: 'Nama user yang ditugaskan' })
-  @IsOptional()
-  @IsString()
-  assigned_user_name?: string;
-
-  @ApiPropertyOptional({ description: 'Tanggal movement', example: '2024-01-01T00:00:00Z' })
-  @IsOptional()
-  @IsDateString()
-  movement_date?: string;
 
   @ApiPropertyOptional({ description: 'Catatan movement' })
   @IsOptional()
