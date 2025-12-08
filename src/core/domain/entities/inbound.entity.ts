@@ -15,6 +15,16 @@ export enum InboundStatus {
 
 @Entity('inbound')
 export class Inbound extends BaseEntity {
+
+  @Column({ nullable: true })
+  photo_license_plate: string;
+
+  @Column({ nullable: true })
+  photo_seal: string;
+
+  @Column({ nullable: true })
+  photo_condition: string;
+
   @Column({ nullable: true })
   inbound_number: string;
 

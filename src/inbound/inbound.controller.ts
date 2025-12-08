@@ -19,9 +19,7 @@ import { Inbound } from '../core/domain/entities/inbound.entity';
 import { AssignedHelper } from '../core/domain/entities/assigned-helper.entity';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
-import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
-import { UpdateSaldoInspectionDto } from './dto/update-saldo-inspection.dto';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem } from '../core/domain/entities/inbound-item.entity';
 

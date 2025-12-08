@@ -4,7 +4,22 @@ import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './cr
 
 export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) {}
 export class UpdateInboundDoDto extends PartialType(CreateInboundDoDto) {}
-export class UpdateInboundDto extends PartialType(CreateInboundDto) {}
+export class UpdateInboundDto extends PartialType(CreateInboundDto) {
+  @ApiPropertyOptional({ description: 'Photo Condition' })
+  @IsOptional()
+  @IsString()
+  photo_condition?: string;
+
+  @ApiPropertyOptional({ description: 'Photo License Plate' })
+  @IsOptional()
+  @IsString()
+  photo_license_plate?: string;
+
+  @ApiPropertyOptional({ description: 'Photo Seal' })
+  @IsOptional()
+  @IsString()
+  photo_seal?: string;
+}
 
 export class UpdateInboundStatusDto {
   @ApiPropertyOptional({ description: 'Status' })
