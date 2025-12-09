@@ -150,8 +150,8 @@ export class AssignedGateService {
     return await this.assignedGateRepo.findAll();
   }
 
-  async findAllByOutboundDo(outboundDoId: string): Promise<AssignedGate[]> {
-    return await this.assignedGateRepo.findAllByOutboundDo(outboundDoId);
+  async findAllByUserId(userId: string): Promise<AssignedGate[]> {
+    return await this.assignedGateRepo.findAllByUserId(userId);
   }
 
   async findOne(id: string): Promise<AssignedGate> {
@@ -164,60 +164,6 @@ export class AssignedGateService {
 
   async remove(id: string): Promise<void> {
     await this.assignedGateRepo.remove(id);
-  }
-
-  // AssignedGateUser CRUD operations
-  async createOrUpdateUser(createAssignedGateUserDto: CreateAssignedGateUserDto): Promise<AssignedGateUser> {
-    if (createAssignedGateUserDto.id) {
-      // Update existing record
-      const { id, ...updateData } = createAssignedGateUserDto;
-      if (!id) {
-        throw new BadRequestException('ID is required for update');
-      }
-      const updated = await this.assignedGateUserRepo.update(id, updateData);
-      if (!updated) {
-        throw new NotFoundException('AssignedGateUser not found');
-      }
-      return updated;
-    } else {
-      // Create new record - validate assigned_gate_id is provided for standalone creation
-      if (!createAssignedGateUserDto.assigned_gate_id) {
-        throw new BadRequestException('assigned_gate_id is required when creating a user');
-      }
-      return await this.assignedGateUserRepo.create(createAssignedGateUserDto);
-    }
-  }
-
-  async findAllUsers(): Promise<AssignedGateUser[]> {
-    return await this.assignedGateUserRepo.findAll();
-  }
-
-  async findAllUsersByAssignedGate(assignedGateId: string): Promise<AssignedGateUser[]> {
-    return await this.assignedGateUserRepo.findAllByAssignedGate(assignedGateId);
-  }
-
-  async findAllUsersByUserId(userId: string): Promise<AssignedGateUser[]> {
-    return await this.assignedGateUserRepo.findAllByUserId(userId);
-  }
-
-  async findOneUserByUserId(userId: string): Promise<AssignedGateUser> {
-    const found = await this.assignedGateUserRepo.findOneByUserId(userId);
-    if (!found) {
-      throw new NotFoundException('AssignedGateUser not found for the given user_id');
-    }
-    return found;
-  }
-
-  async findOneUser(id: string): Promise<AssignedGateUser> {
-    const found = await this.assignedGateUserRepo.findOne(id);
-    if (!found) {
-      throw new NotFoundException('AssignedGateUser not found');
-    }
-    return found;
-  }
-
-  async removeUser(id: string): Promise<void> {
-    await this.assignedGateUserRepo.remove(id);
   }
 }
 

@@ -21,9 +21,9 @@ export class AssignedGateRepository {
     });
   }
 
-  async findAllByOutboundDo(outboundDoId: string): Promise<AssignedGate[]> {
+  async findAllByUserId(userId: string): Promise<AssignedGate[]> {
     return await this.repository.find({
-      where: { outbound_do_id: outboundDoId },
+      where: { assigned_gate_users: { user_id: userId } },
       relations: ['outbound_do', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
     });
   }

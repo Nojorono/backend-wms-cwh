@@ -29,20 +29,20 @@ export class AssignedGateController {
   @Get()
   @ApiOperation({ summary: 'List all assigned gates' })
   @ApiQuery({
-    name: 'outbound_do_id',
+    name: 'user_id',
     required: false,
     type: String,
-    description: 'Filter by outbound DO ID',
-    example: 'uuid-outbound-do-123',
+    description: 'Filter by user ID',
+    example: 'uuid-user-123',
   })
   @ApiResponse({
     status: 200,
     description: 'List of assigned gates retrieved successfully',
     type: [AssignedGate],
   })
-  findAll(@Query('outbound_do_id') outboundDoId?: string) {
-    if (outboundDoId) {
-      return this.assignedGateService.findAllByOutboundDo(outboundDoId);
+  findAll(@Query('user_id') userId?: string) {
+    if (userId) {
+      return this.assignedGateService.findAllByUserId(userId);
     }
     return this.assignedGateService.findAll();
   }
@@ -66,75 +66,6 @@ export class AssignedGateController {
   @ApiResponse({ status: 404, description: 'Assigned gate not found' })
   remove(@Param('id') id: string) {
     return this.assignedGateService.remove(id);
-  }
-
-  // AssignedGateUser endpoints
-  @Post('user')
-  @ApiOperation({ summary: 'Create or update assigned gate user (provide id to update, omit to create)' })
-  @ApiResponse({
-    status: 201,
-    description: 'Assigned gate user created or updated successfully',
-    type: AssignedGateUser,
-  })
-  @ApiResponse({ status: 400, description: 'Bad Request' })
-  @ApiResponse({ status: 404, description: 'Assigned gate user not found (when updating)' })
-  createOrUpdateUser(@Body() createAssignedGateUserDto: CreateAssignedGateUserDto) {
-    return this.assignedGateService.createOrUpdateUser(createAssignedGateUserDto);
-  }
-
-  @Get('user')
-  @ApiOperation({ summary: 'List all assigned gate users' })
-  @ApiQuery({
-    name: 'assigned_gate_id',
-    required: false,
-    type: String,
-    description: 'Filter by assigned gate ID',
-    example: 'uuid-assigned-gate-123',
-  })
-  @ApiQuery({
-    name: 'user_id',
-    required: false,
-    type: String,
-    description: 'Filter by user ID',
-    example: 'uuid-user-123',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'List of assigned gate users retrieved successfully',
-    type: [AssignedGateUser],
-  })
-  findAllUsers(
-    @Query('assigned_gate_id') assignedGateId?: string,
-    @Query('user_id') userId?: string,
-  ) {
-    if (assignedGateId) {
-      return this.assignedGateService.findAllUsersByAssignedGate(assignedGateId);
-    }
-    if (userId) {
-      return this.assignedGateService.findAllUsersByUserId(userId);
-    }
-    return this.assignedGateService.findAllUsers();
-  }
-
-  @Get('user/:user_id')
-  @ApiOperation({ summary: 'Get all assigned gate users by user_id' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of assigned gate users retrieved successfully',
-    type: [AssignedGateUser],
-  })
-  @ApiResponse({ status: 404, description: 'Assigned gate user not found' })
-  findAllByUserId(@Param('user_id') userId: string) {
-    return this.assignedGateService.findAllUsersByUserId(userId);
-  }
-
-
-  @Delete('user/:id')
-  @ApiOperation({ summary: 'Delete assigned gate user' })
-  @ApiResponse({ status: 200, description: 'Assigned gate user deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Assigned gate user not found' })
-  removeUser(@Param('id') id: string) {
-    return this.assignedGateService.removeUser(id);
   }
 }
 
