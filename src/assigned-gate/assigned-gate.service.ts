@@ -154,6 +154,10 @@ export class AssignedGateService {
     return await this.assignedGateRepo.findAllByUserId(userId);
   }
 
+  async findAllByGateId(gateId: string): Promise<AssignedGate[]> {
+    return await this.assignedGateRepo.findAllByGateId(gateId);
+  }
+
   async findOne(id: string): Promise<AssignedGate> {
     const found = await this.assignedGateRepo.findOne(id);
     if (!found) {
@@ -164,6 +168,142 @@ export class AssignedGateService {
 
   async remove(id: string): Promise<void> {
     await this.assignedGateRepo.remove(id);
+  }
+
+  // User management methods by assigned-gate-id
+  async addUserToGate(
+    assignedGateId: string,
+    createUserDto: CreateAssignedGateUserDto,
+  ): Promise<AssignedGateUser> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    const userData = {
+      ...createUserDto,
+      assigned_gate_id: assignedGateId,
+    };
+
+    return await this.assignedGateUserRepo.create(userData);
+  }
+
+  async updateUserInGate(
+    assignedGateId: string,
+    userId: string,
+    updateUserDto: Partial<CreateAssignedGateUserDto>,
+  ): Promise<AssignedGateUser> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    // Verify user exists and belongs to this gate
+    const existingUser = await this.assignedGateUserRepo.findOne(userId);
+    if (!existingUser) {
+      throw new NotFoundException('AssignedGateUser not found');
+    }
+    if (existingUser.assigned_gate_id !== assignedGateId) {
+      throw new BadRequestException('User does not belong to this assigned gate');
+    }
+
+    const userData = {
+      ...updateUserDto,
+      assigned_gate_id: assignedGateId,
+    };
+
+    const updated = await this.assignedGateUserRepo.update(userId, userData);
+    if (!updated) {
+      throw new NotFoundException('AssignedGateUser not found');
+    }
+    return updated;
+  }
+
+  async removeUserFromGate(assignedGateId: string, userId: string): Promise<void> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    // Verify user exists and belongs to this gate
+    const existingUser = await this.assignedGateUserRepo.findOne(userId);
+    if (!existingUser) {
+      throw new NotFoundException('AssignedGateUser not found');
+    }
+    if (existingUser.assigned_gate_id !== assignedGateId) {
+      throw new BadRequestException('User does not belong to this assigned gate');
+    }
+
+    await this.assignedGateUserRepo.remove(userId);
+  }
+
+  async getUsersByGate(assignedGateId: string): Promise<AssignedGateUser[]> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    return await this.assignedGateUserRepo.findAllByAssignedGate(assignedGateId);
+  }
+
+  // Pallet management methods by assigned-gate-id
+  async addPalletToGate(
+    assignedGateId: string,
+    createPalletDto: CreateAssignedGatePalletDto,
+  ): Promise<AssignedGatePallet> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    const palletData = {
+      ...createPalletDto,
+      assigned_gate_id: assignedGateId,
+    };
+
+    return await this.assignedGatePalletRepo.create(palletData);
+  }
+
+  async updatePalletInGate(
+    assignedGateId: string,
+    palletId: string,
+    updatePalletDto: Partial<CreateAssignedGatePalletDto>,
+  ): Promise<AssignedGatePallet> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    // Verify pallet exists and belongs to this gate
+    const existingPallet = await this.assignedGatePalletRepo.findOne(palletId);
+    if (!existingPallet) {
+      throw new NotFoundException('AssignedGatePallet not found');
+    }
+    if (existingPallet.assigned_gate_id !== assignedGateId) {
+      throw new BadRequestException('Pallet does not belong to this assigned gate');
+    }
+
+    const palletData = {
+      ...updatePalletDto,
+      assigned_gate_id: assignedGateId,
+    };
+
+    const updated = await this.assignedGatePalletRepo.update(palletId, palletData);
+    if (!updated) {
+      throw new NotFoundException('AssignedGatePallet not found');
+    }
+    return updated;
+  }
+
+  async removePalletFromGate(assignedGateId: string, palletId: string): Promise<void> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    // Verify pallet exists and belongs to this gate
+    const existingPallet = await this.assignedGatePalletRepo.findOne(palletId);
+    if (!existingPallet) {
+      throw new NotFoundException('AssignedGatePallet not found');
+    }
+    if (existingPallet.assigned_gate_id !== assignedGateId) {
+      throw new BadRequestException('Pallet does not belong to this assigned gate');
+    }
+
+    await this.assignedGatePalletRepo.remove(palletId);
+  }
+
+  async getPalletsByGate(assignedGateId: string): Promise<AssignedGatePallet[]> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    return await this.assignedGatePalletRepo.findAllByAssignedGate(assignedGateId);
   }
 }
 

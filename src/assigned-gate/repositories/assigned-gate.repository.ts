@@ -28,6 +28,13 @@ export class AssignedGateRepository {
     });
   }
 
+  async findAllByGateId(gateId: string): Promise<AssignedGate[]> {
+    return await this.repository.find({
+      where: { gate_id: gateId },
+      relations: ['outbound_do', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet', 'gate'],
+    });
+  }
+
   async findOne(id: string): Promise<AssignedGate | null> {
     const entity = await this.repository.findOne({
       where: { id },
