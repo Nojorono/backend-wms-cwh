@@ -111,4 +111,15 @@ export class MasterWarehouseSubService {
   async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
     return await this.repository.findByIsStagingNull();
   }
+
+  async findByIsGate(is_gate: boolean): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByIsGate(is_gate);
+  }
+
+  async findByFilters(
+    is_staging?: WarehouseSubStagingType,
+    is_gate?: boolean,
+  ): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByFilters(is_staging, is_gate);
+  }
 }

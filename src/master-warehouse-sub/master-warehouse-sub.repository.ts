@@ -69,4 +69,22 @@ export class MasterWarehouseSubRepository {
   async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
     return await this.repository.find({ where: { is_staging: IsNull() } });
   }
+
+  async findByIsGate(is_gate: boolean): Promise<MasterWarehouseSub[]> {
+    return await this.repository.find({ where: { is_gate } });
+  }
+
+  async findByFilters(
+    is_staging?: WarehouseSubStagingType,
+    is_gate?: boolean,
+  ): Promise<MasterWarehouseSub[]> {
+    const where: Partial<MasterWarehouseSub> = {};
+    if (is_staging !== undefined) {
+      where.is_staging = is_staging;
+    }
+    if (is_gate !== undefined) {
+      where.is_gate = is_gate;
+    }
+    return await this.repository.find({ where });
+  }
 }

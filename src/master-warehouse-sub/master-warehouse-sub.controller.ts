@@ -47,10 +47,13 @@ export class MasterWarehouseSubController {
     type: [MasterWarehouseSub],
   })
   @ApiQuery({ name: 'is_staging', required: false, enum: WarehouseSubStagingType })
-  findAll(@Query('is_staging') is_staging?: WarehouseSubStagingType) {
-    if (is_staging) {
-      return this.masterWarehouseSubService.findByIsStaging(is_staging);
-    } else if (is_staging === undefined) {
+  @ApiQuery({ name: 'is_gate', required: false, type: Boolean })
+  findAll(@Query('is_staging') is_staging?: WarehouseSubStagingType, @Query('is_gate') is_gate?: string) {
+    const isGateBoolean = is_gate !== undefined ? is_gate === 'true' : undefined;
+    
+    if (is_staging !== undefined || isGateBoolean !== undefined) {
+      return this.masterWarehouseSubService.findByFilters(is_staging, isGateBoolean);
+    } else {
       return this.masterWarehouseSubService.findAll();
     }
   }
