@@ -173,7 +173,7 @@ export class AssignedGateService {
                 assignedPallet.pallet.id,
               );
               // Add current_skus array to the pallet object
-              (assignedPallet.pallet as any).current_skus = palletItems.map((item) => ({
+              (assignedPallet.pallet as any).currentItems = palletItems.map((item) => ({
                 item_id: item.item_id,
                 item_name: item.item_name,
                 current_quantity: item.current_quantity,
@@ -183,7 +183,7 @@ export class AssignedGateService {
               }));
             } catch (error) {
               // If pallet not found or error, set empty array
-              (assignedPallet.pallet as any).current_skus = [];
+              (assignedPallet.pallet as any).currentItems = [];
             }
           }
         }
