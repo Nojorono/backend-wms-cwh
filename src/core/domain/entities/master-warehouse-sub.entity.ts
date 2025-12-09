@@ -36,6 +36,9 @@ export class MasterWarehouseSub extends BaseEntity {
   @Column({ nullable: true, name: 'is_good_stock' , default: true })
   is_good_stock: boolean;
 
+  @Column({ nullable: true, name: 'is_gate' , default: false })
+  is_gate: boolean;
+
   @OneToMany(() => InventoryTracking, (inventoryTracking) => inventoryTracking.warehouseSub)
   inventory_trackings: InventoryTracking[];
 }

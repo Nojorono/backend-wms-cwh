@@ -53,4 +53,9 @@ export class CreateMasterWarehouseSubDto {
   @IsBoolean()
   @IsOptional()
   is_good_stock?: boolean;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_gate?: boolean;
 }

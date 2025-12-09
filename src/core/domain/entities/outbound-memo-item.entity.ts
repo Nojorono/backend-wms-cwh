@@ -4,8 +4,7 @@ import { OutboundMemo } from './outbound-memo.entity';
 import { MasterItem } from './master-item.entity';
 
 export enum OutboundMemoItemStatus {
-  PENDING = 'PENDING',
-  APPROVED = 'APPROVED',
+  PROCESS = 'PROCESS',
   REJECTED = 'REJECTED',
 }
 
@@ -29,13 +28,16 @@ export class OutboundMemoItem extends BaseEntity {
   quantity_plan: number;
 
   @Column({ nullable: true })
+  quantity_delivered: number;
+
+  @Column({ nullable: true })
   uom: string;
 
   @Column({
     nullable: true,
     type: 'enum',
     enum: OutboundMemoItemStatus,
-    default: OutboundMemoItemStatus.PENDING,
+    default: OutboundMemoItemStatus.PROCESS,
   })
   status: OutboundMemoItemStatus;
 }
