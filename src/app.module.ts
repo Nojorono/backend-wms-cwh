@@ -38,7 +38,6 @@ import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion
 import { NotificationModule } from './notification/notification.module';
 import { InventoryMovementModule } from './inventory-movement/inventory-movement.module';
 import { MoveOrderModule } from './move-order/move-order.module';
-import { StockAdjustmentApprovalModule } from './stock-adjustment-approval/stock-adjustment-approval.module';
 import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
 import { ApprovalModule } from './approval/approval.module';
 import { UsersActivityModule } from './users-activity/users-activity.module';
@@ -102,7 +101,6 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     NotificationModule,
     InventoryMovementModule,
     MoveOrderModule,
-    StockAdjustmentApprovalModule,
     ApprovalSetupModule,
     ApprovalModule,
     UsersActivityModule,

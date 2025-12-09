@@ -368,50 +368,18 @@ export class ApprovalService {
         return;
       }
 
-      // Find stock adjustment approval by entity_id (which is the stock adjustment ID)
-      const { StockAdjustmentApproval } = await import('../core/domain/entities/stock-adjustment-approval.entity');
-      const stockAdjustmentRepo = this.dataSource.getRepository(StockAdjustmentApproval);
-      
-      const stockAdjustment = await stockAdjustmentRepo.findOne({
-        where: { id: latestApproval.entity_id },
-      });
-
-      if (!stockAdjustment) {
-        console.warn(`Stock adjustment with ID ${latestApproval.entity_id} not found.`);
-        return;
-      }
-
-      if (stockAdjustment.approval_id !== latestApproval.id) {
-        console.warn(
-          `Stock adjustment ${stockAdjustment.id} approval_id (${stockAdjustment.approval_id}) does not match approval ${latestApproval.id}.`,
-        );
-        return;
-      }
-
       // Get the latest approver from approval history
       const history = latestApproval.approval_history || [];
       const latestApprover = history.length > 0 ? history[history.length - 1].approved_by : undefined;
 
       // Get StockAdjustmentApprovalService using ModuleRef to avoid circular dependency
       try {
-        const { StockAdjustmentApprovalService } = await import('../stock-adjustment-approval/stock-adjustment-approval.service');
-        const stockAdjustmentService = this.moduleRef.get(StockAdjustmentApprovalService, { strict: false });
-        
-        if (stockAdjustmentService) {
-          console.log(`Executing stock adjustment ${stockAdjustment.id} after full approval.`);
-          await stockAdjustmentService.executeStockAdjustment(
-            stockAdjustment.id,
-            latestApprover,
-          );
-          console.log(`Stock adjustment ${stockAdjustment.id} executed successfully.`);
-        } else {
-          console.warn(`StockAdjustmentApprovalService not available. Stock adjustment ${stockAdjustment.id} should be executed manually.`);
-        }
+        // Stock adjustment approval is now handled by the stock-adjustment-approval module
+        // No need to execute stock adjustment here
       } catch (serviceError) {
         // Service might not be available due to circular dependency
         // Log but don't fail - approval is already marked as approved
         console.error(`Error getting StockAdjustmentApprovalService: ${serviceError.message}`);
-        console.log(`Stock adjustment ${stockAdjustment.id} approved. Execution should be triggered via stock-adjustment-approval endpoint.`);
       }
     } catch (error) {
       console.error('Error executing stock adjustment:', error);
