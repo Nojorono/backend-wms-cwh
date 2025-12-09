@@ -14,11 +14,11 @@ export class CreateAssignedGateDto {
   id?: string;
 
   @ApiProperty({
-    description: 'Gate name',
-    example: 'Gate A',
+    description: 'Gate ID',
+    example: 'uuid-gate-123',
   })
   @IsString()
-  gate_name: string;
+  gate_id: string;
 
   @ApiProperty({
     description: 'Outbound DO ID',

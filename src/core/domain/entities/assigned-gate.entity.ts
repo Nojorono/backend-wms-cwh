@@ -3,6 +3,7 @@ import { BaseEntity } from './base.entity';
 import { OutboundDo } from './outbound-do.entity';
 import { AssignedGateUser } from './assigned-gate-user.entity';
 import { AssignedGatePallet } from './assigned-gate-pallet.entity';
+import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 
 export enum AssignedGateStatus {
   PENDING = 'PENDING',
@@ -12,7 +13,11 @@ export enum AssignedGateStatus {
 @Entity('assigned_gate')
 export class AssignedGate extends BaseEntity {
   @Column({ nullable: true })
-  gate_name: string;
+  gate_id: string;
+
+  @ManyToOne(() => MasterWarehouseSub, (gate) => gate.id, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'gate_id' })
+  gate: MasterWarehouseSub;
 
   @Column({ nullable: true })
   outbound_do_id: string;
