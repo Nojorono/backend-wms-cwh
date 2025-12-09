@@ -8,6 +8,7 @@ import { AssignedGatePalletRepository } from './repositories/assigned-gate-palle
 import { CreateAssignedGateDto } from './dto/create-assigned-gate.dto';
 import { CreateAssignedGateUserDto } from './dto/create-assigned-gate-user.dto';
 import { CreateAssignedGatePalletDto } from './dto/create-assigned-gate-pallet.dto';
+import { MasterPalletService } from '../master-pallet/master-pallet.service';
 
 @Injectable()
 export class AssignedGateService {
@@ -15,6 +16,7 @@ export class AssignedGateService {
     private readonly assignedGateRepo: AssignedGateRepository,
     private readonly assignedGateUserRepo: AssignedGateUserRepository,
     private readonly assignedGatePalletRepo: AssignedGatePalletRepository,
+    private readonly masterPalletService: MasterPalletService,
   ) {}
 
   // AssignedGate CRUD operations
@@ -147,15 +149,47 @@ export class AssignedGateService {
   }
 
   async findAll(): Promise<AssignedGate[]> {
-    return await this.assignedGateRepo.findAll();
+    const gates = await this.assignedGateRepo.findAll();
+    return await this.enrichPalletsWithSkus(gates);
   }
 
   async findAllByUserId(userId: string): Promise<AssignedGate[]> {
-    return await this.assignedGateRepo.findAllByUserId(userId);
+    const gates = await this.assignedGateRepo.findAllByUserId(userId);
+    return await this.enrichPalletsWithSkus(gates);
   }
 
   async findAllByGateId(gateId: string): Promise<AssignedGate[]> {
-    return await this.assignedGateRepo.findAllByGateId(gateId);
+    const gates = await this.assignedGateRepo.findAllByGateId(gateId);
+    return await this.enrichPalletsWithSkus(gates);
+  }
+
+  private async enrichPalletsWithSkus(gates: AssignedGate[]): Promise<AssignedGate[]> {
+    for (const gate of gates) {
+      if (gate.assigned_gate_pallets && gate.assigned_gate_pallets.length > 0) {
+        for (const assignedPallet of gate.assigned_gate_pallets) {
+          if (assignedPallet.pallet && assignedPallet.pallet.id) {
+            try {
+              const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(
+                assignedPallet.pallet.id,
+              );
+              // Add current_skus array to the pallet object
+              (assignedPallet.pallet as any).current_skus = palletItems.map((item) => ({
+                item_id: item.item_id,
+                item_name: item.item_name,
+                current_quantity: item.current_quantity,
+                uom: item.uom,
+                production_date: item.production_date,
+                week_number: item.week_number,
+              }));
+            } catch (error) {
+              // If pallet not found or error, set empty array
+              (assignedPallet.pallet as any).current_skus = [];
+            }
+          }
+        }
+      }
+    }
+    return gates;
   }
 
   async findOne(id: string): Promise<AssignedGate> {
@@ -163,7 +197,8 @@ export class AssignedGateService {
     if (!found) {
       throw new NotFoundException('AssignedGate not found');
     }
-    return found;
+    const enriched = await this.enrichPalletsWithSkus([found]);
+    return enriched[0];
   }
 
   async remove(id: string): Promise<void> {

@@ -8,9 +8,10 @@ import { AssignedGateService } from './assigned-gate.service';
 import { AssignedGateRepository } from './repositories/assigned-gate.repository';
 import { AssignedGateUserRepository } from './repositories/assigned-gate-user.repository';
 import { AssignedGatePalletRepository } from './repositories/assigned-gate-pallet.repository';
+import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([AssignedGate, AssignedGateUser, AssignedGatePallet])],
+  imports: [TypeOrmModule.forFeature([AssignedGate, AssignedGateUser, AssignedGatePallet]), MasterPalletModule],
   controllers: [AssignedGateController],
   providers: [AssignedGateService, AssignedGateRepository, AssignedGateUserRepository, AssignedGatePalletRepository],
   exports: [AssignedGateService],
