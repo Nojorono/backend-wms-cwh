@@ -41,6 +41,8 @@ async function bootstrap() {
     .setTitle('WMS API')
     .setDescription('The WMS API description')
     .setVersion('1.0')
+    .addServer('/service-wms', 'Production Server (via Kong Gateway)')
+    .addServer('', 'Local Development Server')
     .addBearerAuth(
       {
         type: 'http',
@@ -63,6 +65,7 @@ async function bootstrap() {
       defaultModelsExpandDepth: 0,
       defaultModelExpandDepth: 0,
       tryItOutEnabled: true,
+      supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
     },
   });
 
