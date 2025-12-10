@@ -42,9 +42,11 @@ import { MoveOrderModule } from './move-order/move-order.module';
 import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
 import { ApprovalModule } from './approval/approval.module';
 import { UsersActivityModule } from './users-activity/users-activity.module';
+import { LoggerModule } from './infrastructure/modules/logger.module';
 
 @Module({
   imports: [
+    LoggerModule, // Global logger module - must be imported first
     ConfigModule.forRoot({
       isGlobal: true,
     }),
