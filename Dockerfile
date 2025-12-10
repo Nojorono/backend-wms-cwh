@@ -47,12 +47,12 @@ RUN mkdir -p /app/logs && \
 # Switch to non-root user
 USER nestjs
 
-# Expose port
+# Expose port (default 3000, but can be overridden via PORT env var)
 EXPOSE 3000
 
-# Health check
+# Health check - uses PORT env var or defaults to 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD sh -c "node -e \"const port = process.env.PORT || '3000'; require('http').get('http://localhost:' + port + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))\""
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
