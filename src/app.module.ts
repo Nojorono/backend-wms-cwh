@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './infrastructure/guards/auth.guard';
+import { getTypeOrmConfig } from './infrastructure/database/typeorm.config';
 import { RolePermissionModule } from './infrastructure/modules/role-permission.module';
 import { MenuModule } from './infrastructure/modules/menu.module';
 import { AuthModule } from './infrastructure/modules/auth.module';
@@ -41,30 +42,15 @@ import { MoveOrderModule } from './move-order/move-order.module';
 import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
 import { ApprovalModule } from './approval/approval.module';
 import { UsersActivityModule } from './users-activity/users-activity.module';
-import { LoggerModule } from './infrastructure/modules/logger.module';
 
 @Module({
   imports: [
-    LoggerModule, // Global logger module - must be imported first
     ConfigModule.forRoot({
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'postgres'),
-        password: configService.get('DB_PASSWORD', 'postgres'),
-        database: configService.get('DB_DATABASE', 'wms_db'),
-        entities: [join(__dirname, 'core', 'domain', 'entities', '*.entity.{ts,js}')],
-        synchronize: false,
-        extra: {
-          // PostgreSQL connection options for timezone handling
-          timezone: 'UTC', // Ensure PostgreSQL connection uses UTC
-        },
-      }),
+      useFactory: (configService: ConfigService) => getTypeOrmConfig(configService),
       inject: [ConfigService],
     }),
     AuthModule,
