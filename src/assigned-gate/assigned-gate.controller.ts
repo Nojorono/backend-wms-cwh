@@ -44,17 +44,31 @@ export class AssignedGateController {
     description: 'Filter by gate ID (MasterWarehouseSub ID)',
     example: 'uuid-gate-123',
   })
+  @ApiQuery({
+    name: 'outbound_do_id',
+    required: false,
+    type: String,
+    description: 'Filter by outbound DO ID',
+    example: 'uuid-outbound-do-123',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of assigned gates retrieved successfully',
     type: [AssignedGate],
   })
-  findAll(@Query('user_id') userId?: string, @Query('gate_id') gateId?: string) {
+  findAll(
+    @Query('user_id') userId?: string,
+    @Query('gate_id') gateId?: string,
+    @Query('outbound_do_id') outboundDoId?: string,
+  ) {
     if (userId) {
       return this.assignedGateService.findAllByUserId(userId);
     }
     if (gateId) {
       return this.assignedGateService.findAllByGateId(gateId);
+    }
+    if (outboundDoId) {
+      return this.assignedGateService.findAllByOutboundDoId(outboundDoId);
     }
     return this.assignedGateService.findAll();
   }

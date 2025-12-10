@@ -17,28 +17,35 @@ export class AssignedGateRepository {
 
   async findAll(): Promise<AssignedGate[]> {
     return await this.repository.find({
-      relations: ['outbound_do', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
+      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
     });
   }
 
   async findAllByUserId(userId: string): Promise<AssignedGate[]> {
     return await this.repository.find({
       where: { assigned_gate_users: { user_id: userId } },
-      relations: ['outbound_do', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
+      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
     });
   }
 
   async findAllByGateId(gateId: string): Promise<AssignedGate[]> {
     return await this.repository.find({
       where: { gate_id: gateId },
-      relations: ['outbound_do', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet', 'gate'],
+      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
+    });
+  }
+
+  async findAllByOutboundDoId(outboundDoId: string): Promise<AssignedGate[]> {
+    return await this.repository.find({
+      where: { outbound_do_id: outboundDoId },
+      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
     });
   }
 
   async findOne(id: string): Promise<AssignedGate | null> {
     const entity = await this.repository.findOne({
       where: { id },
-      relations: ['outbound_do', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
+      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
     });
     if (!entity) {
       return null;

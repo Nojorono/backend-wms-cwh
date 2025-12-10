@@ -163,6 +163,11 @@ export class AssignedGateService {
     return await this.enrichPalletsWithSkus(gates);
   }
 
+  async findAllByOutboundDoId(outboundDoId: string): Promise<AssignedGate[]> {
+    const gates = await this.assignedGateRepo.findAllByOutboundDoId(outboundDoId);
+    return await this.enrichPalletsWithSkus(gates);
+  }
+
   private async enrichPalletsWithSkus(gates: AssignedGate[]): Promise<AssignedGate[]> {
     for (const gate of gates) {
       if (gate.assigned_gate_pallets && gate.assigned_gate_pallets.length > 0) {
