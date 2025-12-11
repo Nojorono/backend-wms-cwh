@@ -10,6 +10,7 @@ import {
   InventoryTrackingAction,
 } from '../core/domain/entities/inventory-tracking-history.entity';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
+import { PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
 
@@ -72,6 +73,7 @@ export class InventoryTrackingRepository {
       warehouse_bin_id?: string;
       pallet_id?: string;
       progression_status?: string;
+      item_id?: string;
     },
     page: number = 1,
     limit: number = 10,
@@ -118,6 +120,17 @@ export class InventoryTrackingRepository {
       });
     }
 
+    // Filter by item_id - need to join with transaction_pallet_history
+    if (filters.item_id) {
+      queryBuilder
+        .leftJoin(
+          PalletTransactionHistory,
+          'pth',
+          'pth.pallet_id = inventory.pallet_id AND pth.new_quantity > 0',
+        )
+        .andWhere('pth.item_id = :item_id', { item_id: filters.item_id });
+    }
+
     // Apply search
     if (search) {
       queryBuilder.andWhere(
@@ -142,15 +155,21 @@ export class InventoryTrackingRepository {
     const orderField = sortBy && sortableFields[sortBy] ? sortableFields[sortBy] : defaultOrderField;
 
     // Apply joins and pagination
-    const data = await queryBuilder
+    queryBuilder
       .leftJoinAndSelect('inventory.pallet', 'pallet')
       .leftJoinAndSelect('inventory.warehouse', 'warehouse')
       .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
       .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin')
       .orderBy(orderField, sortOrder)
       .skip((page - 1) * limit)
-      .take(limit)
-      .getMany();
+      .take(limit);
+
+    // Add DISTINCT if filtering by item_id to avoid duplicates
+    if (filters.item_id) {
+      queryBuilder.distinct(true);
+    }
+
+    const data = await queryBuilder.getMany();
 
     return { data, total };
   }

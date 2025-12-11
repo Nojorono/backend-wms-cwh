@@ -7,7 +7,6 @@ import {
   ApiBody,
   ApiQuery,
   ApiParam,
-  ApiExtraModels,
 } from '@nestjs/swagger';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
@@ -19,7 +18,6 @@ import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
-import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @ApiTags('Inventory Tracking')
 @Controller('inventory-tracking')
@@ -116,6 +114,11 @@ export class InventoryTrackingController {
       description: 'Filter by progression status',
       example: 'IN_PROGRESS',
     },
+    {
+      name: 'item_id',
+      description: 'Filter by item ID',
+      example: 'uuid-item-123',
+    },
   ])
   @ApiResponse({
     status: 200,
@@ -143,7 +146,8 @@ export class InventoryTrackingController {
       paginationQuery.warehouse_sub_id ||
       paginationQuery.warehouse_bin_id ||
       paginationQuery.pallet_id ||
-      paginationQuery.progression_status;
+      paginationQuery.progression_status ||
+      paginationQuery.item_id;
 
     if (hasPaginationParams) {
       return this.service.findAllPaginated(paginationQuery);
