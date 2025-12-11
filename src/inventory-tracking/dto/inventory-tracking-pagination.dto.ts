@@ -50,5 +50,13 @@ export class InventoryTrackingPaginationQueryDto extends BasePaginationQueryDto 
   @IsOptional()
   @IsString()
   progression_status?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by item ID',
+    example: 'uuid-item-123',
+  })
+  @IsOptional()
+  @IsString()
+  item_id?: string;
 }
 

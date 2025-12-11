@@ -244,27 +244,4 @@ export class TransactionPickingController {
   async cancelTransaction(@Param('transactionId') transactionId: string) {
     return await this.service.cancelTransaction(transactionId);
   }
-  // // detach memo from transaction picking
-  // @Patch('memo/:memoId/detach')
-  // @ApiOperation({ summary: 'Detach memo from transaction picking' })
-  // @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
-  // @ApiResponse({
-  //   status: 204,
-  //   description: 'Memo berhasil dilepas dari transaction picking',
-  // })
-  // async detachMemo(@Param('memoId') memoId: string) {
-  //   return await this.service.detachMemo(memoId);
-  // }
-  // // attach memo to transaction picking
-  // @Patch('memo/:memoId/attach')
-  // @HttpCode(HttpStatus.NO_CONTENT)
-  // @ApiOperation({ summary: 'Attach memo to transaction picking' })
-  // @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
-  // @ApiResponse({
-  //   status: 204,
-  //   description: 'Memo berhasil diattach ke transaction picking',
-  // })
-  // async attachMemo(@Param('memoId') memoId: string, @Body() attachMemoDto: AttachMemoDto) {
-  //   return await this.service.attachMemo(attachMemoDto.transactionIds, memoId);
-  // }
 }

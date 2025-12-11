@@ -12,6 +12,7 @@ import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
 import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 import { PaginationService } from '../core/services/pagination.service';
+import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PaginationService } from '../core/services/pagination.service';
       MasterWarehouseSub,
       MasterWarehouseBin,
     ]),
+    MasterPalletModule,
   ],
   controllers: [InventoryTrackingController],
   providers: [

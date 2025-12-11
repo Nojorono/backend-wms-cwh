@@ -10,12 +10,14 @@ import { InventoryTrackingHistory } from '../core/domain/entities/inventory-trac
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
+import { MasterPalletService } from '../master-pallet/master-pallet.service';
 
 @Injectable()
 export class InventoryTrackingService {
   constructor(
     private readonly repository: InventoryTrackingRepository,
     private readonly paginationService: PaginationService,
+    private readonly masterPalletService: MasterPalletService,
   ) {}
 
   // Validasi status yang diperbolehkan
@@ -67,11 +69,14 @@ export class InventoryTrackingService {
       await this.validatePalletIdUniqueness(dto.pallet_id);
     }
 
-    return this.repository.create(dto);
+    const created = await this.repository.create(dto);
+    const enriched = await this.enrichPalletsWithCurrentItems([created]);
+    return enriched[0];
   }
 
   async findAll(): Promise<InventoryTracking[]> {
-    return this.repository.findAll();
+    const inventoryTrackings = await this.repository.findAll();
+    return await this.enrichPalletsWithCurrentItems(inventoryTrackings);
   }
 
   async findAllPaginated(
@@ -84,6 +89,7 @@ export class InventoryTrackingService {
       warehouse_bin_id: paginationQuery.warehouse_bin_id,
       pallet_id: paginationQuery.pallet_id,
       progression_status: paginationQuery.progression_status,
+      item_id: paginationQuery.item_id,
     };
 
     const { data, total } = await this.repository.findAllPaginated(
@@ -95,11 +101,44 @@ export class InventoryTrackingService {
       paginationQuery.sortOrder,
     );
 
-    return this.paginationService.createPaginatedResponse(data, paginationQuery, total);
+    const enrichedData = await this.enrichPalletsWithCurrentItems(data);
+
+    return this.paginationService.createPaginatedResponse(enrichedData, paginationQuery, total);
+  }
+
+  /**
+   * Enrich inventory tracking pallets with current items data
+   */
+  private async enrichPalletsWithCurrentItems(
+    inventoryTrackings: InventoryTracking[],
+  ): Promise<InventoryTracking[]> {
+    for (const tracking of inventoryTrackings) {
+      if (tracking.pallet && tracking.pallet.id) {
+        try {
+          const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(
+            tracking.pallet.id,
+          );
+          // Add currentItems array to the pallet object
+          (tracking.pallet as any).currentItems = palletItems.map((item) => ({
+            item_id: item.item_id,
+            item_name: item.item_name,
+            current_quantity: item.current_quantity,
+            uom: item.uom,
+            production_date: item.production_date,
+            week_number: item.week_number,
+          }));
+        } catch (error) {
+          // If pallet not found or error, set empty array
+          (tracking.pallet as any).currentItems = [];
+        }
+      }
+    }
+    return inventoryTrackings;
   }
 
   async findAllByWarehouse(warehouse_sub_id, warehouse_bin_id): Promise<InventoryTracking[]> {
-    return this.repository.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+    const inventoryTrackings = await this.repository.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+    return await this.enrichPalletsWithCurrentItems(inventoryTrackings);
   }
 
   async findHistoryByPalletId(pallet_id: string): Promise<InventoryTrackingHistory[]> {
@@ -115,7 +154,8 @@ export class InventoryTrackingService {
     if (!entity) {
       throw new NotFoundException(`InventoryTracking with ID ${id} not found`);
     }
-    return entity;
+    const enriched = await this.enrichPalletsWithCurrentItems([entity]);
+    return enriched[0];
   }
 
   async findOneByPalletId(palletId: string): Promise<InventoryTracking> {
@@ -123,7 +163,8 @@ export class InventoryTrackingService {
     if (!entity) {
       throw new NotFoundException(`InventoryTracking with pallet ID ${palletId} not found`);
     }
-    return entity;
+    const enriched = await this.enrichPalletsWithCurrentItems([entity]);
+    return enriched[0];
   }
 
   async update(id: string, dto: UpdateInventoryTrackingDto): Promise<InventoryTracking> {
@@ -240,7 +281,9 @@ export class InventoryTrackingService {
       }
     }
 
-    return this.repository.create(dto);
+    const created = await this.repository.create(dto);
+    const enriched = await this.enrichPalletsWithCurrentItems([created]);
+    return enriched[0];
   }
 
   // Method untuk createOrUpdate dengan pengecekan duplikasi inbound_id

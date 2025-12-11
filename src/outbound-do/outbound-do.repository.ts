@@ -389,6 +389,7 @@ export class OutboundDoRepository {
   async findByAssignedUserId(userId: string): Promise<OutboundDo[]> {
     const outboundDos = await this.buildQueryWithAllRelations()
       .where('assigned_pickings.picking_user_id = :userId', { userId })
+      .andWhere('transaction_pickings.status = :status', { status: 'PENDING' })
       .andWhere('assigned_pickings.id IS NOT NULL')
       .andWhere('outbound_do.deletedAt IS NULL')
       .distinct(true)
