@@ -6,12 +6,16 @@ import { PickingTransaction, Status } from '../core/domain/entities/transaction-
 import { PaginationQueryDto, PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { TransactionPickingPaginationDto } from './dto/transaction-picking-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
+import { TransactionScanPickingRepository } from '../transaction-scan-picking/transaction-scan-picking.repository';
+import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 
 @Injectable()
 export class TransactionPickingService {
   constructor(
     private readonly repository: TransactionPickingRepository,
     private readonly paginationService: PaginationService,
+    private readonly transactionScanPickingRepository: TransactionScanPickingRepository,
+    private readonly inventoryTrackingService: InventoryTrackingService,
   ) {}
 
   async create(data: CreateTransactionPickingDto): Promise<PickingTransaction> {
@@ -143,11 +147,77 @@ export class TransactionPickingService {
   }
 
   async cancelTransaction(transactionId: string): Promise<void> {
-    return this.repository.cancelTransaction(transactionId);
+    await this.repository.cancelTransaction(transactionId);
+    
+    // Update inventory tracking status from PICKED to IN_INVENTORY for related pallets
+    await this.revertInventoryTrackingStatus(transactionId);
   }
 
   async cancelTransactionByMemoId(memoId: string): Promise<void> {
-    return this.repository.cancelTransactionByMemoId(memoId);
+    await this.repository.cancelTransactionByMemoId(memoId);
+    
+    // Get all transactions for this memo and revert their inventory tracking
+    const transactions = await this.repository.findByMemoId(memoId);
+    for (const transaction of transactions) {
+      await this.revertInventoryTrackingStatus(transaction.id);
+    }
+  }
+
+  /**
+   * Revert inventory tracking status from PICKED to IN_INVENTORY
+   * for all pallets related to transaction-scan-picking records
+   */
+  private async revertInventoryTrackingStatus(transactionPickingId: string): Promise<void> {
+    try {
+      // Find all transaction-scan-picking records for this transaction picking
+      const scanPickingTransactions = await this.transactionScanPickingRepository.findAll({
+        transactionPickingId: transactionPickingId,
+      });
+
+      if (scanPickingTransactions.length === 0) {
+        return;
+      }
+
+      // Collect all unique pallet IDs from scan picking transactions
+      const palletIds = new Set<string>();
+      for (const scanPicking of scanPickingTransactions) {
+        if (scanPicking.pallet_use_id) {
+          palletIds.add(scanPicking.pallet_use_id);
+        }
+        if (scanPicking.pallet_source_id) {
+          palletIds.add(scanPicking.pallet_source_id);
+        }
+        if (scanPicking.pallet_switch_id) {
+          palletIds.add(scanPicking.pallet_switch_id);
+        }
+      }
+
+      // Update inventory tracking status for each pallet from PICKED to IN_INVENTORY
+      for (const palletId of palletIds) {
+        try {
+          const inventoryTracking = await this.inventoryTrackingService.findOneByPalletId(palletId);
+          
+          // Only update if current status is PICKED
+          if (inventoryTracking.inventory_status === 'PICKED') {
+            await this.inventoryTrackingService.update(inventoryTracking.id, {
+              inventory_status: 'IN_INVENTORY',
+              inventory_note: `Reverted from PICKED to IN_INVENTORY due to transaction picking cancellation`,
+              inventory_date: new Date(),
+            });
+          }
+        } catch (error) {
+          // If inventory tracking not found or other error, log and continue
+          if (error instanceof NotFoundException) {
+            // Pallet doesn't have inventory tracking, skip
+            continue;
+          }
+          console.error(`Failed to revert inventory tracking for pallet ${palletId}:`, error);
+        }
+      }
+    } catch (error) {
+      // Log error but don't fail the cancellation
+      console.error(`Failed to revert inventory tracking status for transaction ${transactionPickingId}:`, error);
+    }
   }
 
   async detachDo(doId: string): Promise<void> {

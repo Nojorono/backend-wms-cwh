@@ -9,6 +9,7 @@ import { QuantityOperationType, StatusInventory } from '../core/domain/entities/
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseBinService } from '../master-warehouse-bin/master-warehouse-bin.service';
+import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
 
 @Injectable()
 export class TransactionScanPickingService {
@@ -558,23 +559,27 @@ export class TransactionScanPickingService {
           
           if (targetPalletTracking) {
             // Update existing tracking to destination location
+            // Always set status to 'PICKED' for pallet use when moved to destination
             await this.inventoryTrackingService.update(targetPalletTracking.id, {
               warehouse_sub_id: destinationWarehouseSubId,
               warehouse_bin_id: destinationBinId,
               warehouse_id: destinationWarehouseId,
-              inventory_status: isSamePallet ? 'PICKED' : 'IN_INVENTORY',
+              progression_status: ProgressionStatus.COMPLETED,
+              inventory_status: 'PICKED',
               inventory_note: isSamePallet 
                 ? `Picked ${quantityPicked} and moved to destination via transaction scan picking`
-                : `Moved from source pallet to destination via transaction scan picking`,
+                : `Picked ${quantityPicked} from source pallet and moved to destination via transaction scan picking`,
               inventory_date: new Date(),
             });
           } else {
             // Create new tracking for target pallet at destination location
+            // Always set status to 'PICKED' for pallet use when moved to destination
             await this.inventoryTrackingService.createOrUpdateInventoryTracking(
               targetPalletId,
               destinationWarehouseSubId,
               destinationWarehouseId,
-              isSamePallet ? 'PICKED' : 'IN_INVENTORY',
+              'PICKED',
+              ProgressionStatus.COMPLETED,
             );
             
             // Update bin if provided
@@ -652,6 +657,7 @@ export class TransactionScanPickingService {
               inventory_status: 'IN_INVENTORY',
               inventory_note: `Switched ${quantitySwitch} from source pallet via transaction scan picking`,
               inventory_date: new Date(),
+              progression_status: ProgressionStatus.COMPLETED,
             });
           } else {
             // Create new tracking for switch pallet using source pallet location
@@ -660,6 +666,7 @@ export class TransactionScanPickingService {
               finalWarehouseSubId,
               finalWarehouseId,
               'IN_INVENTORY',
+              ProgressionStatus.COMPLETED,
             );
             
             // Update bin if provided
@@ -668,6 +675,7 @@ export class TransactionScanPickingService {
               if (tracking) {
                 await this.inventoryTrackingService.update(tracking.id, {
                   warehouse_bin_id: finalBinId,
+                  progression_status: ProgressionStatus.COMPLETED,
                 });
               }
             }
@@ -758,6 +766,7 @@ export class TransactionScanPickingService {
                 ? `Reverted: Moved back to previous location`
                 : `Reverted: Transaction scan picking reverted`,
               inventory_date: new Date(),
+              progression_status: ProgressionStatus.COMPLETED,
             });
           }
         } catch (error) {
@@ -782,6 +791,7 @@ export class TransactionScanPickingService {
                 ? `Reverted: Moved back to previous location`
                 : `Reverted: Transaction scan picking reverted`,
               inventory_date: new Date(),
+              progression_status: ProgressionStatus.COMPLETED,
             });
           }
         } catch (error) {

@@ -7,7 +7,6 @@ import { PaginationService } from '../core/services/pagination.service';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
-import { Status } from '../core/domain/entities/transaction-picking.entity';
 
 @Injectable()
 export class OutboundDoService {
@@ -106,11 +105,6 @@ export class OutboundDoService {
       throw new BadRequestException('Format nomor telepon tidak valid');
     }
 
-    // Validasi status transition
-    if (data.status && existing.status !== data.status) {
-      this.validateStatusTransition(existing.status, data.status);
-    }
-
     return this.repository.update(id, data);
   }
 
@@ -135,28 +129,7 @@ export class OutboundDoService {
 
   async updateStatus(id: string, status: OutboundDoStatus): Promise<OutboundDo> {
     const existing = await this.repository.findOne(id);
-    this.validateStatusTransition(existing.status, status);
-
     return this.repository.update(id, { status } as UpdateOutboundDoDto);
-  }
-
-  private validateStatusTransition(
-    currentStatus: OutboundDoStatus,
-    newStatus: OutboundDoStatus,
-  ): void {
-    const validTransitions: Record<OutboundDoStatus, OutboundDoStatus[]> = {
-      [OutboundDoStatus.PENDING]: [OutboundDoStatus.IN_PROGRESS, OutboundDoStatus.CANCELLED, OutboundDoStatus.APPROVED, OutboundDoStatus.COMPLETED],
-      [OutboundDoStatus.IN_PROGRESS]: [OutboundDoStatus.COMPLETED, OutboundDoStatus.CANCELLED],
-      [OutboundDoStatus.APPROVED]: [OutboundDoStatus.COMPLETED, OutboundDoStatus.CANCELLED],
-      [OutboundDoStatus.COMPLETED]: [],
-      [OutboundDoStatus.CANCELLED]: [],
-    };
-
-    if (!validTransitions[currentStatus]?.includes(newStatus)) {
-      throw new BadRequestException(
-        `Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`,
-      );
-    }
   }
 
   private isValidPhoneNumber(phone: string): boolean {

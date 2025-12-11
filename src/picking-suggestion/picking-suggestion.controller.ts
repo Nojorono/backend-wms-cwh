@@ -9,22 +9,6 @@ import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
 export class PickingSuggestionController {
   constructor(private readonly pickingSuggestionService: PickingSuggestionService) {}
 
-  @Get('outbound-do/:outboundDoId')
-  @ApiOperation({ summary: 'Get picking suggestions for an outbound DO' })
-  @ApiParam({ name: 'outboundDoId', description: 'Outbound DO ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Picking suggestions generated successfully',
-    type: [PickingSuggestionDto],
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Outbound DO not found',
-  })
-  async getPickingSuggestionsForOutboundDo(@Param('outboundDoId') outboundDoId: string) {
-    return this.pickingSuggestionService.getPickingSuggestionsForOutboundDo(outboundDoId);
-  }
-
   @Get('memo/:memoId')
   @ApiOperation({ summary: 'Get picking suggestions for a memo' })
   @ApiParam({ name: 'memoId', description: 'Outbound memo ID' })
@@ -60,6 +44,13 @@ export class PickingSuggestionController {
     description: 'Filter available inventory by item UOM',
     example: 'PCS',
   })
+  @ApiQuery({
+    name: 'sortMethod',
+    required: false,
+    description: 'Sorting method for inventory picking: FIFO (First In First Out - smallest week_number) or LIFO (Last In First Out - biggest week_number)',
+    enum: ['FIFO', 'LIFO'],
+    example: 'FIFO',
+  })
   @ApiResponse({
     status: 200,
     description: 'Picking suggestions generated successfully',
@@ -71,8 +62,9 @@ export class PickingSuggestionController {
   async getPickingSuggestionsByItemId(
     @Param('itemId') itemId: string,
     @Query('uom') uom?: string,
+    @Query('sortMethod') sortMethod?: 'FIFO' | 'LIFO',
   ) {
-    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId, uom);
+    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId, uom, sortMethod);
   }
 
   @Get('put-away')

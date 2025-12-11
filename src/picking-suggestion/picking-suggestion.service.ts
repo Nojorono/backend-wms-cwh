@@ -700,7 +700,7 @@ export class PickingSuggestionService {
     return note;
   }
 
-  async getPickingSuggestionsByItemId(itemId: string, uom?: string): Promise<any> {
+  async getPickingSuggestionsByItemId(itemId: string, uom?: string, sortMethod?: 'FIFO' | 'LIFO'): Promise<any> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
       throw new Error('Item ID is required');
@@ -718,7 +718,7 @@ export class PickingSuggestionService {
 
     // Find all available inventory for this item
     const preferredUom = uom || undefined;
-    const availableInventory = await this.findAvailableInventoryForItem(itemId, 0, preferredUom);
+    const availableInventory = await this.findAvailableInventoryForItem(itemId, 0, preferredUom, sortMethod);
 
     if (availableInventory.length === 0) {
       return {

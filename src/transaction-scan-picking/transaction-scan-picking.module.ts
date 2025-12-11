@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionScanPickingController } from './transaction-scan-picking.controller';
 import { TransactionScanPickingService } from './transaction-scan-picking.service';
@@ -12,14 +12,14 @@ import { MasterWarehouseBinModule } from '../master-warehouse-bin/master-warehou
 @Module({
   imports: [
     TypeOrmModule.forFeature([ScanPickingTransaction]),
-    TransactionPickingModule,
+    forwardRef(() => TransactionPickingModule),
     MasterPalletModule,
     InventoryTrackingModule,
     MasterWarehouseBinModule,
   ],
   controllers: [TransactionScanPickingController],
   providers: [TransactionScanPickingService, TransactionScanPickingRepository],
-  exports: [TransactionScanPickingService],
+  exports: [TransactionScanPickingService, TransactionScanPickingRepository],
 })
 export class TransactionScanPickingModule {}
 
