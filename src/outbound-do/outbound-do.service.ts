@@ -7,7 +7,6 @@ import { PaginationService } from '../core/services/pagination.service';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
-import { Status } from '../core/domain/entities/transaction-picking.entity';
 
 @Injectable()
 export class OutboundDoService {
