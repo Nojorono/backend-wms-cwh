@@ -8,8 +8,13 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including devDependencies for build)
-RUN npm ci
+# Verify package-lock.json exists and install dependencies
+# Fallback to npm install if npm ci fails (e.g., lockfileVersion compatibility issues)
+RUN if [ ! -f package-lock.json ]; then \
+      echo "Warning: package-lock.json not found, generating it..." && \
+      npm install --package-lock-only; \
+    fi && \
+    (npm ci --prefer-offline --no-audit || (echo "npm ci failed, falling back to npm install..." && npm install --no-audit))
 
 # Copy source code
 COPY . .
@@ -33,8 +38,13 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production && \
+# Verify package-lock.json exists and install only production dependencies
+# Fallback to npm install if npm ci fails
+RUN if [ ! -f package-lock.json ]; then \
+      echo "Warning: package-lock.json not found, generating it..." && \
+      npm install --package-lock-only --only=production; \
+    fi && \
+    (npm ci --only=production --prefer-offline --no-audit || (echo "npm ci failed, falling back to npm install..." && npm install --only=production --no-audit)) && \
     npm cache clean --force
 
 # Copy built application from builder stage
