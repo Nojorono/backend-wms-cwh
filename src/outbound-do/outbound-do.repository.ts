@@ -383,10 +383,18 @@ export class OutboundDoRepository {
     return sequenceData.sort((a, b) => a.sequence - b.sequence);
   }
 
-  async findOneWithMemoSequence(id: string): Promise<OutboundDo> {
-    const outboundDo = await this.buildQueryWithAllRelations()
-      .where('outbound_do.id = :id', { id })
-      .getOne();
+  async findOneWithMemoSequence(id: string, transactionPickingStatus?: string): Promise<OutboundDo> {
+    const queryBuilder = this.buildQueryWithAllRelations()
+      .where('outbound_do.id = :id', { id });
+
+    // Filter transaction pickings by status if provided
+    if (transactionPickingStatus) {
+      queryBuilder.andWhere('transaction_pickings.status = :transactionPickingStatus', {
+        transactionPickingStatus,
+      });
+    }
+
+    const outboundDo = await queryBuilder.getOne();
 
     if (!outboundDo) {
       throw new NotFoundException('Outbound DO not found');

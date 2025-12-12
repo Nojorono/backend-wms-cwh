@@ -76,8 +76,8 @@ export class OutboundDoService {
     );
   }
 
-  async findOne(id: string): Promise<OutboundDo> {
-    return this.repository.findOneWithMemoSequence(id);
+  async findOne(id: string, transactionPickingStatus?: string): Promise<OutboundDo> {
+    return this.repository.findOneWithMemoSequence(id, transactionPickingStatus);
   }
 
   async update(id: string, data: UpdateOutboundDoDto): Promise<OutboundDo> {

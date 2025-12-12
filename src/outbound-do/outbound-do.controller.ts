@@ -128,6 +128,13 @@ export class OutboundDoController {
   @Get(':id')
   @ApiOperation({ summary: 'Dapatkan outbound DO berdasarkan ID' })
   @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiQuery({
+    name: 'transaction_picking_status',
+    required: false,
+    enum: TransactionPickingStatus,
+    description: 'Filter transaction pickings by status',
+    example: TransactionPickingStatus.PENDING,
+  })
   @ApiResponse({
     status: 200,
     description: 'Detail outbound DO',
@@ -145,8 +152,11 @@ export class OutboundDoController {
       },
     },
   })
-  async findOne(@Param('id') id: string) {
-    return this.outboundDoService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @Query('transaction_picking_status') transactionPickingStatus?: string,
+  ) {
+    return this.outboundDoService.findOne(id.trim(), transactionPickingStatus);
   }
 
   @Patch(':id')
