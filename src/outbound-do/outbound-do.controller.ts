@@ -25,6 +25,7 @@ import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoResponseDto } from './dto/outbound-do-response.dto';
 import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbound-do.entity';
+import { Status as TransactionPickingStatus } from '../core/domain/entities/transaction-picking.entity';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 
@@ -93,6 +94,12 @@ export class OutboundDoController {
       type: Boolean,
       example: true,
     },
+    {
+    name: 'transaction_picking_status',
+      description: 'Filter outbound DO berdasarkan status transaction picking',
+      enum: Object.values(TransactionPickingStatus),
+      example: TransactionPickingStatus.PENDING,
+    },
   ])
   @ApiResponse({
     status: 200,
@@ -108,7 +115,8 @@ export class OutboundDoController {
       paginationQuery.sortOrder ||
       paginationQuery.status ||
       paginationQuery.outbound_type ||
-      paginationQuery.has_transaction_scan_picking !== undefined;
+      paginationQuery.has_transaction_scan_picking !== undefined ||
+      paginationQuery.transaction_picking_status;
 
     if (hasPaginationParams) {
       return this.outboundDoService.findAllPaginated(paginationQuery);

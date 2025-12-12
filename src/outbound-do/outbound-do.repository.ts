@@ -279,6 +279,7 @@ export class OutboundDoRepository {
       status,
       outbound_type,
       has_transaction_scan_picking,
+      transaction_picking_status,
     } = paginationDto;
 
     const qb = this.buildQueryWithAllRelations();
@@ -303,6 +304,14 @@ export class OutboundDoRepository {
           'NOT EXISTS (SELECT 1 FROM transaction_scan_picking tsp INNER JOIN transaction_picking tp ON tsp.transaction_picking_id = tp.id INNER JOIN outbound_memo om ON tp.memo_id = om.id INNER JOIN outbound_do_memo odm ON om.id = odm.outbound_memo_id WHERE odm.outbound_do_id = outbound_do.id)',
         );
       }
+    }
+
+    if (transaction_picking_status) {
+      // Filter for outbound DOs that have at least one transaction picking with the specified status
+      qb.andWhere('transaction_pickings.status = :transaction_picking_status', {
+        transaction_picking_status,
+      });
+      qb.distinct(true);
     }
 
     if (search) {
