@@ -128,11 +128,9 @@ export class TransactionPickingService {
 
   private validateStatusTransition(currentStatus: Status, newStatus: Status): void {
     const validTransitions: Record<Status, Status[]> = {
-      [Status.PENDING]: [Status.COMPLETED, Status.CANCELLED, Status.INSPECTION],
+      [Status.PENDING]: [Status.COMPLETED, Status.CANCELLED],
       [Status.COMPLETED]: [],
       [Status.CANCELLED]: [Status.PENDING],
-      [Status.INSPECTION]: [Status.INSPECTION_APPROVED],
-      [Status.INSPECTION_APPROVED]: [Status.COMPLETED],
     };
 
     if (!validTransitions[currentStatus]?.includes(newStatus)) {

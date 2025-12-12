@@ -9,8 +9,6 @@ import { ScanPickingTransaction } from './transaction-scan-picking.entity';
 
 export enum Status {
   PENDING = 'PENDING',
-  INSPECTION = 'INSPECTION',
-  INSPECTION_APPROVED = 'INSPECTION_APPROVED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
