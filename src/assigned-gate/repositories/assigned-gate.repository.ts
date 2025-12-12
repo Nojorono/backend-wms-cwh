@@ -44,14 +44,7 @@ export class AssignedGateRepository {
       queryBuilder.andWhere('assigned_gate.status = :status', { status: filters.status });
     }
 
-    // Filter by user_id requires join with assigned_gate_users
-    if (filters.user_id) {
-      queryBuilder
-        .leftJoin('assigned_gate.assigned_gate_users', 'assigned_gate_users')
-        .andWhere('assigned_gate_users.user_id = :user_id', { user_id: filters.user_id });
-    }
-
-    // Add all relations
+    // Add all relations first
     queryBuilder
       .leftJoinAndSelect('assigned_gate.outbound_do', 'outbound_do')
       .leftJoinAndSelect('assigned_gate.gate', 'gate')
@@ -59,6 +52,11 @@ export class AssignedGateRepository {
       .leftJoinAndSelect('assigned_gate_users.user', 'user')
       .leftJoinAndSelect('assigned_gate.assigned_gate_pallets', 'assigned_gate_pallets')
       .leftJoinAndSelect('assigned_gate_pallets.pallet', 'pallet');
+
+    // Filter by user_id - use the already joined assigned_gate_users
+    if (filters.user_id) {
+      queryBuilder.andWhere('assigned_gate_users.user_id = :user_id', { user_id: filters.user_id });
+    }
 
     // Add distinct to avoid duplicates when filtering by user_id
     if (filters.user_id) {
