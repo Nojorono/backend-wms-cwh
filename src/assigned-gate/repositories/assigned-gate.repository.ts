@@ -21,25 +21,63 @@ export class AssignedGateRepository {
     });
   }
 
+  async findAllWithFilters(filters: {
+    user_id?: string;
+    gate_id?: string;
+    outbound_do_id?: string;
+    status?: string;
+  }): Promise<AssignedGate[]> {
+    const queryBuilder = this.repository.createQueryBuilder('assigned_gate');
+
+    // Apply filters
+    if (filters.gate_id) {
+      queryBuilder.andWhere('assigned_gate.gate_id = :gate_id', { gate_id: filters.gate_id });
+    }
+
+    if (filters.outbound_do_id) {
+      queryBuilder.andWhere('assigned_gate.outbound_do_id = :outbound_do_id', {
+        outbound_do_id: filters.outbound_do_id,
+      });
+    }
+
+    if (filters.status) {
+      queryBuilder.andWhere('assigned_gate.status = :status', { status: filters.status });
+    }
+
+    // Filter by user_id requires join with assigned_gate_users
+    if (filters.user_id) {
+      queryBuilder
+        .leftJoin('assigned_gate.assigned_gate_users', 'assigned_gate_users')
+        .andWhere('assigned_gate_users.user_id = :user_id', { user_id: filters.user_id });
+    }
+
+    // Add all relations
+    queryBuilder
+      .leftJoinAndSelect('assigned_gate.outbound_do', 'outbound_do')
+      .leftJoinAndSelect('assigned_gate.gate', 'gate')
+      .leftJoinAndSelect('assigned_gate.assigned_gate_users', 'assigned_gate_users')
+      .leftJoinAndSelect('assigned_gate_users.user', 'user')
+      .leftJoinAndSelect('assigned_gate.assigned_gate_pallets', 'assigned_gate_pallets')
+      .leftJoinAndSelect('assigned_gate_pallets.pallet', 'pallet');
+
+    // Add distinct to avoid duplicates when filtering by user_id
+    if (filters.user_id) {
+      queryBuilder.distinct(true);
+    }
+
+    return await queryBuilder.getMany();
+  }
+
   async findAllByUserId(userId: string): Promise<AssignedGate[]> {
-    return await this.repository.find({
-      where: { assigned_gate_users: { user_id: userId } },
-      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
-    });
+    return await this.findAllWithFilters({ user_id: userId });
   }
 
   async findAllByGateId(gateId: string): Promise<AssignedGate[]> {
-    return await this.repository.find({
-      where: { gate_id: gateId },
-      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
-    });
+    return await this.findAllWithFilters({ gate_id: gateId });
   }
 
   async findAllByOutboundDoId(outboundDoId: string): Promise<AssignedGate[]> {
-    return await this.repository.find({
-      where: { outbound_do_id: outboundDoId },
-      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
-    });
+    return await this.findAllWithFilters({ outbound_do_id: outboundDoId });
   }
 
   async findOne(id: string): Promise<AssignedGate | null> {

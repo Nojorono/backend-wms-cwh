@@ -7,7 +7,7 @@ import { UpdateAssignedGateUserDto } from './dto/update-assigned-gate-user.dto';
 import { CreateAssignedGatePalletDto } from './dto/create-assigned-gate-pallet.dto';
 import { UpdateAssignedGatePalletDto } from './dto/update-assigned-gate-pallet.dto';
 import { UpdateAssignedGateStatusDto } from './dto/update-assigned-gate-status.dto';
-import { AssignedGate } from '../core/domain/entities/assigned-gate.entity';
+import { AssignedGate, AssignedGateStatus } from '../core/domain/entities/assigned-gate.entity';
 import { AssignedGateUser } from '../core/domain/entities/assigned-gate-user.entity';
 import { AssignedGatePallet } from '../core/domain/entities/assigned-gate-pallet.entity';
 
@@ -32,7 +32,7 @@ export class AssignedGateController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List all assigned gates' })
+  @ApiOperation({ summary: 'List all assigned gates with optional filters' })
   @ApiQuery({
     name: 'user_id',
     required: false,
@@ -54,6 +54,13 @@ export class AssignedGateController {
     description: 'Filter by outbound DO ID',
     example: 'uuid-outbound-do-123',
   })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: AssignedGateStatus,
+    description: 'Filter by status',
+    example: AssignedGateStatus.PENDING,
+  })
   @ApiResponse({
     status: 200,
     description: 'List of assigned gates retrieved successfully',
@@ -63,17 +70,21 @@ export class AssignedGateController {
     @Query('user_id') userId?: string,
     @Query('gate_id') gateId?: string,
     @Query('outbound_do_id') outboundDoId?: string,
+    @Query('status') status?: string,
   ) {
-    if (userId) {
-      return this.assignedGateService.findAllByUserId(userId);
-    }
-    if (gateId) {
-      return this.assignedGateService.findAllByGateId(gateId);
-    }
-    if (outboundDoId) {
-      return this.assignedGateService.findAllByOutboundDoId(outboundDoId);
-    }
-    return this.assignedGateService.findAll();
+    const filters: {
+      user_id?: string;
+      gate_id?: string;
+      outbound_do_id?: string;
+      status?: string;
+    } = {};
+
+    if (userId) filters.user_id = userId;
+    if (gateId) filters.gate_id = gateId;
+    if (outboundDoId) filters.outbound_do_id = outboundDoId;
+    if (status) filters.status = status;
+
+    return this.assignedGateService.findAll(Object.keys(filters).length > 0 ? filters : undefined);
   }
 
   // User management endpoints by assigned-gate-id (must come before :id route)

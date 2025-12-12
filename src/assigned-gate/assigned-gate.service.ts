@@ -153,8 +153,18 @@ export class AssignedGateService {
     return result;
   }
 
-  async findAll(): Promise<AssignedGate[]> {
-    const gates = await this.assignedGateRepo.findAll();
+  async findAll(filters?: {
+    user_id?: string;
+    gate_id?: string;
+    outbound_do_id?: string;
+    status?: string;
+  }): Promise<AssignedGate[]> {
+    let gates: AssignedGate[];
+    if (filters && Object.keys(filters).length > 0) {
+      gates = await this.assignedGateRepo.findAllWithFilters(filters);
+    } else {
+      gates = await this.assignedGateRepo.findAll();
+    }
     return await this.enrichPalletsWithSkus(gates);
   }
 
