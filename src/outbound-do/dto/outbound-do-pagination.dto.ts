@@ -3,6 +3,7 @@ import { IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { BasePaginationQueryDto } from '../../core/dto/base-pagination.dto';
 import { OutboundDoStatus, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
+import { Status as TransactionPickingStatus } from '../../core/domain/entities/transaction-picking.entity';
 
 export class OutboundDoPaginationDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({
@@ -36,6 +37,15 @@ export class OutboundDoPaginationDto extends BasePaginationQueryDto {
     return value;
   })
   has_transaction_scan_picking?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter outbound DO by transaction picking status',
+    enum: TransactionPickingStatus,
+    example: TransactionPickingStatus.PENDING,
+  })
+  @IsOptional()
+  @IsEnum(TransactionPickingStatus)
+  transaction_picking_status?: TransactionPickingStatus;
 }
 
 

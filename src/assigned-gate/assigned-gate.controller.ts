@@ -1,10 +1,13 @@
 import { Controller, Get, Post, Body, Param, Delete, Query, Patch } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { AssignedGateService } from './assigned-gate.service';
 import { CreateAssignedGateDto } from './dto/create-assigned-gate.dto';
 import { CreateAssignedGateUserDto } from './dto/create-assigned-gate-user.dto';
+import { UpdateAssignedGateUserDto } from './dto/update-assigned-gate-user.dto';
 import { CreateAssignedGatePalletDto } from './dto/create-assigned-gate-pallet.dto';
-import { AssignedGate } from '../core/domain/entities/assigned-gate.entity';
+import { UpdateAssignedGatePalletDto } from './dto/update-assigned-gate-pallet.dto';
+import { UpdateAssignedGateStatusDto } from './dto/update-assigned-gate-status.dto';
+import { AssignedGate, AssignedGateStatus } from '../core/domain/entities/assigned-gate.entity';
 import { AssignedGateUser } from '../core/domain/entities/assigned-gate-user.entity';
 import { AssignedGatePallet } from '../core/domain/entities/assigned-gate-pallet.entity';
 
@@ -29,7 +32,7 @@ export class AssignedGateController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List all assigned gates' })
+  @ApiOperation({ summary: 'List all assigned gates with optional filters' })
   @ApiQuery({
     name: 'user_id',
     required: false,
@@ -51,6 +54,13 @@ export class AssignedGateController {
     description: 'Filter by outbound DO ID',
     example: 'uuid-outbound-do-123',
   })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: AssignedGateStatus,
+    description: 'Filter by status',
+    example: AssignedGateStatus.PENDING,
+  })
   @ApiResponse({
     status: 200,
     description: 'List of assigned gates retrieved successfully',
@@ -60,17 +70,21 @@ export class AssignedGateController {
     @Query('user_id') userId?: string,
     @Query('gate_id') gateId?: string,
     @Query('outbound_do_id') outboundDoId?: string,
+    @Query('status') status?: string,
   ) {
-    if (userId) {
-      return this.assignedGateService.findAllByUserId(userId);
-    }
-    if (gateId) {
-      return this.assignedGateService.findAllByGateId(gateId);
-    }
-    if (outboundDoId) {
-      return this.assignedGateService.findAllByOutboundDoId(outboundDoId);
-    }
-    return this.assignedGateService.findAll();
+    const filters: {
+      user_id?: string;
+      gate_id?: string;
+      outbound_do_id?: string;
+      status?: string;
+    } = {};
+
+    if (userId) filters.user_id = userId;
+    if (gateId) filters.gate_id = gateId;
+    if (outboundDoId) filters.outbound_do_id = outboundDoId;
+    if (status) filters.status = status;
+
+    return this.assignedGateService.findAll(Object.keys(filters).length > 0 ? filters : undefined);
   }
 
   // User management endpoints by assigned-gate-id (must come before :id route)
@@ -103,6 +117,10 @@ export class AssignedGateController {
 
   @Patch(':assignedGateId/users/:userId')
   @ApiOperation({ summary: 'Update user in assigned gate' })
+  @ApiBody({
+    type: UpdateAssignedGateUserDto,
+    description: 'Update user data in assigned gate',
+  })
   @ApiResponse({
     status: 200,
     description: 'User updated successfully',
@@ -113,7 +131,7 @@ export class AssignedGateController {
   updateUserInGate(
     @Param('assignedGateId') assignedGateId: string,
     @Param('userId') userId: string,
-    @Body() updateUserDto: Partial<CreateAssignedGateUserDto>,
+    @Body() updateUserDto: UpdateAssignedGateUserDto,
   ) {
     return this.assignedGateService.updateUserInGate(assignedGateId, userId, updateUserDto);
   }
@@ -160,6 +178,10 @@ export class AssignedGateController {
 
   @Patch(':assignedGateId/pallets/:palletId')
   @ApiOperation({ summary: 'Update pallet in assigned gate' })
+  @ApiBody({
+    type: UpdateAssignedGatePalletDto,
+    description: 'Update pallet data in assigned gate',
+  })
   @ApiResponse({
     status: 200,
     description: 'Pallet updated successfully',
@@ -170,7 +192,7 @@ export class AssignedGateController {
   updatePalletInGate(
     @Param('assignedGateId') assignedGateId: string,
     @Param('palletId') palletId: string,
-    @Body() updatePalletDto: Partial<CreateAssignedGatePalletDto>,
+    @Body() updatePalletDto: UpdateAssignedGatePalletDto,
   ) {
     return this.assignedGateService.updatePalletInGate(assignedGateId, palletId, updatePalletDto);
   }
@@ -198,6 +220,25 @@ export class AssignedGateController {
   @ApiResponse({ status: 404, description: 'Assigned gate not found' })
   findOne(@Param('id') id: string) {
     return this.assignedGateService.findOne(id);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update assigned gate status' })
+  @ApiBody({
+    type: UpdateAssignedGateStatusDto,
+    description: 'Update assigned gate status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Assigned gate status updated successfully',
+    type: AssignedGate,
+  })
+  @ApiResponse({ status: 404, description: 'Assigned gate not found' })
+  updateStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdateAssignedGateStatusDto,
+  ) {
+    return this.assignedGateService.updateStatus(id, updateStatusDto);
   }
 
   @Delete(':id')

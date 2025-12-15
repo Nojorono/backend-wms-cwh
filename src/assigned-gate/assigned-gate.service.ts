@@ -8,6 +8,7 @@ import { AssignedGatePalletRepository } from './repositories/assigned-gate-palle
 import { CreateAssignedGateDto } from './dto/create-assigned-gate.dto';
 import { CreateAssignedGateUserDto } from './dto/create-assigned-gate-user.dto';
 import { CreateAssignedGatePalletDto } from './dto/create-assigned-gate-pallet.dto';
+import { UpdateAssignedGateStatusDto } from './dto/update-assigned-gate-status.dto';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseSubService } from '../master-warehouse-sub/master-warehouse-sub.service';
@@ -152,8 +153,18 @@ export class AssignedGateService {
     return result;
   }
 
-  async findAll(): Promise<AssignedGate[]> {
-    const gates = await this.assignedGateRepo.findAll();
+  async findAll(filters?: {
+    user_id?: string;
+    gate_id?: string;
+    outbound_do_id?: string;
+    status?: string;
+  }): Promise<AssignedGate[]> {
+    let gates: AssignedGate[];
+    if (filters && Object.keys(filters).length > 0) {
+      gates = await this.assignedGateRepo.findAllWithFilters(filters);
+    } else {
+      gates = await this.assignedGateRepo.findAll();
+    }
     return await this.enrichPalletsWithSkus(gates);
   }
 
@@ -212,6 +223,15 @@ export class AssignedGateService {
 
   async remove(id: string): Promise<void> {
     await this.assignedGateRepo.remove(id);
+  }
+
+  async updateStatus(id: string, updateStatusDto: UpdateAssignedGateStatusDto): Promise<AssignedGate> {
+    const updated = await this.assignedGateRepo.update(id, { status: updateStatusDto.status });
+    if (!updated) {
+      throw new NotFoundException('AssignedGate not found');
+    }
+    const enriched = await this.enrichPalletsWithSkus([updated]);
+    return enriched[0];
   }
 
   // User management methods by assigned-gate-id

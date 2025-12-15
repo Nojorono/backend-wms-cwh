@@ -25,6 +25,7 @@ import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoResponseDto } from './dto/outbound-do-response.dto';
 import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbound-do.entity';
+import { Status as TransactionPickingStatus } from '../core/domain/entities/transaction-picking.entity';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 
@@ -93,6 +94,12 @@ export class OutboundDoController {
       type: Boolean,
       example: true,
     },
+    {
+    name: 'transaction_picking_status',
+      description: 'Filter outbound DO berdasarkan status transaction picking',
+      enum: Object.values(TransactionPickingStatus),
+      example: TransactionPickingStatus.PENDING,
+    },
   ])
   @ApiResponse({
     status: 200,
@@ -108,7 +115,8 @@ export class OutboundDoController {
       paginationQuery.sortOrder ||
       paginationQuery.status ||
       paginationQuery.outbound_type ||
-      paginationQuery.has_transaction_scan_picking !== undefined;
+      paginationQuery.has_transaction_scan_picking !== undefined ||
+      paginationQuery.transaction_picking_status;
 
     if (hasPaginationParams) {
       return this.outboundDoService.findAllPaginated(paginationQuery);
@@ -120,6 +128,13 @@ export class OutboundDoController {
   @Get(':id')
   @ApiOperation({ summary: 'Dapatkan outbound DO berdasarkan ID' })
   @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiQuery({
+    name: 'transaction_picking_status',
+    required: false,
+    enum: TransactionPickingStatus,
+    description: 'Filter transaction pickings by status',
+    example: TransactionPickingStatus.PENDING,
+  })
   @ApiResponse({
     status: 200,
     description: 'Detail outbound DO',
@@ -137,8 +152,11 @@ export class OutboundDoController {
       },
     },
   })
-  async findOne(@Param('id') id: string) {
-    return this.outboundDoService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @Query('transaction_picking_status') transactionPickingStatus?: string,
+  ) {
+    return this.outboundDoService.findOne(id.trim(), transactionPickingStatus);
   }
 
   @Patch(':id')
