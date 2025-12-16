@@ -502,25 +502,26 @@ export class MasterPalletService {
           warehouse_sub_name: latestInventory?.warehouseSub?.code,
           warehouse_bin_id: latestInventory?.warehouse_bin_id,
           warehouse_bin_name: latestInventory?.warehouseBin?.code,
+          memo_id: pallet.memo_id,
         },
       ];
     }
 
-    return results
-      .map((history: any) => ({
-        id: palletId,
-        item_id: history.item_id,
-        item_name: history.item?.sku,
-        current_quantity: history.new_quantity, // use your latest field
-        uom: history.uom,
-        last_updated: history.createdAt,
-        production_date: history.production_date,
-        week_number: history.week_number ?? pallet.currentWeekNumber ?? undefined,
-        warehouse_sub_id: latestInventory?.warehouse_sub_id,
-        warehouse_sub_name: latestInventory?.warehouseSub?.code,
-        warehouse_bin_id: latestInventory?.warehouse_bin_id,
-        warehouse_bin_name: latestInventory?.warehouseBin?.code,
-      }));
+    return results.map((history: any) => ({
+      id: palletId,
+      item_id: history.item_id,
+      item_name: history.item?.sku,
+      current_quantity: history.new_quantity, // use your latest field
+      uom: history.uom,
+      last_updated: history.createdAt,
+      production_date: history.production_date,
+      week_number: history.week_number ?? pallet.currentWeekNumber ?? undefined,
+      warehouse_sub_id: latestInventory?.warehouse_sub_id,
+      warehouse_sub_name: latestInventory?.warehouseSub?.code,
+      warehouse_bin_id: latestInventory?.warehouse_bin_id,
+      warehouse_bin_name: latestInventory?.warehouseBin?.code,
+      memo_id: pallet.memo_id,
+    }));
   }
 
   async getQuantityHistoryByPalletCode(

@@ -27,11 +27,14 @@ export class TransactionScanPickingService {
     // Get transaction picking to retrieve item details
     const transactionPicking = await this.transactionPickingService.findOne(data.transaction_picking_id);
     const memo_id = transactionPicking.memo_id;
+    
+    if (!memo_id) {
+      throw new BadRequestException('Transaction picking must have a memo_id');
+    }
+
     const memo = await this.outboundMemoService.findOne(memo_id);
-    // find pallet_use_id if exist memo_id
-    const palletUseId = await this.masterPalletService.findByMemoId(memo_id);
-    if (palletUseId.memo_id !== memo.id) {
-      throw new BadRequestException('Pallet use ID does not match memo ID');
+    if (!memo) {
+      throw new NotFoundException(`Memo with ID ${memo_id} not found`);
     }
 
     await this.validateQuantities(data.quantity_picked, data.quantity_switch);
@@ -40,6 +43,16 @@ export class TransactionScanPickingService {
       data.pallet_use_id,
       data.pallet_switch_id,
     ]);
+
+    // Validate pallet_use_id has the same memo_id as transaction picking
+    if (data.pallet_use_id) {
+      const usePallet = await this.masterPalletService.findOne(data.pallet_use_id);
+      if (usePallet.memo_id && usePallet.memo_id !== memo_id) {
+        throw new BadRequestException(
+          `Use pallet (${data.pallet_use_id}) has memo_id ${usePallet.memo_id} which does not match transaction picking memo_id ${memo_id}`,
+        );
+      }
+    }
 
     // Use item_id, uom, week_number from transaction_picking if not provided in DTO
     const itemId = data.item_id || transactionPicking.item_id;
