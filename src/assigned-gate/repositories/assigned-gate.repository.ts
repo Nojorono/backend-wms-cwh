@@ -17,7 +17,18 @@ export class AssignedGateRepository {
 
   async findAll(): Promise<AssignedGate[]> {
     return await this.repository.find({
-      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
+      relations: [
+        'outbound_do',
+        'outbound_do.outbound_memos',
+        'outbound_do.outbound_memos.outbound_memo_items',
+        'outbound_do.outbound_memos.transaction_pickings',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking',
+        'gate',
+        'assigned_gate_users',
+        'assigned_gate_users.user',
+        'assigned_gate_pallets',
+        'assigned_gate_pallets.pallet',
+      ],
     });
   }
 
@@ -47,6 +58,10 @@ export class AssignedGateRepository {
     // Add all relations first
     queryBuilder
       .leftJoinAndSelect('assigned_gate.outbound_do', 'outbound_do')
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
+      .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
+      .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transactionScanPicking')
       .leftJoinAndSelect('assigned_gate.gate', 'gate')
       .leftJoinAndSelect('assigned_gate.assigned_gate_users', 'assigned_gate_users')
       .leftJoinAndSelect('assigned_gate_users.user', 'user')
@@ -81,7 +96,18 @@ export class AssignedGateRepository {
   async findOne(id: string): Promise<AssignedGate | null> {
     const entity = await this.repository.findOne({
       where: { id },
-      relations: ['outbound_do', 'gate', 'assigned_gate_users', 'assigned_gate_users.user', 'assigned_gate_pallets', 'assigned_gate_pallets.pallet'],
+      relations: [
+        'outbound_do',
+        'outbound_do.outbound_memos',
+        'outbound_do.outbound_memos.outbound_memo_items',
+        'outbound_do.outbound_memos.transaction_pickings',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking',
+        'gate',
+        'assigned_gate_users',
+        'assigned_gate_users.user',
+        'assigned_gate_pallets',
+        'assigned_gate_pallets.pallet',
+      ],
     });
     if (!entity) {
       return null;
