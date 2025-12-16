@@ -125,12 +125,8 @@ export class TransactionPickingController {
     type: [PickingTransaction],
   })
   async findByItemId(@Param('itemId') itemId: string) {
-    const result = await this.service.findByItemId(itemId);
-    return {
-      success: true,
-      message: 'Data transaction picking berhasil diambil',
-      data: result,
-    };
+     return await this.service.findByItemId(itemId);
+    
   }
 
   @Get(':id')
