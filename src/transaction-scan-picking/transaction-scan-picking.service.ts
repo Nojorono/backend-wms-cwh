@@ -28,14 +28,9 @@ export class TransactionScanPickingService {
     const transactionPicking = await this.transactionPickingService.findOne(data.transaction_picking_id);
     const memo_id = transactionPicking.memo_id;
     const memo = await this.outboundMemoService.findOne(memo_id);
-
-    if (!memo) {
-      throw new BadRequestException('Memo not found');
-    }
-
     // find pallet_use_id if exist memo_id
     const palletUseId = await this.masterPalletService.findByMemoId(memo_id);
-    if (palletUseId.memo_id !== memo_id) {
+    if (palletUseId.memo_id !== memo.id) {
       throw new BadRequestException('Pallet use ID does not match memo ID');
     }
 

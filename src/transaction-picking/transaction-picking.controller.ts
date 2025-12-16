@@ -20,8 +20,6 @@ import {
 import { TransactionPickingService } from './transaction-picking.service';
 import { CreateTransactionPickingDto, CreateManyTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
-import { AttachMemoDto } from './dto/attach-memo.dto';
-import { AttachDoDto } from './dto/attach-do.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
 import { TransactionPickingPaginationDto } from './dto/transaction-picking-pagination.dto';
 import { ApiPaginationQuery } from '../core/decorators/pagination.decorator';
