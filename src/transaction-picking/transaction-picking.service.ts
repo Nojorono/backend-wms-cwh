@@ -111,6 +111,10 @@ export class TransactionPickingService {
     return this.repository.findByStatus(status);
   }
 
+  async findByItemId(itemId: string): Promise<PickingTransaction[]> {
+    return this.repository.findByItemId(itemId);
+  }
+
   async updateStatus(id: string, status: Status): Promise<PickingTransaction> {
     const existing = await this.repository.findOne(id);
     if (!existing) {

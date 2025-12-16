@@ -115,6 +115,23 @@ export class TransactionPickingController {
     };
   }
 
+  @Get('item/:itemId')
+  @ApiOperation({ summary: 'Get transaction picking by item ID' })
+  @ApiParam({ name: 'itemId', description: 'ID item' })
+  @ApiResponse({
+    status: 200,
+    description: 'Daftar transaction picking berdasarkan item',
+    type: [PickingTransaction],
+  })
+  async findByItemId(@Param('itemId') itemId: string) {
+    const result = await this.service.findByItemId(itemId);
+    return {
+      success: true,
+      message: 'Data transaction picking berhasil diambil',
+      data: result,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get transaction picking by ID' })
   @ApiParam({ name: 'id', description: 'ID transaction picking' })

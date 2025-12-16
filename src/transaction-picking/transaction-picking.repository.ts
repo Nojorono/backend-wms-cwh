@@ -191,6 +191,23 @@ export class TransactionPickingRepository {
     });
   }
 
+  async findByItemId(itemId: string): Promise<PickingTransaction[]> {
+    return this.repository.find({
+      where: { item_id: itemId },
+      relations: [
+        'do',
+        'memo',
+        'item',
+        'sourceWarehouseSub',
+        'sourceBin',
+        'destinationWarehouseSub',
+        'destinationBin',
+        'transactionScanPicking',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async updateStatus(id: string, status: string): Promise<PickingTransaction> {
     await this.repository.update(id, { status: status as any });
     const result = await this.findOne(id);
