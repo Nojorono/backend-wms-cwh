@@ -8,6 +8,7 @@ import { TransactionPickingModule } from '../transaction-picking/transaction-pic
 import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 import { InventoryTrackingModule } from '../inventory-tracking/inventory-tracking.module';
 import { MasterWarehouseBinModule } from '../master-warehouse-bin/master-warehouse-bin.module';
+import { OutboundMemoModule } from '../outbound-memo/outbound-memo.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { MasterWarehouseBinModule } from '../master-warehouse-bin/master-warehou
     MasterPalletModule,
     InventoryTrackingModule,
     MasterWarehouseBinModule,
+    OutboundMemoModule,
   ],
   controllers: [TransactionScanPickingController],
   providers: [TransactionScanPickingService, TransactionScanPickingRepository],

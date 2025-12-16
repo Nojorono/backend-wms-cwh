@@ -10,6 +10,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseBinService } from '../master-warehouse-bin/master-warehouse-bin.service';
 import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
+import { OutboundMemoService } from '../outbound-memo/outbound-memo.service';
 
 @Injectable()
 export class TransactionScanPickingService {
@@ -19,12 +20,25 @@ export class TransactionScanPickingService {
     private readonly masterPalletService: MasterPalletService,
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly masterWarehouseBinService: MasterWarehouseBinService,
+    private readonly outboundMemoService: OutboundMemoService,
   ) {}
 
   async create(data: CreateTransactionScanPickingDto): Promise<ScanPickingTransaction> {
     // Get transaction picking to retrieve item details
     const transactionPicking = await this.transactionPickingService.findOne(data.transaction_picking_id);
-    
+    const memo_id = transactionPicking.memo_id;
+    const memo = await this.outboundMemoService.findOne(memo_id);
+
+    if (!memo) {
+      throw new BadRequestException('Memo not found');
+    }
+
+    // find pallet_use_id if exist memo_id
+    const palletUseId = await this.masterPalletService.findByMemoId(memo_id);
+    if (palletUseId.memo_id !== memo_id) {
+      throw new BadRequestException('Pallet use ID does not match memo ID');
+    }
+
     await this.validateQuantities(data.quantity_picked, data.quantity_switch);
     await this.validatePallets([
       data.pallet_source_id,
@@ -149,6 +163,12 @@ export class TransactionScanPickingService {
       quantitySwitch,
       isSamePallet,
     );
+
+    if (data.pallet_use_id) {
+      await this.masterPalletService.update(data.pallet_use_id, {
+        memo_id: memo.id,
+      });
+    }
 
     return this.repository.create(data);
   }
