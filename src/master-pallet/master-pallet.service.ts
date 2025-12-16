@@ -69,6 +69,14 @@ export class MasterPalletService {
     return pallet;
   }
 
+  async findByMemoId(memoId: string): Promise<MasterPallet> {
+    const pallet = await this.repository.findByMemoId(memoId);
+    if (!pallet) {
+      throw new NotFoundException(`Pallet with memo ID ${memoId} not found`);
+    }
+    return pallet;
+  }
+  
   async findByPalletCode(palletCode: string): Promise<MasterPallet> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {

@@ -1,7 +1,8 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { PalletTransactionHistory } from './transaction-pallet-history.entity';
 import { InventoryTracking } from './inventory-tracking.entity';
+import { OutboundMemo } from './outbound-memo.entity';
 @Entity('m_pallet')
 export class MasterPallet extends BaseEntity {
   @Column({ nullable: true })
@@ -27,6 +28,13 @@ export class MasterPallet extends BaseEntity {
 
   @Column({ name: 'current_week_number', type: 'int', default: 0 })
   currentWeekNumber: number;
+
+  @Column({ name: 'memo_id', nullable: true })
+  memo_id: string;
+
+  @ManyToOne(() => OutboundMemo, (memo) => memo.id)
+  @JoinColumn({ name: 'memo_id' })
+  memo: OutboundMemo;
 
   @OneToMany(() => PalletTransactionHistory, (history) => history.pallet)
   transactionHistory: PalletTransactionHistory[];

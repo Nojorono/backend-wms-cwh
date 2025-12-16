@@ -39,6 +39,14 @@ export class MasterPalletRepository {
     return pallet;
   }
 
+  async findByMemoId(memoId: string): Promise<MasterPallet | null> {
+    const pallet = await this.repository.findOne({ where: { memo_id: memoId } });
+    if (!pallet) {
+      return null;
+    }
+    return pallet;
+  }
+
   async update(
     id: string,
     updateMasterPalletDto: UpdateMasterPalletDto,
