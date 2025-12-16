@@ -99,8 +99,8 @@ export class TransactionPickingService {
     return this.repository.remove(id);
   }
 
-  async findByMemoId(memoId: string): Promise<PickingTransaction[]> {
-    return this.repository.findByMemoId(memoId);
+  async findByMemoId(memoId: string, status?: Status): Promise<PickingTransaction[]> {
+    return this.repository.findByMemoId(memoId, status);
   }
 
   async findByDoId(doId: string): Promise<PickingTransaction[]> {

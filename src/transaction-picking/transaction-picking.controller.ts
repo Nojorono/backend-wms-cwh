@@ -15,6 +15,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { TransactionPickingService } from './transaction-picking.service';
@@ -208,13 +209,28 @@ export class TransactionPickingController {
   @Get('memo/:memoId')
   @ApiOperation({ summary: 'Get transaction picking by memo ID' })
   @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: Status,
+    description: 'Filter by status (PENDING, COMPLETED, CANCELLED)',
+    example: Status.PENDING,
+  })
   @ApiResponse({
     status: 200,
     description: 'Daftar transaction picking berdasarkan memo',
     type: [PickingTransaction],
   })
-  async findByMemoId(@Param('memoId') memoId: string) {
-    return await this.service.findByMemoId(memoId);
+  async findByMemoId(
+    @Param('memoId') memoId: string,
+    @Query('status') status?: Status,
+  ) {
+    const result = await this.service.findByMemoId(memoId, status);
+    return {
+      success: true,
+      message: 'Data transaction picking berhasil diambil',
+      data: result,
+    };
   }
 
   @Get('status/:status')

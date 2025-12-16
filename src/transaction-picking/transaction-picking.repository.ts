@@ -140,9 +140,14 @@ export class TransactionPickingRepository {
     await this.repository.softDelete(id);
   }
 
-  async findByMemoId(memoId: string): Promise<PickingTransaction[]> {
+  async findByMemoId(memoId: string, status?: Status): Promise<PickingTransaction[]> {
+    const whereCondition: any = { memo_id: memoId };
+    if (status) {
+      whereCondition.status = status;
+    }
+
     return this.repository.find({
-      where: { memo_id: memoId },
+      where: whereCondition,
       relations: [
         'do',
         'memo',
@@ -152,6 +157,9 @@ export class TransactionPickingRepository {
         'destinationWarehouseSub',
         'destinationBin',
         'transactionScanPicking',
+        'transactionScanPicking.palletSource',
+        'transactionScanPicking.palletUse',
+        'transactionScanPicking.palletSwitch',
       ],
       order: { createdAt: 'DESC' },
     });
