@@ -225,12 +225,7 @@ export class TransactionPickingController {
     @Param('memoId') memoId: string,
     @Query('status') status?: Status,
   ) {
-    const result = await this.service.findByMemoId(memoId, status);
-    return {
-      success: true,
-      message: 'Data transaction picking berhasil diambil',
-      data: result,
-    };
+   return await this.service.findByMemoId(memoId, status);
   }
 
   @Get('status/:status')
