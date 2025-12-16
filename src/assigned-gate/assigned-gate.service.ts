@@ -314,6 +314,17 @@ export class AssignedGateService {
       throw new BadRequestException('Assigned gate must have a gate_id (warehouse sub)');
     }
 
+    // Check if pallet already exists for this gate
+    const existingPallets = await this.assignedGatePalletRepo.findAllByAssignedGate(assignedGateId);
+    const existingPallet = existingPallets.find(
+      (p) => p.pallet_id === createPalletDto.pallet_id && !p.deletedAt,
+    );
+
+    // If pallet already exists, return the existing one
+    if (existingPallet) {
+      return existingPallet;
+    }
+
     // Get the gate (MasterWarehouseSub) to get warehouse_id
     const gate = await this.masterWarehouseSubService.findOne(assignedGate.gate_id);
     if (!gate) {
