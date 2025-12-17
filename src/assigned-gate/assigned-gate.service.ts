@@ -436,22 +436,31 @@ export class AssignedGateService {
         };
 
         // Update existing inventory tracking to move to gate's subwarehouse
+        // Set warehouse_bin_id to null explicitly
         await this.inventoryTrackingService.update(existingInventory.id, {
           warehouse_sub_id: assignedGate.gate_id,
           warehouse_id: gate.warehouse_id,
-          warehouse_bin_id: undefined, // Clear bin when moving to gate
-          inventory_status: 'IN_GATE',
+          warehouse_bin_id: null as any, // Clear bin when moving to gate (null is needed for DB)
+          inventory_status: existingInventory.inventory_status || 'IN_INVENTORY', // Keep existing status if valid
           inventory_note: `Moved to gate ${gate.name || gate.code} via assigned gate ${assignedGate.id}. Previous location: ${previousLocation.warehouse_sub_id || 'N/A'}`,
           inventory_date: new Date(),
         });
       } else {
         // Create new inventory tracking if it doesn't exist
-        await this.inventoryTrackingService.createOrUpdateInventoryTracking(
+        const newInventory = await this.inventoryTrackingService.createOrUpdateInventoryTracking(
           createPalletDto.pallet_id,
           assignedGate.gate_id,
           gate.warehouse_id,
-          'IN_GATE',
+          'IN_INVENTORY', // Use standard status instead of IN_GATE
         );
+        
+        // Ensure warehouse_bin_id is set to null for gate location
+        if (newInventory && newInventory.warehouse_bin_id) {
+          await this.inventoryTrackingService.update(newInventory.id, {
+            warehouse_bin_id: null as any, // Clear bin when moving to gate (null is needed for DB)
+            inventory_note: `Moved to gate ${gate.name || gate.code} via assigned gate ${assignedGate.id}`,
+          });
+        }
       }
     } catch (error) {
       // Log error but don't fail the pallet creation if inventory tracking fails
