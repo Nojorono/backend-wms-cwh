@@ -23,6 +23,10 @@ export class AssignedGateRepository {
         'outbound_do.outbound_memos.outbound_memo_items',
         'outbound_do.outbound_memos.transaction_pickings',
         'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.item',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.palletUse',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.palletSource',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.palletSwitch',
         'gate',
         'assigned_gate_users',
         'assigned_gate_users.user',
@@ -62,6 +66,10 @@ export class AssignedGateRepository {
       .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
       .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
       .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transactionScanPicking')
+      .leftJoinAndSelect('transactionScanPicking.item', 'scanPickingItem')
+      .leftJoinAndSelect('transactionScanPicking.palletUse', 'palletUse')
+      .leftJoinAndSelect('transactionScanPicking.palletSource', 'palletSource')
+      .leftJoinAndSelect('transactionScanPicking.palletSwitch', 'palletSwitch')
       .leftJoinAndSelect('assigned_gate.gate', 'gate')
       .leftJoinAndSelect('assigned_gate.assigned_gate_users', 'assigned_gate_users')
       .leftJoinAndSelect('assigned_gate_users.user', 'user')
@@ -102,6 +110,10 @@ export class AssignedGateRepository {
         'outbound_do.outbound_memos.outbound_memo_items',
         'outbound_do.outbound_memos.transaction_pickings',
         'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.item',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.palletUse',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.palletSource',
+        'outbound_do.outbound_memos.transaction_pickings.transactionScanPicking.palletSwitch',
         'gate',
         'assigned_gate_users',
         'assigned_gate_users.user',

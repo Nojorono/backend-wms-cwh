@@ -224,8 +224,22 @@ export class InventoryTrackingRepository {
     const entity = await this.repository.findOne({
       where: { pallet_id },
       relations: ['pallet', 'warehouse', 'warehouseSub', 'warehouseBin'],
+      order: { createdAt: 'DESC' },
     });
     return entity ?? null;
+  }
+
+  async findAllByPalletId(pallet_id: string, inventory_status?: string): Promise<InventoryTracking[]> {
+    const whereCondition: any = { pallet_id };
+    if (inventory_status) {
+      whereCondition.inventory_status = inventory_status;
+    }
+
+    return await this.repository.find({
+      where: whereCondition,
+      relations: ['pallet', 'warehouse', 'warehouseSub', 'warehouseBin'],
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async findPalletById(pallet_id: string): Promise<MasterPallet | null> {

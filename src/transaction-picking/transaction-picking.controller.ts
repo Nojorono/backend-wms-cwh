@@ -15,13 +15,12 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { TransactionPickingService } from './transaction-picking.service';
 import { CreateTransactionPickingDto, CreateManyTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
-import { AttachMemoDto } from './dto/attach-memo.dto';
-import { AttachDoDto } from './dto/attach-do.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
 import { TransactionPickingPaginationDto } from './dto/transaction-picking-pagination.dto';
 import { ApiPaginationQuery } from '../core/decorators/pagination.decorator';
@@ -117,6 +116,19 @@ export class TransactionPickingController {
     };
   }
 
+  @Get('item/:itemId')
+  @ApiOperation({ summary: 'Get transaction picking by item ID' })
+  @ApiParam({ name: 'itemId', description: 'ID item' })
+  @ApiResponse({
+    status: 200,
+    description: 'Daftar transaction picking berdasarkan item',
+    type: [PickingTransaction],
+  })
+  async findByItemId(@Param('itemId') itemId: string) {
+     return await this.service.findByItemId(itemId);
+    
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get transaction picking by ID' })
   @ApiParam({ name: 'id', description: 'ID transaction picking' })
@@ -193,13 +205,23 @@ export class TransactionPickingController {
   @Get('memo/:memoId')
   @ApiOperation({ summary: 'Get transaction picking by memo ID' })
   @ApiParam({ name: 'memoId', description: 'ID outbound memo' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: Status,
+    description: 'Filter by status (PENDING, COMPLETED, CANCELLED)',
+    example: Status.PENDING,
+  })
   @ApiResponse({
     status: 200,
     description: 'Daftar transaction picking berdasarkan memo',
     type: [PickingTransaction],
   })
-  async findByMemoId(@Param('memoId') memoId: string) {
-    return await this.service.findByMemoId(memoId);
+  async findByMemoId(
+    @Param('memoId') memoId: string,
+    @Query('status') status?: Status,
+  ) {
+   return await this.service.findByMemoId(memoId, status);
   }
 
   @Get('status/:status')

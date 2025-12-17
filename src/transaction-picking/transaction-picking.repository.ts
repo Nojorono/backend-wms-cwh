@@ -140,9 +140,14 @@ export class TransactionPickingRepository {
     await this.repository.softDelete(id);
   }
 
-  async findByMemoId(memoId: string): Promise<PickingTransaction[]> {
+  async findByMemoId(memoId: string, status?: Status): Promise<PickingTransaction[]> {
+    const whereCondition: any = { memo_id: memoId };
+    if (status) {
+      whereCondition.status = status;
+    }
+
     return this.repository.find({
-      where: { memo_id: memoId },
+      where: whereCondition,
       relations: [
         'do',
         'memo',
@@ -152,6 +157,9 @@ export class TransactionPickingRepository {
         'destinationWarehouseSub',
         'destinationBin',
         'transactionScanPicking',
+        'transactionScanPicking.palletSource',
+        'transactionScanPicking.palletUse',
+        'transactionScanPicking.palletSwitch',
       ],
       order: { createdAt: 'DESC' },
     });
@@ -177,6 +185,23 @@ export class TransactionPickingRepository {
   async findByStatus(status: string): Promise<PickingTransaction[]> {
     return this.repository.find({
       where: { status: status as any },
+      relations: [
+        'do',
+        'memo',
+        'item',
+        'sourceWarehouseSub',
+        'sourceBin',
+        'destinationWarehouseSub',
+        'destinationBin',
+        'transactionScanPicking',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findByItemId(itemId: string): Promise<PickingTransaction[]> {
+    return this.repository.find({
+      where: { item_id: itemId },
       relations: [
         'do',
         'memo',
@@ -222,5 +247,32 @@ export class TransactionPickingRepository {
 
   async attachDo(transactionIds: string[], doId: string): Promise<void> {
     await this.repository.update(transactionIds, { do_id: doId });
+  }
+
+  /**
+   * Find active transaction pickings (PENDING or COMPLETED) that use a specific pallet
+   * by checking transaction_scan_picking records
+   */
+  async findActiveByPalletId(palletId: string, excludeTransactionPickingId?: string): Promise<PickingTransaction[]> {
+    const queryBuilder = this.repository
+      .createQueryBuilder('transaction')
+      .innerJoin(
+        'transaction_scan_picking',
+        'scan',
+        'scan.transaction_picking_id = transaction.id AND scan.pallet_use_id = :palletId',
+        { palletId },
+      )
+      .where('transaction.deletedAt IS NULL')
+      .andWhere('transaction.status IN (:...statuses)', {
+        statuses: [Status.PENDING, Status.COMPLETED],
+      });
+
+    if (excludeTransactionPickingId) {
+      queryBuilder.andWhere('transaction.id != :excludeId', {
+        excludeId: excludeTransactionPickingId,
+      });
+    }
+
+    return queryBuilder.getMany();
   }
 }

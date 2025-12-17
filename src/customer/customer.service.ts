@@ -92,6 +92,7 @@ export class CustomerService {
           setOfBooksId: customer.SET_OF_BOOKS_ID,
           shortCode: customer.SHORT_CODE,
           usableFlag: customer.USABLE_FLAG === 'Y' || customer.USABLE_FLAG === true,
+          address: customer.ADDRESS,
         })) || null
       );
     } else {
@@ -108,6 +109,7 @@ export class CustomerService {
         setOfBooksId: customer.SET_OF_BOOKS_ID,
         shortCode: customer.SHORT_CODE,
         usableFlag: customer.USABLE_FLAG === 'Y' || customer.USABLE_FLAG === true,
+        address: customer.ADDRESS,
       });
     }
   }

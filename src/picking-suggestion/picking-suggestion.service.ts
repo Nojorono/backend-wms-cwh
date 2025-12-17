@@ -752,8 +752,8 @@ export class PickingSuggestionService {
   async getPutAwaySuggestions(): Promise<{
     palletSuggestions: Array<{
       stagingPallet: InventoryTracking;
-      suggestedBin: MasterWarehouseBin;
-      suggestedZone: MasterWarehouseSub;
+      suggestedBin: MasterWarehouseBin | null;
+      suggestedZone: MasterWarehouseSub | null;
       palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
     }>;
   }> {
@@ -822,8 +822,8 @@ export class PickingSuggestionService {
 
     const palletSuggestions: Array<{
       stagingPallet: InventoryTracking;
-      suggestedBin: MasterWarehouseBin;
-      suggestedZone: MasterWarehouseSub;
+      suggestedBin: MasterWarehouseBin | null;
+      suggestedZone: MasterWarehouseSub | null;
       palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
     }> = [];
 
@@ -954,13 +954,16 @@ export class PickingSuggestionService {
           | undefined;
       }
 
+      // Always add pallet to suggestions, even if bin/zone suggestions are not available
+      palletSuggestions.push({
+        stagingPallet,
+        suggestedBin: suggestedBin || null,
+        suggestedZone: suggestedZone || null,
+        palletItems,
+      });
+
+      // Only mark as used if both bin and zone are found
       if (suggestedBin && suggestedZone) {
-        palletSuggestions.push({
-          stagingPallet,
-          suggestedBin,
-          suggestedZone,
-          palletItems,
-        });
         usedBinIds.add(suggestedBin.id);
         usedZoneIds.add(suggestedZone.id);
       }

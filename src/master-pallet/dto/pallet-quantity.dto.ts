@@ -182,6 +182,20 @@ export class PalletItemQuantityDto {
 
   @ApiPropertyOptional({ example: 'BIN-001', description: 'Warehouse bin name/code' })
   warehouse_bin_name?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-memo-123', description: 'Outbound memo ID' })
+  @IsOptional()
+  @IsString()
+  memo_id?: string;
+
+  @ApiPropertyOptional({
+    enum: StatusInventory,
+    example: StatusInventory.READY,
+    description: 'Status inventory for the item (READY or PENDING)',
+  })
+  @IsOptional()
+  @IsEnum(StatusInventory)
+  status_inventory?: StatusInventory;
 }
 
 export class PalletCapacityValidationDto {

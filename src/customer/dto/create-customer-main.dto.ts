@@ -50,5 +50,10 @@ export class CreateCustomerMainDto {
   @IsBoolean()
   @IsOptional()
   usableFlag?: boolean;
+
+  @ApiProperty({ example: '123 Main St', description: 'Address' })
+  @IsString()
+  @IsOptional()
+  address?: string;
 }
 

@@ -51,4 +51,8 @@ export class CustomerMain extends BaseEntity {
   @ApiProperty({ description: 'Usable flag', example: true })
   @Column({ name: 'usable_flag', type: 'boolean', default: true , nullable: true })
   usableFlag: boolean;
+
+  @ApiProperty({ description: 'Address', example: 1 })
+  @Column({ name: 'address', type: 'varchar', length: 255 , nullable: true })
+  address: string;
 }

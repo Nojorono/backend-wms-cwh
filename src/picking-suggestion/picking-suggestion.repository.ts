@@ -192,8 +192,14 @@ export class PickingSuggestionRepository {
       LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
       WHERE pth.item_id = $1
         AND ($2::text IS NULL OR pth.uom::text = $2::text)
-        AND pth.status_inventory = 'READY'
-        AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED')
+        -- For staging OUTBOUND (FIFO) and staging INBOUND (LIFO), include both READY and PENDING
+        -- For regular locations, only include READY
+        AND (
+          (it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'OUTBOUND' AND pth.status_inventory IN ('READY', 'PENDING'))
+          OR (it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'INBOUND' AND pth.status_inventory IN ('READY', 'PENDING'))
+          OR (COALESCE(ws.is_staging::text, '') NOT IN ('OUTBOUND', 'INBOUND') AND pth.status_inventory = 'READY')
+        )
+        AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'PICKED')
         AND it.progression_status NOT IN ('IN_PROGRESS')
         AND pth.new_quantity > 0
         AND (it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)
@@ -206,7 +212,11 @@ export class PickingSuggestionRepository {
           FROM transaction_pallet_history pth2
           WHERE pth2.pallet_id = pth.pallet_id
             AND pth2.item_id = pth.item_id
-            AND pth2.status_inventory = 'READY'
+            -- For staging areas, get latest regardless of status; for regular areas, only READY
+            AND (
+              (it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') IN ('OUTBOUND', 'INBOUND') AND pth2.status_inventory IN ('READY', 'PENDING'))
+              OR (COALESCE(ws.is_staging::text, '') NOT IN ('OUTBOUND', 'INBOUND') AND pth2.status_inventory = 'READY')
+            )
         )
         -- Only show locations with available quantity after reservations
         -- For staging areas (PRELOAD OUTBOUND for FIFO, staging INBOUND for LIFO), always show if they have stock
@@ -254,7 +264,7 @@ export class PickingSuggestionRepository {
         'it.progression_status',
       ])
       .where('it.inventory_status IN (:...statuses)', {
-        statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING'],
+        statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING', 'PICKED'],
       })
       .orderBy('it.created_at', 'DESC')
       .limit(10);
@@ -285,7 +295,7 @@ export class PickingSuggestionRepository {
         'wb.name as bin_name',
       ])
       .where('it.inventory_status IN (:...statuses)', {
-        statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING'],
+        statuses: ['IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'STAGING', 'PICKED'],
       })
       .andWhere('it.pallet_id IS NOT NULL')
       .orderBy('it.created_at', 'DESC')
