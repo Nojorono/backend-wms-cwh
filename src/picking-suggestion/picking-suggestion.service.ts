@@ -948,6 +948,65 @@ export class PickingSuggestionService {
           | undefined;
       }
 
+      // Final fallback: Get any regular warehouse bin/zone if still not found
+      if (!suggestedBin) {
+        const anyBin = await this.masterWarehouseBinRepository
+          .createQueryBuilder('bin')
+          .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
+          .where('warehouseSub.is_staging IS NULL')
+          .andWhere('bin.capacity_pallet > 0')
+          .orderBy('bin.capacity_pallet', 'DESC')
+          .limit(1)
+          .getOne();
+
+        if (anyBin) {
+          suggestedBin = anyBin;
+          suggestedZone = availableZones.find(
+            (zone) => zone.id === anyBin.warehouse_sub_id,
+          ) as MasterWarehouseSub;
+        }
+      }
+
+      if (!suggestedZone && suggestedBin) {
+        // If we have a bin but no zone, get the zone from the bin's warehouse_sub_id
+        const zoneFromBin = await this.masterWarehouseSubRepository.findOne({
+          where: { id: suggestedBin.warehouse_sub_id },
+        });
+        if (zoneFromBin) {
+          suggestedZone = zoneFromBin;
+        }
+      }
+
+      if (!suggestedZone) {
+        // Final fallback: Get any regular warehouse zone
+        const anyZone = await this.masterWarehouseSubRepository
+          .createQueryBuilder('zone')
+          .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
+          .where('zone.is_staging IS NULL')
+          .andWhere('bin.id IS NOT NULL')
+          .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
+          .limit(1)
+          .getOne();
+
+        if (anyZone) {
+          suggestedZone = anyZone;
+          // Try to find a bin in this zone
+          if (!suggestedBin) {
+            const binInZone = await this.masterWarehouseBinRepository
+              .createQueryBuilder('bin')
+              .where('bin.warehouse_sub_id = :zoneId', { zoneId: anyZone.id })
+              .andWhere('bin.capacity_pallet > 0')
+              .orderBy('bin.capacity_pallet', 'DESC')
+              .limit(1)
+              .getOne();
+
+            if (binInZone) {
+              suggestedBin = binInZone;
+            }
+          }
+        }
+      }
+
       // Always add pallet to suggestions, even if bin/zone suggestions are not available
       palletSuggestions.push({
         stagingPallet,
