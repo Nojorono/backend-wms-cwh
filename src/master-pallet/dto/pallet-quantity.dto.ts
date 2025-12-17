@@ -187,6 +187,15 @@ export class PalletItemQuantityDto {
   @IsOptional()
   @IsString()
   memo_id?: string;
+
+  @ApiPropertyOptional({
+    enum: StatusInventory,
+    example: StatusInventory.READY,
+    description: 'Status inventory for the item (READY or PENDING)',
+  })
+  @IsOptional()
+  @IsEnum(StatusInventory)
+  status_inventory?: StatusInventory;
 }
 
 export class PalletCapacityValidationDto {
