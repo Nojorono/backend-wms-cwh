@@ -61,5 +61,10 @@ export class UpdateCustomerMainDto {
   @IsBoolean()
   @IsOptional()
   usableFlag?: boolean;
+
+  @ApiProperty({ example: '123 Main St', description: 'Address', required: false })
+  @IsString()
+  @IsOptional()
+  address?: string;
 }
 
