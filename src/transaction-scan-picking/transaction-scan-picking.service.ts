@@ -139,7 +139,7 @@ export class TransactionScanPickingService {
             reference_id: data.transaction_picking_id,
             reference_type: 'TRANSACTION_SCAN_PICKING',
             notes: `Added back ${remainingQuantity} to same pallet (remaining after switch)`,
-            status_inventory: StatusInventory.READY,
+            status_inventory: StatusInventory.PENDING,
           });
         }
       } else {
@@ -156,7 +156,7 @@ export class TransactionScanPickingService {
           reference_id: data.transaction_picking_id,
           reference_type: 'TRANSACTION_SCAN_PICKING',
           notes: `Added ${data.quantity_picked} to destination pallet from transaction scan picking`,
-          status_inventory: StatusInventory.READY,
+          status_inventory: StatusInventory.PENDING,
         });
       }
     }
@@ -340,7 +340,7 @@ export class TransactionScanPickingService {
               reference_id: transactionPickingId,
               reference_type: 'TRANSACTION_SCAN_PICKING',
               notes: `Added back ${remainingQuantity} to same pallet (remaining after switch) - updated`,
-              status_inventory: StatusInventory.READY,
+              status_inventory: StatusInventory.PENDING,
             });
           }
         } else {
@@ -357,7 +357,7 @@ export class TransactionScanPickingService {
             reference_id: transactionPickingId,
             reference_type: 'TRANSACTION_SCAN_PICKING',
             notes: `Added ${quantityPicked} to destination pallet from transaction scan picking (updated)`,
-            status_inventory: StatusInventory.READY,
+            status_inventory: StatusInventory.PENDING,
           });
         }
       }

@@ -248,4 +248,31 @@ export class TransactionPickingRepository {
   async attachDo(transactionIds: string[], doId: string): Promise<void> {
     await this.repository.update(transactionIds, { do_id: doId });
   }
+
+  /**
+   * Find active transaction pickings (PENDING or COMPLETED) that use a specific pallet
+   * by checking transaction_scan_picking records
+   */
+  async findActiveByPalletId(palletId: string, excludeTransactionPickingId?: string): Promise<PickingTransaction[]> {
+    const queryBuilder = this.repository
+      .createQueryBuilder('transaction')
+      .innerJoin(
+        'transaction_scan_picking',
+        'scan',
+        'scan.transaction_picking_id = transaction.id AND scan.pallet_use_id = :palletId',
+        { palletId },
+      )
+      .where('transaction.deletedAt IS NULL')
+      .andWhere('transaction.status IN (:...statuses)', {
+        statuses: [Status.PENDING, Status.COMPLETED],
+      });
+
+    if (excludeTransactionPickingId) {
+      queryBuilder.andWhere('transaction.id != :excludeId', {
+        excludeId: excludeTransactionPickingId,
+      });
+    }
+
+    return queryBuilder.getMany();
+  }
 }

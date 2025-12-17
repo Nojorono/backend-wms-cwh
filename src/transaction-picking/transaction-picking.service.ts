@@ -8,6 +8,10 @@ import { TransactionPickingPaginationDto } from './dto/transaction-picking-pagin
 import { PaginationService } from '../core/services/pagination.service';
 import { TransactionScanPickingRepository } from '../transaction-scan-picking/transaction-scan-picking.repository';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
+import { MasterPalletService } from '../master-pallet/master-pallet.service';
+import { StatusInventory, QuantityOperationType, PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class TransactionPickingService {
@@ -16,6 +20,9 @@ export class TransactionPickingService {
     private readonly paginationService: PaginationService,
     private readonly transactionScanPickingRepository: TransactionScanPickingRepository,
     private readonly inventoryTrackingService: InventoryTrackingService,
+    private readonly masterPalletService: MasterPalletService,
+    @InjectRepository(PalletTransactionHistory)
+    private readonly palletHistoryRepository: Repository<PalletTransactionHistory>,
   ) {}
 
   async create(data: CreateTransactionPickingDto): Promise<PickingTransaction> {
@@ -153,6 +160,9 @@ export class TransactionPickingService {
     
     // Update inventory tracking status from PICKED to IN_INVENTORY for related pallets
     await this.revertInventoryTrackingStatus(transactionId);
+    
+    // Set items to READY status in transaction_pallet_history for pallet_use_id
+    await this.setItemsToReadyStatus(transactionId);
   }
 
   async cancelTransactionByMemoId(memoId: string): Promise<void> {
@@ -168,6 +178,8 @@ export class TransactionPickingService {
   /**
    * Revert inventory tracking status from PICKED to IN_INVENTORY
    * for all pallets related to transaction-scan-picking records
+   * Only reverts if there are no other active transaction pickings (PENDING or COMPLETED)
+   * for the same pallet with different items
    */
   private async revertInventoryTrackingStatus(transactionPickingId: string): Promise<void> {
     try {
@@ -180,27 +192,49 @@ export class TransactionPickingService {
         return;
       }
 
-      // Collect all unique pallet IDs from scan picking transactions
+      // Collect all unique pallet_use_id from scan picking transactions
       const palletIds = new Set<string>();
       for (const scanPicking of scanPickingTransactions) {
         if (scanPicking.pallet_use_id) {
           palletIds.add(scanPicking.pallet_use_id);
         }
-        if (scanPicking.pallet_source_id) {
-          palletIds.add(scanPicking.pallet_source_id);
-        }
-        if (scanPicking.pallet_switch_id) {
-          palletIds.add(scanPicking.pallet_switch_id);
-        }
       }
 
       // Update inventory tracking status for each pallet from PICKED to IN_INVENTORY
+      // Only revert if there are no other active transaction pickings for the same pallet
       for (const palletId of palletIds) {
         try {
-          const inventoryTracking = await this.inventoryTrackingService.findOneByPalletId(palletId);
-          
-          // Only update if current status is PICKED
-          if (inventoryTracking.inventory_status === 'PICKED') {
+          // Check if there are other active transaction pickings (PENDING or COMPLETED)
+          // that use the same pallet but for different items
+          const otherActiveTransactions = await this.repository.findActiveByPalletId(
+            palletId,
+            transactionPickingId,
+          );
+
+          // If there are other active transaction pickings for this pallet, don't revert
+          // The pallet is still being used for other items
+          if (otherActiveTransactions.length > 0) {
+            console.log(
+              `Skipping inventory tracking revert for pallet ${palletId}: ` +
+                `Found ${otherActiveTransactions.length} other active transaction pickings for this pallet`,
+            );
+            continue;
+          }
+
+          // No other active transaction pickings found, safe to revert
+          // Find all inventory tracking records with status PICKED for this pallet
+          const inventoryTrackings = await this.inventoryTrackingService.findAllByPalletId(
+            palletId,
+            'PICKED',
+          );
+
+          if (inventoryTrackings.length === 0) {
+            // No PICKED records found, skip
+            continue;
+          }
+
+          // Update all PICKED records to IN_INVENTORY
+          for (const inventoryTracking of inventoryTrackings) {
             await this.inventoryTrackingService.update(inventoryTracking.id, {
               inventory_status: 'IN_INVENTORY',
               inventory_note: `Reverted from PICKED to IN_INVENTORY due to transaction picking cancellation`,
@@ -219,6 +253,84 @@ export class TransactionPickingService {
     } catch (error) {
       // Log error but don't fail the cancellation
       console.error(`Failed to revert inventory tracking status for transaction ${transactionPickingId}:`, error);
+    }
+  }
+
+  /**
+   * Set items to READY status in transaction_pallet_history for pallet_use_id
+   * when transaction picking is cancelled
+   */
+  private async setItemsToReadyStatus(transactionPickingId: string): Promise<void> {
+    try {
+      // Find all transaction-scan-picking records for this transaction picking
+      const scanPickingTransactions = await this.transactionScanPickingRepository.findAll({
+        transactionPickingId: transactionPickingId,
+      });
+
+      if (scanPickingTransactions.length === 0) {
+        return;
+      }
+
+      // Process each scan picking transaction to update items in pallet_use_id
+      for (const scanPicking of scanPickingTransactions) {
+        if (!scanPicking.pallet_use_id || !scanPicking.item_id) {
+          continue;
+        }
+
+        try {
+          // Build where condition for querying latest history record
+          const whereCondition: any = {
+            pallet_id: scanPicking.pallet_use_id,
+            item_id: scanPicking.item_id,
+          };
+
+          // Only add UOM filter if it exists
+          if (scanPicking.uom) {
+            whereCondition.uom = scanPicking.uom;
+          }
+
+          // Get the latest history record for this item on the pallet using query builder
+          // to handle soft deletes properly
+          const queryBuilder = this.palletHistoryRepository
+            .createQueryBuilder('history')
+            .where('history.pallet_id = :palletId', { palletId: scanPicking.pallet_use_id })
+            .andWhere('history.item_id = :itemId', { itemId: scanPicking.item_id })
+            .andWhere('history.deletedAt IS NULL')
+            .orderBy('history.createdAt', 'DESC');
+
+          // Only add UOM filter if it exists
+          if (scanPicking.uom) {
+            queryBuilder.andWhere('history.uom = :uom', { uom: scanPicking.uom });
+          }
+
+          const latestHistory = await queryBuilder.getOne();
+
+          if (!latestHistory || latestHistory.new_quantity === 0) {
+            // No quantity on pallet or no history record, skip
+            continue;
+          }
+
+          // Only update if current status is PENDING
+          if (latestHistory.status_inventory === StatusInventory.PENDING) {
+            // Use query builder to update the status
+            await this.palletHistoryRepository
+              .createQueryBuilder()
+              .update(PalletTransactionHistory)
+              .set({ status_inventory: StatusInventory.READY })
+              .where('id = :id', { id: latestHistory.id })
+              .andWhere('deletedAt IS NULL')
+              .execute();
+          }
+        } catch (error) {
+          console.error(
+            `Failed to set item ${scanPicking.item_id} to READY status for pallet ${scanPicking.pallet_use_id}:`,
+            error,
+          );
+        }
+      }
+    } catch (error) {
+      // Log error but don't fail the cancellation
+      console.error(`Failed to set items to READY status for transaction ${transactionPickingId}:`, error);
     }
   }
 

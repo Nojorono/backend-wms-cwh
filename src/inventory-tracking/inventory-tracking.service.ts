@@ -167,6 +167,10 @@ export class InventoryTrackingService {
     return enriched[0];
   }
 
+  async findAllByPalletId(palletId: string, inventory_status?: string): Promise<InventoryTracking[]> {
+    return await this.repository.findAllByPalletId(palletId, inventory_status);
+  }
+
   async update(id: string, dto: UpdateInventoryTrackingDto): Promise<InventoryTracking> {
     // Validasi status jika ada
     if (dto.inventory_status) {
