@@ -2,7 +2,6 @@ import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { AssignedGate } from './assigned-gate.entity';
 import { MasterPallet } from './master-pallet.entity';
-import { User } from './user.entity';
 
 export enum AssignedGatePalletStatus {
   ASSIGNED = 'ASSIGNED',

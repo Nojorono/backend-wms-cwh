@@ -4,6 +4,7 @@ import { OutboundDo } from './outbound-do.entity';
 import { AssignedGateUser } from './assigned-gate-user.entity';
 import { AssignedGatePallet } from './assigned-gate-pallet.entity';
 import { MasterWarehouseSub } from './master-warehouse-sub.entity';
+import { AssignedGateHelper } from './assigned-gate-helper.entity';
 
 export enum AssignedGateStatus {
   PENDING = 'PENDING',
@@ -39,4 +40,7 @@ export class AssignedGate extends BaseEntity {
 
   @OneToMany(() => AssignedGatePallet, (assignedGatePallet) => assignedGatePallet.assigned_gate)
   assigned_gate_pallets: AssignedGatePallet[];
+
+  @OneToMany(() => AssignedGateHelper, (assignedGateHelper) => assignedGateHelper.assigned_gate)
+  assigned_gate_helpers: AssignedGateHelper[];
 }

@@ -2,12 +2,15 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { AssignedGate } from '../core/domain/entities/assigned-gate.entity';
 import { AssignedGateUser } from '../core/domain/entities/assigned-gate-user.entity';
 import { AssignedGatePallet } from '../core/domain/entities/assigned-gate-pallet.entity';
+import { AssignedGateHelper } from '../core/domain/entities/assigned-gate-helper.entity';
 import { AssignedGateRepository } from './repositories/assigned-gate.repository';
 import { AssignedGateUserRepository } from './repositories/assigned-gate-user.repository';
 import { AssignedGatePalletRepository } from './repositories/assigned-gate-pallet.repository';
+import { AssignedGateHelperRepository } from './repositories/assigned-gate-helper.repository';
 import { CreateAssignedGateDto } from './dto/create-assigned-gate.dto';
 import { CreateAssignedGateUserDto } from './dto/create-assigned-gate-user.dto';
 import { CreateAssignedGatePalletDto } from './dto/create-assigned-gate-pallet.dto';
+import { CreateAssignedGateHelperDto } from './dto/create-assigned-gate-helper.dto';
 import { UpdateAssignedGateStatusDto } from './dto/update-assigned-gate-status.dto';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
@@ -19,6 +22,7 @@ export class AssignedGateService {
     private readonly assignedGateRepo: AssignedGateRepository,
     private readonly assignedGateUserRepo: AssignedGateUserRepository,
     private readonly assignedGatePalletRepo: AssignedGatePalletRepository,
+    private readonly assignedGateHelperRepo: AssignedGateHelperRepository,
     private readonly masterPalletService: MasterPalletService,
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly masterWarehouseSubService: MasterWarehouseSubService,
@@ -300,6 +304,74 @@ export class AssignedGateService {
     await this.findOne(assignedGateId);
 
     return await this.assignedGateUserRepo.findAllByAssignedGate(assignedGateId);
+  }
+
+  // Helper management methods by assigned-gate-id
+  async addHelperToGate(
+    assignedGateId: string,
+    createHelperDto: CreateAssignedGateHelperDto,
+  ): Promise<AssignedGateHelper> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    const helperData = {
+      ...createHelperDto,
+      assigned_gate_id: assignedGateId,
+    };
+
+    return await this.assignedGateHelperRepo.create(helperData);
+  }
+
+  async updateHelperInGate(
+    assignedGateId: string,
+    helperId: string,
+    updateHelperDto: Partial<CreateAssignedGateHelperDto>,
+  ): Promise<AssignedGateHelper> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    // Verify helper exists and belongs to this gate
+    const existingHelper = await this.assignedGateHelperRepo.findOne(helperId);
+    if (!existingHelper) {
+      throw new NotFoundException('AssignedGateHelper not found');
+    }
+    if (existingHelper.assigned_gate_id !== assignedGateId) {
+      throw new BadRequestException('Helper does not belong to this assigned gate');
+    }
+
+    const helperData = {
+      ...updateHelperDto,
+      assigned_gate_id: assignedGateId,
+    };
+
+    const updated = await this.assignedGateHelperRepo.update(helperId, helperData);
+    if (!updated) {
+      throw new NotFoundException('AssignedGateHelper not found');
+    }
+    return updated;
+  }
+
+  async removeHelperFromGate(assignedGateId: string, helperId: string): Promise<void> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    // Verify helper exists and belongs to this gate
+    const existingHelper = await this.assignedGateHelperRepo.findOne(helperId);
+    if (!existingHelper) {
+      throw new NotFoundException('AssignedGateHelper not found');
+    }
+    if (existingHelper.assigned_gate_id !== assignedGateId) {
+      throw new BadRequestException('Helper does not belong to this assigned gate');
+    }
+
+    await this.assignedGateHelperRepo.remove(helperId);
+  }
+
+  async getHelpersByGate(assignedGateId: string): Promise<AssignedGateHelper[]> {
+    // Verify gate exists
+    await this.findOne(assignedGateId);
+
+    return await this.assignedGateHelperRepo.findAllByAssignedGate(assignedGateId);
   }
 
   // Pallet management methods by assigned-gate-id

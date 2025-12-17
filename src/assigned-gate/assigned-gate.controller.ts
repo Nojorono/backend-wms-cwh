@@ -6,10 +6,13 @@ import { CreateAssignedGateUserDto } from './dto/create-assigned-gate-user.dto';
 import { UpdateAssignedGateUserDto } from './dto/update-assigned-gate-user.dto';
 import { CreateAssignedGatePalletDto } from './dto/create-assigned-gate-pallet.dto';
 import { UpdateAssignedGatePalletDto } from './dto/update-assigned-gate-pallet.dto';
+import { CreateAssignedGateHelperDto } from './dto/create-assigned-gate-helper.dto';
+import { UpdateAssignedGateHelperDto } from './dto/update-assigned-gate-helper.dto';
 import { UpdateAssignedGateStatusDto } from './dto/update-assigned-gate-status.dto';
 import { AssignedGate, AssignedGateStatus } from '../core/domain/entities/assigned-gate.entity';
 import { AssignedGateUser } from '../core/domain/entities/assigned-gate-user.entity';
 import { AssignedGatePallet } from '../core/domain/entities/assigned-gate-pallet.entity';
+import { AssignedGateHelper } from '../core/domain/entities/assigned-gate-helper.entity';
 
 @ApiTags('Assigned Gate')
 @Controller('assigned-gate')
@@ -146,6 +149,67 @@ export class AssignedGateController {
     @Param('userId') userId: string,
   ) {
     return this.assignedGateService.removeUserFromGate(assignedGateId, userId);
+  }
+
+  // Helper management endpoints by assigned-gate-id
+  @Post(':assignedGateId/helpers')
+  @ApiOperation({ summary: 'Add helper to assigned gate' })
+  @ApiResponse({
+    status: 201,
+    description: 'Helper added to assigned gate successfully',
+    type: AssignedGateHelper,
+  })
+  @ApiResponse({ status: 404, description: 'Assigned gate not found' })
+  addHelperToGate(
+    @Param('assignedGateId') assignedGateId: string,
+    @Body() createHelperDto: CreateAssignedGateHelperDto,
+  ) {
+    return this.assignedGateService.addHelperToGate(assignedGateId, createHelperDto);
+  }
+
+  @Get(':assignedGateId/helpers')
+  @ApiOperation({ summary: 'Get all helpers by assigned gate ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of helpers retrieved successfully',
+    type: [AssignedGateHelper],
+  })
+  @ApiResponse({ status: 404, description: 'Assigned gate not found' })
+  getHelpersByGate(@Param('assignedGateId') assignedGateId: string) {
+    return this.assignedGateService.getHelpersByGate(assignedGateId);
+  }
+
+  @Patch(':assignedGateId/helpers/:helperId')
+  @ApiOperation({ summary: 'Update helper in assigned gate' })
+  @ApiBody({
+    type: UpdateAssignedGateHelperDto,
+    description: 'Update helper data in assigned gate',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Helper updated successfully',
+    type: AssignedGateHelper,
+  })
+  @ApiResponse({ status: 404, description: 'Assigned gate or helper not found' })
+  @ApiResponse({ status: 400, description: 'Helper does not belong to this assigned gate' })
+  updateHelperInGate(
+    @Param('assignedGateId') assignedGateId: string,
+    @Param('helperId') helperId: string,
+    @Body() updateHelperDto: UpdateAssignedGateHelperDto,
+  ) {
+    return this.assignedGateService.updateHelperInGate(assignedGateId, helperId, updateHelperDto);
+  }
+
+  @Delete(':assignedGateId/helpers/:helperId')
+  @ApiOperation({ summary: 'Remove helper from assigned gate' })
+  @ApiResponse({ status: 200, description: 'Helper removed successfully' })
+  @ApiResponse({ status: 404, description: 'Assigned gate or helper not found' })
+  @ApiResponse({ status: 400, description: 'Helper does not belong to this assigned gate' })
+  removeHelperFromGate(
+    @Param('assignedGateId') assignedGateId: string,
+    @Param('helperId') helperId: string,
+  ) {
+    return this.assignedGateService.removeHelperFromGate(assignedGateId, helperId);
   }
 
   // Pallet management endpoints by assigned-gate-id
