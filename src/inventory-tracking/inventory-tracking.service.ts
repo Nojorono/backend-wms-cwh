@@ -352,6 +352,7 @@ export class InventoryTrackingService {
     existing_tracking: InventoryTracking | null;
     can_create: boolean;
     reasons: string[];
+    items: any[];
   }> {
     try {
       const reasons: string[] = [];
@@ -378,7 +379,20 @@ export class InventoryTrackingService {
           existing_tracking: null,
           can_create: false,
           reasons: ['Pallet tidak ditemukan dalam sistem'],
+          items: [],
         };
+      }
+
+      // Get all items on the pallet (filter out items with zero quantity)
+      let palletItems: any[] = [];
+      try {
+        const allItems = await this.masterPalletService.getPalletItemLatestQuantity(pallet.id);
+        // Filter out items with current_quantity = 0
+        palletItems = allItems.filter((item) => item.current_quantity > 0);
+      } catch (error) {
+        // If error getting items, continue with empty array
+        console.warn(`Failed to get items for pallet ${pallet.id}:`, error);
+        palletItems = [];
       }
 
       // 2. Cek status pallet
@@ -453,6 +467,7 @@ export class InventoryTrackingService {
         existing_tracking: existingTracking,
         can_create: canCreate,
         reasons,
+        items: palletItems,
       };
     } catch (error) {
       throw new BadRequestException(`Error validating pallet: ${error.message}`);
