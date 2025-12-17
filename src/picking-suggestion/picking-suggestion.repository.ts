@@ -106,17 +106,6 @@ export class PickingSuggestionRepository {
           ELSE 4
         END`;
 
-    // Build staging area filter condition based on sort method
-    // FIFO: Include staging OUTBOUND (PRELOAD) if they have stock
-    // LIFO: Include staging INBOUND if they have stock
-    const stagingCondition = sortMethod === 'FIFO'
-      ? `it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'OUTBOUND' AND pth.new_quantity > 0`
-      : `it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'INBOUND' AND pth.new_quantity > 0`;
-
-    // Build non-staging filter condition
-    const nonStagingCondition = sortMethod === 'FIFO'
-      ? `it.warehouse_sub_id IS NULL OR COALESCE(ws.is_staging::text, '') != 'OUTBOUND'`
-      : `it.warehouse_sub_id IS NULL OR COALESCE(ws.is_staging::text, '') != 'INBOUND'`;
 
     // Use raw SQL to include reserved quantity calculation
     const query = `
@@ -192,13 +181,9 @@ export class PickingSuggestionRepository {
       LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
       WHERE pth.item_id = $1
         AND ($2::text IS NULL OR pth.uom::text = $2::text)
-        -- For staging OUTBOUND (FIFO) and staging INBOUND (LIFO), include both READY and PENDING
-        -- For regular locations, only include READY
-        AND (
-          (it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'OUTBOUND' AND pth.status_inventory IN ('READY', 'PENDING'))
-          OR (it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'INBOUND' AND pth.status_inventory IN ('READY', 'PENDING'))
-          OR (COALESCE(ws.is_staging::text, '') NOT IN ('OUTBOUND', 'INBOUND') AND pth.status_inventory = 'READY')
-        )
+        -- For picking suggestions, only include READY items (not PENDING)
+        -- PENDING items are already allocated to another memo/transaction
+        AND pth.status_inventory = 'READY'
         AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'PICKED')
         AND it.progression_status NOT IN ('IN_PROGRESS')
         AND pth.new_quantity > 0
@@ -212,34 +197,24 @@ export class PickingSuggestionRepository {
           FROM transaction_pallet_history pth2
           WHERE pth2.pallet_id = pth.pallet_id
             AND pth2.item_id = pth.item_id
-            -- For staging areas, get latest regardless of status; for regular areas, only READY
-            AND (
-              (it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') IN ('OUTBOUND', 'INBOUND') AND pth2.status_inventory IN ('READY', 'PENDING'))
-              OR (COALESCE(ws.is_staging::text, '') NOT IN ('OUTBOUND', 'INBOUND') AND pth2.status_inventory = 'READY')
-            )
+            -- For picking suggestions, only get latest READY records
+            -- PENDING items are already allocated and should not be suggested
+            AND pth2.status_inventory = 'READY'
         )
         -- Only show locations with available quantity after reservations
-        -- For staging areas (PRELOAD OUTBOUND for FIFO, staging INBOUND for LIFO), always show if they have stock
-        AND (
-          -- Staging areas: show if they have any stock (new_quantity > 0), regardless of reservations
-          (${stagingCondition})
-          -- Regular locations: must have available quantity after reservations
-          OR (
-            (${nonStagingCondition})
-            AND pth.new_quantity > COALESCE((
-              SELECT SUM(tp.quantity)
-              FROM transaction_picking tp
-              WHERE tp.item_id::text = pth.item_id::text
-                AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
-                AND (
-                  (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
-                  (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
-                )
-                AND tp.status::text = 'PENDING'
-                AND tp.deleted_at IS NULL
-            ), 0)
-          )
-        )
+        -- All locations must have available quantity after reservations (since we only show READY items)
+        AND pth.new_quantity > COALESCE((
+          SELECT SUM(tp.quantity)
+          FROM transaction_picking tp
+          WHERE tp.item_id::text = pth.item_id::text
+            AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
+            AND (
+              (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
+              (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
+            )
+            AND tp.status::text = 'PENDING'
+            AND tp.deleted_at IS NULL
+        ), 0)
       ORDER BY 
         location_priority ASC,
         pth.week_number ${weekNumberSort},
