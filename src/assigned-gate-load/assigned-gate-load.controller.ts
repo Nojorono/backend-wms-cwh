@@ -131,7 +131,7 @@ export class AssignedGateLoadController {
     @Param('id') id: string,
     @Body() body: { status: AssignedGateLoadStatus.APPROVED },
   ) {
-    return this.service.updateStatus(id, body.status);
+    return this.service.approve(id, body.status);
   }
 
   @Delete(':id')
