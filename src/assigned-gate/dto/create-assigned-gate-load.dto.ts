@@ -3,7 +3,6 @@ import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 import { AssignedGateLoadStatus } from '../../core/domain/entities/assigned-gate-load.entity';
 
 export class CreateAssignedGateLoadDto {
-
     @ApiPropertyOptional({
         description: 'Assigned Gate ID',
         example: 'uuid-assigned-gate-123',

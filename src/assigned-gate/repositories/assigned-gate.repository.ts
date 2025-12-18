@@ -8,7 +8,7 @@ export class AssignedGateRepository {
   constructor(
     @InjectRepository(AssignedGate)
     private readonly repository: Repository<AssignedGate>,
-  ) {}
+  ) { }
 
   async create(data: Partial<AssignedGate>): Promise<AssignedGate> {
     const entity = this.repository.create(data);
@@ -32,6 +32,9 @@ export class AssignedGateRepository {
         'assigned_gate_users.user',
         'assigned_gate_pallets',
         'assigned_gate_pallets.pallet',
+        'assigned_gate_helpers',
+        'assigned_gate_loads',
+        'assigned_gate_loads.pallet',
       ],
     });
   }
