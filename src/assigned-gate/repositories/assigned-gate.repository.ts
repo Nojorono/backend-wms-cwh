@@ -79,7 +79,9 @@ export class AssignedGateRepository {
       .leftJoinAndSelect('assigned_gate.assigned_gate_pallets', 'assigned_gate_pallets')
       .leftJoinAndSelect('assigned_gate_pallets.pallet', 'pallet')
       .leftJoinAndSelect('assigned_gate.assigned_gate_helpers', 'assigned_gate_helpers')
-      .leftJoinAndSelect('assigned_gate_loads', 'assigned_gate_loads')
+      .leftJoinAndSelect('assigned_gate.assigned_gate_loads', 'assigned_gate_loads')
+      .leftJoinAndSelect('assigned_gate_loads.pallet', 'loadPallet')
+      .leftJoinAndSelect('assigned_gate_loads.item', 'loadItem')
 
 
     // Filter by user_id - use the already joined assigned_gate_users
