@@ -798,9 +798,7 @@ export class PickingSuggestionService {
       .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
       .leftJoin('bin.inventory_trackings', 'tracking')
       .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
-      .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', {
-        staging: 'INBOUND',
-      })
+      .where('warehouseSub.is_staging IS NULL')
       .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
         status: 'IN_INVENTORY',
       })
@@ -814,7 +812,7 @@ export class PickingSuggestionService {
     const availableZones = await this.masterWarehouseSubRepository
       .createQueryBuilder('zone')
       .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
-      .where('zone.is_staging IS NULL OR zone.is_staging != :staging', { staging: 'INBOUND' })
+      .where('zone.is_staging IS NULL')
       .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
       .having('COUNT(bin.id) > 0')
       .orderBy('zone.name', 'ASC')
@@ -869,9 +867,7 @@ export class PickingSuggestionService {
           .leftJoin('bin.warehouseSub', 'warehouseSub')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .addSelect('COUNT(scan.id)', 'matching_items_count')
-          .where('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', {
-            staging: 'INBOUND',
-          })
+          .where('warehouseSub.is_staging IS NULL')
           .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
             status: 'IN_INVENTORY',
           })
@@ -917,9 +913,7 @@ export class PickingSuggestionService {
           .leftJoin('bin.inventory_trackings', 'tracking')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .where('bin.capacity_pallet > 0')
-          .andWhere('(warehouseSub.is_staging IS NULL OR warehouseSub.is_staging != :staging)', {
-            staging: 'INBOUND',
-          })
+          .andWhere('warehouseSub.is_staging IS NULL')
           .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
             status: 'IN_INVENTORY',
           })
@@ -952,6 +946,65 @@ export class PickingSuggestionService {
         suggestedZone = availableZones.find((zone) => !usedZoneIds.has(zone.id)) as
           | MasterWarehouseSub
           | undefined;
+      }
+
+      // Final fallback: Get any regular warehouse bin/zone if still not found
+      if (!suggestedBin) {
+        const anyBin = await this.masterWarehouseBinRepository
+          .createQueryBuilder('bin')
+          .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
+          .where('warehouseSub.is_staging IS NULL')
+          .andWhere('bin.capacity_pallet > 0')
+          .orderBy('bin.capacity_pallet', 'DESC')
+          .limit(1)
+          .getOne();
+
+        if (anyBin) {
+          suggestedBin = anyBin;
+          suggestedZone = availableZones.find(
+            (zone) => zone.id === anyBin.warehouse_sub_id,
+          ) as MasterWarehouseSub;
+        }
+      }
+
+      if (!suggestedZone && suggestedBin) {
+        // If we have a bin but no zone, get the zone from the bin's warehouse_sub_id
+        const zoneFromBin = await this.masterWarehouseSubRepository.findOne({
+          where: { id: suggestedBin.warehouse_sub_id },
+        });
+        if (zoneFromBin) {
+          suggestedZone = zoneFromBin;
+        }
+      }
+
+      if (!suggestedZone) {
+        // Final fallback: Get any regular warehouse zone
+        const anyZone = await this.masterWarehouseSubRepository
+          .createQueryBuilder('zone')
+          .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
+          .where('zone.is_staging IS NULL')
+          .andWhere('bin.id IS NOT NULL')
+          .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
+          .limit(1)
+          .getOne();
+
+        if (anyZone) {
+          suggestedZone = anyZone;
+          // Try to find a bin in this zone
+          if (!suggestedBin) {
+            const binInZone = await this.masterWarehouseBinRepository
+              .createQueryBuilder('bin')
+              .where('bin.warehouse_sub_id = :zoneId', { zoneId: anyZone.id })
+              .andWhere('bin.capacity_pallet > 0')
+              .orderBy('bin.capacity_pallet', 'DESC')
+              .limit(1)
+              .getOne();
+
+            if (binInZone) {
+              suggestedBin = binInZone;
+            }
+          }
+        }
       }
 
       // Always add pallet to suggestions, even if bin/zone suggestions are not available

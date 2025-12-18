@@ -8,7 +8,7 @@ export class AssignedGateRepository {
   constructor(
     @InjectRepository(AssignedGate)
     private readonly repository: Repository<AssignedGate>,
-  ) {}
+  ) { }
 
   async create(data: Partial<AssignedGate>): Promise<AssignedGate> {
     const entity = this.repository.create(data);
@@ -32,6 +32,9 @@ export class AssignedGateRepository {
         'assigned_gate_users.user',
         'assigned_gate_pallets',
         'assigned_gate_pallets.pallet',
+        'assigned_gate_helpers',
+        'assigned_gate_loads',
+        'assigned_gate_loads.pallet',
       ],
     });
   }
@@ -74,7 +77,12 @@ export class AssignedGateRepository {
       .leftJoinAndSelect('assigned_gate.assigned_gate_users', 'assigned_gate_users')
       .leftJoinAndSelect('assigned_gate_users.user', 'user')
       .leftJoinAndSelect('assigned_gate.assigned_gate_pallets', 'assigned_gate_pallets')
-      .leftJoinAndSelect('assigned_gate_pallets.pallet', 'pallet');
+      .leftJoinAndSelect('assigned_gate_pallets.pallet', 'pallet')
+      .leftJoinAndSelect('assigned_gate.assigned_gate_helpers', 'assigned_gate_helpers')
+      .leftJoinAndSelect('assigned_gate.assigned_gate_loads', 'assigned_gate_loads')
+      .leftJoinAndSelect('assigned_gate_loads.pallet', 'loadPallet')
+      .leftJoinAndSelect('assigned_gate_loads.item', 'loadItem')
+
 
     // Filter by user_id - use the already joined assigned_gate_users
     if (filters.user_id) {
