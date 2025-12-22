@@ -12,13 +12,20 @@ import {
   ItemListIntegrationService,
   ItemListResponseDto,
 } from './integration/item-list-integration.service';
+import {
+  SalesItemIntegrationService,
+  SalesItemResponseDto,
+} from './integration/sales-item-integration.service';
+import { MetaSalesItemDtoByBranch } from './dto/meta-sales-item-by-branch.dto';
+import { FindByBranchResponseDto } from './dto/find-by-branch-response.dto';
 
 @Injectable()
 export class MasterItemService {
   constructor(
     private readonly repository: MasterItemRepository,
     private readonly itemListIntegrationService: ItemListIntegrationService,
-  ) {}
+    private readonly salesItemIntegrationService: SalesItemIntegrationService,
+  ) { }
 
   async create(createMasterItemDto: CreateMasterItemDto): Promise<MasterItem> {
     const sku = createMasterItemDto.sku;
@@ -95,5 +102,49 @@ export class MasterItemService {
     }
 
     return itemLists;
+  }
+
+  async findByBranch(org_code: string): Promise<FindByBranchResponseDto> {
+    const dto: MetaSalesItemDtoByBranch = {
+      branch: org_code,
+    };
+
+    // Get sales items from microservice
+    const salesItemResponse = await this.salesItemIntegrationService.getSalesItemsFromOracleByBranch(dto);
+
+    // Extract item_code values from the response
+    const salesItems = salesItemResponse.data || [];
+    const itemCodes = salesItems.map((item: any) => item.item_code).filter(Boolean);
+
+    const salesItemCount = salesItemResponse.count || salesItems.length;
+
+    if (itemCodes.length === 0) {
+      return {
+        masterItems: [],
+        unmatchedSalesItems: salesItems,
+        salesItemCount,
+        masterItemCount: 0,
+        unmatchedSalesItemCount: salesItems.length,
+      };
+    }
+
+    // Find master items where sku matches any of the item_codes
+    const masterItems = await this.repository.findBySkus(itemCodes);
+
+    // Get SKUs of found master items
+    const foundSkus = new Set(masterItems.map((item) => item.sku));
+
+    // Find sales items that don't have a matching master item
+    const unmatchedSalesItems = salesItems.filter(
+      (salesItem: any) => !foundSkus.has(salesItem.item_code),
+    );
+
+    return {
+      masterItems,
+      unmatchedSalesItems,
+      salesItemCount,
+      masterItemCount: masterItems.length,
+      unmatchedSalesItemCount: unmatchedSalesItems.length,
+    };
   }
 }

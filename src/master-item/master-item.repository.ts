@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { MasterItem } from '../core/domain/entities/master-item.entity';
 import { CreateMasterItemDto } from './dto/create-master-item.dto';
 import { UpdateMasterItemDto } from './dto/update-master-item.dto';
@@ -10,7 +10,7 @@ export class MasterItemRepository {
   constructor(
     @InjectRepository(MasterItem)
     private readonly repository: Repository<MasterItem>,
-  ) {}
+  ) { }
 
   async create(createMasterItemDto: CreateMasterItemDto): Promise<MasterItem> {
     const item = this.repository.create(createMasterItemDto);
@@ -94,5 +94,14 @@ export class MasterItemRepository {
       return null;
     }
     return item;
+  }
+
+  async findBySkus(skus: string[]): Promise<MasterItem[]> {
+    if (!skus || skus.length === 0) {
+      return [];
+    }
+    return await this.repository.find({
+      where: { sku: In(skus) },
+    });
   }
 }
