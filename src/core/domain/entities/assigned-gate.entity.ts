@@ -10,6 +10,7 @@ import { AssignedGateLoad } from './assigned-gate-load.entity';
 export enum AssignedGateStatus {
   PENDING = 'PENDING',
   DONE = 'DONE',
+  APPROVED = 'APPROVED',
 }
 
 @Entity('assigned_gate')
