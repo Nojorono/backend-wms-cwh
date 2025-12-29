@@ -127,6 +127,9 @@ export class AssignedGateRepository {
         'assigned_gate_users.user',
         'assigned_gate_pallets',
         'assigned_gate_pallets.pallet',
+        'assigned_gate_loads',
+        'assigned_gate_loads.pallet',
+        'assigned_gate_loads.item',
       ],
     });
     if (!entity) {

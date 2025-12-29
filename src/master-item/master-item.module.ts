@@ -7,6 +7,7 @@ import { MasterItemController } from './master-item.controller';
 import { MasterItemService } from './master-item.service';
 import { MasterItemRepository } from './master-item.repository';
 import { ItemListIntegrationService } from './integration/item-list-integration.service';
+import { SalesItemIntegrationService } from './integration/sales-item-integration.service';
 
 @Module({
   imports: [
@@ -27,10 +28,29 @@ import { ItemListIntegrationService } from './integration/item-list-integration.
         }),
         inject: [ConfigService],
       },
+      {
+        name: 'SALES_ITEM_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.salesItem') || 'sales_item_queue',
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [MasterItemController],
-  providers: [MasterItemService, MasterItemRepository, ItemListIntegrationService],
-  exports: [MasterItemService, ItemListIntegrationService],
+  providers: [
+    MasterItemService,
+    MasterItemRepository,
+    ItemListIntegrationService,
+    SalesItemIntegrationService,
+  ],
+  exports: [MasterItemService, ItemListIntegrationService, SalesItemIntegrationService],
 })
-export class MasterItemModule {}
+export class MasterItemModule { }
