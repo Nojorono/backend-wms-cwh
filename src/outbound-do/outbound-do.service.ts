@@ -14,7 +14,7 @@ export class OutboundDoService {
     private readonly repository: OutboundDoRepository,
     private readonly paginationService: PaginationService,
     private readonly transactionPickingService: TransactionPickingService,
-  ) {}
+  ) { }
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
     // Validasi delivery_date tidak boleh di masa lalu
@@ -156,7 +156,7 @@ export class OutboundDoService {
       for (const memoIdToCancel of memoIds) {
         await this.cancelTransactionPickingsByMemoId(memoIdToCancel);
       }
-      
+
       await this.repository.updateMultipleMemosHasDo(memoIds, false);
       return this.repository.findOne(id);
     }
@@ -234,5 +234,18 @@ export class OutboundDoService {
 
     // Add memo to outbound DO
     return this.repository.addMemoToOutboundDo(id, memoId, newSequence, memo);
+  }
+
+  async cancel(id: string): Promise<OutboundDo> {
+    const outboundDo = await this.repository.findOne(id);
+    if (!outboundDo) {
+      throw new BadRequestException('Outbound DO not found');
+    }
+    // check memo has do
+    if (outboundDo.outbound_memos?.some((memo) => memo.has_do)) {
+      throw new BadRequestException(`already have memo ${outboundDo.outbound_memos.map((memo) => memo.outbound_memo_number).join(', ')} attached to this outbound DO`);
+    }
+
+    return this.repository.update(id, { status: OutboundDoStatus.CANCELLED });
   }
 }

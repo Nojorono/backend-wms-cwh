@@ -28,12 +28,11 @@ lerna-debug.log*
 .settings/
 *.sublime-workspace
 
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+# IDE - VSCode (completely ignored)
+.vscode/
+
+# Cursor IDE (completely ignored)
+.cursor/
 
 # dotenv environment variable files
 .env
@@ -54,5 +53,3 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-
-.cursor
