@@ -30,7 +30,7 @@ import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-paginati
 @Controller('outbound-memo')
 @ApiBearerAuth('JWT-auth')
 export class OutboundMemoController {
-  constructor(private readonly outboundMemoService: OutboundMemoService) {}
+  constructor(private readonly outboundMemoService: OutboundMemoService) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -260,6 +260,6 @@ export class OutboundMemoController {
     description: 'Outbound memo berhasil dibatalkan',
   })
   async rejected(@Param('id') id: string) {
-    return this.outboundMemoService.updateStatus(id, OutboundMemoStatus.CANCELLED);
+    return this.outboundMemoService.cancel(id);
   }
 }
