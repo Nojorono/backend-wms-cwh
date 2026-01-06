@@ -30,6 +30,12 @@ export class OutboundDo extends BaseEntity {
   license_plate: string;
 
   @Column({ nullable: true })
+  container_number: string;
+
+  @Column({ nullable: true })
+  seal_number: string;
+
+  @Column({ nullable: true })
   driver_name: string;
 
   @Column({ nullable: true })

@@ -41,6 +41,14 @@ export class CreateOutboundDoDto {
   @IsString()
   license_plate: string;
 
+  @ApiProperty({ example: '1234567890' })
+  @IsString()
+  container_number: string;
+
+  @ApiProperty({ example: '1234567890' })
+  @IsString()
+  seal_number: string;
+
   @ApiProperty({ example: 'John Doe' })
   @IsString()
   driver_name: string;
