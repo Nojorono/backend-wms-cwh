@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsNumber, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 import { AssignedGateLoadStatus } from '../../core/domain/entities/assigned-gate-load.entity';
 
 export class CreateAssignedGateLoadDto {
@@ -71,6 +72,7 @@ export class CreateAssignedGateLoadDto {
     })
     @IsOptional()
     @IsDate()
+    @Type(() => Date)
     production_date?: Date;
 
     @ApiPropertyOptional({
