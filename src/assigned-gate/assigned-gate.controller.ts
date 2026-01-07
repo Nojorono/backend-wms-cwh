@@ -312,5 +312,14 @@ export class AssignedGateController {
   remove(@Param('id') id: string) {
     return this.assignedGateService.remove(id);
   }
+
+  // approved assigned gate
+  @Post(':id/approve')
+  @ApiOperation({ summary: 'Approve assigned gate' })
+  @ApiResponse({ status: 200, description: 'Assigned gate approved successfully' })
+  @ApiResponse({ status: 404, description: 'Assigned gate not found' })
+  approve(@Param('id') id: string) {
+    return this.assignedGateService.approve(id);
+  }
 }
 

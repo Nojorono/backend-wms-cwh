@@ -13,10 +13,12 @@ import { AssignedGateHelperRepository } from './repositories/assigned-gate-helpe
 import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 import { InventoryTrackingModule } from '../inventory-tracking/inventory-tracking.module';
 import { MasterWarehouseSubModule } from '../master-warehouse-sub/master-warehouse-sub.module';
+import { AssignedGateLoadRepository } from './repositories/assigned-gate-load.repository';
+import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AssignedGate, AssignedGateUser, AssignedGatePallet, AssignedGateHelper]),
+    TypeOrmModule.forFeature([AssignedGate, AssignedGateUser, AssignedGatePallet, AssignedGateHelper, AssignedGateLoad]),
     MasterPalletModule,
     InventoryTrackingModule,
     MasterWarehouseSubModule,
@@ -28,8 +30,9 @@ import { MasterWarehouseSubModule } from '../master-warehouse-sub/master-warehou
     AssignedGateUserRepository,
     AssignedGatePalletRepository,
     AssignedGateHelperRepository,
+    AssignedGateLoadRepository,
   ],
   exports: [AssignedGateService],
 })
-export class AssignedGateModule {}
+export class AssignedGateModule { }
 

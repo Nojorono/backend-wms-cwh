@@ -39,7 +39,7 @@ export class MasterPalletService {
     private readonly inventoryTrackingRepository: Repository<InventoryTracking>,
     private readonly paginationService: PaginationService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
     const existingPallet = await this.repository.findByPalletCode(
@@ -77,7 +77,7 @@ export class MasterPalletService {
     }
     return pallet;
   }
-  
+
   async findByPalletCode(palletCode: string): Promise<MasterPallet> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
