@@ -55,7 +55,7 @@ export class MasterPalletRepository {
     if (!pallet) {
       throw new NotFoundException('Pallet not found');
     }
-    await this.repository.update(id, updateMasterPalletDto);
+    await this.repository.update(id, updateMasterPalletDto as any);
     return await this.findOne(id);
   }
 

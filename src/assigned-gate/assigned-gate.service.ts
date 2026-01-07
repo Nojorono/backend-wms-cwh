@@ -663,7 +663,7 @@ export class AssignedGateService {
     const assignedGateLoads = await this.assignedGateLoadRepo.findAllByAssignedGate(id);
     for (const assignedGateLoad of assignedGateLoads) {
       // clear memo_id in pallet
-      await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: '' });
+      await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: null });
       // update pallet quantity
       await this.masterPalletService.updateQuantity(assignedGateLoad.pallet_id, {
         item_id: assignedGateLoad.item_id,

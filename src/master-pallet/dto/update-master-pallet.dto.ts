@@ -42,8 +42,7 @@ export class UpdateMasterPalletDto {
   @IsOptional()
   currentWeekNumber?: number;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false })
-  @IsString()
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false, nullable: true })
   @IsOptional()
-  memo_id?: string;
+  memo_id?: string | null;
 }
