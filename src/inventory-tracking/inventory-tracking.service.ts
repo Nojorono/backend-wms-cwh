@@ -171,6 +171,14 @@ export class InventoryTrackingService {
     return await this.repository.findAllByPalletId(palletId, inventory_status);
   }
 
+  async updateByPalletId(palletId: string, dto: UpdateInventoryTrackingDto): Promise<InventoryTracking> {
+    const existing = await this.repository.findOneByPalletId(palletId);
+    if (!existing) {
+      throw new NotFoundException(`InventoryTracking with pallet ID ${palletId} not found`);
+    }
+    return this.update(existing.id, dto);
+  }
+
   async update(id: string, dto: UpdateInventoryTrackingDto): Promise<InventoryTracking> {
     // Validasi status jika ada
     if (dto.inventory_status) {
