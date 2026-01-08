@@ -19,6 +19,8 @@ import { AssignedGateLoadRepository } from './repositories/assigned-gate-load.re
 import { AssignedGateLoadStatus } from 'src/core/domain/entities/assigned-gate-load.entity';
 import { QuantityOperationType, StatusInventory } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
+import { OutboundDoService } from 'src/outbound-do/outbound-do.service';
+import { OutboundDoStatus } from 'src/core/domain/entities/outbound-do.entity';
 
 @Injectable()
 export class AssignedGateService {
@@ -31,6 +33,7 @@ export class AssignedGateService {
     private readonly masterPalletService: MasterPalletService,
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly masterWarehouseSubService: MasterWarehouseSubService,
+    private readonly outboundDoService: OutboundDoService,
   ) { }
 
   // AssignedGate CRUD operations
@@ -692,6 +695,8 @@ export class AssignedGateService {
     }
 
     const updated = await this.assignedGateRepo.update(id, { status: AssignedGateStatus.APPROVED });
+    // update outbound do status to approved
+    await this.outboundDoService.updateStatus(assignedGate.outbound_do_id, OutboundDoStatus.APPROVED_LOADED);
     if (!updated) {
       throw new NotFoundException('Assigned gate not found');
     }

@@ -17,7 +17,7 @@ export class PickingSuggestionRepository {
     private readonly inventoryTrackingRepository: Repository<InventoryTracking>,
     @InjectRepository(MasterItem)
     private readonly itemRepository: Repository<MasterItem>,
-  ) {}
+  ) { }
 
   async getOutboundDoWithMemos(outboundDoId: string): Promise<any[]> {
     const query = `
@@ -187,6 +187,7 @@ export class PickingSuggestionRepository {
         AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'PICKED')
         AND it.progression_status NOT IN ('IN_PROGRESS')
         AND pth.new_quantity > 0
+        AND p.current_quantity > 0
         AND (it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)
         AND pth.item_id IS NOT NULL
         AND it.pallet_id IS NOT NULL
@@ -197,6 +198,7 @@ export class PickingSuggestionRepository {
           FROM transaction_pallet_history pth2
           WHERE pth2.pallet_id = pth.pallet_id
             AND pth2.item_id = pth.item_id
+            AND (pth2.week_number = pth.week_number OR (pth2.week_number IS NULL AND pth.week_number IS NULL))
             -- For picking suggestions, only get latest READY records
             -- PENDING items are already allocated and should not be suggested
             AND pth2.status_inventory = 'READY'
