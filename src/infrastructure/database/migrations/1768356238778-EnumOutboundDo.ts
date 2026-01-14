@@ -5,7 +5,7 @@ export class EnumOutboundDo1768356238778 implements MigrationInterface {
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TYPE "public"."outbound_do_status_enum" RENAME TO "outbound_do_status_enum_old"`);
-        await queryRunner.query(`CREATE TYPE "public"."outbound_do_status_enum" AS ENUM('PENDING', 'IN_PROGRESS', 'APPROVED', 'COMPLETED', 'CANCELLED', 'APPROVED_LOADED')`);
+        await queryRunner.query(`CREATE TYPE "public"."outbound_do_status_enum" AS ENUM('PENDING', 'IN_PROGRESS', 'APPROVED', 'COMPLETED', 'CANCELLED', 'APPROVED_LOAD')`);
         await queryRunner.query(`ALTER TABLE "outbound_do" ALTER COLUMN "status" DROP DEFAULT`);
         await queryRunner.query(`ALTER TABLE "outbound_do" ALTER COLUMN "status" TYPE "public"."outbound_do_status_enum" USING "status"::"text"::"public"."outbound_do_status_enum"`);
         await queryRunner.query(`ALTER TABLE "outbound_do" ALTER COLUMN "status" SET DEFAULT 'PENDING'`);

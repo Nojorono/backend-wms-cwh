@@ -8,7 +8,7 @@ export enum OutboundDoStatus {
   APPROVED = 'APPROVED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
-  APPROVED_LOADED = 'APPROVED_LOADED',
+  APPROVED_LOAD = 'APPROVED_LOAD',
 }
 
 export enum OutboundDoType {

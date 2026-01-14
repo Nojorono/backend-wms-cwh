@@ -696,7 +696,7 @@ export class AssignedGateService {
 
     const updated = await this.assignedGateRepo.update(id, { status: AssignedGateStatus.APPROVED });
     // update outbound do status to approved
-    await this.outboundDoService.updateStatus(assignedGate.outbound_do_id, OutboundDoStatus.APPROVED_LOADED);
+    await this.outboundDoService.updateStatus(assignedGate.outbound_do_id, OutboundDoStatus.APPROVED_LOAD);
     if (!updated) {
       throw new NotFoundException('Assigned gate not found');
     }
