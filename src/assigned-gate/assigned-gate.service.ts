@@ -21,6 +21,8 @@ import { QuantityOperationType, StatusInventory } from 'src/core/domain/entities
 import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
 import { OutboundDoService } from 'src/outbound-do/outbound-do.service';
 import { OutboundDoStatus } from 'src/core/domain/entities/outbound-do.entity';
+import { TransactionPickingService } from 'src/transaction-picking/transaction-picking.service';
+import { Status } from 'src/core/domain/entities/transaction-picking.entity';
 
 @Injectable()
 export class AssignedGateService {
@@ -34,6 +36,7 @@ export class AssignedGateService {
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly masterWarehouseSubService: MasterWarehouseSubService,
     private readonly outboundDoService: OutboundDoService,
+    private readonly transactionPickingService: TransactionPickingService,
   ) { }
 
   // AssignedGate CRUD operations
@@ -697,6 +700,13 @@ export class AssignedGateService {
     const updated = await this.assignedGateRepo.update(id, { status: AssignedGateStatus.APPROVED });
     // update outbound do status to approved
     await this.outboundDoService.updateStatus(assignedGate.outbound_do_id, OutboundDoStatus.APPROVED_LOAD);
+    // update transaction picking status to approved
+    const transactionPickings = await this.transactionPickingService.findByDoId(assignedGate.outbound_do_id);
+    for (const transactionPicking of transactionPickings) {
+      if (transactionPicking.status === Status.PENDING) {
+        await this.transactionPickingService.updateStatus(transactionPicking.id, Status.COMPLETED);
+      }
+    }
     if (!updated) {
       throw new NotFoundException('Assigned gate not found');
     }

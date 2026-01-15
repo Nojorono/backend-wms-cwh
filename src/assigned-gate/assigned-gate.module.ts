@@ -16,6 +16,7 @@ import { MasterWarehouseSubModule } from '../master-warehouse-sub/master-warehou
 import { AssignedGateLoadRepository } from './repositories/assigned-gate-load.repository';
 import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
 import { OutboundDoModule } from 'src/outbound-do/outbound-do.module';
+import { TransactionPickingModule } from 'src/transaction-picking/transaction-picking.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { OutboundDoModule } from 'src/outbound-do/outbound-do.module';
     InventoryTrackingModule,
     MasterWarehouseSubModule,
     OutboundDoModule,
+    TransactionPickingModule,
   ],
   controllers: [AssignedGateController],
   providers: [
