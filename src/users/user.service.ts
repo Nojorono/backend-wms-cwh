@@ -7,6 +7,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '../core/domain/entities/user.entity';
 import { UserDetail } from '../core/domain/entities/user-detail.entity';
 import * as bcrypt from 'bcrypt';
+import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-sub.entity';
 
 @Injectable()
 export class UserService {
@@ -14,7 +15,7 @@ export class UserService {
     private readonly repository: UserRepository,
     @InjectRepository(UserDetail)
     private readonly userDetailRepository: Repository<UserDetail>,
-  ) {}
+  ) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     const existingUser = await this.repository.findByUsername(createUserDto.username);
@@ -31,23 +32,23 @@ export class UserService {
       createUserDto.employeeId ||
       createUserDto.email ||
       createUserDto.phone ||
-      createUserDto.organizationId
+      createUserDto.organizationId ||
+      createUserDto.warehouseSubId
     ) {
       const userDetail = this.userDetailRepository.create({
-        userId: user.username,
+        userId: user.id,
         employee_id: createUserDto.employeeId || `EMP_${user.username}`,
         email: createUserDto.email || `${user.username}@default.com`,
         phone: createUserDto.phone || '0000000000',
         organizationId: createUserDto.organizationId,
+        warehouseSubId: createUserDto.warehouseSubId,
       });
 
-      const savedUserDetail = await this.userDetailRepository.save(userDetail);
-
-      user.userDetailId = savedUserDetail.id;
-      await this.repository.updateUserDetailId(user.id, savedUserDetail.id);
+      await this.userDetailRepository.save(userDetail);
     }
 
-    return user;
+    // Reload user with relationships
+    return await this.findOne(user.id);
   }
 
   async findAll(): Promise<User[]> {
@@ -84,40 +85,52 @@ export class UserService {
       }
     }
 
-    if (updateUserDto.password) {
+    // Extract only User entity fields (exclude UserDetail fields)
+    const userUpdateData: Partial<UpdateUserDto> = {};
+    if (updateUserDto.username !== undefined) userUpdateData.username = updateUserDto.username;
+    if (updateUserDto.password !== undefined) {
       const hashedPassword = await bcrypt.hash(updateUserDto.password, 10);
-      updateUserDto.password = hashedPassword;
+      userUpdateData.password = hashedPassword;
+    }
+    if (updateUserDto.isActive !== undefined) userUpdateData.isActive = updateUserDto.isActive;
+    if (updateUserDto.roleId !== undefined) userUpdateData.roleId = updateUserDto.roleId;
+
+    // Only update User entity if there are User fields to update
+    if (Object.keys(userUpdateData).length > 0) {
+      const updatedUser = await this.repository.update(id, userUpdateData);
+      if (!updatedUser) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
     }
 
-    const updatedUser = await this.repository.update(id, updateUserDto);
-    if (!updatedUser) {
-      throw new NotFoundException(`User with ID ${id} not found`);
-    }
-
+    // Handle UserDetail fields separately
     if (
-      updateUserDto.employeeId ||
-      updateUserDto.email ||
-      updateUserDto.phone ||
-      updateUserDto.organizationId
+      updateUserDto.employeeId !== undefined ||
+      updateUserDto.email !== undefined ||
+      updateUserDto.phone !== undefined ||
+      updateUserDto.organizationId !== undefined ||
+      updateUserDto.warehouseSubId !== undefined
     ) {
-      if (user.userDetailId) {
-        await this.userDetailRepository.update(user.userDetailId, {
+      const userDetailUpdateData: Partial<UserDetail> = {};
+      if (updateUserDto.employeeId !== undefined) userDetailUpdateData.employee_id = updateUserDto.employeeId;
+      if (updateUserDto.email !== undefined) userDetailUpdateData.email = updateUserDto.email;
+      if (updateUserDto.phone !== undefined) userDetailUpdateData.phone = updateUserDto.phone;
+      if (updateUserDto.organizationId !== undefined) userDetailUpdateData.organizationId = updateUserDto.organizationId;
+      if (updateUserDto.warehouseSubId !== undefined) userDetailUpdateData.warehouseSubId = updateUserDto.warehouseSubId;
+
+      let userDetail = await this.userDetailRepository.findOne({ where: { userId: user.id } });
+      if (!userDetail) {
+        userDetail = this.userDetailRepository.create({
+          userId: user.id,
           employee_id: updateUserDto.employeeId,
           email: updateUserDto.email,
           phone: updateUserDto.phone,
           organizationId: updateUserDto.organizationId,
+          warehouseSubId: updateUserDto.warehouseSubId,
         });
+        await this.userDetailRepository.save(userDetail);
       } else {
-        const userDetail = this.userDetailRepository.create({
-          userId: user.username,
-          employee_id: updateUserDto.employeeId || `EMP_${user.username}`,
-          email: updateUserDto.email || `${user.username}@default.com`,
-          phone: updateUserDto.phone || '0000000000',
-          organizationId: updateUserDto.organizationId,
-        });
-
-        const savedUserDetail = await this.userDetailRepository.save(userDetail);
-        await this.repository.updateUserDetailId(id, savedUserDetail.id);
+        await this.userDetailRepository.update(userDetail.id, userDetailUpdateData);
       }
     }
 
@@ -127,8 +140,8 @@ export class UserService {
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
 
-    if (user.userDetailId) {
-      await this.userDetailRepository.softDelete(user.userDetailId);
+    if (user.userDetail) {
+      await this.userDetailRepository.softDelete(user.userDetail.id);
     }
 
     await this.repository.softDelete(id);
@@ -143,8 +156,8 @@ export class UserService {
 
     await this.repository.restore(id);
 
-    if (user.userDetailId) {
-      await this.userDetailRepository.restore(user.userDetailId);
+    if (user.userDetail) {
+      await this.userDetailRepository.restore(user.userDetail.id);
     }
 
     return await this.findOne(id);
@@ -153,8 +166,8 @@ export class UserService {
   async hardDelete(id: string): Promise<void> {
     const user = await this.findOneWithDeleted(id);
 
-    if (user.userDetailId) {
-      await this.userDetailRepository.delete(user.userDetailId);
+    if (user.userDetail) {
+      await this.userDetailRepository.delete(user.userDetail.id);
     }
 
     await this.repository.hardDelete(id);
