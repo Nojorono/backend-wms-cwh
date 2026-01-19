@@ -15,7 +15,7 @@ export class OutboundMemoService {
     private readonly repository: OutboundMemoRepository,
     private readonly paginationService: PaginationService,
     private readonly notificationService: NotificationService,
-  ) {}
+  ) { }
 
   async create(data: CreateOutboundMemoDto): Promise<OutboundMemo> {
     // Validasi delivery_date tidak boleh di masa lalu
@@ -150,6 +150,14 @@ export class OutboundMemoService {
     }
 
     return updated;
+  }
+
+  async cancel(id: string): Promise<OutboundMemo> {
+    const existing = await this.repository.findOne(id);
+    if (!existing) {
+      throw new BadRequestException('Outbound memo not found');
+    }
+    return this.repository.update(id, { status: OutboundMemoStatus.CANCELLED });
   }
 
   private validateStatusTransition(

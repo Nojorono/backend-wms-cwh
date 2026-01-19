@@ -1,26 +1,39 @@
-import { Entity, Column, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { MasterIO } from './master-io.entity';
+import { MasterWarehouseSub } from './master-warehouse-sub.entity';
+import { User } from './user.entity';
 
 @Entity('user_details')
 @Index(['userId'], { unique: true })
 export class UserDetail extends BaseEntity {
-  @Column({ name: 'user_id', length: 100 })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ length: 255 })
+  @OneToOne(() => User, (user) => user.userDetail)
+  @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
+  user: User;
+
+  @Column({ nullable: true })
   employee_id: string;
 
-  @Column({ length: 255 })
+  @Column({ nullable: true })
   email: string;
 
-  @Column({ length: 255 })
+  @Column({ nullable: true })
   phone: string;
 
-  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'organization_id' })
   organization: MasterIO;
 
-  @Column({ name: 'organization_id' })
+  @Column({ name: 'organization_id', nullable: true })
   organizationId: string;
+
+  @Column({ name: 'warehouse_sub_id', nullable: true })
+  warehouseSubId: string;
+
+  @ManyToOne(() => MasterWarehouseSub, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'warehouse_sub_id' })
+  warehouseSub: MasterWarehouseSub;
 }

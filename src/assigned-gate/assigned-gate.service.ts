@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { AssignedGate } from '../core/domain/entities/assigned-gate.entity';
+import { AssignedGate, AssignedGateStatus } from '../core/domain/entities/assigned-gate.entity';
 import { AssignedGateUser } from '../core/domain/entities/assigned-gate-user.entity';
 import { AssignedGatePallet } from '../core/domain/entities/assigned-gate-pallet.entity';
 import { AssignedGateHelper } from '../core/domain/entities/assigned-gate-helper.entity';
@@ -15,6 +15,14 @@ import { UpdateAssignedGateStatusDto } from './dto/update-assigned-gate-status.d
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 import { MasterWarehouseSubService } from '../master-warehouse-sub/master-warehouse-sub.service';
+import { AssignedGateLoadRepository } from './repositories/assigned-gate-load.repository';
+import { AssignedGateLoadStatus } from 'src/core/domain/entities/assigned-gate-load.entity';
+import { QuantityOperationType, StatusInventory } from 'src/core/domain/entities/transaction-pallet-history.entity';
+import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
+import { OutboundDoService } from 'src/outbound-do/outbound-do.service';
+import { OutboundDoStatus } from 'src/core/domain/entities/outbound-do.entity';
+import { TransactionPickingService } from 'src/transaction-picking/transaction-picking.service';
+import { Status } from 'src/core/domain/entities/transaction-picking.entity';
 
 @Injectable()
 export class AssignedGateService {
@@ -23,10 +31,13 @@ export class AssignedGateService {
     private readonly assignedGateUserRepo: AssignedGateUserRepository,
     private readonly assignedGatePalletRepo: AssignedGatePalletRepository,
     private readonly assignedGateHelperRepo: AssignedGateHelperRepository,
+    private readonly assignedGateLoadRepo: AssignedGateLoadRepository,
     private readonly masterPalletService: MasterPalletService,
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly masterWarehouseSubService: MasterWarehouseSubService,
-  ) {}
+    private readonly outboundDoService: OutboundDoService,
+    private readonly transactionPickingService: TransactionPickingService,
+  ) { }
 
   // AssignedGate CRUD operations
   async createOrUpdate(createAssignedGateDto: CreateAssignedGateDto): Promise<AssignedGate> {
@@ -453,7 +464,7 @@ export class AssignedGateService {
           gate.warehouse_id,
           'IN_INVENTORY', // Use standard status instead of IN_GATE
         );
-        
+
         // Ensure warehouse_bin_id is set to null for gate location
         if (newInventory && newInventory.warehouse_bin_id) {
           await this.inventoryTrackingService.update(newInventory.id, {
@@ -643,6 +654,63 @@ export class AssignedGateService {
     await this.findOne(assignedGateId);
 
     return await this.assignedGatePalletRepo.findAllByAssignedGate(assignedGateId);
+  }
+
+  async approve(id: string): Promise<AssignedGate> {
+    const assignedGate = await this.findOne(id);
+    if (!assignedGate) {
+      throw new NotFoundException('Assigned gate not found');
+    }
+
+    if (assignedGate.status !== AssignedGateStatus.DONE) {
+      throw new BadRequestException('Assigned gate is not done');
+    }
+
+    // find all assigned gate load
+    const assignedGateLoads = await this.assignedGateLoadRepo.findAllByAssignedGate(id);
+    for (const assignedGateLoad of assignedGateLoads) {
+      // clear memo_id in pallet
+      await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: null });
+      // update pallet quantity
+      await this.masterPalletService.updateQuantity(assignedGateLoad.pallet_id, {
+        item_id: assignedGateLoad.item_id,
+        quantity: assignedGateLoad.quantity_loaded,
+        operation_type: QuantityOperationType.REMOVE,
+        outbound_do_id: assignedGateLoad.outbound_memo_id,
+        notes: `Loaded quantity ${assignedGateLoad.quantity_loaded} to gate ${assignedGate.gate.name || assignedGate.gate.code}`,
+        uom: assignedGateLoad.uom,
+        week_number: assignedGateLoad.week_number,
+        production_date: assignedGateLoad.production_date,
+        reference_id: assignedGateLoad.id,
+        reference_type: 'ASSIGNED_GATE_LOAD',
+        status_inventory: StatusInventory.READY,
+      });
+
+      // update inventory tracking
+      await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
+        inventory_status: 'IN_INVENTORY',
+        progression_status: ProgressionStatus.COMPLETED,
+        inventory_note: `Loaded is done`,
+        inventory_date: new Date(),
+      });
+      // update assigned gate load status to approved
+      await this.assignedGateLoadRepo.update(assignedGateLoad.id, { status: AssignedGateLoadStatus.APPROVED });
+    }
+
+    const updated = await this.assignedGateRepo.update(id, { status: AssignedGateStatus.APPROVED });
+    // update outbound do status to approved
+    await this.outboundDoService.updateStatus(assignedGate.outbound_do_id, OutboundDoStatus.APPROVED_LOAD);
+    // update transaction picking status to approved
+    const transactionPickings = await this.transactionPickingService.findByDoId(assignedGate.outbound_do_id);
+    for (const transactionPicking of transactionPickings) {
+      if (transactionPicking.status === Status.PENDING) {
+        await this.transactionPickingService.updateStatus(transactionPicking.id, Status.COMPLETED);
+      }
+    }
+    if (!updated) {
+      throw new NotFoundException('Assigned gate not found');
+    }
+    return updated;
   }
 }
 

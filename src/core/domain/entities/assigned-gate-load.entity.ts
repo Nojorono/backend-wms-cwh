@@ -52,6 +52,12 @@ export class AssignedGateLoad extends BaseEntity {
     uom: string;
 
     @Column({ nullable: true })
+    week_number: number;
+
+    @Column({ nullable: true })
+    production_date: Date;
+
+    @Column({ nullable: true })
     quantity_picked: number;
 
     @Column({ nullable: true })

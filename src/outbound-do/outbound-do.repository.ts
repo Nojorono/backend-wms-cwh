@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
 import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
+import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
@@ -14,7 +15,7 @@ export class OutboundDoRepository {
     private readonly outboundDoRepository: Repository<OutboundDo>,
     @InjectRepository(OutboundMemo)
     private readonly outboundMemoRepository: Repository<OutboundMemo>,
-  ) {}
+  ) { }
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
     const { outbound_memo_ids, ...outboundDoData } = data;
@@ -89,6 +90,14 @@ export class OutboundDoRepository {
       .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
       .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
       .leftJoinAndSelect('outbound_memo_items.item', 'memo_item')
+      .leftJoinAndSelect(
+        AssignedGateLoad,
+        'assigned_gate_load',
+        'assigned_gate_load.outbound_memo_id = outbound_memo_items.outbound_memo_id AND assigned_gate_load.item_id = outbound_memo_items.item_id',
+      )
+      .leftJoinAndSelect('assigned_gate_load.item', 'assigned_gate_load_item')
+      .leftJoinAndSelect('assigned_gate_load.pallet', 'assigned_gate_load_pallet')
+      .leftJoinAndSelect('assigned_gate_load.assigned_gate', 'assigned_gate')
       .leftJoinAndSelect('outbound_memos.transaction_pickings', 'transaction_pickings')
       .leftJoinAndSelect('transaction_pickings.item', 'picking_item')
       .leftJoinAndSelect('transaction_pickings.sourceWarehouseSub', 'source_warehouse_sub')
@@ -109,8 +118,13 @@ export class OutboundDoRepository {
       .distinct(true)
       .getMany();
 
-    // Add sequence information to each memo in all outbound DOs
-    return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+    // Add sequence information and nest assigned_gate_load for each memo in all outbound DOs
+    return await Promise.all(
+      outboundDos.map(async (outboundDo) => {
+        const processed = this.addSequenceToMemos(outboundDo);
+        return await this.nestAssignedGateLoad(processed);
+      }),
+    );
   }
 
   async findOne(id: string): Promise<OutboundDo> {
@@ -118,7 +132,8 @@ export class OutboundDoRepository {
       .where('outbound_do.id = :id', { id })
       .getOne();
     if (!entity) throw new NotFoundException('Outbound DO not found');
-    return this.addSequenceToMemos(entity);
+    const processed = this.addSequenceToMemos(entity);
+    return await this.nestAssignedGateLoad(processed);
   }
 
   async findByOutboundDoNumber(outbound_do_number: string): Promise<OutboundDo | null> {
@@ -126,7 +141,8 @@ export class OutboundDoRepository {
       .where('outbound_do.outbound_do_number = :outbound_do_number', { outbound_do_number })
       .getOne();
     if (!entity) return null;
-    return this.addSequenceToMemos(entity);
+    const processed = this.addSequenceToMemos(entity);
+    return await this.nestAssignedGateLoad(processed);
   }
 
   async update(id: string, data: UpdateOutboundDoDto): Promise<OutboundDo> {
@@ -252,8 +268,13 @@ export class OutboundDoRepository {
       .distinct(true)
       .getMany();
 
-    // Add sequence information to each memo
-    return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+    // Add sequence information and nest assigned_gate_load for each memo
+    return await Promise.all(
+      outboundDos.map(async (outboundDo) => {
+        const processed = this.addSequenceToMemos(outboundDo);
+        return await this.nestAssignedGateLoad(processed);
+      }),
+    );
   }
 
   async findByOutboundType(outbound_type: string): Promise<OutboundDo[]> {
@@ -263,8 +284,13 @@ export class OutboundDoRepository {
       .distinct(true)
       .getMany();
 
-    // Add sequence information to each memo
-    return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+    // Add sequence information and nest assigned_gate_load for each memo
+    return await Promise.all(
+      outboundDos.map(async (outboundDo) => {
+        const processed = this.addSequenceToMemos(outboundDo);
+        return await this.nestAssignedGateLoad(processed);
+      }),
+    );
   }
 
   async findAllPaginated(
@@ -343,7 +369,12 @@ export class OutboundDoRepository {
       .take(limit)
       .getManyAndCount();
 
-    const data = entities.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+    const data = await Promise.all(
+      entities.map(async (outboundDo) => {
+        const processed = this.addSequenceToMemos(outboundDo);
+        return await this.nestAssignedGateLoad(processed);
+      }),
+    );
 
     return { data, total };
   }
@@ -364,6 +395,70 @@ export class OutboundDoRepository {
       // Then sort by sequence number
       outboundDo.outbound_memos = memosWithSequence.sort((a, b) => a.sequence - b.sequence);
     }
+    return outboundDo;
+  }
+
+  private async nestAssignedGateLoad(outboundDo: OutboundDo): Promise<OutboundDo> {
+    if (!outboundDo.outbound_memos) {
+      return outboundDo;
+    }
+
+    // Collect all unique memo IDs and item IDs
+    const memoIds = new Set<string>();
+    const itemKeys = new Set<string>();
+
+    outboundDo.outbound_memos.forEach((memo) => {
+      memoIds.add(memo.id);
+      if (memo.outbound_memo_items) {
+        memo.outbound_memo_items.forEach((item) => {
+          const key = `${memo.id}_${item.item_id}`;
+          itemKeys.add(key);
+        });
+      }
+    });
+
+    if (memoIds.size === 0 || itemKeys.size === 0) {
+      return outboundDo;
+    }
+
+    // Query assigned_gate_load for all matching memo_id and item_id combinations
+    const assignedGateLoads = await this.outboundDoRepository.manager
+      .getRepository(AssignedGateLoad)
+      .createQueryBuilder('assigned_gate_load')
+      .leftJoinAndSelect('assigned_gate_load.item', 'item')
+      .leftJoinAndSelect('assigned_gate_load.pallet', 'pallet')
+      .leftJoinAndSelect('assigned_gate_load.assigned_gate', 'assigned_gate')
+      .where('assigned_gate_load.outbound_memo_id IN (:...memoIds)', {
+        memoIds: Array.from(memoIds),
+      })
+      .getMany();
+
+    // Create a map of assigned_gate_load by memo_id and item_id
+    const assignedGateLoadMap = new Map<string, AssignedGateLoad[]>();
+    assignedGateLoads.forEach((load) => {
+      const key = `${load.outbound_memo_id}_${load.item_id}`;
+      if (itemKeys.has(key)) {
+        if (!assignedGateLoadMap.has(key)) {
+          assignedGateLoadMap.set(key, []);
+        }
+        assignedGateLoadMap.get(key)!.push(load);
+      }
+    });
+
+    // Nest assigned_gate_load into each outbound_memo_items
+    outboundDo.outbound_memos.forEach((memo) => {
+      if (memo.outbound_memo_items) {
+        memo.outbound_memo_items = memo.outbound_memo_items.map((item) => {
+          const key = `${memo.id}_${item.item_id}`;
+          const assignedGateLoads = assignedGateLoadMap.get(key) || [];
+          return {
+            ...item,
+            assigned_gate_load: assignedGateLoads.length > 0 ? assignedGateLoads : null,
+          } as any;
+        });
+      }
+    });
+
     return outboundDo;
   }
 
@@ -400,7 +495,8 @@ export class OutboundDoRepository {
       throw new NotFoundException('Outbound DO not found');
     }
 
-    return this.addSequenceToMemos(outboundDo);
+    const processed = this.addSequenceToMemos(outboundDo);
+    return await this.nestAssignedGateLoad(processed);
   }
 
   async findByAssignedUserId(userId: string): Promise<OutboundDo[]> {
@@ -412,7 +508,12 @@ export class OutboundDoRepository {
       .distinct(true)
       .getMany();
 
-    return outboundDos.map((outboundDo) => this.addSequenceToMemos(outboundDo));
+    return await Promise.all(
+      outboundDos.map(async (outboundDo) => {
+        const processed = this.addSequenceToMemos(outboundDo);
+        return await this.nestAssignedGateLoad(processed);
+      }),
+    );
   }
 
   async getNextOutboundDoNumberForDate(date: Date): Promise<string> {

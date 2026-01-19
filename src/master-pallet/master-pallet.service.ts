@@ -39,7 +39,7 @@ export class MasterPalletService {
     private readonly inventoryTrackingRepository: Repository<InventoryTracking>,
     private readonly paginationService: PaginationService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
     const existingPallet = await this.repository.findByPalletCode(
@@ -77,7 +77,7 @@ export class MasterPalletService {
     }
     return pallet;
   }
-  
+
   async findByPalletCode(palletCode: string): Promise<MasterPallet> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
@@ -482,16 +482,28 @@ export class MasterPalletService {
       throw new NotFoundException(`Pallet with ID ${palletId} not found`);
     }
 
-    // Auto-reset week number when pallet has no quantity
+    // Auto-reset week number and memo_id when pallet has no quantity
     const currentQuantity = pallet.currentQuantity ?? 0;
     const currentWeekNumber = pallet.currentWeekNumber ?? 0;
-    if (currentQuantity === 0 && currentWeekNumber !== 0) {
-      await this.repository.update(palletId, {
-        currentWeekNumber: 0,
+    if (currentQuantity === 0) {
+      const updateData: any = {
         isFull: false,
-      });
-      pallet.currentWeekNumber = 0;
-      pallet.isFull = false;
+      };
+
+      if (currentWeekNumber !== 0) {
+        updateData.currentWeekNumber = 0;
+        pallet.currentWeekNumber = 0;
+      }
+
+      if (pallet.memo_id != null) {
+        updateData.memo_id = null;
+        (pallet as any).memo_id = null;
+      }
+
+      if (Object.keys(updateData).length > 1) {
+        await this.repository.update(palletId, updateData);
+        pallet.isFull = false;
+      }
     }
 
     const qb = this.transactionHistoryRepository
@@ -506,6 +518,7 @@ export class MasterPalletService {
           .where('h2.item_id = history.item_id')
           .andWhere('h2.pallet_id = :palletId')
           .andWhere('h2.uom = history.uom') // Add UOM filtering
+          .andWhere('(h2.week_number = history.week_number OR (h2.week_number IS NULL AND history.week_number IS NULL))') // Include week_number in grouping
           .getQuery();
         return `history.createdAt = ${subQuery}`;
       })

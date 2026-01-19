@@ -8,6 +8,7 @@ export enum OutboundDoStatus {
   APPROVED = 'APPROVED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
+  APPROVED_LOAD = 'APPROVED_LOAD',
 }
 
 export enum OutboundDoType {
@@ -28,6 +29,12 @@ export class OutboundDo extends BaseEntity {
 
   @Column({ nullable: true })
   license_plate: string;
+
+  @Column({ nullable: true })
+  container_number: string;
+
+  @Column({ nullable: true })
+  seal_number: string;
 
   @Column({ nullable: true })
   driver_name: string;

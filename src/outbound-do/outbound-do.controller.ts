@@ -35,7 +35,7 @@ import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-paginati
 export class OutboundDoController {
   constructor(
     private readonly outboundDoService: OutboundDoService,
-  ) {}
+  ) { }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -77,25 +77,25 @@ export class OutboundDoController {
   @ApiOperation({ summary: 'Dapatkan semua outbound DO' })
   @ApiFlexiblePaginationQuery([
     {
-    name: 'status',
+      name: 'status',
       description: 'Filter outbound DO berdasarkan status',
       enum: Object.values(OutboundDoStatus),
       example: OutboundDoStatus.PENDING,
     },
     {
-    name: 'outbound_type',
+      name: 'outbound_type',
       description: 'Filter outbound DO berdasarkan tipe outbound',
       enum: Object.values(OutboundDoType),
       example: OutboundDoType.SUBDIST,
     },
     {
-    name: 'has_transaction_scan_picking',
+      name: 'has_transaction_scan_picking',
       description: 'Filter outbound DO yang memiliki transaction scan picking (true/false)',
       type: Boolean,
       example: true,
     },
     {
-    name: 'transaction_picking_status',
+      name: 'transaction_picking_status',
       description: 'Filter outbound DO berdasarkan status transaction picking',
       enum: Object.values(TransactionPickingStatus),
       example: TransactionPickingStatus.PENDING,
@@ -281,15 +281,15 @@ export class OutboundDoController {
 
   // detach memo from outbound do
   @Patch(':id/detach-memo')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Detach memo from outbound DO',
     description: 'Jika memoId tidak disediakan, semua memo akan dilepas dari outbound DO'
   })
   @ApiParam({ name: 'id', description: 'ID outbound DO' })
-  @ApiQuery({ 
-    name: 'memoId', 
-    description: 'ID memo yang akan dilepas (opsional, jika tidak disediakan semua memo akan dilepas)', 
-    required: false 
+  @ApiQuery({
+    name: 'memoId',
+    description: 'ID memo yang akan dilepas (opsional, jika tidak disediakan semua memo akan dilepas)',
+    required: false
   })
   @ApiResponse({
     status: 200,
@@ -329,9 +329,9 @@ export class OutboundDoController {
   @ApiOperation({ summary: 'Attach memo to outbound DO' })
   @ApiParam({ name: 'id', description: 'ID outbound DO' })
   @ApiQuery({ name: 'memoId', description: 'ID memo yang akan ditambahkan' })
-  @ApiQuery({ 
-    name: 'sequence', 
-    description: 'Sequence number untuk memo (opsional, akan auto-increment jika tidak disediakan)', 
+  @ApiQuery({
+    name: 'sequence',
+    description: 'Sequence number untuk memo (opsional, akan auto-increment jika tidak disediakan)',
     required: false,
     type: Number
   })
@@ -365,11 +365,23 @@ export class OutboundDoController {
     },
   })
   async attachMemo(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Query('memoId') memoId: string,
     @Query('sequence') sequence?: number
   ) {
     const sequenceNumber = sequence ? Number(sequence) : undefined;
     return this.outboundDoService.attachMemo(id, memoId, sequenceNumber);
+  }
+  // cancel outbound do
+  @Patch(':id/cancel')
+  @ApiOperation({ summary: 'Cancel outbound DO' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiResponse({
+    status: 200,
+    description: 'Outbound DO berhasil dibatalkan',
+    type: OutboundDoResponseDto,
+  })
+  async cancel(@Param('id') id: string) {
+    return this.outboundDoService.cancel(id);
   }
 }

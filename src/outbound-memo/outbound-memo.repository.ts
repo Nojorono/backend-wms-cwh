@@ -6,6 +6,7 @@ import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.ent
 import { CreateOutboundMemoDto } from './dto/create-outbound-memo.dto';
 import { UpdateOutboundMemoDto } from './dto/update-outbound-memo.dto';
 import { OutboundMemoPaginationDto } from './dto/outbound-memo-pagination.dto';
+import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
 
 @Injectable()
 export class OutboundMemoRepository {
@@ -14,7 +15,7 @@ export class OutboundMemoRepository {
     private readonly outboundMemoRepository: Repository<OutboundMemo>,
     @InjectRepository(OutboundMemoItem)
     private readonly outboundMemoItemRepository: Repository<OutboundMemoItem>,
-  ) {}
+  ) { }
 
   async create(data: CreateOutboundMemoDto): Promise<OutboundMemo> {
     const { outbound_memo_items, ...outboundMemoData } = data;
@@ -121,6 +122,17 @@ export class OutboundMemoRepository {
 
     const qb = this.outboundMemoRepository
       .createQueryBuilder('memo')
+      .leftJoin(
+        'outbound_do_memo',
+        'odm',
+        'odm.outbound_memo_id = memo.id AND memo.has_do = true',
+      )
+      .leftJoinAndMapMany(
+        'memo.outbound_do',
+        OutboundDo,
+        'outbound_do',
+        'outbound_do.id = odm.outbound_do_id',
+      )
       .leftJoinAndSelect('memo.outbound_memo_items', 'items')
       .leftJoinAndSelect('items.item', 'item')
       .leftJoinAndSelect('memo.transaction_pickings', 'transaction_pickings')
