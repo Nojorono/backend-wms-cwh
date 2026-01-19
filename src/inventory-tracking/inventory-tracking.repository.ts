@@ -23,7 +23,7 @@ export class InventoryTrackingRepository {
     private readonly historyRepository: Repository<InventoryTrackingHistory>,
     @InjectRepository(MasterPallet)
     private readonly palletRepository: Repository<MasterPallet>,
-  ) {}
+  ) { }
 
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
     // Extract inbound_id from dto before creating to avoid saving to non-existent column
@@ -397,6 +397,182 @@ export class InventoryTrackingRepository {
     `;
 
     const results = (await this.repository.query(query, [item_id])) as any[];
+    return results;
+  }
+
+  async getVisibilityDashboard(item_id?: string): Promise<any[]> {
+    const itemFilter = item_id ? `AND pth.item_id::uuid = $1::uuid` : '';
+    const itemFilterParams = item_id ? [item_id] : [];
+
+    const query = `
+      WITH latest_pallet_items AS (
+        -- Get latest quantity per item per pallet (grouped by item_id, uom, week_number)
+        -- Same logic as getPalletItemLatestQuantity - using subquery for MAX(created_at)
+        SELECT 
+          pth.id,
+          pth.item_id::uuid as item_id,
+          pth.pallet_id,
+          pth.uom,
+          pth.new_quantity::integer as new_quantity,
+          pth.week_number,
+          pth.production_date,
+          pth.status_inventory,
+          pth.created_at
+        FROM transaction_pallet_history pth
+        WHERE pth.deleted_at IS NULL
+          AND pth.status_inventory = 'READY'
+          ${itemFilter}
+          AND pth.created_at = (
+            SELECT MAX(pth2.created_at)
+            FROM transaction_pallet_history pth2
+            WHERE pth2.pallet_id = pth.pallet_id
+              AND pth2.item_id = pth.item_id
+              AND COALESCE(pth2.uom, '') = COALESCE(pth.uom, '')
+              AND (pth2.week_number = pth.week_number OR (pth2.week_number IS NULL AND pth.week_number IS NULL))
+              AND pth2.deleted_at IS NULL
+              AND pth2.status_inventory = 'READY'
+          )
+      ),
+      item_inventory AS (
+        -- Join with inventory tracking to get warehouse location info and master table names
+        SELECT 
+          lpi.item_id,
+          lpi.pallet_id,
+          lpi.uom,
+          lpi.new_quantity,
+          lpi.week_number,
+          lpi.production_date,
+          lpi.status_inventory,
+          it.warehouse_id,
+          it.warehouse_sub_id,
+          it.warehouse_bin_id,
+          it.inventory_status,
+          p.pallet_code,
+          w.name as warehouse_name,
+          ws.name as warehouse_sub_name,
+          ws.code as warehouse_sub_code,
+          wb.name as warehouse_bin_name,
+          wb.code as warehouse_bin_code,
+          lpi.created_at as last_updated
+        FROM latest_pallet_items lpi
+        INNER JOIN inventory_tracking it ON it.pallet_id = lpi.pallet_id
+        LEFT JOIN m_pallet p ON p.id = lpi.pallet_id
+        LEFT JOIN m_warehouse w ON w.id = it.warehouse_id
+        LEFT JOIN m_warehouse_sub ws ON ws.id = it.warehouse_sub_id
+        LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
+        WHERE lpi.new_quantity > 0
+          AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED')
+          AND it.deleted_at IS NULL
+      ),
+      item_totals AS (
+        -- Aggregate total quantity per item (ensure numeric sum)
+        SELECT 
+          item_id,
+          COALESCE(uom, '') as uom,
+          SUM(new_quantity::integer)::integer as total_quantity,
+          COUNT(DISTINCT pallet_id)::integer as pallet_count,
+          MIN(week_number) as min_week_number,
+          MAX(week_number) as max_week_number,
+          MIN(production_date) as earliest_production_date,
+          MAX(production_date) as latest_production_date,
+          json_agg(
+            json_build_object(
+              'pallet_id', pallet_id,
+              'pallet_code', pallet_code,
+              'warehouse_id', warehouse_id,
+              'warehouse_name', warehouse_name,
+              'warehouse_sub_id', warehouse_sub_id,
+              'warehouse_sub_name', warehouse_sub_name,
+              'warehouse_sub_code', warehouse_sub_code,
+              'warehouse_bin_id', warehouse_bin_id,
+              'warehouse_bin_name', warehouse_bin_name,
+              'warehouse_bin_code', warehouse_bin_code,
+              'quantity', new_quantity,
+              'week_number', week_number,
+              'production_date', production_date
+            ) ORDER BY week_number ASC NULLS LAST, production_date ASC NULLS LAST
+          ) as pallet_details
+        FROM item_inventory
+        GROUP BY item_id, COALESCE(uom, '')
+      ),
+      pending_bookings AS (
+        -- Get pending bookings from transaction_picking with names/codes (ensure numeric sum)
+        SELECT 
+          tp.item_id::uuid as item_id,
+          COALESCE(tp.uom, '') as uom,
+          SUM(tp.quantity::integer)::integer as booked_quantity,
+          COUNT(*)::integer as booking_count,
+          json_agg(
+            json_build_object(
+              'transaction_id', tp.id,
+              'do_id', tp.do_id,
+              'do_number', od.outbound_do_number,
+              'memo_id', tp.memo_id,
+              'memo_number', om.outbound_memo_number,
+              'quantity', tp.quantity,
+              'week_number', tp.week_number,
+              'source_warehouse_sub_id', tp.source_warehouse_sub_id,
+              'source_warehouse_sub_name', ws_source.name,
+              'source_warehouse_sub_code', ws_source.code,
+              'source_bin_id', tp.source_bin_id,
+              'source_bin_name', wb_source.name,
+              'source_bin_code', wb_source.code
+            )
+          ) as booking_details
+        FROM transaction_picking tp
+        LEFT JOIN outbound_do od ON od.id = tp.do_id
+        LEFT JOIN outbound_memo om ON om.id = tp.memo_id
+        LEFT JOIN m_warehouse_sub ws_source ON ws_source.id = tp.source_warehouse_sub_id
+        LEFT JOIN m_warehouse_bin wb_source ON wb_source.id = tp.source_bin_id
+        WHERE tp.status = 'PENDING'
+          AND tp.deleted_at IS NULL
+          ${item_id ? `AND tp.item_id::uuid = $1::uuid` : ''}
+        GROUP BY tp.item_id::uuid, COALESCE(tp.uom, '')
+      ),
+      combined_items AS (
+        -- Combine item inventory and bookings to get all item-uom combinations
+        SELECT DISTINCT
+          COALESCE(it_totals.item_id, pb.item_id) as item_id,
+          COALESCE(it_totals.uom, pb.uom) as uom
+        FROM item_totals it_totals
+        FULL OUTER JOIN pending_bookings pb 
+          ON it_totals.item_id = pb.item_id 
+          AND it_totals.uom = pb.uom
+      )
+      SELECT 
+        it.id as item_id,
+        it.sku,
+        it.item_number,
+        it.description as item_name,
+        COALESCE(ci.uom, '') as uom,
+        COALESCE(it_totals.total_quantity, 0)::integer as total_quantity,
+        COALESCE(it_totals.pallet_count, 0)::integer as pallet_count,
+        COALESCE(pb.booked_quantity, 0)::integer as booked_quantity,
+        COALESCE(pb.booking_count, 0)::integer as booking_count,
+        GREATEST(0, COALESCE(it_totals.total_quantity, 0)::integer - COALESCE(pb.booked_quantity, 0)::integer)::integer as available_quantity,
+        it_totals.min_week_number,
+        it_totals.max_week_number,
+        it_totals.earliest_production_date,
+        it_totals.latest_production_date,
+        COALESCE(it_totals.pallet_details, '[]'::json) as pallet_details,
+        COALESCE(pb.booking_details, '[]'::json) as booking_details,
+        CASE 
+          WHEN COALESCE(pb.booked_quantity, 0) > 0 THEN true
+          ELSE false
+        END as has_pending_booking
+      FROM combined_items ci
+      INNER JOIN m_item it ON it.id = ci.item_id
+      LEFT JOIN item_totals it_totals 
+        ON it_totals.item_id = ci.item_id 
+        AND it_totals.uom = ci.uom
+      LEFT JOIN pending_bookings pb 
+        ON pb.item_id = ci.item_id 
+        AND pb.uom = ci.uom
+      ${item_id ? 'WHERE ci.item_id = $1::uuid' : ''}
+      ORDER BY it.sku, ci.uom
+    `;
+
+    const results = (await this.repository.query(query, itemFilterParams)) as any[];
     return results;
   }
 }
