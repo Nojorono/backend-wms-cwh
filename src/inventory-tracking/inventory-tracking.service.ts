@@ -18,7 +18,7 @@ export class InventoryTrackingService {
     private readonly repository: InventoryTrackingRepository,
     private readonly paginationService: PaginationService,
     private readonly masterPalletService: MasterPalletService,
-  ) {}
+  ) { }
 
   // Validasi status yang diperbolehkan
   private validateInventoryStatus(status: string): void {
@@ -495,18 +495,14 @@ export class InventoryTrackingService {
   }
 
   async getVisibilityInventoryTrackingAllItemInWarehouse(item_id?: string): Promise<{
-    success: boolean;
-    message: string;
-    data: {
-      summary: {
-        total_items: number;
-        total_quantity: number;
-        total_booked_quantity: number;
-        total_available_quantity: number;
-        items_with_pending_bookings: number;
-      };
-      items: any[];
+    summary: {
+      total_items: number;
+      total_quantity: number;
+      total_booked_quantity: number;
+      total_available_quantity: number;
+      items_with_pending_bookings: number;
     };
+    items: any[];
   }> {
     try {
       const items = await this.repository.getVisibilityDashboard(item_id);
@@ -521,12 +517,8 @@ export class InventoryTrackingService {
       };
 
       return {
-        success: true,
-        message: 'Dashboard visibility data retrieved successfully',
-        data: {
-          summary,
-          items,
-        },
+        summary,
+        items,
       };
     } catch (error) {
       throw new BadRequestException(`Error getting visibility dashboard: ${error.message}`);
