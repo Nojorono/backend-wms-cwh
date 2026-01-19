@@ -9,7 +9,7 @@ import { User } from '../core/domain/entities/user.entity';
 @Controller('user')
 @ApiBearerAuth('JWT-auth')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new User' })
@@ -20,7 +20,7 @@ export class UserController {
   })
   @ApiResponse({
     status: 409,
-    description: 'User with this code already exists.',
+    description: 'User with this username already exists.',
   })
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
@@ -74,7 +74,7 @@ export class UserController {
   @ApiResponse({ status: 404, description: 'User not found.' })
   @ApiResponse({
     status: 409,
-    description: 'User with this code already exists.',
+    description: 'User with this username already exists.',
   })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(id, updateUserDto);

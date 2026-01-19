@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, QueryFailedError } from 'typeorm';
 import { UserRepository } from './user.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -18,7 +18,8 @@ export class UserService {
   ) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.repository.findByUsername(createUserDto.username);
+    // Check for existing user including soft-deleted ones
+    const existingUser = await this.repository.findByUsername(createUserDto.username, true);
     if (existingUser) {
       throw new ConflictException(`User with username ${createUserDto.username} already exists`);
     }
@@ -26,29 +27,44 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     createUserDto.password = hashedPassword;
 
-    const user = await this.repository.create(createUserDto);
+    try {
+      const user = await this.repository.create(createUserDto);
 
-    if (
-      createUserDto.employeeId ||
-      createUserDto.email ||
-      createUserDto.phone ||
-      createUserDto.organizationId ||
-      createUserDto.warehouseSubId
-    ) {
-      const userDetail = this.userDetailRepository.create({
-        userId: user.id,
-        employee_id: createUserDto.employeeId || `EMP_${user.username}`,
-        email: createUserDto.email || `${user.username}@default.com`,
-        phone: createUserDto.phone || '0000000000',
-        organizationId: createUserDto.organizationId,
-        warehouseSubId: createUserDto.warehouseSubId,
-      });
+      if (
+        createUserDto.employeeId ||
+        createUserDto.email ||
+        createUserDto.phone ||
+        createUserDto.organizationId ||
+        createUserDto.warehouseSubId
+      ) {
+        const userDetail = this.userDetailRepository.create({
+          userId: user.id,
+          employee_id: createUserDto.employeeId || `EMP_${user.username}`,
+          email: createUserDto.email || `${user.username}@default.com`,
+          phone: createUserDto.phone || '0000000000',
+          organizationId: createUserDto.organizationId,
+          warehouseSubId: createUserDto.warehouseSubId,
+        });
 
-      await this.userDetailRepository.save(userDetail);
+        await this.userDetailRepository.save(userDetail);
+      }
+
+      // Reload user with relationships
+      return await this.findOne(user.id);
+    } catch (error) {
+      // Handle database constraint violations (e.g., duplicate username)
+      if (error instanceof QueryFailedError) {
+        const pgError = error as any;
+        if (pgError.code === '23505') {
+          // Unique constraint violation
+          if (pgError.constraint === 'users_username_key' || pgError.detail?.includes('username')) {
+            throw new ConflictException(`User with username ${createUserDto.username} already exists`);
+          }
+        }
+      }
+      // Re-throw if it's not a constraint violation we can handle
+      throw error;
     }
-
-    // Reload user with relationships
-    return await this.findOne(user.id);
   }
 
   async findAll(): Promise<User[]> {

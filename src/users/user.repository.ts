@@ -25,8 +25,12 @@ export class UserRepository {
     return await this.repository.find({ withDeleted: true });
   }
 
-  async findByUsername(username: string): Promise<User | null> {
-    const user = await this.repository.findOne({ where: { username } });
+  async findByUsername(username: string, includeDeleted: boolean = false): Promise<User | null> {
+    const options: any = { where: { username } };
+    if (includeDeleted) {
+      options.withDeleted = true;
+    }
+    const user = await this.repository.findOne(options);
     if (!user) {
       return null;
     }
