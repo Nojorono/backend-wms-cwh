@@ -55,17 +55,9 @@ export interface IS3Service {
     options?: S3UploadOptions,
   ): Promise<S3FileMetadata>;
 
-  downloadFile(
-    bucket: string,
-    key: string,
-    options?: S3DownloadOptions,
-  ): Promise<Buffer>;
+  downloadFile(bucket: string, key: string, options?: S3DownloadOptions): Promise<Buffer>;
 
-  downloadFileAsStream(
-    bucket: string,
-    key: string,
-    options?: S3DownloadOptions,
-  ): Promise<Readable>;
+  downloadFileAsStream(bucket: string, key: string, options?: S3DownloadOptions): Promise<Readable>;
 
   deleteFile(bucket: string, key: string): Promise<void>;
 

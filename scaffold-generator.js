@@ -96,10 +96,7 @@ export class Update${pascalCase}Dto extends PartialType(Create${pascalCase}Dto) 
   }
 
   generateRepository(modulePath, pascalCase, entityName) {
-    const repositoryPath = path.join(
-      modulePath,
-      `${this.toKebabCase(pascalCase)}.repository.ts`,
-    );
+    const repositoryPath = path.join(modulePath, `${this.toKebabCase(pascalCase)}.repository.ts`);
 
     const repositoryContent = `import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -155,10 +152,7 @@ export class ${pascalCase}Repository {
   }
 
   generateService(modulePath, pascalCase, entityName) {
-    const servicePath = path.join(
-      modulePath,
-      `${this.toKebabCase(pascalCase)}.service.ts`,
-    );
+    const servicePath = path.join(modulePath, `${this.toKebabCase(pascalCase)}.service.ts`);
 
     const serviceContent = `import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { ${pascalCase}Repository } from './${this.toKebabCase(pascalCase)}.repository';
@@ -205,10 +199,7 @@ export class ${pascalCase}Service {
   }
 
   generateController(modulePath, pascalCase, entityName) {
-    const controllerPath = path.join(
-      modulePath,
-      `${this.toKebabCase(pascalCase)}.controller.ts`,
-    );
+    const controllerPath = path.join(modulePath, `${this.toKebabCase(pascalCase)}.controller.ts`);
 
     const controllerContent = `import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -272,10 +263,7 @@ export class ${pascalCase}Controller {
   }
 
   generateModule(modulePath, pascalCase, entityName) {
-    const modulePathFile = path.join(
-      modulePath,
-      `${this.toKebabCase(pascalCase)}.module.ts`,
-    );
+    const modulePathFile = path.join(modulePath, `${this.toKebabCase(pascalCase)}.module.ts`);
 
     const moduleContent = `import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';

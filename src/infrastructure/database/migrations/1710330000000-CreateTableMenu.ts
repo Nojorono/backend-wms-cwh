@@ -29,9 +29,7 @@ export class CreateMenusTable1710330000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "menus" DROP CONSTRAINT "FK_menus_parent_id"`,
-    );
+    await queryRunner.query(`ALTER TABLE "menus" DROP CONSTRAINT "FK_menus_parent_id"`);
     await queryRunner.query(`DROP INDEX "IDX_menus_path"`);
     await queryRunner.query(`DROP INDEX "IDX_menus_parentId"`);
     await queryRunner.query(`DROP TABLE "menus"`);

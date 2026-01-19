@@ -27,11 +27,6 @@ export class UpdateMasterPalletDto {
   @IsOptional()
   isFull?: boolean;
 
-  @ApiProperty({ example: 'https://example.com/pallet.png', required: false })
-  @IsString()
-  @IsOptional()
-  qr_image_url?: string;
-
   @ApiProperty({ example: 'DUS', required: false })
   @IsString()
   @IsOptional()
@@ -41,4 +36,13 @@ export class UpdateMasterPalletDto {
   @IsNumber()
   @IsOptional()
   currentQuantity?: number;
+
+  @ApiProperty({ example: 0, required: false })
+  @IsNumber()
+  @IsOptional()
+  currentWeekNumber?: number;
+
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false, nullable: true })
+  @IsOptional()
+  memo_id?: string | null;
 }

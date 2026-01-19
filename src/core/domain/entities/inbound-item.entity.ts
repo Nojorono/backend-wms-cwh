@@ -3,6 +3,11 @@ import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
 import { InboundDo } from './inbound-do.entity';
 
+export enum InspectionStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+}
+
 @Entity('inbound_item')
 export class InboundItem extends BaseEntity {
   @Column({ nullable: true })
@@ -24,6 +29,15 @@ export class InboundItem extends BaseEntity {
 
   @Column({ nullable: true })
   quantity: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  quantity_inspection: number;
+
+  @Column({ nullable: true })
+  uom_inspection: string;
+
+  @Column({ nullable: true, default: InspectionStatus.PENDING })
+  inspection_status: InspectionStatus;
 
   @Column({ nullable: true })
   classification_id: string;

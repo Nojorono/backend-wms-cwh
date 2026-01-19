@@ -12,9 +12,7 @@ export class MasterPalletRepository {
     private readonly repository: Repository<MasterPallet>,
   ) {}
 
-  async create(
-    createMasterPalletDto: CreateMasterPalletDto,
-  ): Promise<MasterPallet> {
+  async create(createMasterPalletDto: CreateMasterPalletDto): Promise<MasterPallet> {
     const pallet = this.repository.create(createMasterPalletDto);
     return await this.repository.save(pallet);
   }
@@ -41,6 +39,14 @@ export class MasterPalletRepository {
     return pallet;
   }
 
+  async findByMemoId(memoId: string): Promise<MasterPallet | null> {
+    const pallet = await this.repository.findOne({ where: { memo_id: memoId } });
+    if (!pallet) {
+      return null;
+    }
+    return pallet;
+  }
+
   async update(
     id: string,
     updateMasterPalletDto: UpdateMasterPalletDto,
@@ -49,7 +55,7 @@ export class MasterPalletRepository {
     if (!pallet) {
       throw new NotFoundException('Pallet not found');
     }
-    await this.repository.update(id, updateMasterPalletDto);
+    await this.repository.update(id, updateMasterPalletDto as any);
     return await this.findOne(id);
   }
 

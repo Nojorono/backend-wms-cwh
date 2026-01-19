@@ -1,27 +1,25 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels, ApiBody } from '@nestjs/swagger';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
-import { PalletQuantityHistoryResponseDto, PalletCapacityValidationDto, PalletItemQuantityDto, UpdatePalletQuantityDto } from './dto/pallet-quantity.dto';
+import {
+  PalletQuantityHistoryResponseDto,
+  PalletCapacityValidationDto,
+  PalletItemQuantityDto,
+  UpdatePalletQuantityDto,
+  UpdatePalletItemStockDto,
+} from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
+import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
+import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
 
 @ApiTags('Master Pallet')
 @Controller('master-pallet')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(PalletQuantityHistoryResponseDto, PaginatedResponseDto, UpdatePalletItemStockDto)
 export class MasterPalletController {
   constructor(private readonly masterPalletService: MasterPalletService) {}
 
@@ -75,10 +73,7 @@ export class MasterPalletController {
     status: 409,
     description: 'Pallet with this code already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterPalletDto: UpdateMasterPalletDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterPalletDto: UpdateMasterPalletDto) {
     return this.masterPalletService.update(id, updateMasterPalletDto);
   }
 
@@ -101,23 +96,60 @@ export class MasterPalletController {
     type: MasterPallet,
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  updateQuantity(@Param('palletCode') palletCode: string, @Body() updateQuantityDto: UpdatePalletQuantityDto) {
+  updateQuantity(
+    @Param('palletCode') palletCode: string,
+    @Body() updateQuantityDto: UpdatePalletQuantityDto,
+  ) {
     return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
   }
 
   @Get('by-code/:palletCode/quantity-history')
   @ApiOperation({ summary: 'Get pallet quantity history by pallet code' })
+  @ApiFlexiblePaginationQuery([
+    {
+      name: 'operation_type',
+      description: 'Filter berdasarkan tipe operasi kuantitas',
+      enum: Object.values(QuantityOperationType),
+      required: false,
+    },
+  ])
   @ApiResponse({
     status: 200,
     description: 'Return pallet quantity history.',
-    type: [PalletQuantityHistoryResponseDto],
+    schema: {
+      oneOf: [
+        {
+          type: 'array',
+          items: { $ref: '#/components/schemas/PalletQuantityHistoryResponseDto' },
+        },
+        { $ref: '#/components/schemas/PaginatedResponseDtoOfPalletQuantityHistoryResponseDto' },
+      ],
+    },
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  getQuantityHistoryByPalletCode(@Param('palletCode') palletCode: string) {
+  getQuantityHistoryByPalletCode(
+    @Param('palletCode') palletCode: string,
+    @Query() paginationQuery: PalletHistoryPaginationDto,
+  ) {
+    const hasPaginationParams =
+      paginationQuery.page ||
+      paginationQuery.limit ||
+      paginationQuery.search ||
+      paginationQuery.sortBy ||
+      paginationQuery.sortOrder ||
+      paginationQuery.operation_type;
+
+    if (hasPaginationParams) {
+      return this.masterPalletService.getQuantityHistoryByPalletCodePaginated(
+        palletCode,
+        paginationQuery,
+      );
+    }
+
     return this.masterPalletService.getQuantityHistoryByPalletCode(palletCode);
   }
 
-  @Get('by-code/:palletCode/items')
+  @Get('by-code/:palletCode/current')
   @ApiOperation({ summary: 'Get all items and their quantities on a pallet by pallet code' })
   @ApiResponse({
     status: 200,
@@ -125,8 +157,61 @@ export class MasterPalletController {
     type: [PalletItemQuantityDto],
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  getPalletItemQuantitiesByPalletCode(@Param('palletCode') palletCode: string) {
-    return this.masterPalletService.getPalletItemQuantitiesByPalletCode(palletCode);
+  getPalletItemLatestQuantityByPalletCode(@Param('palletCode') palletCode: string) {
+    return this.masterPalletService.getPalletItemLatestQuantityByPalletCode(palletCode);
+  }
+
+  @Patch('by-code/:palletCode/item/:itemId/quantity')
+  @ApiOperation({ 
+    summary: 'Update quantity for specific item on pallet by pallet code and item ID',
+    description: 'Direct stock adjustment for pallet item. This endpoint adjusts the item quantity to the specified value. Only quantity is required. Operation type is automatically set to ADJUST.'
+  })
+  @ApiBody({ type: UpdatePalletItemStockDto })
+  @ApiResponse({
+    status: 200,
+    description: 'The quantity for item on pallet has been successfully updated.',
+    type: MasterPallet,
+  })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  @ApiResponse({ status: 400, description: 'Invalid request body or validation error.' })
+  updateItemQuantityByPalletCode(
+    @Param('palletCode') palletCode: string,
+    @Param('itemId') itemId: string,
+    @Body() stockDto: UpdatePalletItemStockDto,
+  ) {
+    // Map to UpdatePalletQuantityDto for service call
+    // Automatically use ADJUST operation type for stock adjustments
+    const updateQuantityDto: UpdatePalletQuantityDto = {
+      item_id: itemId,
+      quantity: stockDto.quantity,
+      operation_type: QuantityOperationType.ADJUST,
+      uom: stockDto.uom,
+      production_date: stockDto.production_date,
+      week_number: stockDto.week_number,
+      notes: stockDto.notes,
+      user_id: stockDto.user_id,
+      reference_type: 'STOCK_ADJUSTMENT',
+      // Explicitly exclude inbound/outbound references
+      inbound_id: undefined,
+      outbound_do_id: undefined,
+    };
+    return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
+  }
+
+  @Get('by-code/:palletCode/item/:itemId/history')
+  @ApiOperation({ summary: 'Get item quantity history by pallet code and item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return item quantity history.',
+    type: [PalletQuantityHistoryResponseDto],
+  })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  getItemQuantityHistoryByPalletCode(
+    @Param('palletCode') palletCode: string,
+    @Param('itemId') itemId: string,
+    @Query('uom') uom?: string,
+  ) {
+    return this.masterPalletService.getItemQuantityHistoryByPalletCode(palletCode, itemId, uom);
   }
 
   @Get('by-code/:palletCode/capacity-validation')

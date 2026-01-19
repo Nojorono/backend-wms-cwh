@@ -10,7 +10,7 @@ export class UserRepository {
   constructor(
     @InjectRepository(User)
     private readonly repository: Repository<User>,
-  ) {}
+  ) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     const user = this.repository.create(createUserDto);
@@ -34,7 +34,10 @@ export class UserRepository {
   }
 
   async findOne(id: string): Promise<User | null> {
-    const user = await this.repository.findOne({ where: { id } });
+    const user = await this.repository.findOne({
+      where: { id },
+      relations: ['userDetail'],
+    });
     if (!user) {
       return null;
     }
@@ -45,6 +48,7 @@ export class UserRepository {
     const user = await this.repository.findOne({
       where: { id },
       withDeleted: true,
+      relations: ['userDetail'],
     });
     if (!user) {
       return null;
@@ -59,10 +63,6 @@ export class UserRepository {
     }
     await this.repository.update(id, updateUserDto);
     return await this.findOne(id);
-  }
-
-  async updateUserDetailId(id: string, userDetailId: string): Promise<void> {
-    await this.repository.update(id, { userDetailId });
   }
 
   async remove(id: string): Promise<void> {

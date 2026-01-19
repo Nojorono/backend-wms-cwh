@@ -4,9 +4,15 @@ import { MasterPallet } from './master-pallet.entity';
 
 export enum QuantityOperationType {
   ADD = 'ADD',
+  PICK = 'PICK',
   REMOVE = 'REMOVE',
   ADJUST = 'ADJUST',
-  RESET = 'RESET'
+  RESET = 'RESET',
+}
+
+export enum StatusInventory {
+  READY = 'READY',
+  PENDING = 'PENDING',
 }
 
 @Entity('transaction_pallet_history')
@@ -34,7 +40,16 @@ export class PalletTransactionHistory extends BaseEntity {
   operation_type: QuantityOperationType;
 
   @Column({ nullable: true })
-  production_date: Date;  
+  production_date: Date;
+
+  @Column({ nullable: true })
+  week_number: number;
+
+  @Column({ nullable: true })
+  inbound_id: string;
+
+  @Column({ nullable: true })
+  outbound_do_id: string;
 
   @Column({ nullable: true })
   reference_id: string;
@@ -47,6 +62,9 @@ export class PalletTransactionHistory extends BaseEntity {
 
   @Column({ nullable: true })
   user_id: string;
+
+  @Column({ type: 'enum', enum: StatusInventory, default: StatusInventory.PENDING })
+  status_inventory: StatusInventory;
 
   @Column({ nullable: true })
   uom: string;

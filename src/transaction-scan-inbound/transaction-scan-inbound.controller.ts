@@ -1,9 +1,22 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { TransactionScanInboundService } from './transaction-scan-inbound.service';
 import { CreateTransactionScanInboundDto } from './dto/create-transaction-scan-inbound.dto';
-import { UpdateTransactionScanInboundDto } from './dto/update-transaction-scan-inbound.dto';
-import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
+import {
+  UpdateManyStatusToDto,
+  UpdateTransactionScanInboundDto,
+} from './dto/update-transaction-scan-inbound.dto';
+import {
+  ScanInboundStatus,
+  TransactionScanInbound,
+} from '../core/domain/entities/transaction-scan-inbound.entity';
 
 @ApiTags('Transaction Scan Inbound')
 @Controller('transaction-scan-inbound')
@@ -22,8 +35,14 @@ export class TransactionScanInboundController {
   @ApiOperation({ summary: 'Get all transaction scan inbound records' })
   @ApiResponse({ status: 200, description: 'OK', type: [TransactionScanInbound] })
   @ApiQuery({ name: 'inbound_id', required: true, type: String })
-  findAll(@Query('inbound_id') inbound_id: string) {
-    return this.service.findAll(inbound_id);
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'item_id', required: false, type: String })
+  findAll(
+    @Query('inbound_id') inbound_id: string,
+    @Query('status') status: string,
+    @Query('item_id') item_id: string,
+  ) {
+    return this.service.findAll(inbound_id, status, item_id);
   }
 
   @Get(':id')
@@ -48,12 +67,49 @@ export class TransactionScanInboundController {
     return this.service.update(id, dto);
   }
 
+  @Patch('inspection-approved/:id')
+  @ApiOperation({
+    summary: 'Update the inspection approved of a transaction scan inbound PENDING OR COMPLETED',
+  })
+  @ApiResponse({ status: 200, description: 'Updated', type: TransactionScanInbound })
+  @ApiQuery({ name: 'status', required: true, type: String })
+  @ApiQuery({ name: 'inspection_by', required: false, type: String })
+  updateInspectionApproved(
+    @Param('id') id: string,
+    @Query('status') status: ScanInboundStatus,
+    @Query('inspection_by') inspection_by: string,
+  ) {
+    return this.service.updateInspectionApproved(id, status, inspection_by);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a transaction scan inbound' })
   @ApiResponse({ status: 200, description: 'Deleted' })
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
+
+  // update many status to PENDING
+  @Post('update-many-status-to')
+  @ApiOperation({ summary: 'Update many status to PENDING or COMPLETED' })
+  @ApiResponse({ status: 200, description: 'Updated' })
+  @ApiBody({ type: UpdateManyStatusToDto })
+  @ApiQuery({ name: 'status', required: true, type: String })
+  @ApiQuery({ name: 'inspection_by', required: false, type: String })
+  updateManyStatusToPending(
+    @Body() dto: UpdateManyStatusToDto,
+    @Query('status') status: ScanInboundStatus,
+    @Query('inspection_by') inspection_by: string,
+  ) {
+    return this.service.updateManyStatusTo(dto, status, inspection_by);
+  }
+
+  // update change pallet
+  @Post('change-pallet/:id')
+  @ApiOperation({ summary: 'Update change pallet' })
+  @ApiResponse({ status: 200, description: 'Updated' })
+  @ApiBody({ type: CreateTransactionScanInboundDto })
+  updateChangePallet(@Param('id') id: string, @Body() dto: CreateTransactionScanInboundDto) {
+    return this.service.updateChangePallet(id, dto);
+  }
 }
-
-

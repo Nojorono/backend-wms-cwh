@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterClassificationItemService } from './master-classification-item.service';
 import { CreateMasterClassificationItemDto } from './dto/create-master-classification-item.dto';
 import { UpdateMasterClassificationItemDto } from './dto/update-master-classification-item.dto';
@@ -23,9 +9,7 @@ import { MasterClassificationItem } from '../core/domain/entities/master-classif
 @Controller('master-classification-item')
 @ApiBearerAuth('JWT-auth')
 export class MasterClassificationItemController {
-  constructor(
-    private readonly masterClassificationItemService: MasterClassificationItemService,
-  ) {}
+  constructor(private readonly masterClassificationItemService: MasterClassificationItemService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Classification Item' })
@@ -42,9 +26,7 @@ export class MasterClassificationItemController {
     @Body()
     createMasterClassificationItemDto: CreateMasterClassificationItemDto,
   ) {
-    return this.masterClassificationItemService.create(
-      createMasterClassificationItemDto,
-    );
+    return this.masterClassificationItemService.create(createMasterClassificationItemDto);
   }
 
   @Get()
@@ -82,10 +64,7 @@ export class MasterClassificationItemController {
     @Body()
     updateMasterClassificationItemDto: UpdateMasterClassificationItemDto,
   ) {
-    return this.masterClassificationItemService.update(
-      id,
-      updateMasterClassificationItemDto,
-    );
+    return this.masterClassificationItemService.update(id, updateMasterClassificationItemDto);
   }
 
   @Delete(':id')

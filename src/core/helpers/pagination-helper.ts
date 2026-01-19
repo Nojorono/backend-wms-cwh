@@ -14,7 +14,7 @@ export interface PaginationFieldConfig {
 export function createPaginationDto(fields: PaginationFieldConfig[]) {
   class DynamicPaginationDto extends BasePaginationQueryDto {}
 
-  fields.forEach(field => {
+  fields.forEach((field) => {
     const decorators = [
       ApiPropertyOptional({
         description: field.description,
@@ -26,9 +26,15 @@ export function createPaginationDto(fields: PaginationFieldConfig[]) {
     if (field.type === 'string') {
       decorators.push(IsString());
     } else if (field.type === 'number') {
-      decorators.push(Type(() => Number), IsNumber());
+      decorators.push(
+        Type(() => Number),
+        IsNumber(),
+      );
     } else if (field.type === 'boolean') {
-      decorators.push(Type(() => Boolean), IsBoolean());
+      decorators.push(
+        Type(() => Boolean),
+        IsBoolean(),
+      );
     }
 
     if (field.required) {
@@ -43,7 +49,7 @@ export function createPaginationDto(fields: PaginationFieldConfig[]) {
     });
 
     // Apply decorators to the property
-    decorators.forEach(decorator => {
+    decorators.forEach((decorator) => {
       decorator(DynamicPaginationDto.prototype, field.name);
     });
   });

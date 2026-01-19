@@ -12,9 +12,7 @@ export class MasterSupplierRepository {
     private readonly repository: Repository<MasterSupplier>,
   ) {}
 
-  async create(
-    createMasterSupplierDto: CreateMasterSupplierDto,
-  ): Promise<MasterSupplier> {
+  async create(createMasterSupplierDto: CreateMasterSupplierDto): Promise<MasterSupplier> {
     const supplier = this.repository.create(createMasterSupplierDto);
     return await this.repository.save(supplier);
   }
@@ -31,9 +29,7 @@ export class MasterSupplierRepository {
     return supplier;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterSupplier | null> {
+  async findByOrganizationId(organization_id: number): Promise<MasterSupplier | null> {
     const supplier = await this.repository.findOne({
       where: { organization_id },
     });

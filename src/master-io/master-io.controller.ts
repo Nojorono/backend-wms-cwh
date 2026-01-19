@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterIOService } from './master-io.service';
 import { CreateMasterIODto } from './dto/create-master-io.dto';
 import { UpdateMasterIODto } from './dto/update-master-io.dto';
@@ -71,10 +57,7 @@ export class MasterIOController {
     status: 409,
     description: 'IO with this code already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterIODto: UpdateMasterIODto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterIODto: UpdateMasterIODto) {
     return this.masterIOService.update(id, updateMasterIODto);
   }
 

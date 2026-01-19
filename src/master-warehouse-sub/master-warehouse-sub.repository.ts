@@ -1,9 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
-import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
+import {
+  MasterWarehouseSub,
+  WarehouseSubStagingType,
+} from '../core/domain/entities/master-warehouse-sub.entity';
 
 @Injectable()
 export class MasterWarehouseSubRepository {
@@ -31,9 +34,7 @@ export class MasterWarehouseSubRepository {
     return warehouseSub;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterWarehouseSub[]> {
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseSub[]> {
     return await this.repository.find({ where: { organization_id } });
   }
 
@@ -59,5 +60,31 @@ export class MasterWarehouseSubRepository {
       throw new NotFoundException('Warehouse not found');
     }
     await this.repository.delete(id);
+  }
+
+  async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
+    return await this.repository.find({ where: { is_staging } });
+  }
+
+  async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
+    return await this.repository.find({ where: { is_staging: IsNull() } });
+  }
+
+  async findByIsGate(is_gate: boolean): Promise<MasterWarehouseSub[]> {
+    return await this.repository.find({ where: { is_gate } });
+  }
+
+  async findByFilters(
+    is_staging?: WarehouseSubStagingType,
+    is_gate?: boolean,
+  ): Promise<MasterWarehouseSub[]> {
+    const where: Partial<MasterWarehouseSub> = {};
+    if (is_staging !== undefined) {
+      where.is_staging = is_staging;
+    }
+    if (is_gate !== undefined) {
+      where.is_gate = is_gate;
+    }
+    return await this.repository.find({ where });
   }
 }

@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterSupplierService } from './master-supplier.service';
 import { CreateMasterSupplierDto } from './dto/create-master-supplier.dto';
 import { UpdateMasterSupplierDto } from './dto/update-master-supplier.dto';
@@ -75,10 +61,7 @@ export class MasterSupplierController {
     status: 409,
     description: 'Supplier with this code already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterSupplierDto: UpdateMasterSupplierDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterSupplierDto: UpdateMasterSupplierDto) {
     return this.masterSupplierService.update(id, updateMasterSupplierDto);
   }
 

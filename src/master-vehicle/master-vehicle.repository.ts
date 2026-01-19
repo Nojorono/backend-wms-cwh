@@ -37,10 +37,7 @@ export class MasterVehicleRepository {
     return vehicle;
   }
 
-  async update(
-    id: string,
-    updateVehicleIODto: UpdateVehicleIODto,
-  ): Promise<MasterVehicle | null> {
+  async update(id: string, updateVehicleIODto: UpdateVehicleIODto): Promise<MasterVehicle | null> {
     const vehicle = await this.findOne(id);
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found');

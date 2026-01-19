@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterVehicleService } from './master-vehicle.service';
 import { CreateVehicleIODto } from './dto/create-vehicle.dto';
 import { UpdateVehicleIODto } from './dto/update-vehicle.dto';
@@ -75,10 +61,7 @@ export class MasterVehicleController {
     status: 409,
     description: 'Vehicle with this type already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateVehicleIODto: UpdateVehicleIODto,
-  ) {
+  update(@Param('id') id: string, @Body() updateVehicleIODto: UpdateVehicleIODto) {
     return this.masterVehicleService.update(id, updateVehicleIODto);
   }
 

@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterWarehouseService } from './master-warehouse.service';
 import { CreateMasterWarehouseDto } from './dto/create-master-warehouse.dto';
 import { UpdateMasterWarehouseDto } from './dto/update-master-warehouse.dto';
@@ -23,9 +9,7 @@ import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity
 @Controller('master-warehouse')
 @ApiBearerAuth('JWT-auth')
 export class MasterWarehouseController {
-  constructor(
-    private readonly masterWarehouseService: MasterWarehouseService,
-  ) {}
+  constructor(private readonly masterWarehouseService: MasterWarehouseService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Warehouse' })
@@ -73,9 +57,7 @@ export class MasterWarehouseController {
     type: [MasterWarehouse],
   })
   @ApiResponse({ status: 404, description: 'Warehouse not found.' })
-  findByOrganizationId(
-    @Param('organization_id', ParseIntPipe) organization_id: number,
-  ) {
+  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
     return this.masterWarehouseService.findByOrganizationId(organization_id);
   }
 
@@ -91,10 +73,7 @@ export class MasterWarehouseController {
     status: 409,
     description: 'Warehouse with this organization ID already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterWarehouseDto: UpdateMasterWarehouseDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterWarehouseDto: UpdateMasterWarehouseDto) {
     return this.masterWarehouseService.update(id, updateMasterWarehouseDto);
   }
 

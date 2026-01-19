@@ -1,14 +1,7 @@
-import {
-  Entity,
-  Column,
-  ManyToOne,
-  JoinColumn,
-  Index,
-  OneToOne,
-  OneToMany,
-} from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index, OneToOne, OneToMany } from 'typeorm';
 import { Role } from './role.entity';
 import { BaseEntity } from './base.entity';
+import { UserDetail } from './user-detail.entity';
 
 @Entity('users')
 @Index(['username'], { unique: true })
@@ -30,6 +23,6 @@ export class User extends BaseEntity {
   @Column({ name: 'role_id' })
   roleId: number;
 
-  @Column({ name: 'user_detail_id', nullable: true })
-  userDetailId: string;
+  @OneToOne(() => UserDetail, (userDetail) => userDetail.user, { nullable: true })
+  userDetail: UserDetail;
 }

@@ -3,6 +3,13 @@ import { InboundItem } from './inbound-item.entity';
 import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
 
+export enum IntegrationStatus {
+  PENDING = 'PENDING',
+  READY = 'READY',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+}
+
 @Entity('inbound_do')
 export class InboundDo extends BaseEntity {
   @Column({ nullable: true })
@@ -30,6 +37,12 @@ export class InboundDo extends BaseEntity {
   @Column({ default: false })
   flag_validated: boolean;
 
+  @Column({ default: false })
+  validation_surat_jalan: boolean;
+
   @OneToMany(() => InboundItem, (inboundItem) => inboundItem.inbound_do)
   inbound_items: InboundItem[];
+
+  @Column({ nullable: true, default: null })
+  integration_status: IntegrationStatus;
 }

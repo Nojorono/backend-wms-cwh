@@ -7,16 +7,13 @@ import { MasterPalletRepository } from './master-pallet.repository';
 import { S3Service } from 'src/infrastructure/services/s3.service';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 import { PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
+import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import { PaginationModule } from '../core/modules/pagination.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterPallet, PalletTransactionHistory])],
+  imports: [TypeOrmModule.forFeature([MasterPallet, PalletTransactionHistory, InventoryTracking]), PaginationModule],
   controllers: [MasterPalletController],
-  providers: [
-    MasterPalletService,
-    MasterPalletRepository,
-    S3Service,
-    BarcodeService,
-  ],
+  providers: [MasterPalletService, MasterPalletRepository, S3Service, BarcodeService],
   exports: [MasterPalletService],
 })
 export class MasterPalletModule {}

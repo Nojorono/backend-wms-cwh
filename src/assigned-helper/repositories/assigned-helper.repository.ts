@@ -29,7 +29,7 @@ export class AssignedHelperRepository {
   }
 
   async findOne(id: string): Promise<AssignedHelper | null> {
-    const entity = await this.repository.findOne({ 
+    const entity = await this.repository.findOne({
       where: { id },
       relations: ['inbound'],
     });

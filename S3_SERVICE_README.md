@@ -66,18 +66,13 @@ AWS_SECRET_ACCESS_KEY=minioadmin
 
 ```typescript
 // Upload file
-const metadata = await s3Service.uploadFile(
-  'my-bucket',
-  'uploads/file.txt',
-  fileBuffer,
-  { contentType: 'text/plain', acl: 'private' },
-);
+const metadata = await s3Service.uploadFile('my-bucket', 'uploads/file.txt', fileBuffer, {
+  contentType: 'text/plain',
+  acl: 'private',
+});
 
 // Download file
-const fileBuffer = await s3Service.downloadFile(
-  'my-bucket',
-  'uploads/file.txt',
-);
+const fileBuffer = await s3Service.downloadFile('my-bucket', 'uploads/file.txt');
 
 // Delete file
 await s3Service.deleteFile('my-bucket', 'uploads/file.txt');
@@ -87,11 +82,10 @@ await s3Service.deleteFile('my-bucket', 'uploads/file.txt');
 
 ```typescript
 // Generate presigned upload URL
-const uploadUrl = await s3Service.generatePresignedUploadUrl(
-  'my-bucket',
-  'uploads/file.jpg',
-  { expiresIn: 3600, contentType: 'image/jpeg' },
-);
+const uploadUrl = await s3Service.generatePresignedUploadUrl('my-bucket', 'uploads/file.jpg', {
+  expiresIn: 3600,
+  contentType: 'image/jpeg',
+});
 
 // List files with pagination
 const result = await s3Service.listFiles('my-bucket', {

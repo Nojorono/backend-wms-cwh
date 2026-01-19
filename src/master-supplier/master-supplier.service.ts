@@ -13,15 +13,12 @@ import { MasterSupplier } from '../core/domain/entities/master-supplier.entity';
 export class MasterSupplierService {
   constructor(private readonly repository: MasterSupplierRepository) {}
 
-  async create(
-    createMasterSupplierDto: CreateMasterSupplierDto,
-  ): Promise<MasterSupplier> {
+  async create(createMasterSupplierDto: CreateMasterSupplierDto): Promise<MasterSupplier> {
     const organizationId = createMasterSupplierDto.organization_id;
     if (!organizationId) {
       throw new BadRequestException('Organization ID is required');
     }
-    const existingSupplier =
-      await this.repository.findByOrganizationId(organizationId);
+    const existingSupplier = await this.repository.findByOrganizationId(organizationId);
     if (existingSupplier) {
       throw new ConflictException(
         `Supplier with code ${createMasterSupplierDto.organization_id} already exists`,
@@ -60,10 +57,7 @@ export class MasterSupplierService {
         );
       }
     }
-    const updatedSupplier = await this.repository.update(
-      id,
-      updateMasterSupplierDto,
-    );
+    const updatedSupplier = await this.repository.update(id, updateMasterSupplierDto);
     if (!updatedSupplier) {
       throw new NotFoundException(`Supplier with ID ${id} not found`);
     }

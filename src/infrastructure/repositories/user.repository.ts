@@ -9,14 +9,17 @@ export class UserRepository implements IUserRepository {
   constructor(
     @InjectRepository(User)
     private readonly repository: Repository<User>,
-  ) {}
+  ) { }
 
   async findById(id: string): Promise<User | null> {
-    return this.repository.findOne({ where: { id } });
+    return this.repository.findOne({
+      where: { id },
+      relations: ['userDetail'],
+    });
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    return this.repository.findOne({ where: { username } });
+    return this.repository.findOne({ where: { username }, relations: ['userDetail'] });
   }
 
   async create(user: Partial<User>): Promise<User> {

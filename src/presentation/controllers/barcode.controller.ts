@@ -51,12 +51,7 @@ export class BarcodeController {
         contentType: { type: 'string', example: 'image/png' },
         acl: {
           type: 'string',
-          enum: [
-            'private',
-            'public-read',
-            'public-read-write',
-            'authenticated-read',
-          ],
+          enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'],
           example: 'private',
         },
         metadata: { type: 'object', additionalProperties: { type: 'string' } },
@@ -71,10 +66,7 @@ export class BarcodeController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @UseInterceptors(FileInterceptor('file'))
   @HttpCode(HttpStatus.CREATED)
-  async uploadBarcodeImage(
-    @UploadedFile() file: any,
-    @Body() body: UploadBarcodeImageDto,
-  ) {
+  async uploadBarcodeImage(@UploadedFile() file: any, @Body() body: UploadBarcodeImageDto) {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
@@ -112,12 +104,7 @@ export class BarcodeController {
         extension: { type: 'string', example: 'png' },
         acl: {
           type: 'string',
-          enum: [
-            'private',
-            'public-read',
-            'public-read-write',
-            'authenticated-read',
-          ],
+          enum: ['private', 'public-read', 'public-read-write', 'authenticated-read'],
           example: 'private',
         },
         metadata: { type: 'object', additionalProperties: { type: 'string' } },

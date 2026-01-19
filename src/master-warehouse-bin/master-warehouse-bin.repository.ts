@@ -31,15 +31,11 @@ export class MasterWarehouseBinRepository {
     return warehouseBin;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterWarehouseBin[]> {
+  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseBin[]> {
     return await this.repository.find({ where: { organization_id } });
   }
 
-  async findByWarehouseSubId(
-    warehouse_sub_id: string,
-  ): Promise<MasterWarehouseBin[]> {
+  async findByWarehouseSubId(warehouse_sub_id: string): Promise<MasterWarehouseBin[]> {
     return await this.repository.find({ where: { warehouse_sub_id } });
   }
 

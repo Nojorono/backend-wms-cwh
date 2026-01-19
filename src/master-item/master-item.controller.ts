@@ -1,28 +1,16 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { MasterItemService } from './master-item.service';
 import { CreateMasterItemDto } from './dto/create-master-item.dto';
 import { UpdateMasterItemDto } from './dto/update-master-item.dto';
 import { MasterItem } from '../core/domain/entities/master-item.entity';
+import { FindByBranchResponseDto } from './dto/find-by-branch-response.dto';
 
 @ApiTags('Master Item')
 @Controller('master-item')
 @ApiBearerAuth('JWT-auth')
 export class MasterItemController {
-  constructor(private readonly masterItemService: MasterItemService) {}
+  constructor(private readonly masterItemService: MasterItemService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new Item' })
@@ -74,10 +62,7 @@ export class MasterItemController {
     status: 409,
     description: 'Item with this SKU already exists.',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateMasterItemDto: UpdateMasterItemDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterItemDto: UpdateMasterItemDto) {
     return this.masterItemService.update(id, updateMasterItemDto);
   }
 
@@ -90,5 +75,31 @@ export class MasterItemController {
   @ApiResponse({ status: 404, description: 'Item not found.' })
   remove(@Param('id') id: string) {
     return this.masterItemService.remove(id);
+  }
+
+  // sync from meta oracle
+  @Post('sync-from-meta-oracle')
+  @ApiOperation({ summary: 'Sync from meta oracle' })
+  @ApiResponse({ status: 200, description: 'Sync from meta oracle' })
+  syncFromMetaOracle() {
+    return this.masterItemService.syncFromMetaOracle();
+  }
+
+  // find by branch
+  @Get('find-by-org-code/:org_code')
+  @ApiOperation({ summary: 'Find by org code' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns master items that match sales items and unmatched sales items',
+    type: FindByBranchResponseDto,
+  })
+  @ApiParam({
+    name: 'org_code',
+    description: 'Organization code to filter by',
+    example: 'ORG001',
+    type: String,
+  })
+  findByOrgCode(@Param('org_code') org_code: string) {
+    return this.masterItemService.findByBranch(org_code);
   }
 }

@@ -6,16 +6,12 @@ import { MasterWarehouseBinService } from './master-warehouse-bin.service';
 import { MasterWarehouseBinRepository } from './master-warehouse-bin.repository';
 import { S3Service } from 'src/infrastructure/services/s3.service';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
+import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterWarehouseBin])],
+  imports: [TypeOrmModule.forFeature([MasterWarehouseBin]), MasterPalletModule],
   controllers: [MasterWarehouseBinController],
-  providers: [
-    MasterWarehouseBinService,
-    MasterWarehouseBinRepository,
-    S3Service,
-    BarcodeService,
-  ],
+  providers: [MasterWarehouseBinService, MasterWarehouseBinRepository, S3Service, BarcodeService],
   exports: [MasterWarehouseBinService],
 })
 export class MasterWarehouseBinModule {}

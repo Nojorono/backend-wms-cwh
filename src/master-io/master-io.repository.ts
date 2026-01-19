@@ -29,9 +29,7 @@ export class MasterIORepository {
     return io;
   }
 
-  async findByOrganizationId(
-    organization_id: number,
-  ): Promise<MasterIO | null> {
+  async findByOrganizationId(organization_id: number): Promise<MasterIO | null> {
     const io = await this.repository.findOne({ where: { organization_id } });
     if (!io) {
       return null;
@@ -39,10 +37,7 @@ export class MasterIORepository {
     return io;
   }
 
-  async update(
-    id: string,
-    updateMasterIODto: UpdateMasterIODto,
-  ): Promise<MasterIO | null> {
+  async update(id: string, updateMasterIODto: UpdateMasterIODto): Promise<MasterIO | null> {
     const io = await this.findOne(id);
     if (!io) {
       throw new NotFoundException('IO not found');

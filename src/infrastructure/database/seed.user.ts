@@ -1,23 +1,42 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
+import { join } from 'path';
 import { User } from '../../core/domain/entities/user.entity';
 import { Role } from '../../core/domain/entities/role.entity';
 import { Permission } from '../../core/domain/entities/permission.entity';
 import { Menu } from '../../core/domain/entities/menu.entity';
 import * as bcrypt from 'bcrypt';
 
-// Load .env
-config();
+// Load .env file explicitly with path
+const envPath = process.env.ENV_PATH || join(process.cwd(), '.env');
+config({ path: envPath });
+
+// Get database config from environment variables
+const dbHost = process.env.DB_HOST;
+const dbPort = parseInt(process.env.DB_PORT || '5432');
+const dbUsername = process.env.DB_USERNAME;
+const dbPassword = process.env.DB_PASSWORD;
+const dbDatabase = process.env.DB_DATABASE;
+
+// Check if connecting to AWS RDS (requires SSL)
+const isAwsRds = dbHost?.includes('rds.amazonaws.com') || false;
+const requiresSSL = isAwsRds || process.env.NODE_ENV === 'production';
 
 const AppDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_DATABASE,
+  host: dbHost,
+  port: dbPort,
+  username: dbUsername,
+  password: dbPassword,
+  database: dbDatabase,
   entities: [User, Role, Permission, Menu],
   synchronize: false,
+  ssl: requiresSSL ? {
+    rejectUnauthorized: false,
+  } : false,
+  extra: {
+    timezone: 'UTC',
+  },
 });
 
 async function seed() {

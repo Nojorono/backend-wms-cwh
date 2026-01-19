@@ -5,12 +5,8 @@ export class AddFieldMasterItem1752639652811 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "m_item" DROP COLUMN "name"`);
-    await queryRunner.query(
-      `ALTER TABLE "m_item" ADD "item_number" character varying`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "m_item" ADD "inventory_item_id" character varying`,
-    );
+    await queryRunner.query(`ALTER TABLE "m_item" ADD "item_number" character varying`);
+    await queryRunner.query(`ALTER TABLE "m_item" ADD "inventory_item_id" character varying`);
     await queryRunner.query(`ALTER TABLE "m_item" ADD "dus_per_stack" integer`);
     await queryRunner.query(`ALTER TABLE "m_item" ADD "bal_per_dus" integer`);
     await queryRunner.query(`ALTER TABLE "m_item" ADD "press_per_bal" integer`);
@@ -24,12 +20,8 @@ export class AddFieldMasterItem1752639652811 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "m_item" DROP COLUMN "press_per_bal"`);
     await queryRunner.query(`ALTER TABLE "m_item" DROP COLUMN "bal_per_dus"`);
     await queryRunner.query(`ALTER TABLE "m_item" DROP COLUMN "dus_per_stack"`);
-    await queryRunner.query(
-      `ALTER TABLE "m_item" DROP COLUMN "inventory_item_id"`,
-    );
+    await queryRunner.query(`ALTER TABLE "m_item" DROP COLUMN "inventory_item_id"`);
     await queryRunner.query(`ALTER TABLE "m_item" DROP COLUMN "item_number"`);
-    await queryRunner.query(
-      `ALTER TABLE "m_item" ADD "name" character varying`,
-    );
+    await queryRunner.query(`ALTER TABLE "m_item" ADD "name" character varying`);
   }
 }

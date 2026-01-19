@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsNumber, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsUUID, IsEnum, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { WarehouseSubStagingType } from 'src/core/domain/entities/master-warehouse-sub.entity';
 
 export class CreateMasterWarehouseSubDto {
   @ApiProperty({ example: 1, required: false })
@@ -42,4 +43,19 @@ export class CreateMasterWarehouseSubDto {
   @IsString()
   @IsOptional()
   barcode_image_url?: string;
+
+  @ApiProperty({ example: WarehouseSubStagingType.INBOUND, required: false })
+  @IsEnum(WarehouseSubStagingType)
+  @IsOptional()
+  is_staging?: WarehouseSubStagingType;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_good_stock?: boolean;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_gate?: boolean;
 }

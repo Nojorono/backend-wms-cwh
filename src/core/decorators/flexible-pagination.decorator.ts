@@ -53,7 +53,7 @@ export function ApiFlexiblePaginationQuery(additionalParams: PaginationQueryPara
   const allParams = [...baseParams, ...additionalParams];
 
   return applyDecorators(
-    ...allParams.map(param => 
+    ...allParams.map((param) =>
       ApiQuery({
         name: param.name,
         required: param.required || false,
@@ -61,7 +61,7 @@ export function ApiFlexiblePaginationQuery(additionalParams: PaginationQueryPara
         description: param.description,
         example: param.example,
         enum: param.enum,
-      })
-    )
+      }),
+    ),
   );
 }

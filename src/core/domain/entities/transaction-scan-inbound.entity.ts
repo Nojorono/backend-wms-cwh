@@ -3,8 +3,10 @@ import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
 import { MasterPallet } from './master-pallet.entity';
 import { MasterItem } from './master-item.entity';
+import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 
 export enum ScanInboundStatus {
+  OPEN = 'OPEN',
   PENDING = 'PENDING',
   COMPLETED = 'COMPLETED',
 }
@@ -22,12 +24,15 @@ export class TransactionScanInbound extends BaseEntity {
   production_date: Date;
 
   @Column({ nullable: true })
+  week_number: number;
+
+  @Column({ nullable: true })
   item_id: string;
 
   @ManyToOne(() => MasterItem, (item) => item.id, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'item_id' })
   item: MasterItem;
-    
+
   @Column({ nullable: true })
   quantity: number;
 
@@ -48,6 +53,15 @@ export class TransactionScanInbound extends BaseEntity {
   pallet: MasterPallet;
 
   @Column({ nullable: true })
+  m_warehouse_sub_id: string;
+
+  @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'm_warehouse_sub_id' })
+  warehouseSub: MasterWarehouseSub;
+
+  @Column({ nullable: true })
   status: ScanInboundStatus;
-  
+
+  @Column({ nullable: true })
+  inspection_by: string;
 }

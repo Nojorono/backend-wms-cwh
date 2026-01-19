@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterUomService } from './master-uom.service';
 import { CreateMasterUomDto } from './dto/create-master-uom.dto';
 import { UpdateMasterUomDto } from './dto/update-master-uom.dto';
@@ -55,7 +41,7 @@ export class MasterUomController {
   @ApiOperation({ summary: 'Get a UOM by id' })
   @ApiResponse({ status: 200, description: 'Return the UOM.', type: MasterUom })
   @ApiResponse({ status: 404, description: 'UOM not found.' })
-  findOne(@Param('id', ParseIntPipe) id: string) {
+  findOne(@Param('id') id: string) {
     return this.masterUomService.findOne(id);
   }
 
@@ -71,10 +57,7 @@ export class MasterUomController {
     status: 409,
     description: 'UOM with this code already exists.',
   })
-  update(
-    @Param('id', ParseIntPipe) id: string,
-    @Body() updateMasterUomDto: UpdateMasterUomDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateMasterUomDto: UpdateMasterUomDto) {
     return this.masterUomService.update(id, updateMasterUomDto);
   }
 
@@ -85,7 +68,7 @@ export class MasterUomController {
     description: 'The UOM has been successfully deleted.',
   })
   @ApiResponse({ status: 404, description: 'UOM not found.' })
-  remove(@Param('id', ParseIntPipe) id: string) {
+  remove(@Param('id') id: string) {
     return this.masterUomService.remove(id);
   }
 }

@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterWarehouseBinService } from './master-warehouse-bin.service';
 import { CreateMasterWarehouseBinDto } from './dto/create-master-warehouse-bin.dto';
 import { UpdateMasterWarehouseBinDto } from './dto/update-master-warehouse-bin.dto';
@@ -23,9 +9,7 @@ import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin
 @Controller('master-warehouse-bin')
 @ApiBearerAuth('JWT-auth')
 export class MasterWarehouseBinController {
-  constructor(
-    private readonly masterWarehouseBinService: MasterWarehouseBinService,
-  ) {}
+  constructor(private readonly masterWarehouseBinService: MasterWarehouseBinService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Warehouse Bin' })
@@ -73,9 +57,7 @@ export class MasterWarehouseBinController {
     type: [MasterWarehouseBin],
   })
   @ApiResponse({ status: 404, description: 'Warehouse Bin not found.' })
-  findByOrganizationId(
-    @Param('organization_id', ParseIntPipe) organization_id: number,
-  ) {
+  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
     return this.masterWarehouseBinService.findByOrganizationId(organization_id);
   }
 
@@ -88,9 +70,7 @@ export class MasterWarehouseBinController {
   })
   @ApiResponse({ status: 404, description: 'Warehouse Bin not found.' })
   findByWarehouseSubId(@Param('warehouse_sub_id') warehouse_sub_id: string) {
-    return this.masterWarehouseBinService.findByWarehouseSubId(
-      warehouse_sub_id,
-    );
+    return this.masterWarehouseBinService.findByWarehouseSubId(warehouse_sub_id);
   }
 
   @Patch(':id')
@@ -104,10 +84,7 @@ export class MasterWarehouseBinController {
     @Param('id') id: string,
     @Body() updateMasterWarehouseBinDto: UpdateMasterWarehouseBinDto,
   ) {
-    return this.masterWarehouseBinService.update(
-      id,
-      updateMasterWarehouseBinDto,
-    );
+    return this.masterWarehouseBinService.update(id, updateMasterWarehouseBinDto);
   }
 
   @Delete(':id')
@@ -120,4 +97,5 @@ export class MasterWarehouseBinController {
   remove(@Param('id') id: string) {
     return this.masterWarehouseBinService.remove(id);
   }
+
 }

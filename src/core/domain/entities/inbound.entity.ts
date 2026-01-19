@@ -4,8 +4,27 @@ import { BaseEntity } from './base.entity';
 import { AssignedHelper } from './assigned-helper.entity';
 import { TransactionScanInbound } from './transaction-scan-inbound.entity';
 
+export enum InboundStatus {
+  CREATED = 'CREATED',
+  UNLOADING = 'UNLOADING',
+  INSPECTION = 'INSPECTION',
+  READY_INTEGRATION = 'READY_INTEGRATION',
+  INTEGRATED = 'INTEGRATED',
+  FAILED = 'FAILED',
+}
+
 @Entity('inbound')
 export class Inbound extends BaseEntity {
+
+  @Column({ nullable: true })
+  photo_license_plate: string;
+
+  @Column({ nullable: true })
+  photo_seal: string;
+
+  @Column({ nullable: true })
+  photo_condition: string;
+
   @Column({ nullable: true })
   inbound_number: string;
 
@@ -25,7 +44,7 @@ export class Inbound extends BaseEntity {
   driver_phone: string;
 
   @Column({ nullable: true })
-  status: string;
+  status: InboundStatus;
 
   @Column({ nullable: true })
   inbound_type: string;
@@ -42,6 +61,9 @@ export class Inbound extends BaseEntity {
   @OneToMany(() => AssignedHelper, (assignedHelper) => assignedHelper.inbound)
   assigned_helpers: AssignedHelper[];
 
-  @OneToMany(() => TransactionScanInbound, (transactionScanInbound) => transactionScanInbound.inbound)
+  @OneToMany(
+    () => TransactionScanInbound,
+    (transactionScanInbound) => transactionScanInbound.inbound,
+  )
   transaction_scan_inbounds: TransactionScanInbound[];
 }

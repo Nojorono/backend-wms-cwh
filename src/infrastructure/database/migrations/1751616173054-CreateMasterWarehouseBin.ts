@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateMasterWarehouseBin1751616173054
-  implements MigrationInterface
-{
+export class CreateMasterWarehouseBin1751616173054 implements MigrationInterface {
   name = 'CreateMasterWarehouseBin1751616173054';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
