@@ -18,7 +18,7 @@ export class InventoryTrackingService {
     private readonly repository: InventoryTrackingRepository,
     private readonly paginationService: PaginationService,
     private readonly masterPalletService: MasterPalletService,
-  ) {}
+  ) { }
 
   // Validasi status yang diperbolehkan
   private validateInventoryStatus(status: string): void {
@@ -491,6 +491,37 @@ export class InventoryTrackingService {
       return true;
     } catch (error) {
       return false;
+    }
+  }
+
+  async getVisibilityInventoryTrackingAllItemInWarehouse(item_id?: string): Promise<{
+    summary: {
+      total_items: number;
+      total_quantity: number;
+      total_booked_quantity: number;
+      total_available_quantity: number;
+      items_with_pending_bookings: number;
+    };
+    items: any[];
+  }> {
+    try {
+      const items = await this.repository.getVisibilityDashboard(item_id);
+
+      // Calculate summary statistics (ensure numeric conversion)
+      const summary = {
+        total_items: items.length,
+        total_quantity: items.reduce((sum, item) => sum + (Number(item.total_quantity) || 0), 0),
+        total_booked_quantity: items.reduce((sum, item) => sum + (Number(item.booked_quantity) || 0), 0),
+        total_available_quantity: items.reduce((sum, item) => sum + (Number(item.available_quantity) || 0), 0),
+        items_with_pending_bookings: items.filter((item) => item.has_pending_booking).length,
+      };
+
+      return {
+        summary,
+        items,
+      };
+    } catch (error) {
+      throw new BadRequestException(`Error getting visibility dashboard: ${error.message}`);
     }
   }
 }
