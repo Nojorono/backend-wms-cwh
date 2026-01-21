@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { MasterSupplierService } from './master-supplier.service';
 import { CreateMasterSupplierDto } from './dto/create-master-supplier.dto';
 import { UpdateMasterSupplierDto } from './dto/update-master-supplier.dto';
@@ -42,6 +43,17 @@ export class MasterSupplierController {
     return this.masterSupplierService.findAll();
   }
 
+  @Get('attribute7')
+  @ApiOperation({ summary: 'Get Suppliers by attribute7 value (FREIGHT/FRG) with pagination and search' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all Suppliers with pagination and search filtered by attribute7.',
+  })
+  @ApiResponse({ status: 404, description: 'Supplier not found.' })
+  findAllByAttribute7(@Query() query: SupplierQueryDto) {
+    return this.supplierIntegrationService.getSuppliers(query);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a Supplier by id' })
   @ApiResponse({
@@ -79,16 +91,5 @@ export class MasterSupplierController {
   @ApiResponse({ status: 404, description: 'Supplier not found.' })
   remove(@Param('id') id: string) {
     return this.masterSupplierService.remove(id);
-  }
-
-  @Get('attribute7')
-  @ApiOperation({ summary: 'Get a Supplier by attribute7 value' })
-  @ApiResponse({
-    status: 200,
-    description: 'Return all Suppliers with pagination and search.',
-  })
-  @ApiResponse({ status: 404, description: 'Supplier not found.' })
-  findAllByAttribute7(@Query() query: SupplierQueryDto) {
-    return this.supplierIntegrationService.getSuppliers(query);
   }
 }

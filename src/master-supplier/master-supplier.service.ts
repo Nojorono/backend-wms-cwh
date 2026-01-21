@@ -7,6 +7,7 @@ import {
 import { MasterSupplierRepository } from './master-supplier.repository';
 import { CreateMasterSupplierDto } from './dto/create-master-supplier.dto';
 import { UpdateMasterSupplierDto } from './dto/update-master-supplier.dto';
+import { SupplierQueryDto } from './dto/supplier-query.dto';
 import { MasterSupplier } from '../core/domain/entities/master-supplier.entity';
 
 @Injectable()
