@@ -1,11 +1,10 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { SupplierQueryDto } from '../dto/supplier-query.dto';
-import { MasterSupplier } from '../../core/domain/entities/master-supplier.entity';
 import { firstValueFrom, timeout, catchError } from 'rxjs';
 
 export interface SupplierResponseDto {
-    data: MasterSupplier[];
+    data: any[];
     count: number;
     status: boolean;
     message: string;
