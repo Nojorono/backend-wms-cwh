@@ -11,7 +11,7 @@ import { MasterSupplier } from '../core/domain/entities/master-supplier.entity';
 
 @Injectable()
 export class MasterSupplierService {
-  constructor(private readonly repository: MasterSupplierRepository) {}
+  constructor(private readonly repository: MasterSupplierRepository) { }
 
   async create(createMasterSupplierDto: CreateMasterSupplierDto): Promise<MasterSupplier> {
     const organizationId = createMasterSupplierDto.organization_id;
