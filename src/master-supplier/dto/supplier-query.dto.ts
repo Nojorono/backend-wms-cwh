@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class SupplierQueryDto {
     @ApiPropertyOptional({ description: 'Search term' })
@@ -7,14 +8,19 @@ export class SupplierQueryDto {
     @IsString()
     search?: string;
 
-    @ApiPropertyOptional({ description: 'Page number', example: 1 })
+    @ApiPropertyOptional({ description: 'Page number', example: 1, minimum: 1 })
     @IsOptional()
-    @IsNumber()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
     page?: number;
 
-    @ApiPropertyOptional({ description: 'Items per page', example: 10 })
+    @ApiPropertyOptional({ description: 'Items per page', example: 10, minimum: 1, maximum: 100 })
     @IsOptional()
-    @IsNumber()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
     limit?: number;
 
     @ApiPropertyOptional({
