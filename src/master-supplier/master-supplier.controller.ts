@@ -51,7 +51,7 @@ export class MasterSupplierController {
   })
   @ApiResponse({ status: 404, description: 'Supplier not found.' })
   findAllByAttribute7(@Query() query: SupplierQueryDto) {
-    return this.supplierIntegrationService.getSuppliers(query);
+    return this.supplierIntegrationService.getAllSuppliersByAttribute7(query);
   }
 
   @Get(':id')

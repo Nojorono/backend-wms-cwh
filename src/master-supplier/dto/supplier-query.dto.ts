@@ -8,21 +8,6 @@ export class SupplierQueryDto {
     @IsString()
     search?: string;
 
-    @ApiPropertyOptional({ description: 'Page number', example: 1, minimum: 1 })
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    page?: number;
-
-    @ApiPropertyOptional({ description: 'Items per page', example: 10, minimum: 1, maximum: 100 })
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    @Max(100)
-    limit?: number;
-
     @ApiPropertyOptional({
         description: 'Attribute 7 to filter by. Use GET /supplier/attribute7/list to get all available values',
         example: 'FREIGHT (FRG)',

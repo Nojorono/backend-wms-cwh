@@ -3,16 +3,6 @@ import { ClientProxy } from '@nestjs/microservices';
 import { SupplierQueryDto } from '../dto/supplier-query.dto';
 import { firstValueFrom, timeout, catchError } from 'rxjs';
 
-export interface SupplierResponseDto {
-    data: any[];
-    count: number;
-    status: boolean;
-    message: string;
-    currentPage?: number;
-    limit?: number;
-    totalPages?: number;
-}
-
 @Injectable()
 export class SupplierIntegrationService implements OnModuleInit {
     private readonly logger = new Logger(SupplierIntegrationService.name);
@@ -65,12 +55,10 @@ export class SupplierIntegrationService implements OnModuleInit {
         }
     }
 
-    async getSuppliers(params?: SupplierQueryDto): Promise<SupplierResponseDto> {
+    async getAllSuppliersByAttribute7(params?: SupplierQueryDto): Promise<any> {
         try {
             const queryParams: SupplierQueryDto = {
                 search: params?.search || undefined,
-                page: params?.page,
-                limit: params?.limit,
                 attribute7: params?.attribute7 || undefined,
             };
 
@@ -80,7 +68,7 @@ export class SupplierIntegrationService implements OnModuleInit {
             this.logger.log(`Using timeout of ${timeoutMs}ms for RabbitMQ request`);
 
             const supplierResponse = await firstValueFrom(
-                this.supplierClient.send<SupplierResponseDto>('supplier.findAll', queryParams).pipe(
+                this.supplierClient.send<any>('supplier.findAll', queryParams).pipe(
                     timeout(timeoutMs),
                     catchError((error) => {
                         this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
@@ -91,26 +79,10 @@ export class SupplierIntegrationService implements OnModuleInit {
             );
 
             this.logger.log('Received response from supplier service:', {
-                status: supplierResponse?.status,
-                count: supplierResponse?.count,
-                dataLength: supplierResponse?.data?.length,
-                message: supplierResponse?.message,
+                data: supplierResponse,
             });
 
-            const response: SupplierResponseDto = {
-                data: supplierResponse?.data || [],
-                count: supplierResponse?.count || 0,
-                status: supplierResponse?.status ?? false,
-                message: supplierResponse?.message || 'No data received from supplier service',
-            };
-
-            if (supplierResponse?.currentPage !== undefined) {
-                response.currentPage = supplierResponse.currentPage;
-                response.limit = supplierResponse.limit;
-                response.totalPages = supplierResponse.totalPages;
-            }
-
-            return response;
+            return supplierResponse;
         } catch (error) {
             this.logger.error(
                 'Error getting suppliers via RabbitMQ, falling back to local service:',
