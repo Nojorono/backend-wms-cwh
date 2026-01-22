@@ -61,6 +61,11 @@ export class CreateOutboundDoDto {
   @IsString()
   driver_phone: string;
 
+  @ApiProperty({ example: '1234567890' })
+  @IsOptional()
+  @IsString()
+  vendor_id: string;
+
   @ApiPropertyOptional({ enum: OutboundDoStatus, example: OutboundDoStatus.PENDING })
   @IsOptional()
   @IsEnum(OutboundDoStatus)

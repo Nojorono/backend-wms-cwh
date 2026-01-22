@@ -10,7 +10,7 @@ export class MasterSupplierRepository {
   constructor(
     @InjectRepository(MasterSupplier)
     private readonly repository: Repository<MasterSupplier>,
-  ) {}
+  ) { }
 
   async create(createMasterSupplierDto: CreateMasterSupplierDto): Promise<MasterSupplier> {
     const supplier = this.repository.create(createMasterSupplierDto);

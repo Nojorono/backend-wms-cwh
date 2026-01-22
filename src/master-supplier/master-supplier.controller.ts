@@ -1,15 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { MasterSupplierService } from './master-supplier.service';
 import { CreateMasterSupplierDto } from './dto/create-master-supplier.dto';
 import { UpdateMasterSupplierDto } from './dto/update-master-supplier.dto';
+import { SupplierQueryDto } from './dto/supplier-query.dto';
 import { MasterSupplier } from '../core/domain/entities/master-supplier.entity';
+import { SupplierIntegrationService } from './integration/supplier-integration.service';
 
 @ApiTags('Master Supplier')
 @Controller('master-supplier')
 @ApiBearerAuth('JWT-auth')
 export class MasterSupplierController {
-  constructor(private readonly masterSupplierService: MasterSupplierService) {}
+  constructor(
+    private readonly masterSupplierService: MasterSupplierService,
+    private readonly supplierIntegrationService: SupplierIntegrationService,
+  ) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new Supplier' })
@@ -35,6 +41,17 @@ export class MasterSupplierController {
   })
   findAll() {
     return this.masterSupplierService.findAll();
+  }
+
+  @Get('attribute7')
+  @ApiOperation({ summary: 'Get Suppliers by attribute7 value (FREIGHT/FRG) with pagination and search' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all Suppliers with pagination and search filtered by attribute7.',
+  })
+  @ApiResponse({ status: 404, description: 'Supplier not found.' })
+  findAllByAttribute7(@Query() query: SupplierQueryDto) {
+    return this.supplierIntegrationService.getAllSuppliersByAttribute7(query);
   }
 
   @Get(':id')
