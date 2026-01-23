@@ -16,9 +16,9 @@ export class InventoryMovementRepository {
     private readonly palletRepository: Repository<InventoryMovementPallet>,
     @InjectRepository(InventoryMovementUser)
     private readonly userRepository: Repository<InventoryMovementUser>,
-  ) {}
+  ) { }
 
-  async create(data: CreateInventoryMovementDto, pallets: InventoryMovementPallet[], users: InventoryMovementUser[] ): Promise<InventoryMovement> {
+  async create(data: CreateInventoryMovementDto, pallets: InventoryMovementPallet[], users: InventoryMovementUser[]): Promise<InventoryMovement> {
     const entity = this.repository.create({
       movement_number: data.movement_number,
       source_warehouse_id: data.source_warehouse_id,
@@ -194,7 +194,7 @@ export class InventoryMovementRepository {
     // Since assigned_user_id doesn't exist in entity, return empty array or filter by status
     // This method may need to be removed or refactored based on business requirements
     return this.repository.find({
-      where: { status: MovementStatus.IN_PROGRESS },
+      where: { status: MovementStatus.APPROVED },
       relations: [
         'pallets',
         'pallets.pallet',

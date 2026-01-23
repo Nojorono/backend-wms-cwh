@@ -8,7 +8,7 @@ import { InventoryMovementUser } from './inventory-movment-user.entity';
 
 export enum MovementStatus {
   PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
+  APPROVED = 'APPROVED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }

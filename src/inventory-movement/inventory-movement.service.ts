@@ -27,7 +27,7 @@ export class InventoryMovementService {
     @InjectRepository(InventoryTrackingHistory)
     private readonly historyRepository: Repository<InventoryTrackingHistory>,
     private readonly paginationService: PaginationService,
-  ) {}
+  ) { }
 
   async create(data: CreateInventoryMovementDto): Promise<InventoryMovement> {
     // Generate movement_number if not provided
@@ -155,7 +155,7 @@ export class InventoryMovementService {
     }
 
     // If status is being changed to IN_PROGRESS
-    if (data.status === MovementStatus.IN_PROGRESS && existing.status !== MovementStatus.IN_PROGRESS) {
+    if (data.status === MovementStatus.APPROVED && existing.status !== MovementStatus.APPROVED) {
       // Movement started
     }
 
@@ -200,7 +200,7 @@ export class InventoryMovementService {
     }
 
     const updated = await this.repository.update(movementId, {
-      status: MovementStatus.IN_PROGRESS,
+      status: MovementStatus.APPROVED,
     });
 
     if (!updated) {

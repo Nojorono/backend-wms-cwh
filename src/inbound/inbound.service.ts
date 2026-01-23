@@ -294,6 +294,7 @@ export class InboundService {
 
         // Create the inbound record
         const inbound = await this.inboundRepo.create({
+          inbound_id_reference: payload.inbound_id_reference,
           inbound_number,
           expedition: payload.expedition,
           origin: payload.origin,
@@ -420,6 +421,7 @@ export class InboundService {
 
       await this.dataSource.transaction(async () => {
         await this.inboundRepo.update(id, {
+          inbound_id_reference: payload.inbound_id_reference,
           expedition: payload.expedition,
           origin: payload.origin,
           license_plate: payload.license_plate,
