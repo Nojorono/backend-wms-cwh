@@ -27,8 +27,6 @@ export class InventoryTrackingService {
       'INSPECTION_COMPLETED',
       'IN_INVENTORY',
       'PICKED',
-      'SHIPPED',
-      'RETURNED',
     ];
 
     if (!allowedStatuses.includes(status)) {

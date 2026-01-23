@@ -13,24 +13,36 @@ export class InventoryMovementRepository {
     @InjectRepository(InventoryMovement)
     private readonly repository: Repository<InventoryMovement>,
     @InjectRepository(InventoryMovementPallet)
-    private readonly palletRepository: Repository<InventoryMovementPallet>,
+    private readonly palletMovementRepository: Repository<InventoryMovementPallet>,
     @InjectRepository(InventoryMovementUser)
     private readonly userRepository: Repository<InventoryMovementUser>,
   ) { }
 
-  async create(data: CreateInventoryMovementDto, pallets: InventoryMovementPallet[], users: InventoryMovementUser[]): Promise<InventoryMovement> {
+  async create(data: CreateInventoryMovementDto): Promise<InventoryMovement> {
     const entity = this.repository.create({
       movement_number: data.movement_number,
+      movement_type: data.movement_type,
       source_warehouse_id: data.source_warehouse_id,
       source_warehouse_sub_id: data.source_warehouse_sub_id,
       source_bin_id: data.source_bin_id,
+      status: data.status,
+      notes: data.notes,
+      pallets: data.pallets.map((pallet) => {
+        return {
+          pallet_id: pallet.pallet_id,
+          inventory_tracking_id: pallet.inventory_tracking_id,
+        };
+      }),
+      users: data.users && data.users.length > 0 ? data.users.map((user) => {
+        return {
+          user_id: user.user_id,
+          user_name: user.user_name,
+          user_phone: user.user_phone,
+        };
+      }) : undefined,
       destination_warehouse_id: data.destination_warehouse_id,
       destination_warehouse_sub_id: data.destination_warehouse_sub_id,
       destination_bin_id: data.destination_bin_id,
-      status: data.status,
-      notes: data.notes,
-      pallets: pallets,
-      users: users,
     });
     return this.repository.save(entity);
   }
@@ -41,6 +53,8 @@ export class InventoryMovementRepository {
         'pallets',
         'pallets.pallet',
         'pallets.inventoryTracking',
+        'users',
+        'users.user',
         'sourceWarehouse',
         'sourceWarehouseSub',
         'sourceBin',
@@ -73,6 +87,8 @@ export class InventoryMovementRepository {
       .leftJoinAndSelect('movement.pallets', 'pallets')
       .leftJoinAndSelect('pallets.pallet', 'pallet')
       .leftJoinAndSelect('pallets.inventoryTracking', 'inventoryTracking')
+      .leftJoinAndSelect('movement.users', 'users')
+      .leftJoinAndSelect('users.user', 'user')
       .leftJoinAndSelect('movement.sourceWarehouse', 'sourceWarehouse')
       .leftJoinAndSelect('movement.sourceWarehouseSub', 'sourceWarehouseSub')
       .leftJoinAndSelect('movement.sourceBin', 'sourceBin')
@@ -166,6 +182,8 @@ export class InventoryMovementRepository {
         'pallets',
         'pallets.pallet',
         'pallets.inventoryTracking',
+        'users',
+        'users.user',
         'sourceWarehouse',
         'sourceWarehouseSub',
         'sourceBin',
@@ -177,12 +195,36 @@ export class InventoryMovementRepository {
   }
 
   async update(id: string, data: UpdateInventoryMovementDto): Promise<InventoryMovement | null> {
-    const updateData: any = { ...data };
-    if (data.completed_date) {
-      updateData.completed_date = new Date(data.completed_date);
+    // Exclude one-to-many relationships that cannot be updated directly
+    const { pallets, users, moved_by, completed_date, ...updateData } = data;
+
+    const finalUpdateData: any = { ...updateData };
+    if (completed_date) {
+      finalUpdateData.completed_date = new Date(completed_date);
     }
 
-    await this.repository.update(id, updateData);
+    // Update the movement entity
+    await this.repository.update(id, finalUpdateData);
+
+    // Handle users update separately if provided
+    if (users !== undefined) {
+      // Delete existing users for this movement
+      await this.userRepository.delete({ inventory_movement_id: id });
+
+      // Create new users if array is not empty
+      if (users.length > 0) {
+        const newUsers = users.map((user) =>
+          this.userRepository.create({
+            inventory_movement_id: id,
+            user_id: user.user_id,
+            user_name: user.user_name,
+            user_phone: user.user_phone,
+          }),
+        );
+        await this.userRepository.save(newUsers);
+      }
+    }
+
     return this.findOne(id);
   }
 
@@ -255,6 +297,20 @@ export class InventoryMovementRepository {
     return this.repository.findOne({
       where: { movement_number: movementNumber },
     });
+  }
+
+  async updateStatusPallet(inventoryMovementId: string, palletId: string, inventoryTrackingId: string): Promise<void> {
+    await this.palletMovementRepository.update(
+      {
+        inventory_movement_id: inventoryMovementId,
+        pallet_id: palletId,
+        inventory_tracking_id: inventoryTrackingId,
+      },
+      {
+        completed_at: new Date(),
+        is_completed: true,
+      },
+    );
   }
 }
 
