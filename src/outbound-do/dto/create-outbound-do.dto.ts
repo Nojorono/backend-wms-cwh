@@ -66,6 +66,11 @@ export class CreateOutboundDoDto {
   @IsString()
   vendor_id: string;
 
+  @ApiProperty({ example: 'PO-2025-001' })
+  @IsOptional()
+  @IsString()
+  vendor_po_number: string;
+
   @ApiPropertyOptional({ enum: OutboundDoStatus, example: OutboundDoStatus.PENDING })
   @IsOptional()
   @IsEnum(OutboundDoStatus)
