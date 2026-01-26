@@ -8,9 +8,14 @@ import { InventoryMovementUser } from './inventory-movment-user.entity';
 
 export enum MovementStatus {
   PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
+  APPROVED = 'APPROVED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
+}
+
+export enum MovementType {
+  GOOD_STOCK = 'GOOD_STOCK',
+  BAD_STOCK = 'BAD_STOCK',
 }
 
 @Entity('inventory_movement')
@@ -27,6 +32,9 @@ export class InventoryMovement extends BaseEntity {
     cascade: true,
   })
   users: InventoryMovementUser[];
+
+  @Column({ nullable: true, type: 'enum', enum: MovementType })
+  movement_type: MovementType;
 
   @Column({ nullable: true })
   source_warehouse_id: string;

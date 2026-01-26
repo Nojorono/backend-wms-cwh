@@ -28,29 +28,29 @@ export class UserService {
     createUserDto.password = hashedPassword;
 
     try {
-      const user = await this.repository.create(createUserDto);
+    const user = await this.repository.create(createUserDto);
 
-      if (
-        createUserDto.employeeId ||
-        createUserDto.email ||
-        createUserDto.phone ||
-        createUserDto.organizationId ||
-        createUserDto.warehouseSubId
-      ) {
-        const userDetail = this.userDetailRepository.create({
-          userId: user.id,
-          employee_id: createUserDto.employeeId || `EMP_${user.username}`,
-          email: createUserDto.email || `${user.username}@default.com`,
-          phone: createUserDto.phone || '0000000000',
-          organizationId: createUserDto.organizationId,
-          warehouseSubId: createUserDto.warehouseSubId,
-        });
+    if (
+      createUserDto.employeeId ||
+      createUserDto.email ||
+      createUserDto.phone ||
+      createUserDto.organizationId ||
+      createUserDto.warehouseSubId
+    ) {
+      const userDetail = this.userDetailRepository.create({
+        userId: user.id,
+        employee_id: createUserDto.employeeId || `EMP_${user.username}`,
+        email: createUserDto.email || `${user.username}@default.com`,
+        phone: createUserDto.phone || '0000000000',
+        organizationId: createUserDto.organizationId,
+        warehouseSubId: createUserDto.warehouseSubId,
+      });
 
-        await this.userDetailRepository.save(userDetail);
-      }
+      await this.userDetailRepository.save(userDetail);
+    }
 
-      // Reload user with relationships
-      return await this.findOne(user.id);
+    // Reload user with relationships
+    return await this.findOne(user.id);
     } catch (error) {
       // Handle database constraint violations (e.g., duplicate username)
       if (error instanceof QueryFailedError) {

@@ -16,7 +16,6 @@ import {
   ProgressionStatus,
 } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingService } from './inventory-tracking.service';
-import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import {
@@ -54,7 +53,6 @@ import { ItemInventoryTrackingDto } from './dto/item-inventory-tracking-response
 export class InventoryTrackingController {
   constructor(
     private readonly service: InventoryTrackingService,
-    private readonly autoSuggestionService: InventoryAutoSuggestionService,
   ) { }
 
   @Post()
@@ -62,31 +60,6 @@ export class InventoryTrackingController {
   @ApiResponse({ status: 201, description: 'Created', type: InventoryTracking })
   create(@Body() dto: CreateInventoryTrackingDto) {
     return this.service.create(dto);
-  }
-
-  @Post('with-inbound-check')
-  @ApiOperation({ summary: 'Create inventory tracking with inbound_id duplication check' })
-  @ApiResponse({ status: 201, description: 'Created', type: InventoryTracking })
-  @ApiResponse({ status: 400, description: 'Bad Request - Duplicate inbound_id found' })
-  createWithInboundCheck(@Body() dto: CreateInventoryTrackingDto) {
-    return this.service.createWithInboundCheck(dto);
-  }
-
-  @Post('create-or-update-with-inbound-check')
-  @ApiOperation({
-    summary: 'Create or update inventory tracking with inbound_id duplication check',
-  })
-  @ApiBody({ type: CreateOrUpdateInventoryTrackingDto })
-  @ApiResponse({ status: 201, description: 'Created or Updated', type: InventoryTracking })
-  @ApiResponse({ status: 400, description: 'Bad Request - Duplicate inbound_id found' })
-  createOrUpdateWithInboundCheck(@Body() body: CreateOrUpdateInventoryTrackingDto) {
-    return this.service.createOrUpdateInventoryTrackingWithInboundCheck(
-      body.pallet_id,
-      body.warehouse_sub_id,
-      body.warehouse_id,
-      body.inventory_status,
-      body.inbound_id,
-    );
   }
 
   @Get()
@@ -258,21 +231,6 @@ export class InventoryTrackingController {
   @ApiResponse({ status: 404, description: 'Not found' })
   remove(@Param('id') id: string) {
     return this.service.remove(id);
-  }
-
-  @Get('auto-suggestion/in/:pallet_id')
-  @ApiOperation({ summary: 'Get auto suggestions for IN operations' })
-  @ApiResponse({ status: 200, description: 'Auto suggestions for IN operations' })
-  getInSuggestions(@Param('pallet_id') pallet_id: string) {
-    return this.autoSuggestionService.getInSuggestions(pallet_id);
-  }
-
-  @Get('auto-suggestion/out/:item_id')
-  @ApiOperation({ summary: 'Get auto suggestions for OUT operations by item ID' })
-  @ApiParam({ name: 'item_id', description: 'Item ID to get outbound suggestions for' })
-  @ApiResponse({ status: 200, description: 'Auto suggestions for OUT operations' })
-  getOutSuggestions(@Param('item_id') item_id: string) {
-    return this.autoSuggestionService.getOutSuggestions(item_id);
   }
 
   @Get('item/:item_id')

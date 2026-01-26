@@ -113,6 +113,11 @@ export class CreateInboundDoDto {
 }
 
 export class CreateInboundDto {
+  @ApiPropertyOptional({ example: 'uuid-inventory-movement-123' })
+  @IsOptional()
+  @IsString({ message: 'inbound_id_reference must be a string' })
+  inbound_id_reference?: string;
+
   @ApiPropertyOptional({ example: 'Carrier A' })
   @IsOptional()
   @IsString({ message: 'expedition must be a string' })

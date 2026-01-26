@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InventoryMovementRepository } from './inventory-movement.repository';
-import { CreateInventoryMovementDto } from './dto/create-inventory-movement.dto';
+import { CreateInventoryMovementDto, CreateInventoryMovementPalletDto } from './dto/create-inventory-movement.dto';
 import { UpdateInventoryMovementDto } from './dto/update-inventory-movement.dto';
 import { InventoryMovement, MovementStatus } from '../core/domain/entities/inventory-movement.entity';
 import { InventoryMovementPallet } from '../core/domain/entities/inventory-movement-pallet.entity';
@@ -18,6 +18,8 @@ import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InventoryMovementPaginationQueryDto } from './dto/inventory-movement-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 import { InventoryMovementUser } from '../core/domain/entities/inventory-movment-user.entity';
+import { InventoryTracking, ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
+import { MovePalletDto } from './dto/move-pallet.dto';
 
 @Injectable()
 export class InventoryMovementService {
@@ -26,10 +28,12 @@ export class InventoryMovementService {
     private readonly inventoryTrackingService: InventoryTrackingService,
     @InjectRepository(InventoryTrackingHistory)
     private readonly historyRepository: Repository<InventoryTrackingHistory>,
+    @InjectRepository(InventoryMovementPallet)
+    private readonly palletRepository: Repository<InventoryMovementPallet>,
     private readonly paginationService: PaginationService,
-  ) {}
+  ) { }
 
-  async create(data: CreateInventoryMovementDto): Promise<InventoryMovement> {
+  async create(data: CreateInventoryMovementDto): Promise<any> {
     // Generate movement_number if not provided
     if (!data.movement_number) {
       data.movement_number = await this.repository.getNextMovementNumberForDate(new Date());
@@ -41,68 +45,20 @@ export class InventoryMovementService {
       }
     }
 
-    // Validate pallets array
-    if (!data.pallets || data.pallets.length === 0) {
-      throw new BadRequestException('At least one pallet is required');
-    }
-
-    // Get inventory tracking for each pallet
-    const inventoryTrackings = await Promise.all(
-      data.pallets.map(async (palletDto) => {
-        // Find inventory tracking by pallet_id
-        return await this.inventoryTrackingService.findOneByPalletId(palletDto.pallet_id);
-      }),
-    );
-
-    // Validate all pallets are in the same source location
-    const allSameLocation = inventoryTrackings.every(
-      (tracking) =>
-        tracking.warehouse_sub_id === data.source_warehouse_sub_id &&
-        tracking.warehouse_bin_id === data.source_bin_id &&
-        tracking.warehouse_id === data.source_warehouse_id,
-    );
-
-    if (!allSameLocation) {
-      throw new BadRequestException(
-        'All pallets must be in the same source location (warehouse, warehouse_sub, bin)',
-      );
-    }
-
-    // Check if there's already a pending movement for any of these pallets
-    const existingMovements = await this.repository.findByStatus(MovementStatus.PENDING);
-    for (const tracking of inventoryTrackings) {
-      const existingMovement = existingMovements.find((m) =>
-        m.pallets?.some((p) => p.inventory_tracking_id === tracking.id),
-      );
-      if (existingMovement) {
-        throw new ConflictException(
-          `There is already a pending movement for pallet ${tracking.pallet_id}`,
-        );
+    for (const pallet of data.pallets) {
+      const inventoryTracking = await this.inventoryTrackingService.findOne(pallet.inventory_tracking_id);
+      if (!inventoryTracking) {
+        throw new BadRequestException('Inventory tracking not found');
+      }
+      if (inventoryTracking.warehouse_sub_id !== data.source_warehouse_sub_id) {
+        throw new BadRequestException('Inventory tracking not found in the source warehouse sub');
+      }
+      if (inventoryTracking.warehouse_bin_id !== data.source_bin_id) {
+        throw new BadRequestException('Inventory tracking not found in the source bin');
       }
     }
 
-    // Create pallet records
-    const palletRecords = inventoryTrackings.map((tracking) => {
-      const palletRecord = new InventoryMovementPallet();
-      palletRecord.pallet_id = tracking.pallet_id;
-      palletRecord.inventory_tracking_id = tracking.id;
-      palletRecord.is_completed = false;
-      return palletRecord;
-    });
-
-    // Create user records
-    const userRecords = data.users.map((userDto) => {
-      const userRecord = new InventoryMovementUser();
-      userRecord.user_id = userDto.user_id;
-      userRecord.user_name = userDto.user_name;
-      userRecord.user_phone = userDto.user_phone;
-      return userRecord;
-    });
-
-    // Create movement with pallets and users
-    const movement = await this.repository.create(data, palletRecords, userRecords);
-
-    return movement;
+    return await this.repository.create(data);
   }
 
   async findAll(): Promise<InventoryMovement[]> {
@@ -155,7 +111,7 @@ export class InventoryMovementService {
     }
 
     // If status is being changed to IN_PROGRESS
-    if (data.status === MovementStatus.IN_PROGRESS && existing.status !== MovementStatus.IN_PROGRESS) {
+    if (data.status === MovementStatus.APPROVED && existing.status !== MovementStatus.APPROVED) {
       // Movement started
     }
 
@@ -200,7 +156,7 @@ export class InventoryMovementService {
     }
 
     const updated = await this.repository.update(movementId, {
-      status: MovementStatus.IN_PROGRESS,
+      status: MovementStatus.APPROVED,
     });
 
     if (!updated) {
@@ -262,6 +218,26 @@ export class InventoryMovementService {
         ),
       );
     }
+  }
+
+
+  async movePalletToDestinationWarehouse(dto: MovePalletDto): Promise<InventoryMovement> {
+
+    const inventoryMovement = await this.repository.findOne(dto.inventory_movement_id);
+    if (!inventoryMovement) {
+      throw new NotFoundException('Inventory movement not found');
+    }
+    await this.inventoryTrackingService.update(dto.inventory_tracking_id, {
+      warehouse_id: dto.destination_warehouse_id,
+      warehouse_sub_id: dto.destination_warehouse_sub_id,
+      warehouse_bin_id: dto.destination_bin_id,
+      inventory_note: 'Pallet moved to destination warehouse',
+      inventory_date: new Date(),
+      inventory_status: 'IN_INVENTORY',
+      progression_status: ProgressionStatus.COMPLETED,
+    });
+    await this.repository.updateStatusPallet(dto.inventory_movement_id, dto.pallet_id, dto.inventory_tracking_id);
+    return inventoryMovement;
   }
 }
 

@@ -45,6 +45,9 @@ export class OutboundDo extends BaseEntity {
   @Column({ nullable: true })
   vendor_id: string;
 
+  @Column({ nullable: true })
+  vendor_po_number: string;
+
   @Column({
     nullable: true,
     type: 'enum',

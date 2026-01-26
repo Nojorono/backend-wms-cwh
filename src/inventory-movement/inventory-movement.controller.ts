@@ -24,29 +24,43 @@ import { UpdateInventoryMovementDto } from './dto/update-inventory-movement.dto'
 import { InventoryMovement } from '../core/domain/entities/inventory-movement.entity';
 import { InventoryMovementPaginationQueryDto } from './dto/inventory-movement-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
-import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginatedResponseDto, PaginationMetaDto } from '../core/dto/pagination.dto';
+import { MovePalletDto } from './dto/move-pallet.dto';
+import {
+  InventoryMovementListResponseDto,
+  InventoryMovementPaginatedResponseDto,
+  InventoryMovementDetailResponseDto,
+  InventoryMovementCreateResponseDto,
+  InventoryMovementUpdateResponseDto,
+  InventoryMovementDeleteResponseDto,
+} from './dto/inventory-movement-response.dto';
 
 @ApiTags('Inventory Movement')
 @Controller('inventory-movement')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(PaginatedResponseDto)
+@ApiExtraModels(
+  PaginatedResponseDto,
+  PaginationMetaDto,
+  InventoryMovementListResponseDto,
+  InventoryMovementPaginatedResponseDto,
+  InventoryMovementDetailResponseDto,
+  InventoryMovementCreateResponseDto,
+  InventoryMovementUpdateResponseDto,
+  InventoryMovementDeleteResponseDto,
+)
 export class InventoryMovementController {
-  constructor(private readonly service: InventoryMovementService) {}
+  constructor(private readonly service: InventoryMovementService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create inventory movement request' })
   @ApiResponse({
     status: 201,
     description: 'Inventory movement created successfully',
-    type: InventoryMovement,
+    type: InventoryMovementCreateResponseDto,
   })
   async create(@Body() dto: CreateInventoryMovementDto) {
     const result = await this.service.create(dto);
-    return {
-      success: true,
-      message: 'Inventory movement berhasil dibuat',
-      data: result,
-    };
+    return result;
   }
 
   @Get()
@@ -90,16 +104,13 @@ export class InventoryMovementController {
   ])
   @ApiResponse({
     status: 200,
-    description: 'Return all inventory movements or paginated results.',
-    schema: {
-      oneOf: [
-        {
-          type: 'array',
-          items: { $ref: '#/components/schemas/InventoryMovement' },
-        },
-        { $ref: '#/components/schemas/PaginatedResponseDto' },
-      ],
-    },
+    description: 'Return all inventory movements (list response)',
+    type: InventoryMovementListResponseDto,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Return paginated inventory movements',
+    type: InventoryMovementPaginatedResponseDto,
   })
   async findAll(@Query() paginationQuery: InventoryMovementPaginationQueryDto) {
     // Check if any pagination parameters are provided
@@ -135,7 +146,7 @@ export class InventoryMovementController {
   @ApiResponse({
     status: 200,
     description: 'List of movements assigned to user',
-    type: [InventoryMovement],
+    type: InventoryMovementListResponseDto,
   })
   async findByAssignedUserId(@Param('userId') userId: string) {
     const result = await this.service.findByAssignedUserId(userId);
@@ -152,7 +163,7 @@ export class InventoryMovementController {
   @ApiResponse({
     status: 200,
     description: 'List of movements by status',
-    type: [InventoryMovement],
+    type: InventoryMovementListResponseDto,
   })
   async findByStatus(@Param('status') status: string) {
     const result = await this.service.findByStatus(status as any);
@@ -169,7 +180,7 @@ export class InventoryMovementController {
   @ApiResponse({
     status: 200,
     description: 'Inventory movement detail',
-    type: InventoryMovement,
+    type: InventoryMovementDetailResponseDto,
   })
   async findOne(@Param('id') id: string) {
     const result = await this.service.findOne(id);
@@ -186,35 +197,11 @@ export class InventoryMovementController {
   @ApiResponse({
     status: 200,
     description: 'Inventory movement updated successfully',
-    type: InventoryMovement,
+    type: InventoryMovementUpdateResponseDto,
   })
   async update(@Param('id') id: string, @Body() dto: UpdateInventoryMovementDto) {
     const result = await this.service.update(id, dto);
-    return {
-      success: true,
-      message: 'Inventory movement berhasil diupdate',
-      data: result,
-    };
-  }
-
-  @Patch(':id/assign')
-  @ApiOperation({ summary: 'Assign job to user for inventory movement' })
-  @ApiParam({ name: 'id', description: 'Inventory movement ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Job assigned successfully',
-    type: InventoryMovement,
-  })
-  async assignJob(
-    @Param('id') id: string,
-    @Body() body: { user_id: string; user_name: string },
-  ) {
-    const result = await this.service.assignJob(id, body.user_id, body.user_name);
-    return {
-      success: true,
-      message: 'Job berhasil ditugaskan',
-      data: result,
-    };
+    return result;
   }
 
   @Delete(':id')
@@ -224,6 +211,7 @@ export class InventoryMovementController {
   @ApiResponse({
     status: 204,
     description: 'Inventory movement deleted successfully',
+    type: InventoryMovementDeleteResponseDto,
   })
   async remove(@Param('id') id: string) {
     await this.service.remove(id);
@@ -232,5 +220,15 @@ export class InventoryMovementController {
       message: 'Inventory movement berhasil dihapus',
     };
   }
+  // pallet move
+  @Post('move-pallet')
+  @ApiOperation({ summary: 'Move pallet to destination warehouse' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pallet moved successfully',
+    type: InventoryMovement,
+  })
+  movePallet(@Body() dto: MovePalletDto) {
+    return this.service.movePalletToDestinationWarehouse(dto);
+  }
 }
-

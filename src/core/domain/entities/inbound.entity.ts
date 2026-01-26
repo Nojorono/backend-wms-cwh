@@ -15,6 +15,8 @@ export enum InboundStatus {
 
 @Entity('inbound')
 export class Inbound extends BaseEntity {
+  @Column({ nullable: true })
+  inbound_id_reference: string;
 
   @Column({ nullable: true })
   photo_license_plate: string;
