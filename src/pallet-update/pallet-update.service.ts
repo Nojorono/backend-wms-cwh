@@ -255,8 +255,6 @@ export class PalletUpdateService {
       productionDate: createPalletUpdateDto.scan.productionDate ?? '',
     };
 
-    console.log("itemBeforeUpdate", itemBeforeUpdate.productionDate);
-    console.log("scanAfterUpdate", scanAfterUpdate.productionDate);
     const palletUpdate = await this.repository.create(createPalletUpdateDto);
     // // if update productionCode, update the productionDate of the scan
     if (createPalletUpdateDto.productionCode) {
@@ -275,12 +273,29 @@ export class PalletUpdateService {
 
     if (createPalletUpdateDto.uom) {
 
+      if (itemBeforeUpdate.uom === scanAfterUpdate.uom) {
+        throw new BadRequestException('from_uom and to_uom must be different');
+      }
+
+      if (itemBeforeUpdate.quantity === 0) {
+        throw new BadRequestException('itemBeforeUpdate quantity is 0');
+      }
+
+      if (scanAfterUpdate.quantity === 0) {
+        throw new BadRequestException('scanAfterUpdate quantity is 0');
+      }
+
+      await this.masterPalletService.updateUOM(scanAfterUpdate.palletId, {
+        item_id: scanAfterUpdate.itemId ?? '',
+        from_uom: itemBeforeUpdate.uom ?? '',
+        from_quantity: itemBeforeUpdate.quantity ?? 0,
+        to_quantity: scanAfterUpdate.quantity ?? 0,
+        to_uom: scanAfterUpdate.uom ?? '',
+        reference_id: palletUpdate.id,
+        reference_type: 'PALLET_UPDATE_UOM',
+        user_id: palletUpdate.initiatedByUserId,
+      });
     }
-
-    // console.log("createPalletUpdateDto", createPalletUpdateDto);
-
-    // console.log("itemBeforeUpdate", itemBeforeUpdate);
-    // console.log("scanAfterUpdate", scanAfterUpdate);
 
     return palletUpdate;
   }

@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { MasterPalletRepository } from './master-pallet.repository';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
@@ -357,7 +357,8 @@ export class MasterPalletService {
 
   /**
    * Update production date for an item line on a pallet without changing quantity.
-   * Marks the existing history row as UPDATED_PROD_DATE, then creates a new ADJUST record with the new production_date.
+   * Marks all history rows matching item_id and production_date_before as UPDATED_PROD_DATE,
+   * then creates a new ADJUST record with the new production_date (using the latest of those rows for quantity/week_number).
    */
   async updateProductionDate(
     palletId: string,
@@ -367,29 +368,55 @@ export class MasterPalletService {
       try {
         await this.findOne(palletId);
 
-        const latest = await this.getLatestHistoryRecord(
-          palletId,
-          dto.item_id,
-          dto.uom,
-        );
-        if (!latest || (latest.new_quantity ?? 0) === 0) {
-          throw new BadRequestException(
-            `No quantity found for item ${dto.item_id}${dto.uom ? ` with UOM ${dto.uom}` : ''} on pallet ${palletId}. Cannot update production date.`,
-          );
-        }
-
-        await manager.update(PalletTransactionHistory, latest.id, {
-          status_inventory: StatusInventory.UPDATED_PROD_DATE,
-        });
-
         const toDateOnly = (v: string | Date | undefined): string => {
           if (v == null) return '';
           const s = typeof v === 'string' ? v : (v as Date).toISOString?.() ?? '';
           return s.slice(0, 10);
         };
+        const dateBefore = toDateOnly(dto.production_date_before);
+        if (!dateBefore) {
+          throw new BadRequestException(
+            'production_date_before is required to identify which records to update.',
+          );
+        }
+
+        const qb = manager
+          .getRepository(PalletTransactionHistory)
+          .createQueryBuilder('h')
+          .where('h.pallet_id = :palletId', { palletId })
+          .andWhere('h.item_id = :itemId', { itemId: dto.item_id })
+          .andWhere('(h.production_date)::date = CAST(:dateBefore AS date)', {
+            dateBefore,
+          })
+          .orderBy('h.createdAt', 'DESC');
+        if (dto.uom) {
+          qb.andWhere('h.uom = :uom', { uom: dto.uom });
+        }
+        const rows = await qb.getMany();
+
+        if (rows.length === 0) {
+          throw new BadRequestException(
+            `No quantity found for item ${dto.item_id}${dto.uom ? ` with UOM ${dto.uom}` : ''} with production date ${dateBefore} on pallet ${palletId}. Cannot update production date.`,
+          );
+        }
+
+        const ids = rows.map((r) => r.id);
+        await manager.update(
+          PalletTransactionHistory,
+          { id: In(ids) },
+          { status_inventory: StatusInventory.UPDATED_PROD_DATE },
+        );
+
+        const latest = rows[0];
+        if ((latest.new_quantity ?? 0) === 0) {
+          throw new BadRequestException(
+            `Latest record for item ${dto.item_id} with production date ${dateBefore} has zero quantity. Cannot update production date.`,
+          );
+        }
+
         const notes =
           dto.notes ??
-          `Production date updated from ${toDateOnly(dto.production_date_before)} to ${toDateOnly(dto.production_date_after)}`;
+          `Production date updated from ${dateBefore} to ${toDateOnly(dto.production_date_after)}`;
 
         return await this.updateQuantity(
           palletId,
@@ -429,7 +456,11 @@ export class MasterPalletService {
   async updateUOM(palletId: string, dto: UpdateUOMDto): Promise<MasterPallet> {
     return await this.dataSource.transaction(async () => {
       try {
-        await this.findOne(palletId);
+        const pallet = await this.findOne(palletId);
+
+        if (pallet.capacity <  dto.to_quantity) {
+          throw new BadRequestException(`Pallet capacity ${pallet.capacity} is less than the quantity to change ${dto.to_quantity}.`);
+        }
 
         if (dto.from_uom === dto.to_uom) {
           throw new BadRequestException('from_uom and to_uom must be different');
@@ -454,6 +485,7 @@ export class MasterPalletService {
           reference_type: dto.reference_type ?? 'PALLET_UPDATE_UOM',
           production_date: latest.production_date,
           week_number: latest.week_number ?? undefined,
+          status_inventory: StatusInventory.READY,
         };
 
         await this.updateQuantity(palletId, {
