@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsEnum, Min, Max, IsDate } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsEnum, Min, Max, IsDate, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { QuantityOperationType, StatusInventory } from '../../core/domain/entities/transaction-pallet-history.entity';
 
@@ -82,6 +82,109 @@ export class UpdatePalletQuantityDto {
   @IsOptional()
   @IsEnum(StatusInventory)
   status_inventory?: StatusInventory;
+}
+
+export class UpdateProductionDateDto {
+  @ApiProperty({ example: 'uuid-item-123', description: 'Item ID on the pallet' })
+  @IsString()
+  item_id: string;
+
+  @ApiProperty({
+    example: '2025-01-15',
+    description: 'New production date (ISO date string or Date)',
+  })
+  @IsDateString()
+  production_date_before: string | Date;
+
+  @ApiProperty({
+    example: '2025-01-15',
+    description: 'New production date (ISO date string or Date)',
+  })
+  @IsDateString()
+  production_date_after: string | Date;
+
+  @ApiPropertyOptional({
+    example: 'PCS',
+    description: 'UOM of the item line to update (required if item has multiple UOMs on pallet)',
+  })
+  @IsOptional()
+  @IsString()
+  uom?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-user-123', description: 'User who performed the update' })
+  @IsOptional()
+  @IsString()
+  user_id?: string;
+
+  @ApiPropertyOptional({ example: 'Production date corrected after inspection' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-reference-123' })
+  @IsOptional()
+  @IsString()
+  reference_id?: string;
+
+  @ApiPropertyOptional({ example: 'PALLET_UPDATE_PROD_DATE' })
+  @IsOptional()
+  @IsString()
+  reference_type?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber()
+  week_number?: number;
+}
+
+export class UpdateUOMDto {
+  @ApiProperty({ example: 'uuid-item-123', description: 'Item ID on the pallet' })
+  @IsString()
+  item_id: string;
+
+  @ApiProperty({
+    example: 'DUS',
+    description: 'Current UOM to change from (the line to convert)',
+  })
+  @IsString()
+  from_uom: string;
+
+  @ApiProperty({
+    example: 'PCS',
+    description: 'New UOM to change to',
+  })
+  @IsString()
+  to_uom: string;
+
+  @ApiProperty({ example: 10, description: 'Quantity to change from' })
+  @IsNumber()
+  @Min(0)
+  from_quantity: number;
+
+  @ApiProperty({ example: 10, description: 'Quantity to change to' })
+  @IsNumber()
+  @Min(0)
+  to_quantity: number;
+
+  @ApiPropertyOptional({ example: 'uuid-user-123', description: 'User who performed the update' })
+  @IsOptional()
+  @IsString()
+  user_id?: string;
+
+  @ApiPropertyOptional({ example: 'UOM conversion from DUS to PCS' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-reference-123' })
+  @IsOptional()
+  @IsString()
+  reference_id?: string;
+
+  @ApiPropertyOptional({ example: 'PALLET_UPDATE_UOM' })
+  @IsOptional()
+  @IsString()
+  reference_type?: string;
 }
 
 export class PalletQuantityHistoryResponseDto {
@@ -196,6 +299,13 @@ export class PalletItemQuantityDto {
   @IsOptional()
   @IsEnum(StatusInventory)
   status_inventory?: StatusInventory;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'True when this row is the latest for (item_id, uom); false when superseded by a newer record (e.g. after production date update).',
+  })
+  @IsOptional()
+  is_latest?: boolean;
 }
 
 export class PalletCapacityValidationDto {
@@ -216,9 +326,9 @@ export class PalletCapacityValidationDto {
 }
 
 export class UpdatePalletItemStockDto {
-  @ApiProperty({ 
-    example: 10, 
-    description: 'New quantity for the item on the pallet (will adjust to this value)' 
+  @ApiProperty({
+    example: 10,
+    description: 'New quantity for the item on the pallet (will adjust to this value)'
   })
   @IsNumber()
   @Min(0)
@@ -229,17 +339,17 @@ export class UpdatePalletItemStockDto {
   @IsString()
   uom?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     example: '2025-01-01',
-    description: 'Production date of the item lot' 
+    description: 'Production date of the item lot'
   })
   @IsOptional()
   @IsDate()
   production_date?: Date;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     example: 42,
-    description: 'Production week number associated with the lot' 
+    description: 'Production week number associated with the lot'
   })
   @IsOptional()
   @IsNumber()

@@ -177,6 +177,30 @@ export class InventoryTrackingService {
     return this.update(existing.id, dto);
   }
 
+  /**
+   * Update inventory tracking by pallet ID if it exists; otherwise create a new record.
+   * Use when destination pallets (e.g. from split) may not have tracking yet.
+   */
+  async updateByPalletIdOrCreate(
+    palletId: string,
+    dto: UpdateInventoryTrackingDto,
+  ): Promise<InventoryTracking> {
+    const existing = await this.repository.findOneByPalletId(palletId);
+    if (existing) {
+      return this.update(existing.id, dto);
+    }
+    return this.create({
+      pallet_id: palletId,
+      warehouse_id: dto.warehouse_id,
+      warehouse_sub_id: dto.warehouse_sub_id,
+      warehouse_bin_id: dto.warehouse_bin_id,
+      inventory_status: dto.inventory_status,
+      progression_status: dto.progression_status,
+      inventory_note: dto.inventory_note,
+      inventory_date: dto.inventory_date,
+    } as CreateInventoryTrackingDto);
+  }
+
   async update(id: string, dto: UpdateInventoryTrackingDto): Promise<InventoryTracking> {
     // Validasi status jika ada
     if (dto.inventory_status) {

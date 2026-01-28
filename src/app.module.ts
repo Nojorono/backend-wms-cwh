@@ -43,6 +43,7 @@ import { MoveOrderModule } from './move-order/move-order.module';
 import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
 import { ApprovalModule } from './approval/approval.module';
 import { UsersActivityModule } from './users-activity/users-activity.module';
+import { PalletUpdateModule } from './pallet-update/pallet-update.module';
 import { LoggerModule } from './infrastructure/modules/logger.module';
 
 @Module({
@@ -94,6 +95,7 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     ApprovalSetupModule,
     ApprovalModule,
     UsersActivityModule,
+    PalletUpdateModule,
   ],
   providers: [
     {
@@ -102,4 +104,4 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

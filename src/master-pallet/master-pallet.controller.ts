@@ -9,6 +9,8 @@ import {
   PalletItemQuantityDto,
   UpdatePalletQuantityDto,
   UpdatePalletItemStockDto,
+  UpdateProductionDateDto,
+  UpdateUOMDto,
 } from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
@@ -101,6 +103,35 @@ export class MasterPalletController {
     @Body() updateQuantityDto: UpdatePalletQuantityDto,
   ) {
     return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
+  }
+
+  @Patch(':id/production-date')
+  @ApiOperation({ summary: 'Update production date for an item line on a pallet' })
+  @ApiResponse({
+    status: 200,
+    description: 'Production date updated. A new history record is created with the same quantity.',
+    type: MasterPallet,
+  })
+  @ApiResponse({ status: 400, description: 'No quantity found for the item/UOM on this pallet.' })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  updateProductionDate(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductionDateDto,
+  ) {
+    return this.masterPalletService.updateProductionDate(id, dto);
+  }
+
+  @Patch(':id/uom')
+  @ApiOperation({ summary: 'Change UOM for an item line on a pallet' })
+  @ApiResponse({
+    status: 200,
+    description: 'UOM updated. Quantity is removed from from_uom and added to to_uom.',
+    type: MasterPallet,
+  })
+  @ApiResponse({ status: 400, description: 'No quantity found for item/from_uom or from_uom equals to_uom.' })
+  @ApiResponse({ status: 404, description: 'Pallet not found.' })
+  updateUOM(@Param('id') id: string, @Body() dto: UpdateUOMDto) {
+    return this.masterPalletService.updateUOM(id, dto);
   }
 
   @Get('by-code/:palletCode/quantity-history')
