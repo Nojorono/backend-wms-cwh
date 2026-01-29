@@ -21,6 +21,7 @@ import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
 import { InboundModule } from './inbound/inbound.module';
+import { InboundReturModule } from './inbound-retur/inbound-retur.module';
 import { AssignedHelperModule } from './assigned-helper/assigned-helper.module';
 import { AssignedGateModule } from './assigned-gate/assigned-gate.module';
 import { AssignedGateLoadModule } from './assigned-gate-load/assigned-gate-load.module';
@@ -74,6 +75,7 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     MasterWeekModule,
     MasterClassificationItemModule,
     InboundModule,
+    InboundReturModule,
     AssignedHelperModule,
     AssignedGateModule,
     AssignedGateLoadModule,

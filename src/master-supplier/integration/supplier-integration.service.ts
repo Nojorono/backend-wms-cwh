@@ -58,8 +58,8 @@ export class SupplierIntegrationService implements OnModuleInit {
     async getAllSuppliersByAttribute7(params?: SupplierQueryDto): Promise<any> {
         try {
             const queryParams: SupplierQueryDto = {
-                search: params?.search || undefined,
-                attribute7: params?.attribute7 || undefined,
+                SEARCH: params?.SEARCH || undefined,
+                ATTRIBUTE7: params?.ATTRIBUTE7 || undefined,
             };
 
             this.logger.log('Sending request to supplier service with params:', queryParams);
