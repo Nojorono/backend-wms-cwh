@@ -6,7 +6,7 @@ export class SupplierQueryDto {
     @ApiPropertyOptional({ description: 'Search term' })
     @IsOptional()
     @IsString()
-    search?: string;
+    SEARCH?: string;
 
     @ApiPropertyOptional({
         description: 'Attribute 7 to filter by. Use GET /supplier/attribute7/list to get all available values',
@@ -33,5 +33,5 @@ export class SupplierQueryDto {
     })
     @IsOptional()
     @IsString()
-    attribute7?: string;
+    ATTRIBUTE7?: string;
 }
