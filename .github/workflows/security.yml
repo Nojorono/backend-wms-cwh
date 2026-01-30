@@ -2,16 +2,18 @@
 # - Dependency vulnerabilities (ASVS 14.x supply chain)
 # - Secret detection (ASVS 6.x, 14.x)
 # - Reproducible install (lockfile integrity)
+#
+# DISABLED - setup not ready. To re-enable: uncomment push/pull_request/schedule under 'on:', and remove 'if: false' from each job.
 name: Security
 
 on:
+  workflow_dispatch: {} # run manually from Actions tab when needed
   # push:
   #   branches: [development, main, master]
   # pull_request:
   #   branches: [development, main, master]
-  schedule:
-    # Weekly full security scan (e.g. Sundays 00:00 UTC)
-    - cron: '0 0 * * 0'
+  # schedule:
+  #   - cron: '0 0 * * 0'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,6 +21,7 @@ concurrency:
 
 jobs:
   dependency-audit:
+    if: false # DISABLED - remove this line to re-enable
     name: Dependency audit (OWASP supply chain)
     runs-on: ubuntu-latest
     steps:
@@ -40,6 +43,7 @@ jobs:
         continue-on-error: false
 
   secret-scan:
+    if: false # DISABLED - remove this line to re-enable
     name: Secret detection (OWASP ASVS)
     runs-on: ubuntu-latest
     steps:

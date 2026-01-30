@@ -1,8 +1,11 @@
 # Main CI: lint, test, build
 # Aligns with OWASP ASVS (e.g. secure SDLC, build integrity)
+#
+# DISABLED - setup not ready. To re-enable: uncomment push/pull_request under 'on:', and remove 'if: false' from the job.
 name: CI
 
 on:
+  workflow_dispatch: {} # run manually from Actions tab when needed
   # push:
   #   branches: [development, main, master]
   # pull_request:
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   lint-and-test:
+    if: false # DISABLED - remove this line to re-enable
     name: Lint & Test
     runs-on: ubuntu-latest
     steps:
