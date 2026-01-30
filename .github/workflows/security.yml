@@ -5,10 +5,10 @@
 name: Security
 
 on:
-  push:
-    branches: [development, main, master]
-  pull_request:
-    branches: [development, main, master]
+  # push:
+  #   branches: [development, main, master]
+  # pull_request:
+  #   branches: [development, main, master]
   schedule:
     # Weekly full security scan (e.g. Sundays 00:00 UTC)
     - cron: '0 0 * * 0'
