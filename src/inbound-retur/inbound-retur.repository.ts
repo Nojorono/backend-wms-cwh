@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InboundRetur } from '../core/domain/entities/inbound-retur.entity';
@@ -9,6 +9,9 @@ import { UpdateInboundReturDto } from './dto/update-inbound-retur.dto';
 import { MasterItem } from '../core/domain/entities/master-item.entity';
 import { InboundReturStatus } from '../core/domain/entities/inbound-retur.entity';
 import { CreateInboundReturHelperDto } from './dto/create-inbound-retur-helper.dto';
+import { CreateInboundReturSortingDto } from './dto/create-inbound-retur-sorting.dto';
+import { InboundReturSorting } from '../core/domain/entities/inbound-retur-sorting.entity';
+import { UpdateInboundReturSortingDto } from './dto/update-inbound-retur-sorting.dto';
 
 export type CreateInboundReturData = CreateInboundReturDto & {
   inbound_retur_number?: string;
@@ -29,6 +32,8 @@ export class InboundReturRepository {
     private readonly helperRepo: Repository<InboundReturHelper>,
     @InjectRepository(InboundReturItem)
     private readonly itemRepo: Repository<InboundReturItem>,
+    @InjectRepository(InboundReturSorting)
+    private readonly sortingRepo: Repository<InboundReturSorting>,
     private readonly dataSource: DataSource,
   ) { }
 
@@ -213,4 +218,39 @@ export class InboundReturRepository {
     await this.helperRepo.softDelete(id);
   }
 
+  async createSorting(payload: CreateInboundReturSortingDto[]): Promise<InboundReturSorting[]> {
+    const sortings = this.sortingRepo.create(payload);
+    return await this.sortingRepo.save(sortings);
+  }
+  
+  async findOneSorting(id: string): Promise<InboundReturSorting | null> {
+    return await this.sortingRepo.findOne({ where: { id } });
+  }
+
+  async updateSorting(id: string, payload: UpdateInboundReturSortingDto): Promise<InboundReturSorting> {
+    try {
+      const existing = await this.findOneSorting(id);
+      if (!existing) throw new NotFoundException('Inbound retur sorting not found');
+      return await this.sortingRepo.save({
+        ...existing,
+        ...payload,
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new BadRequestException(`Failed to update inbound retur sorting: ${message}`);
+    }
+  }
+
+  async deleteSorting(id: string): Promise<void> {
+    try {
+      const existing = await this.findOneSorting(id);
+      if (!existing) throw new NotFoundException('Inbound retur sorting not found');
+      await this.sortingRepo.softDelete(id);
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new BadRequestException(`Failed to delete inbound retur sorting: ${message}`);
+    }
+  }
 }

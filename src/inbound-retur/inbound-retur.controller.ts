@@ -16,11 +16,14 @@ import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-paginati
 import { CreateInboundReturHelperDto } from './dto/create-inbound-retur-helper.dto';
 import { CreateInboundReturItemDto } from './dto/create-inbound-retur-item.dto';
 import { InboundReturHelper } from 'src/core/domain/entities/inbound-retur-helper.entity';
+import { InboundReturSorting } from 'src/core/domain/entities/inbound-retur-sorting.entity';
+import { CreateInboundReturSortingDto } from './dto/create-inbound-retur-sorting.dto';
+import { UpdateInboundReturSortingDto } from './dto/update-inbound-retur-sorting.dto';
 
 @ApiTags('Inbound Retur')
 @Controller('inbound-retur')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(CreateInboundReturHelperDto, CreateInboundReturItemDto)
+@ApiExtraModels(CreateInboundReturHelperDto, CreateInboundReturItemDto, CreateInboundReturSortingDto)
 export class InboundReturController {
   constructor(private readonly service: InboundReturService) { }
 
@@ -119,5 +122,29 @@ export class InboundReturController {
   @ApiResponse({ status: 200, type: InboundReturHelper })
   deleteHelper(@Param('id') id: string) {
     return this.service.deleteHelper(id);
+  }
+
+  // sorting
+  @Post('sortings')
+  @ApiOperation({ summary: 'Sorting inbound retur' })
+  @ApiResponse({ status: 200, type: [InboundReturSorting] })
+  @ApiBody({ type: [CreateInboundReturSortingDto] })
+  createSorting(@Body() dto: CreateInboundReturSortingDto[]): Promise<InboundReturSorting[]> {
+    return this.service.createSorting(dto);  
+  }
+
+  @Patch('sortings/:id')
+  @ApiOperation({ summary: 'Update inbound retur sorting' })
+  @ApiResponse({ status: 200, type: InboundReturSorting })
+  @ApiBody({ type: UpdateInboundReturSortingDto })
+  updateSorting(@Param('id') id: string, @Body() dto: UpdateInboundReturSortingDto): Promise<InboundReturSorting> {
+    return this.service.updateSorting(id, dto);
+  }
+
+  @Delete('sortings/:id')
+  @ApiOperation({ summary: 'Delete inbound retur sorting' })
+  @ApiResponse({ status: 200, type: InboundReturSorting })
+  deleteSorting(@Param('id') id: string): Promise<void> {
+    return this.service.deleteSorting(id);
   }
 }

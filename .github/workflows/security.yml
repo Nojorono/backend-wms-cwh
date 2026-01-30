@@ -1,0 +1,78 @@
+# Security checks aligned with OWASP ASVS and secure SDLC
+# - Dependency vulnerabilities (ASVS 14.x supply chain)
+# - Secret detection (ASVS 6.x, 14.x)
+# - Reproducible install (lockfile integrity)
+name: Security
+
+on:
+  push:
+    branches: [development, main, master]
+  pull_request:
+    branches: [development, main, master]
+  schedule:
+    # Weekly full security scan (e.g. Sundays 00:00 UTC)
+    - cron: '0 0 * * 0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-audit:
+    name: Dependency audit (OWASP supply chain)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies (lockfile integrity)
+        run: npm ci
+
+      # Fail on high/critical vulnerabilities (configurable via npm run audit)
+      - name: npm audit (high/critical)
+        run: npm run audit
+        continue-on-error: false
+
+  secret-scan:
+    name: Secret detection (OWASP ASVS)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for secret scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        with:
+          no-git: false
+          redact: true
+          fail: true
+          # Optional: use .github/gitleaks.toml for allowlist/custom rules
+          config-path: .github/gitleaks.toml
+
+  # Optional: OWASP Dependency-Check (CVE/NVD). Uncomment if you want full CVE scan.
+  # owasp-dependency-check:
+  #   name: OWASP Dependency-Check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: OWASP Dependency-Check
+  #       uses: dependency-check/Dependency-Check_Action@main
+  #       with:
+  #         project: 'be-wms-nest'
+  #         path: '.'
+  #         format: 'SARIF'
+  #         args: '--scan . --enableNodeAudit --enableNodeJs'
+  #     - name: Upload SARIF
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       with:
+  #         sarif_file: reports/dependency-check-report.sarif
