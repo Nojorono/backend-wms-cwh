@@ -16,6 +16,8 @@
     "start:microservice": "node dist/microservice",
     "start:microservice:dev": "ts-node -r tsconfig-paths/register src/microservice.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "audit": "npm audit --audit-level=high",
+    "audit:check": "npm audit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
