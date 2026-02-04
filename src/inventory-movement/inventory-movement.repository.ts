@@ -233,23 +233,22 @@ export class InventoryMovementRepository {
   }
 
   async findByAssignedUserId(userId: string): Promise<InventoryMovement[]> {
-    // Since assigned_user_id doesn't exist in entity, return empty array or filter by status
-    // This method may need to be removed or refactored based on business requirements
-    return this.repository.find({
-      where: { status: MovementStatus.APPROVED },
-      relations: [
-        'pallets',
-        'pallets.pallet',
-        'pallets.inventoryTracking',
-        'sourceWarehouse',
-        'sourceWarehouseSub',
-        'sourceBin',
-        'destinationWarehouse',
-        'destinationWarehouseSub',
-        'destinationBin',
-      ],
-      order: { createdAt: 'DESC' },
-    });
+    return this.repository
+      .createQueryBuilder('movement')
+      .innerJoin('movement.users', 'assignedUser', 'assignedUser.user_id = :userId', { userId })
+      .leftJoinAndSelect('movement.pallets', 'pallets')
+      .leftJoinAndSelect('pallets.pallet', 'pallet')
+      .leftJoinAndSelect('pallets.inventoryTracking', 'inventoryTracking')
+      .leftJoinAndSelect('movement.users', 'users')
+      .leftJoinAndSelect('users.user', 'user')
+      .leftJoinAndSelect('movement.sourceWarehouse', 'sourceWarehouse')
+      .leftJoinAndSelect('movement.sourceWarehouseSub', 'sourceWarehouseSub')
+      .leftJoinAndSelect('movement.sourceBin', 'sourceBin')
+      .leftJoinAndSelect('movement.destinationWarehouse', 'destinationWarehouse')
+      .leftJoinAndSelect('movement.destinationWarehouseSub', 'destinationWarehouseSub')
+      .leftJoinAndSelect('movement.destinationBin', 'destinationBin')
+      .orderBy('movement.createdAt', 'DESC')
+      .getMany();
   }
 
   async findByStatus(status: string): Promise<InventoryMovement[]> {

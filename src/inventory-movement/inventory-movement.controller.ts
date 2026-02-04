@@ -150,11 +150,7 @@ export class InventoryMovementController {
   })
   async findByAssignedUserId(@Param('userId') userId: string) {
     const result = await this.service.findByAssignedUserId(userId);
-    return {
-      success: true,
-      message: 'Data inventory movement berdasarkan assigned user berhasil diambil',
-      data: result,
-    };
+    return result;
   }
 
   @Get('status/:status')
