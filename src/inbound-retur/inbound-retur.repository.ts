@@ -84,7 +84,7 @@ export class InboundReturRepository {
     if (status) {
       qb.andWhere('ir.status = :status', { status });
     }
-    return await qb.orderBy('ir.created_at', 'DESC').getMany();
+    return await qb.orderBy('ir.createdAt', 'DESC').getMany();
   }
 
   async findAllPaginated(
@@ -105,14 +105,32 @@ export class InboundReturRepository {
         { search: `%${search}%` },
       );
     }
+    const sortableFields: Record<string, string> = {
+      createdAt: 'ir.createdAt',
+      updatedAt: 'ir.updatedAt',
+      inbound_retur_number: 'ir.inbound_retur_number',
+      inboundReturNumber: 'ir.inbound_retur_number',
+      meta_number: 'ir.meta_number',
+      metaNumber: 'ir.meta_number',
+      arrival_date: 'ir.arrival_date',
+      arrivalDate: 'ir.arrival_date',
+      status: 'ir.status',
+      expedition: 'ir.expedition',
+      license_plate: 'ir.license_plate',
+      licensePlate: 'ir.license_plate',
+      driver_name: 'ir.driver_name',
+      driverName: 'ir.driver_name',
+    };
+    const orderField =
+      sortBy && sortableFields[sortBy] ? sortableFields[sortBy] : 'ir.createdAt';
+
     const total = await qb.getCount();
-    const sortColumn = sortBy === 'createdAt' ? 'ir.created_at' : `ir.${sortBy}`;
     const data = await qb
       .leftJoinAndSelect('ir.inbound_retur_helpers', 'helpers')
       .leftJoinAndSelect('ir.inbound_retur_items', 'items')
       .leftJoinAndMapOne('items.item', MasterItem, 'item', 'item.id::varchar = items.item_id')
       .leftJoinAndSelect('ir.inbound_retur_sortings', 'sortings')
-      .orderBy(sortColumn, sortOrder)
+      .orderBy(orderField, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)
       .getMany();
@@ -222,7 +240,7 @@ export class InboundReturRepository {
     const sortings = this.sortingRepo.create(payload);
     return await this.sortingRepo.save(sortings);
   }
-  
+
   async findOneSorting(id: string): Promise<InboundReturSorting | null> {
     return await this.sortingRepo.findOne({ where: { id } });
   }

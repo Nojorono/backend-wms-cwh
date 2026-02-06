@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
@@ -72,7 +73,8 @@ async function bootstrap() {
   // Log application startup
   logger.log(`🚀 Application is running on: http://localhost:${port}`, 'Bootstrap');
   logger.log(`📚 Swagger documentation: http://localhost:${port}/api`, 'Bootstrap');
-  logger.log(`📝 Logs directory: ${process.env.LOG_DIR || 'logs'}`, 'Bootstrap');
+  const logDir = resolve(process.cwd(), process.env.LOG_DIR || 'logs');
+  logger.log(`📝 Logs directory: ${logDir}`, 'Bootstrap');
   logger.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`, 'Bootstrap');
 }
 bootstrap();

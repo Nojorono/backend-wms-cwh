@@ -1,27 +1,53 @@
 import { Injectable, LoggerService } from '@nestjs/common';
 import * as winston from 'winston';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 // Use require for winston-daily-rotate-file due to CommonJS compatibility
 // winston-daily-rotate-file exports the constructor directly
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const DailyRotateFile = require('winston-daily-rotate-file') as any;
 
+/** Detailed JSON schema for error-log folder (one JSON object per line) */
+export interface ErrorLogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  context?: string;
+  trace?: string;
+  stack?: string;
+  statusCode?: number;
+  service: string;
+  request?: {
+    method?: string;
+    url?: string;
+    body?: unknown;
+    query?: unknown;
+    params?: unknown;
+    ip?: string;
+    user?: string;
+  };
+  [key: string]: unknown;
+}
+
 @Injectable()
 export class AppLoggerService implements LoggerService {
   private logger: winston.Logger;
 
   constructor() {
-    const logDir = process.env.LOG_DIR || 'logs';
+    // Resolve to absolute path so logs are always under project root (or LOG_DIR)
+    const logDir = resolve(process.cwd(), process.env.LOG_DIR || 'logs');
+    const errorLogDir = join(logDir, 'error-log');
     const logLevel = process.env.LOG_LEVEL || 'info';
 
-    // Create logs directory if it doesn't exist
     const fs = require('fs');
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
+    if (!fs.existsSync(errorLogDir)) {
+      fs.mkdirSync(errorLogDir, { recursive: true });
+    }
 
-    // Define log format
+    // Define log format (application logs - human-readable)
     const logFormat = winston.format.combine(
       winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
       winston.format.errors({ stack: true }),
@@ -35,7 +61,31 @@ export class AppLoggerService implements LoggerService {
       }),
     );
 
-    // Daily rotate file transport for all logs
+    // Detailed JSON format for error-log folder only (one JSON object per line)
+    const errorLogJsonLineFormat = winston.format.combine(
+      winston.format.errors({ stack: true }),
+      winston.format.printf((info: winston.Logform.TransformableInfo) => {
+        const entry: Record<string, unknown> = {
+          timestamp: new Date().toISOString(),
+          level: info.level ?? 'error',
+          message: String(info.message ?? ''),
+          service: String(info.service ?? 'wms-api'),
+        };
+        if (info.context) entry.context = String(info.context);
+        if (info.trace) entry.trace = String(info.trace);
+        if (info.stack) entry.stack = String(info.stack);
+        if (info.statusCode != null) entry.statusCode = Number(info.statusCode);
+        if (info.request) entry.request = info.request;
+        const skip = ['timestamp', 'level', 'message', 'service', 'context', 'trace', 'stack', 'statusCode', 'request', 'symbol'];
+        Object.keys(info).forEach((key) => {
+          if (skip.includes(key) || typeof (info as Record<string, unknown>)[key] === 'symbol') return;
+          entry[key] = (info as Record<string, unknown>)[key];
+        });
+        return JSON.stringify(entry);
+      }),
+    );
+
+    // Daily rotate file transport for all logs (application folder)
     const dailyRotateFileTransport = new DailyRotateFile({
       filename: join(logDir, 'application-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
@@ -45,15 +95,15 @@ export class AppLoggerService implements LoggerService {
       format: logFormat,
     });
 
-    // Daily rotate file transport for errors only
-    const dailyRotateErrorFileTransport = new DailyRotateFile({
-      filename: join(logDir, 'error-%DATE%.log'),
+    // Error-log folder: only error level, detailed JSON schema
+    const errorLogFileTransport = new DailyRotateFile({
+      filename: join(errorLogDir, 'error-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '20m',
       maxFiles: '90d', // Keep error logs for 90 days
       level: 'error',
-      format: logFormat,
+      format: errorLogJsonLineFormat,
     });
 
     // Console transport for development
@@ -76,7 +126,7 @@ export class AppLoggerService implements LoggerService {
       defaultMeta: { service: 'wms-api' },
       transports: [
         dailyRotateFileTransport,
-        dailyRotateErrorFileTransport,
+        errorLogFileTransport,
         ...(process.env.NODE_ENV !== 'production' ? [consoleTransport] : []),
       ],
       exceptionHandlers: [
@@ -87,6 +137,14 @@ export class AppLoggerService implements LoggerService {
           maxSize: '20m',
           maxFiles: '90d',
         }),
+        new DailyRotateFile({
+          filename: join(errorLogDir, 'exceptions-%DATE%.log'),
+          datePattern: 'YYYY-MM-DD',
+          zippedArchive: true,
+          maxSize: '20m',
+          maxFiles: '90d',
+          format: errorLogJsonLineFormat,
+        }),
       ],
       rejectionHandlers: [
         new DailyRotateFile({
@@ -95,6 +153,14 @@ export class AppLoggerService implements LoggerService {
           zippedArchive: true,
           maxSize: '20m',
           maxFiles: '90d',
+        }),
+        new DailyRotateFile({
+          filename: join(errorLogDir, 'rejections-%DATE%.log'),
+          datePattern: 'YYYY-MM-DD',
+          zippedArchive: true,
+          maxSize: '20m',
+          maxFiles: '90d',
+          format: errorLogJsonLineFormat,
         }),
       ],
     });
@@ -165,13 +231,16 @@ export class AppLoggerService implements LoggerService {
     stack?: string;
     statusCode?: number;
     context?: string;
-    request?: any;
+    request?: Record<string, unknown> & { body?: unknown };
   }) {
+    const request = error.request
+      ? { ...error.request, body: this.sanitizeBody(error.request.body) }
+      : undefined;
     this.logger.error(error.message, {
       context: error.context || 'Error',
       stack: error.stack,
       statusCode: error.statusCode,
-      request: error.request,
+      request,
     });
   }
 

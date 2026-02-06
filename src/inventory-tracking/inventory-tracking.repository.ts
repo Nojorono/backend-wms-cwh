@@ -28,7 +28,6 @@ export class InventoryTrackingRepository {
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
     // Extract inbound_id from dto before creating to avoid saving to non-existent column
     const { inbound_id, ...createData } = dto;
-
     const entity = this.repository.create(createData);
     const saved = await this.repository.save(entity);
 
@@ -57,6 +56,17 @@ export class InventoryTrackingRepository {
     }
 
     return saved;
+  }
+
+  async createInventoryTrackingBad(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
+    const { ...createData } = dto;
+    const inventoryTracking = await this.findOneInventoryTrackingId(createData.warehouse_id, createData.warehouse_sub_id, createData.warehouse_bin_id);
+    if (!inventoryTracking) {
+      const entity = this.repository.create(createData);
+      const saved = await this.repository.save(entity);
+      return saved;
+    }
+    return inventoryTracking;
   }
 
   async findAll(): Promise<InventoryTracking[]> {
@@ -160,6 +170,7 @@ export class InventoryTrackingRepository {
       .leftJoinAndSelect('inventory.warehouse', 'warehouse')
       .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
       .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin')
+      .leftJoinAndSelect('inventory.inventoryTrackingBad', 'inventoryTrackingBad')
       .orderBy(orderField, sortOrder)
       .skip((page - 1) * limit)
       .take(limit);
@@ -574,5 +585,21 @@ export class InventoryTrackingRepository {
 
     const results = (await this.repository.query(query, itemFilterParams)) as any[];
     return results;
+  }
+
+  async findOneInventoryTrackingId(
+    warehouse_id?: string,
+    warehouse_sub_id?: string,
+    warehouse_bin_id?: string,
+  ): Promise<InventoryTracking | null> {
+    const where: { warehouse_id?: string; warehouse_sub_id?: string; warehouse_bin_id?: string } = {};
+    if (warehouse_id) where.warehouse_id = warehouse_id;
+    if (warehouse_sub_id) where.warehouse_sub_id = warehouse_sub_id;
+    if (warehouse_bin_id) where.warehouse_bin_id = warehouse_bin_id;
+
+    if (Object.keys(where).length === 0) {
+      return null;
+    }
+    return this.repository.findOne({ where });
   }
 }

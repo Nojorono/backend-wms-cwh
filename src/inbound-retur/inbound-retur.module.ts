@@ -8,6 +8,7 @@ import { InboundReturController } from './inbound-retur.controller';
 import { InboundReturService } from './inbound-retur.service';
 import { InboundReturRepository } from './inbound-retur.repository';
 import { PaginationModule } from '../core/modules/pagination.module';
+import { InventoryTrackingModule } from 'src/inventory-tracking/inventory-tracking.module';
 
 @Module({
   imports: [
@@ -18,9 +19,10 @@ import { PaginationModule } from '../core/modules/pagination.module';
       InboundReturItem,
       InboundReturSorting,
     ]),
+    InventoryTrackingModule,
   ],
   controllers: [InboundReturController],
   providers: [InboundReturService, InboundReturRepository],
   exports: [InboundReturService],
 })
-export class InboundReturModule {}
+export class InboundReturModule { }

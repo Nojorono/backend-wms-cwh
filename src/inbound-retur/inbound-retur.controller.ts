@@ -11,7 +11,7 @@ import { InboundReturService } from './inbound-retur.service';
 import { CreateInboundReturDto } from './dto/create-inbound-retur.dto';
 import { UpdateInboundReturDto, UpdateInboundReturStatusDto } from './dto/update-inbound-retur.dto';
 import { InboundReturPaginationQueryDto } from './dto/inbound-retur-pagination.dto';
-import { InboundRetur } from '../core/domain/entities/inbound-retur.entity';
+import { InboundRetur, InboundReturStatus } from '../core/domain/entities/inbound-retur.entity';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { CreateInboundReturHelperDto } from './dto/create-inbound-retur-helper.dto';
 import { CreateInboundReturItemDto } from './dto/create-inbound-retur-item.dto';
@@ -23,7 +23,7 @@ import { UpdateInboundReturSortingDto } from './dto/update-inbound-retur-sorting
 @ApiTags('Inbound Retur')
 @Controller('inbound-retur')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(CreateInboundReturHelperDto, CreateInboundReturItemDto, CreateInboundReturSortingDto)
+@ApiExtraModels(CreateInboundReturHelperDto, CreateInboundReturItemDto, CreateInboundReturSortingDto, UpdateInboundReturStatusDto)
 export class InboundReturController {
   constructor(private readonly service: InboundReturService) { }
 
@@ -102,13 +102,6 @@ export class InboundReturController {
     return this.service.updateStatus(id, dto);
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete inbound retur (soft delete)' })
-  @ApiResponse({ status: 200, description: 'Deleted' })
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
-  }
-
   @Post('helpers')
   @ApiOperation({ summary: 'Create inbound retur helpers' })
   @ApiResponse({ status: 200, type: InboundReturHelper })
@@ -130,7 +123,7 @@ export class InboundReturController {
   @ApiResponse({ status: 200, type: [InboundReturSorting] })
   @ApiBody({ type: [CreateInboundReturSortingDto] })
   createSorting(@Body() dto: CreateInboundReturSortingDto[]): Promise<InboundReturSorting[]> {
-    return this.service.createSorting(dto);  
+    return this.service.createSorting(dto);
   }
 
   @Patch('sortings/:id')
