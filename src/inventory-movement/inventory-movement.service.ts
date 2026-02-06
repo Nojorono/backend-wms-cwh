@@ -220,7 +220,6 @@ export class InventoryMovementService {
     }
   }
 
-
   async movePalletToDestinationWarehouse(dto: MovePalletDto): Promise<InventoryMovement> {
 
     const inventoryMovement = await this.repository.findOne(dto.inventory_movement_id);
@@ -231,11 +230,21 @@ export class InventoryMovementService {
       warehouse_id: dto.destination_warehouse_id,
       warehouse_sub_id: dto.destination_warehouse_sub_id,
       warehouse_bin_id: dto.destination_bin_id,
-      inventory_note: 'Pallet moved to destination warehouse',
+      inventory_note: 'Pallet inspected and moved to destination warehouse',
       inventory_date: new Date(),
       inventory_status: 'IN_INVENTORY',
       progression_status: ProgressionStatus.COMPLETED,
     });
+    await this.repository.updateStatusPallet(dto.inventory_movement_id, dto.pallet_id, dto.inventory_tracking_id);
+    return inventoryMovement;
+  }
+
+
+  async completePallet(dto: MovePalletDto): Promise<InventoryMovement> {
+    const inventoryMovement = await this.repository.findOne(dto.inventory_movement_id);
+    if (!inventoryMovement) {
+      throw new NotFoundException('Inventory movement not found');
+    }
     await this.repository.updateStatusPallet(dto.inventory_movement_id, dto.pallet_id, dto.inventory_tracking_id);
     return inventoryMovement;
   }
