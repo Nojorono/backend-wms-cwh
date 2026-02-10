@@ -150,7 +150,8 @@ export class PalletUpdateController {
     if (!inspectionByUserId) {
       throw new BadRequestException('Inspection by user ID is required');
     }
-    return this.palletUpdateService.approveInspectionSplitPallet(palletUpdateId, inspectionByUserId);
+    throw new BadRequestException('not implemented');
+    // return this.palletUpdateService.approveInspectionSplitPallet(palletUpdateId, inspectionByUserId);
   }
 
   @Get('/scan-done/:palletUpdateId')
