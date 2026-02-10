@@ -166,7 +166,23 @@ export class AppLoggerService implements LoggerService {
     });
   }
 
+  /** Nest startup contexts that are too verbose for application log (routes/modules list). */
+  private static readonly VERBOSE_STARTUP_CONTEXTS = new Set([
+    'InstanceLoader',
+    'RoutesResolver',
+    'RouterExplorer',
+  ]);
+
   log(message: string, context?: string) {
+    if (context && AppLoggerService.VERBOSE_STARTUP_CONTEXTS.has(context)) {
+      return;
+    }
+    if (context === 'NestApplication' && typeof message === 'string' && message.includes('successfully started')) {
+      return;
+    }
+    if (context === 'NestFactory' && typeof message === 'string' && message.toLowerCase().includes('starting nest')) {
+      return;
+    }
     this.logger.info(message, { context });
   }
 
