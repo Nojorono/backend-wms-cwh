@@ -150,11 +150,7 @@ export class InventoryMovementController {
   })
   async findByAssignedUserId(@Param('userId') userId: string) {
     const result = await this.service.findByAssignedUserId(userId);
-    return {
-      success: true,
-      message: 'Data inventory movement berdasarkan assigned user berhasil diambil',
-      data: result,
-    };
+    return result;
   }
 
   @Get('status/:status')
@@ -220,6 +216,16 @@ export class InventoryMovementController {
       message: 'Inventory movement berhasil dihapus',
     };
   }
+  @Post('inspect-pallet')
+  @ApiOperation({ summary: 'Complete inventory movement' })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory movement completed successfully',
+    type: InventoryMovement,
+  })
+  inspectPallet(@Body() dto: MovePalletDto) {
+    return this.service.movePalletToDestinationWarehouse(dto);
+  }
   // pallet move
   @Post('move-pallet')
   @ApiOperation({ summary: 'Move pallet to destination warehouse' })
@@ -229,6 +235,6 @@ export class InventoryMovementController {
     type: InventoryMovement,
   })
   movePallet(@Body() dto: MovePalletDto) {
-    return this.service.movePalletToDestinationWarehouse(dto);
+    return this.service.completePallet(dto);
   }
 }

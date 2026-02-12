@@ -12,14 +12,18 @@ import { PalletTransactionHistory } from '../core/domain/entities/transaction-pa
 import { InventoryTrackingController } from './inventory-tracking.controller';
 import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
+import { InventoryTrackingBadRepository } from './inventory-tracking-bad.repository';
+import { InventoryTrackingBadService } from './inventory-tracking-bad.service';
 import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 import { PaginationService } from '../core/services/pagination.service';
 import { MasterPalletModule } from '../master-pallet/master-pallet.module';
+import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-tracking-bad.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       InventoryTracking,
+      InventoryTrackingBad,
       InventoryTrackingHistory,
       MasterPallet,
       MasterItem,
@@ -35,9 +39,15 @@ import { MasterPalletModule } from '../master-pallet/master-pallet.module';
   providers: [
     InventoryTrackingService,
     InventoryTrackingRepository,
+    InventoryTrackingBadRepository,
+    InventoryTrackingBadService,
     InventoryAutoSuggestionService,
     PaginationService,
   ],
-  exports: [InventoryTrackingService, InventoryAutoSuggestionService],
+  exports: [
+    InventoryTrackingService,
+    InventoryTrackingBadService,
+    InventoryAutoSuggestionService,
+  ],
 })
 export class InventoryTrackingModule { }

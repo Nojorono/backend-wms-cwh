@@ -123,7 +123,7 @@ export class PalletUpdateController {
     return this.palletUpdateService.findAll(paginationQuery.updateType);
   }
 
-  @Get('/approve-inspection-split-pallet/:palletUpdateId')
+  @Get('/approve-split-pallet/:palletUpdateId')
   @ApiOperation({ summary: 'Approve inspection split pallet' })
   @ApiResponse({
     status: 200,
@@ -136,6 +136,22 @@ export class PalletUpdateController {
       throw new BadRequestException('Inspection by user ID is required');
     }
     return this.palletUpdateService.approveInspectionSplitPallet(palletUpdateId, inspectionByUserId);
+  }
+
+  @Get('/approve-merge-pallet/:palletUpdateId')
+  @ApiOperation({ summary: 'Approve merge pallet' })
+  @ApiResponse({
+    status: 200,
+    description: 'Approve merge pallet successfully.',
+    type: PalletUpdateResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Pallet update not found.' })
+  approveMergePallet(@Param('palletUpdateId') palletUpdateId: string, @Query('inspectionByUserId') inspectionByUserId: string) {
+    if (!inspectionByUserId) {
+      throw new BadRequestException('Inspection by user ID is required');
+    }
+    throw new BadRequestException('not implemented');
+    // return this.palletUpdateService.approveInspectionSplitPallet(palletUpdateId, inspectionByUserId);
   }
 
   @Get('/scan-done/:palletUpdateId')

@@ -2,6 +2,7 @@ import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { InboundRetur } from './inbound-retur.entity';
 import { MasterItem } from './master-item.entity';
+import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 
 export enum InboundReturSortingStatus {
     PENDING = 'PENDING',
@@ -28,10 +29,31 @@ export class InboundReturSorting extends BaseEntity {
     quantity_claim: number;
 
     @Column({ nullable: true })
+    warehouse_sub_id_claim: string;
+
+    @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'warehouse_sub_id_claim' })
+    warehouseSubClaim: MasterWarehouseSub;
+
+    @Column({ nullable: true })
     quantity_unclaim: number;
 
     @Column({ nullable: true })
+    warehouse_sub_id_unclaim: string;
+
+    @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'warehouse_sub_id_unclaim' })
+    warehouseSubUnclaim: MasterWarehouseSub;
+
+    @Column({ nullable: true })
     quantity_tracking: number;
+
+    @Column({ nullable: true })
+    warehouse_sub_id_tracking: string;
+
+    @ManyToOne(() => MasterWarehouseSub, (warehouseSub) => warehouseSub.id, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'warehouse_sub_id_tracking' })
+    warehouseSubTracking: MasterWarehouseSub;
 
     @Column({ nullable: true })
     uom: string;
@@ -41,6 +63,9 @@ export class InboundReturSorting extends BaseEntity {
 
     @Column({ nullable: true })
     year: string;
+
+    @Column({ nullable: true })
+    production_date: Date;
 
     @Column({ nullable: true })
     notes: string;

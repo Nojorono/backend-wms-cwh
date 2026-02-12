@@ -100,21 +100,6 @@ export class InventoryMovementService {
   async update(id: string, data: UpdateInventoryMovementDto): Promise<InventoryMovement> {
     const existing = await this.findOne(id);
 
-    // If status is being changed to COMPLETED, update inventory tracking
-    if (data.status === MovementStatus.COMPLETED && existing.status !== MovementStatus.COMPLETED) {
-      await this.completeMovement(existing, data.moved_by);
-    }
-
-    // If status is being changed to CANCELLED
-    if (data.status === MovementStatus.CANCELLED && existing.status !== MovementStatus.CANCELLED) {
-      // Just update status, don't move inventory
-    }
-
-    // If status is being changed to IN_PROGRESS
-    if (data.status === MovementStatus.APPROVED && existing.status !== MovementStatus.APPROVED) {
-      // Movement started
-    }
-
     const updateData: any = { ...data };
     if (data.status === MovementStatus.COMPLETED && !existing.completed_date) {
       updateData.completed_date = data.completed_date ? new Date(data.completed_date) : new Date();
@@ -214,12 +199,11 @@ export class InventoryMovementService {
     if (movement.pallets && movement.pallets.length > 0) {
       await Promise.all(
         movement.pallets.map((pallet) =>
-          this.repository['palletRepository'].save(pallet),
+          this.palletRepository.save(pallet),
         ),
       );
     }
   }
-
 
   async movePalletToDestinationWarehouse(dto: MovePalletDto): Promise<InventoryMovement> {
 
@@ -231,11 +215,21 @@ export class InventoryMovementService {
       warehouse_id: dto.destination_warehouse_id,
       warehouse_sub_id: dto.destination_warehouse_sub_id,
       warehouse_bin_id: dto.destination_bin_id,
-      inventory_note: 'Pallet moved to destination warehouse',
+      inventory_note: 'Pallet inspected and moved to destination warehouse',
       inventory_date: new Date(),
       inventory_status: 'IN_INVENTORY',
       progression_status: ProgressionStatus.COMPLETED,
     });
+    await this.repository.updateStatusPallet(dto.inventory_movement_id, dto.pallet_id, dto.inventory_tracking_id);
+    return inventoryMovement;
+  }
+
+
+  async completePallet(dto: MovePalletDto): Promise<InventoryMovement> {
+    const inventoryMovement = await this.repository.findOne(dto.inventory_movement_id);
+    if (!inventoryMovement) {
+      throw new NotFoundException('Inventory movement not found');
+    }
     await this.repository.updateStatusPallet(dto.inventory_movement_id, dto.pallet_id, dto.inventory_tracking_id);
     return inventoryMovement;
   }

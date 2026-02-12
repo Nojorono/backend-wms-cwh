@@ -9,6 +9,7 @@ export enum InboundReturStatus {
     ASSIGNED_HELPER = 'ASSIGNED_HELPER',
     SORTING = 'SORTING',
     INSPECTION = 'INSPECTION',
+    SPV_APPROVED = 'SPV_APPROVED',
     COMPLETED = 'COMPLETED',
 }
 

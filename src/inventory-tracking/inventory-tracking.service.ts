@@ -11,6 +11,8 @@ import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
+import { CreateInventoryTrackingBadDto } from './dto/create-inventory-bad.dto';
+import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-tracking-bad.entity';
 
 @Injectable()
 export class InventoryTrackingService {
@@ -454,17 +456,6 @@ export class InventoryTrackingService {
           reasons.push(
             `Pallet sedang dalam proses picking dengan status: ${existingTracking.inventory_status}`,
           );
-        } else if (existingTracking.inventory_status === 'SHIPPED') {
-          // Cek apakah outbound sudah done
-          const isOutboundDone = await this.checkOutboundStatus(pallet.id);
-          if (isOutboundDone) {
-            // Pallet sudah keluar/outbound done - bisa digunakan kembali
-            isAvailable = true;
-            reasons.push(`Pallet sudah keluar/outbound done - dapat digunakan kembali`);
-          } else {
-            isAvailable = false;
-            reasons.push(`Pallet sudah shipped tapi outbound belum selesai`);
-          }
         }
       }
 
@@ -504,18 +495,6 @@ export class InventoryTrackingService {
     }
   }
 
-  // Method untuk mengecek status outbound
-  private async checkOutboundStatus(pallet_id: string): Promise<boolean> {
-    try {
-      // Cek apakah ada outbound transaction yang sudah done untuk pallet ini
-      // Implementasi ini bisa disesuaikan dengan struktur outbound yang ada
-      // Untuk sementara, kita asumsikan jika status SHIPPED maka outbound sudah done
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
   async getVisibilityInventoryTrackingAllItemInWarehouse(item_id?: string): Promise<{
     summary: {
       total_items: number;
@@ -545,5 +524,9 @@ export class InventoryTrackingService {
     } catch (error) {
       throw new BadRequestException(`Error getting visibility dashboard: ${error.message}`);
     }
+  }
+
+  async createInventoryTrackingBad(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
+    return this.repository.createInventoryTrackingBad(dto);
   }
 }
