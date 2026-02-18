@@ -236,6 +236,208 @@ export class PalletUpdateService {
     }
   }
 
+  async approveInspectionMergePallet(palletUpdateId: string, inspectionByUserId: string): Promise<PalletUpdate> {
+    const palletUpdate = await this.repository.findOne(palletUpdateId);
+    if (!palletUpdate) {
+      throw new NotFoundException(`Pallet update with ID ${palletUpdateId} not found`);
+    }
+
+    if (palletUpdate.updateType !== PalletUpdateType.MERGE_PALLET) {
+      throw new BadRequestException(
+        `Pallet update ${palletUpdateId} is not a MERGE_PALLET (current type: ${palletUpdate.updateType})`,
+      );
+    }
+
+    if (palletUpdate.inspectionStatus !== InspectionStatus.PENDING) {
+      throw new BadRequestException(
+        `Pallet update ${palletUpdateId} is not pending inspection (current: ${palletUpdate.inspectionStatus})`,
+      );
+    }
+
+    const mergeItems = palletUpdate.items ?? [];
+    const destinationPallets = palletUpdate.scans ?? [];
+
+    if (mergeItems.length === 0) {
+      throw new BadRequestException(
+        `Pallet update ${palletUpdateId} has no source items (merge requires at least one item)`,
+      );
+    }
+
+    if (destinationPallets.length === 0) {
+      throw new BadRequestException(
+        `Pallet update ${palletUpdateId} has no destination scans (merge requires at least one scan)`,
+      );
+    }
+
+    let referenceLocation: { warehouseId: string; warehouseSubId: string; warehouseBinId: string } | null = null;
+
+    for (const item of mergeItems) {
+      const pallet = await this.masterPalletService.findOne(item.palletId);
+      const currentQuantity = pallet.currentQuantity ?? 0;
+      if (currentQuantity === 0) {
+        continue;
+      }
+
+      const sourceLocation = await this.inventoryTrackingService.findOneByPalletId(item.palletId);
+      if (!sourceLocation) {
+        continue;
+      }
+      const warehouseId = (sourceLocation as { warehouse_id?: string; warehouse?: { id: string } }).warehouse_id
+        ?? (sourceLocation as { warehouse?: { id: string } }).warehouse?.id;
+      const warehouseSubId = (sourceLocation as { warehouse_sub_id?: string; warehouseSub?: { id: string } }).warehouse_sub_id
+        ?? (sourceLocation as { warehouseSub?: { id: string } }).warehouseSub?.id;
+      const warehouseBinId = (sourceLocation as { warehouse_bin_id?: string; warehouseBin?: { id: string } }).warehouse_bin_id
+        ?? (sourceLocation as { warehouseBin?: { id: string } }).warehouseBin?.id;
+
+      if (!warehouseId || !warehouseSubId || !warehouseBinId) {
+        continue;
+      }
+
+      if (referenceLocation === null) {
+        referenceLocation = { warehouseId, warehouseSubId, warehouseBinId };
+        continue;
+      }
+
+      if (
+        referenceLocation.warehouseId !== warehouseId
+        || referenceLocation.warehouseSubId !== warehouseSubId
+        || referenceLocation.warehouseBinId !== warehouseBinId
+      ) {
+        throw new BadRequestException(
+          `Source pallets must be in the same location (warehouse/sub/bin). Pallet ${item.palletId} is in a different location.`,
+        );
+      }
+    }
+
+    if (!referenceLocation) {
+      throw new BadRequestException(
+        `Pallet update ${palletUpdateId}: could not determine reference location from source pallets (ensure at least one source has quantity and valid warehouse location).`,
+      );
+    }
+
+    let mergeItemsProcessed = 0;
+    let destinationPalletsProcessed = 0;
+
+    try {
+      for (const mergeItem of mergeItems) {
+        if (!mergeItem.palletId || !mergeItem.itemId) {
+          throw new BadRequestException(
+            `Pallet update ${palletUpdateId}: merge item missing palletId or itemId`,
+          );
+        }
+        await this.masterPalletService.updateQuantity(mergeItem.palletId, {
+          item_id: mergeItem.itemId,
+          quantity: mergeItem.quantity ?? 0,
+          operation_type: QuantityOperationType.REMOVE,
+          reference_id: palletUpdateId,
+          reference_type: 'PALLET_UPDATE_MERGE',
+          notes: 'Merge pallet from pallet update',
+          user_id: palletUpdate.initiatedByUserId,
+          uom: mergeItem.uom ?? undefined,
+          production_date: mergeItem.productionDate ?? undefined,
+          week_number: mergeItem.weekNumber ?? undefined,
+        });
+        mergeItemsProcessed++;
+      }
+
+      for (const destinationPallet of destinationPallets) {
+        if (!destinationPallet.palletId || !destinationPallet.itemId) {
+          throw new BadRequestException(
+            `Pallet update ${palletUpdateId}: destination scan missing palletId or itemId`,
+          );
+        }
+        await this.masterPalletService.updateQuantity(destinationPallet.palletId, {
+          item_id: destinationPallet.itemId,
+          quantity: destinationPallet.quantity ?? 0,
+          operation_type: QuantityOperationType.ADD,
+          reference_id: palletUpdateId,
+          reference_type: 'PALLET_UPDATE_MERGE',
+          notes: 'Merge pallet from pallet update',
+          user_id: palletUpdate.initiatedByUserId,
+          uom: destinationPallet.uom ?? undefined,
+          production_date: destinationPallet.productionDate ?? undefined,
+          week_number: destinationPallet.weekNumber ?? undefined,
+          status_inventory: StatusInventory.READY,
+        });
+
+        await this.inventoryTrackingService.updateByPalletIdOrCreate(destinationPallet.palletId, {
+          warehouse_bin_id: referenceLocation.warehouseBinId,
+          warehouse_sub_id: referenceLocation.warehouseSubId,
+          warehouse_id: referenceLocation.warehouseId,
+          inventory_status: 'IN_INVENTORY',
+          progression_status: ProgressionStatus.COMPLETED,
+          inventory_note: 'Merge pallet from pallet update',
+          inventory_date: new Date(),
+        });
+        destinationPalletsProcessed++;
+      }
+
+      const updated = await this.dataSource.transaction(async (manager) => {
+        await manager.update(PalletUpdate, palletUpdateId, {
+          inspectionStatus: InspectionStatus.APPROVED,
+          status: PalletUpdateStatus.APPROVED,
+          completedDate: new Date(),
+          inspectionByUserId,
+        });
+        return manager.getRepository(PalletUpdate).findOne({
+          where: { id: palletUpdateId },
+          relations: ['items', 'scans', 'assigned', 'initiatedByUser', 'inspectionByUser'],
+        });
+      });
+
+      if (!updated) {
+        throw new NotFoundException(`Pallet update with ID ${palletUpdateId} not found after approval`);
+      }
+      this.logger.log(`Merge pallet approval completed for pallet update ${palletUpdateId}`);
+      return updated;
+    } catch (err) {
+      if (mergeItemsProcessed > 0 || destinationPalletsProcessed > 0) {
+        this.logger.warn(
+          `Rolling back merge approval for pallet update ${palletUpdateId}: ` +
+            `${mergeItemsProcessed} source item(s) and ${destinationPalletsProcessed} destination pallet(s) had been updated`,
+        );
+        try {
+          for (let i = mergeItemsProcessed - 1; i >= 0; i--) {
+            const mergeItem = mergeItems[i];
+            await this.masterPalletService.updateQuantity(mergeItem.palletId, {
+              item_id: mergeItem.itemId,
+              reference_id: palletUpdateId,
+              reference_type: 'PALLET_UPDATE_MERGE_ROLLBACK',
+              notes: 'Rollback merge pallet from pallet update',
+              user_id: palletUpdate.initiatedByUserId,
+              uom: mergeItem.uom ?? undefined,
+              production_date: mergeItem.productionDate ?? undefined,
+              operation_type: QuantityOperationType.ADD,
+              quantity: mergeItem.quantity ?? 0,
+              week_number: mergeItem.weekNumber ?? undefined,
+            });
+          }
+          for (let i = destinationPalletsProcessed - 1; i >= 0; i--) {
+            const dp = destinationPallets[i];
+            await this.masterPalletService.updateQuantity(dp.palletId, {
+              item_id: dp.itemId,
+              reference_id: palletUpdateId,
+              reference_type: 'PALLET_UPDATE_MERGE_ROLLBACK',
+              notes: 'Rollback merge pallet from pallet update',
+              user_id: palletUpdate.initiatedByUserId,
+              uom: dp.uom ?? undefined,
+              production_date: dp.productionDate ?? undefined,
+              operation_type: QuantityOperationType.REMOVE,
+              quantity: dp.quantity ?? 0,
+              week_number: dp.weekNumber ?? undefined,
+            });
+          }
+          this.logger.log(`Rollback completed for pallet update ${palletUpdateId}`);
+        } catch (rollbackErr) {
+          this.logger.error(
+            `Rollback failed for pallet update ${palletUpdateId}: ${rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr)}`,
+          );
+          throw err;
+        }
+      }
+      throw err;
+    }
+  }
 
   async createUpdate(createPalletUpdateDto: CreatePalletUpdateDto): Promise<PalletUpdate> {
     if (!createPalletUpdateDto.updateNumber) {
