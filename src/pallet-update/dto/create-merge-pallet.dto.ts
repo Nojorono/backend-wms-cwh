@@ -75,8 +75,8 @@ export class CreateMergePalletDto {
     @ApiPropertyOptional({
         type: () => [CreatePalletUpdateItemDto],
         example: [
-            { sequence: 1, palletId: 'uuid-pallet-123', itemId: 'uuid-item-123' },
-            { sequence: 2, palletId: 'uuid-pallet-456', itemId: 'uuid-item-456' },
+            { sequence: 1, palletId: 'uuid-pallet-123', itemId: 'uuid-item-123', productionDate: '2025-01-26T10:00:00.000Z', weekNumber: 1, quantity: 10, uom: 'PCS' },
+            { sequence: 2, palletId: 'uuid-pallet-456', itemId: 'uuid-item-456', productionDate: '2025-01-26T10:00:00.000Z', weekNumber: 1, quantity: 10, uom: 'PCS' },
         ],
     })
     @IsOptional()

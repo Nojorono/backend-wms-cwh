@@ -108,6 +108,7 @@ export class CreatePalletUpdateDto {
       uom: 'PCS',
       productionDate: '2025-01-01T00:00:00.000Z',
       notes: 'Scan notes',
+      weekNumber: 1,
       status: 'PENDING',
     },
   })

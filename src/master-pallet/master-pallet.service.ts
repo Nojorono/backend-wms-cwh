@@ -380,14 +380,17 @@ export class MasterPalletService {
           );
         }
 
+        // Match both date and date+1 day: API returns UTC (e.g. 2026-01-25T17:00:00Z) but DB
+        // may store in local time (2026-01-26 00:00 in GMT+7). toDateOnly gives "2026-01-25".
         const qb = manager
           .getRepository(PalletTransactionHistory)
           .createQueryBuilder('h')
           .where('h.pallet_id = :palletId', { palletId })
           .andWhere('h.item_id = :itemId', { itemId: dto.item_id })
-          .andWhere('(h.production_date)::date = CAST(:dateBefore AS date)', {
-            dateBefore,
-          })
+          .andWhere(
+            `(h.production_date)::date IN (CAST(:dateBefore AS date), (CAST(:dateBefore AS date) + INTERVAL '1 day')::date)`,
+            { dateBefore },
+          )
           .orderBy('h.createdAt', 'DESC');
         if (dto.uom) {
           qb.andWhere('h.uom = :uom', { uom: dto.uom });
@@ -458,7 +461,7 @@ export class MasterPalletService {
       try {
         const pallet = await this.findOne(palletId);
 
-        if (pallet.capacity <  dto.to_quantity) {
+        if (pallet.capacity < dto.to_quantity) {
           throw new BadRequestException(`Pallet capacity ${pallet.capacity} is less than the quantity to change ${dto.to_quantity}.`);
         }
 
