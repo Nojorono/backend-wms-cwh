@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere } from 'typeorm';
-import { PalletUpdate } from '../core/domain/entities/pallet-update.entity';
+import { PalletUpdate, PalletUpdateStatus, PalletUpdateType } from '../core/domain/entities/pallet-update.entity';
 import { PalletUpdateScan } from '../core/domain/entities/pallet-update-scan.entity';
+import { PalletUpdateItem } from '../core/domain/entities/pallet-update-item.entity';
 import { CreatePalletUpdateDto } from './dto/create-pallet-update.dto';
 import { CreatePalletUpdateScanDto } from './dto/create-pallet-update-scan.dto';
 import { UpdatePalletUpdateScanDto } from './dto/update-pallet-update-scan.dto';
-import { PalletUpdateType } from '../core/domain/entities/pallet-update.entity';
 
 @Injectable()
 export class PalletUpdateRepository {
@@ -15,6 +15,8 @@ export class PalletUpdateRepository {
     private readonly repository: Repository<PalletUpdate>,
     @InjectRepository(PalletUpdateScan)
     private readonly scanRepository: Repository<PalletUpdateScan>,
+    @InjectRepository(PalletUpdateItem)
+    private readonly itemRepository: Repository<PalletUpdateItem>,
   ) { }
 
   async create(createPalletUpdateDto: CreatePalletUpdateDto): Promise<PalletUpdate> {
@@ -170,6 +172,63 @@ export class PalletUpdateRepository {
     });
     return await this.scanRepository.save(scan);
   }
+
+  async findByPalletIdScan(palletId: string): Promise<PalletUpdateScan[]> {
+    const pendingStatuses = [
+      PalletUpdateStatus.PENDING_ASSIGNMENT,
+      PalletUpdateStatus.PENDING_HELPER_ACTION,
+      PalletUpdateStatus.PENDING_INSPECTION,
+    ];
+
+    return await this.scanRepository
+      .createQueryBuilder('scan')
+      .leftJoinAndSelect('scan.palletUpdate', 'palletUpdate')
+      .leftJoinAndSelect('scan.scanByUser', 'scanByUser')
+      .leftJoinAndSelect('scan.pallet', 'pallet')
+      .leftJoinAndSelect('scan.item', 'item')
+      .where('scan.palletId = :palletId', { palletId })
+      .andWhere('palletUpdate.status IN (:...statuses)', {
+        statuses: pendingStatuses,
+      })
+      .orderBy('scan.createdAt', 'DESC')
+      .getMany();
+  }
+
+  async findByPalletIdItem(palletId: string): Promise<PalletUpdateItem[]> {
+    const pendingStatuses = [
+      PalletUpdateStatus.PENDING_ASSIGNMENT,
+      PalletUpdateStatus.PENDING_HELPER_ACTION,
+      PalletUpdateStatus.PENDING_INSPECTION,
+    ];
+
+    return await this.itemRepository
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.palletUpdate', 'palletUpdate')
+      .leftJoinAndSelect('item.pallet', 'pallet')
+      .leftJoinAndSelect('item.item', 'itemDetail')
+      .where('item.palletId = :palletId', { palletId })
+      .andWhere('palletUpdate.status IN (:...statuses)', {
+        statuses: pendingStatuses,
+      })
+      .orderBy('item.createdAt', 'DESC')
+      .getMany();
+  }
+
+  async deletePalletUpdate(id: string): Promise<void> {
+    await this.repository.softDelete(id);
+  }
+
+  // async findByPalletId(palletId: string): Promise<{
+  //   scans: PalletUpdateScan[];
+  //   items: PalletUpdateItem[];
+  // }> {
+  //   const [scans, items] = await Promise.all([
+  //     this.findByPalletIdScan(palletId),
+  //     this.findByPalletIdItem(palletId),
+  //   ]);
+
+  //   return { scans, items };
+  // }
 
   async findAllScans(palletUpdateId?: string): Promise<PalletUpdateScan[]> {
     const where: FindOptionsWhere<PalletUpdateScan> = {};

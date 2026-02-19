@@ -77,6 +77,18 @@ export class PalletUpdateController {
     return this.palletUpdateService.createMergeOrSplit(createPalletUpdateDto);
   }
 
+  // delete pallet update
+  @Delete('/:id')
+  @ApiOperation({ summary: 'Delete a pallet update' })
+  @ApiResponse({
+    status: 200,
+    description: 'The pallet update has been successfully deleted.',
+  })
+  @ApiResponse({ status: 404, description: 'Pallet update not found.' })
+  deletePalletUpdate(@Param('id') id: string) {
+    return this.palletUpdateService.deletePalletUpdate(id);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all pallet updates or search with pagination' })
   @ApiFlexiblePaginationQuery([
