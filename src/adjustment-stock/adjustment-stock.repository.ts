@@ -145,4 +145,36 @@ export class AdjustmentStockRepository {
     }
     await this.repository.softDelete(id);
   }
+
+  /**
+   * Generate unique adjustment stock code
+   * Format: ADJ-YYYY-XXXX
+   * Example: ADJ-2025-0001
+   */
+  async getNextCode(year?: number): Promise<string> {
+    const currentYear = year || new Date().getFullYear();
+    const yearStr = currentYear.toString();
+    const prefix = 'ADJ';
+    const searchPrefix = `${prefix}-${yearStr}-`;
+
+    // Find the latest code for this year
+    const row = await this.repository
+      .createQueryBuilder('adjustmentStock')
+      .select('adjustmentStock.code', 'code')
+      .where('adjustmentStock.code LIKE :prefix', { prefix: `${searchPrefix}%` })
+      .orderBy('adjustmentStock.code', 'DESC')
+      .limit(1)
+      .getRawOne<{ code?: string }>();
+
+    let seq = 1;
+    if (row?.code && row.code.startsWith(searchPrefix)) {
+      const tail = row.code.substring(searchPrefix.length);
+      const parsed = parseInt(tail, 10);
+      if (!Number.isNaN(parsed)) {
+        seq = parsed + 1;
+      }
+    }
+
+    return `${searchPrefix}${seq.toString().padStart(4, '0')}`;
+  }
 }

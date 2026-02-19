@@ -26,8 +26,8 @@ export class CreateAdjustmentStockDto {
   type: AdjustmentStockType;
 
   @ApiPropertyOptional({ 
-    example: 'ADJ-2025-001', 
-    description: 'Adjustment code',
+    example: 'ADJ-2025-0001', 
+    description: 'Adjustment code (auto-generated if not provided)',
     maxLength: 255 
   })
   @IsOptional()

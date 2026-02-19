@@ -34,15 +34,23 @@ export class AdjustmentStockService {
       throw new BadRequestException('Quantity is required');
     }
 
-    // Check if code already exists (if provided)
-    if (code) {
+    // Generate code if not provided
+    let finalCode: string;
+    if (!code) {
+      finalCode = await this.repository.getNextCode();
+    } else {
+      // Check if code already exists (if provided)
       const existing = await this.repository.findByCode(code);
       if (existing) {
         throw new ConflictException(`Adjustment stock with code ${code} already exists`);
       }
+      finalCode = code;
     }
 
-    return await this.repository.create(createAdjustmentStockDto);
+    return await this.repository.create({
+      ...createAdjustmentStockDto,
+      code: finalCode,
+    });
   }
 
   async findAll(): Promise<AdjustmentStock[]> {
@@ -136,5 +144,14 @@ export class AdjustmentStockService {
 
     await this.findOne(id);
     await this.repository.remove(id);
+  }
+
+  /**
+   * Generate unique adjustment stock code
+   * Format: ADJ-YYYY-XXXX
+   * Example: ADJ-2025-0001
+   */
+  async generateCode(year?: number): Promise<string> {
+    return await this.repository.getNextCode(year);
   }
 }
