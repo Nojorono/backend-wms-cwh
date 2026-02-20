@@ -45,6 +45,7 @@ import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
 import { ApprovalModule } from './approval/approval.module';
 import { UsersActivityModule } from './users-activity/users-activity.module';
 import { PalletUpdateModule } from './pallet-update/pallet-update.module';
+import { AdjustmentStockModule } from './adjustment-stock/adjustment-stock.module';
 import { LoggerModule } from './infrastructure/modules/logger.module';
 
 @Module({
@@ -98,6 +99,7 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     ApprovalModule,
     UsersActivityModule,
     PalletUpdateModule,
+    AdjustmentStockModule,
   ],
   providers: [
     {

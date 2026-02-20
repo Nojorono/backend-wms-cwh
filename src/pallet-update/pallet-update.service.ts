@@ -23,6 +23,7 @@ import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 import { PalletUpdateResponseDto } from './dto/pallet-update-response.dto';
 import { CreatePalletUpdateScanDto } from './dto/create-pallet-update-scan.dto';
+import { CreatePalletUpdateItemDto } from './dto/create-pallet-update-item.dto';
 import { UpdatePalletUpdateScanDto } from './dto/update-pallet-update-scan.dto';
 import { PalletUpdateScanResponseDto } from './dto/pallet-update-scan-response.dto';
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
@@ -51,6 +52,32 @@ export class PalletUpdateService {
       }
       return await manager.getRepository(PalletUpdate).findOne({ where: { id: palletUpdateId } });
     });
+  }
+
+  // validation in scan and pallet item exist not completed
+  async validateScanAndPalletItem(scans: PalletUpdateScan[], items: PalletUpdateItem[]): Promise<void> {
+    for (const scan of scans) {
+      const result = await this.repository.findByPalletIdScan(scan.palletId);
+      const pallet = await this.masterPalletService.findOne(scan.palletId);
+      if (result.length > 0) {
+        throw new BadRequestException(`Scan Pallet ${pallet?.pallet_code} PENDING in PALLET UPDATE ${result[0].palletUpdate?.updateNumber}`);
+      }
+    }
+    for (const item of items) {
+      const result = await this.repository.findByPalletIdItem(item.palletId);
+      const pallet = await this.masterPalletService.findOne(item.palletId);
+      if (result.length > 0) {
+        throw new BadRequestException(`Item Pallet ${pallet?.pallet_code} PENDING in PALLET UPDATE ${result[0].palletUpdate?.updateNumber}`);
+      }
+    }
+  }
+
+  async deletePalletUpdate(id: string): Promise<void> {
+    const palletUpdate = await this.repository.findOne(id);
+    if (!palletUpdate) {
+      throw new NotFoundException(`Pallet update with ID ${id} not found`);
+    }
+    await this.repository.deletePalletUpdate(id);
   }
 
   /**
@@ -394,7 +421,7 @@ export class PalletUpdateService {
       if (mergeItemsProcessed > 0 || destinationPalletsProcessed > 0) {
         this.logger.warn(
           `Rolling back merge approval for pallet update ${palletUpdateId}: ` +
-            `${mergeItemsProcessed} source item(s) and ${destinationPalletsProcessed} destination pallet(s) had been updated`,
+          `${mergeItemsProcessed} source item(s) and ${destinationPalletsProcessed} destination pallet(s) had been updated`,
         );
         try {
           for (let i = mergeItemsProcessed - 1; i >= 0; i--) {
@@ -456,6 +483,22 @@ export class PalletUpdateService {
       palletId: createPalletUpdateDto.scan.palletId ?? '',
       productionDate: createPalletUpdateDto.scan.productionDate ?? '',
     };
+
+    // Validate that pallets are not already in pending state
+    const itemsToValidate: PalletUpdateItem[] = [];
+    const scansToValidate: PalletUpdateScan[] = [];
+
+    if (itemBeforeUpdate.palletId) {
+      itemsToValidate.push({ palletId: itemBeforeUpdate.palletId } as PalletUpdateItem);
+    }
+
+    if (scanAfterUpdate.palletId) {
+      scansToValidate.push({ palletId: scanAfterUpdate.palletId } as PalletUpdateScan);
+    }
+
+    if (itemsToValidate.length > 0 || scansToValidate.length > 0) {
+      await this.validateScanAndPalletItem(scansToValidate, itemsToValidate);
+    }
 
     const palletUpdate = await this.repository.create(createPalletUpdateDto);
     // // if update productionCode, update the productionDate of the scan
@@ -524,6 +567,33 @@ export class PalletUpdateService {
       }
     }
 
+    // Normalize items and scans before validation
+    const itemsToValidate: CreatePalletUpdateItemDto[] =
+      ('items' in createPalletUpdateDto && Array.isArray(createPalletUpdateDto.items) && createPalletUpdateDto.items.length > 0)
+        ? createPalletUpdateDto.items
+        : ('item' in createPalletUpdateDto && createPalletUpdateDto.item)
+          ? [createPalletUpdateDto.item]
+          : [];
+
+    const scansToValidate: CreatePalletUpdateScanDto[] =
+      ('scans' in createPalletUpdateDto && Array.isArray(createPalletUpdateDto.scans) && createPalletUpdateDto.scans.length > 0)
+        ? createPalletUpdateDto.scans
+        : [];
+
+    // Validate that pallets are not already in pending state
+    if (itemsToValidate.length > 0 || scansToValidate.length > 0) {
+      // Convert DTOs to entity-like objects for validation (only need palletId)
+      const itemsForValidation = itemsToValidate
+        .filter(item => item.palletId)
+        .map(item => ({ palletId: item.palletId } as PalletUpdateItem));
+
+      const scansForValidation = scansToValidate
+        .filter(scan => scan.palletId)
+        .map(scan => ({ palletId: scan.palletId } as PalletUpdateScan));
+
+      await this.validateScanAndPalletItem(scansForValidation, itemsForValidation);
+    }
+
     return await this.dataSource.transaction(async (manager) => {
       const { items, item, assigned, ...palletUpdatePayload } =
         createPalletUpdateDto as CreateMergePalletDto & { item?: unknown };
@@ -535,9 +605,7 @@ export class PalletUpdateService {
       const savedPalletUpdate = await manager.save(PalletUpdate, palletUpdate);
 
       // Normalize items: split uses `item` (singular), merge uses `items` (array)
-      const itemsToCreate =
-        ('items' in createPalletUpdateDto && createPalletUpdateDto.items?.length) ? createPalletUpdateDto.items!
-          : ('item' in createPalletUpdateDto && createPalletUpdateDto.item) ? [createPalletUpdateDto.item] : [];
+      const itemsToCreate = itemsToValidate;
 
       if (itemsToCreate.length > 0) {
         const items = itemsToCreate.map((item) =>
