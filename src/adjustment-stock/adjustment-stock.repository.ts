@@ -1,56 +1,91 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { AdjustmentStock } from '../core/domain/entities/adjustment_stock.entity';
+import { AdjustmentStockItem } from '../core/domain/entities/adjustment_stock_item.entity';
 import { CreateAdjustmentStockDto } from './dto/create-adjustment-stock.dto';
 import { UpdateAdjustmentStockDto } from './dto/update-adjustment-stock.dto';
 import { AdjustmentStockPaginationDto } from './dto/adjustment-stock-pagination.dto';
+
+const ADJUSTMENT_STOCK_ITEM_RELATIONS = [
+  'adjustmentStockItems',
+  'adjustmentStockItems.warehouseSub',
+  'adjustmentStockItems.warehouseBin',
+  'adjustmentStockItems.pallet',
+  'adjustmentStockItems.item',
+];
 
 @Injectable()
 export class AdjustmentStockRepository {
   constructor(
     @InjectRepository(AdjustmentStock)
     private readonly repository: Repository<AdjustmentStock>,
+    @InjectRepository(AdjustmentStockItem)
+    private readonly itemRepository: Repository<AdjustmentStockItem>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createAdjustmentStockDto: CreateAdjustmentStockDto): Promise<AdjustmentStock> {
-    const adjustmentStock = this.repository.create(createAdjustmentStockDto);
-    return await this.repository.save(adjustmentStock);
+    const { items, ...header } = createAdjustmentStockDto;
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const adjustmentStock = this.repository.create(header);
+      const saved = await queryRunner.manager.save(AdjustmentStock, adjustmentStock);
+      const itemEntities = items.map((it) =>
+        this.itemRepository.create({
+          ...it,
+          adjustment_stock_id: saved.id,
+        }),
+      );
+      await queryRunner.manager.save(AdjustmentStockItem, itemEntities);
+      await queryRunner.commitTransaction();
+      return await this.findOne(saved.id) as AdjustmentStock;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async findAll(): Promise<AdjustmentStock[]> {
     return await this.repository.find({
-      relations: ['pallet', 'item'],
+      relations: ADJUSTMENT_STOCK_ITEM_RELATIONS,
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findAllWithFilters(filters: AdjustmentStockPaginationDto): Promise<{ 
-    data: AdjustmentStock[]; 
-    total: number; 
-    page: number; 
-    limit: number 
+  async findAllWithFilters(filters: AdjustmentStockPaginationDto): Promise<{
+    data: AdjustmentStock[];
+    total: number;
+    page: number;
+    limit: number;
   }> {
-    const { 
-      search, 
-      type, 
-      status, 
-      is_inventory, 
-      pallet_id, 
+    const {
+      search,
+      type,
+      status,
+      is_inventory,
+      pallet_id,
       item_id,
-      page = 1, 
-      limit = 10, 
-      sortBy = 'createdAt', 
-      sortOrder = 'desc' 
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = filters;
 
     const queryBuilder = this.repository
       .createQueryBuilder('adjustmentStock')
-      .leftJoinAndSelect('adjustmentStock.pallet', 'pallet')
-      .leftJoinAndSelect('adjustmentStock.item', 'item');
+      .leftJoinAndSelect('adjustmentStock.adjustmentStockItems', 'asi')
+      .leftJoinAndSelect('asi.warehouseSub', 'warehouseSub')
+      .leftJoinAndSelect('asi.warehouseBin', 'warehouseBin')
+      .leftJoinAndSelect('asi.pallet', 'pallet')
+      .leftJoinAndSelect('asi.item', 'item');
 
     if (search) {
-      queryBuilder.where(
+      queryBuilder.andWhere(
         '(adjustmentStock.code ILIKE :search OR adjustmentStock.document ILIKE :search OR adjustmentStock.notes ILIKE :search)',
         { search: `%${search}%` },
       );
@@ -65,15 +100,17 @@ export class AdjustmentStockRepository {
     }
 
     if (is_inventory) {
-      queryBuilder.andWhere('adjustmentStock.is_inventory = :is_inventory', { is_inventory });
+      queryBuilder.andWhere('adjustmentStock.is_inventory = :is_inventory', {
+        is_inventory,
+      });
     }
 
     if (pallet_id) {
-      queryBuilder.andWhere('adjustmentStock.pallet_id = :pallet_id', { pallet_id });
+      queryBuilder.andWhere('asi.pallet_id = :pallet_id', { pallet_id });
     }
 
     if (item_id) {
-      queryBuilder.andWhere('adjustmentStock.item_id = :item_id', { item_id });
+      queryBuilder.andWhere('asi.item_id = :item_id', { item_id });
     }
 
     queryBuilder
@@ -92,57 +129,91 @@ export class AdjustmentStockRepository {
   }
 
   async findOne(id: string): Promise<AdjustmentStock | null> {
-    const adjustmentStock = await this.repository.findOne({ 
+    return await this.repository.findOne({
       where: { id },
-      relations: ['pallet', 'item'],
+      relations: ADJUSTMENT_STOCK_ITEM_RELATIONS,
     });
-    if (!adjustmentStock) {
-      return null;
-    }
-    return adjustmentStock;
   }
 
   async findByPalletId(palletId: string): Promise<AdjustmentStock[]> {
-    return await this.repository.find({
-      where: { pallet_id: palletId },
-      relations: ['pallet', 'item'],
-      order: { createdAt: 'DESC' },
-    });
+    return await this.repository
+      .createQueryBuilder('adjustmentStock')
+      .leftJoinAndSelect('adjustmentStock.adjustmentStockItems', 'asi')
+      .leftJoinAndSelect('asi.warehouseSub', 'warehouseSub')
+      .leftJoinAndSelect('asi.warehouseBin', 'warehouseBin')
+      .leftJoinAndSelect('asi.pallet', 'pallet')
+      .leftJoinAndSelect('asi.item', 'item')
+      .where('asi.pallet_id = :palletId', { palletId })
+      .orderBy('adjustmentStock.createdAt', 'DESC')
+      .getMany();
   }
 
   async findByItemId(itemId: string): Promise<AdjustmentStock[]> {
-    return await this.repository.find({
-      where: { item_id: itemId },
-      relations: ['pallet', 'item'],
-      order: { createdAt: 'DESC' },
-    });
+    return await this.repository
+      .createQueryBuilder('adjustmentStock')
+      .leftJoinAndSelect('adjustmentStock.adjustmentStockItems', 'asi')
+      .leftJoinAndSelect('asi.warehouseSub', 'warehouseSub')
+      .leftJoinAndSelect('asi.warehouseBin', 'warehouseBin')
+      .leftJoinAndSelect('asi.pallet', 'pallet')
+      .leftJoinAndSelect('asi.item', 'item')
+      .where('asi.item_id = :itemId', { itemId })
+      .orderBy('adjustmentStock.createdAt', 'DESC')
+      .getMany();
   }
 
   async findByCode(code: string): Promise<AdjustmentStock | null> {
-    const adjustmentStock = await this.repository.findOne({ 
+    return await this.repository.findOne({
       where: { code },
-      relations: ['pallet', 'item'],
+      relations: ADJUSTMENT_STOCK_ITEM_RELATIONS,
     });
-    if (!adjustmentStock) {
-      return null;
-    }
-    return adjustmentStock;
   }
 
-  async update(id: string, updateAdjustmentStockDto: UpdateAdjustmentStockDto): Promise<AdjustmentStock | null> {
-    const adjustmentStock = await this.findOne(id);
-    if (!adjustmentStock) {
+  async update(
+    id: string,
+    updateAdjustmentStockDto: UpdateAdjustmentStockDto,
+  ): Promise<AdjustmentStock | null> {
+    const existing = await this.findOne(id);
+    if (!existing) {
       throw new NotFoundException('Adjustment stock not found');
     }
-    await this.repository.update(id, updateAdjustmentStockDto);
-    return await this.findOne(id);
+    const { items, ...header } = updateAdjustmentStockDto;
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      if (Object.keys(header).length > 0) {
+        await queryRunner.manager.update(AdjustmentStock, id, header);
+      }
+      if (items !== undefined) {
+        await queryRunner.manager.softDelete(AdjustmentStockItem, {
+          adjustment_stock_id: id,
+        });
+        if (items.length > 0) {
+          const itemEntities = items.map((it) =>
+            this.itemRepository.create({
+              ...it,
+              adjustment_stock_id: id,
+            }),
+          );
+          await queryRunner.manager.save(AdjustmentStockItem, itemEntities);
+        }
+      }
+      await queryRunner.commitTransaction();
+      return await this.findOne(id);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async remove(id: string): Promise<void> {
-    const adjustmentStock = await this.findOne(id);
-    if (!adjustmentStock) {
+    const existing = await this.findOne(id);
+    if (!existing) {
       throw new NotFoundException('Adjustment stock not found');
     }
+    await this.itemRepository.softDelete({ adjustment_stock_id: id });
     await this.repository.softDelete(id);
   }
 
@@ -157,7 +228,6 @@ export class AdjustmentStockRepository {
     const prefix = 'ADJ';
     const searchPrefix = `${prefix}-${yearStr}-`;
 
-    // Find the latest code for this year
     const row = await this.repository
       .createQueryBuilder('adjustmentStock')
       .select('adjustmentStock.code', 'code')

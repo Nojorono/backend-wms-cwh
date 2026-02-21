@@ -20,18 +20,19 @@ export class AdjustmentStockService {
   ) {}
 
   async create(createAdjustmentStockDto: CreateAdjustmentStockDto): Promise<AdjustmentStock> {
-    const { code, pallet_id, item_id, quantity } = createAdjustmentStockDto;
+    const { code, items } = createAdjustmentStockDto;
 
-    if (!pallet_id) {
-      throw new BadRequestException('Pallet ID is required');
+    if (!items?.length) {
+      throw new BadRequestException('At least one item is required');
     }
 
-    if (!item_id) {
-      throw new BadRequestException('Item ID is required');
-    }
-
-    if (quantity === undefined || quantity === null) {
-      throw new BadRequestException('Quantity is required');
+    for (const item of items) {
+      if (!item.item_id) {
+        throw new BadRequestException('Item ID is required for each line item');
+      }
+      if (item.quantity === undefined || item.quantity === null) {
+        throw new BadRequestException('Quantity is required for each line item');
+      }
     }
 
     // Generate code if not provided
@@ -39,7 +40,6 @@ export class AdjustmentStockService {
     if (!code) {
       finalCode = await this.repository.getNextCode();
     } else {
-      // Check if code already exists (if provided)
       const existing = await this.repository.findByCode(code);
       if (existing) {
         throw new ConflictException(`Adjustment stock with code ${code} already exists`);
