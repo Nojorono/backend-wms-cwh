@@ -700,6 +700,14 @@ export class PalletUpdateService {
         palletUpdateId: item.palletUpdateId,
         sequence: item.sequence,
         palletId: item.palletId,
+        pallet: item.pallet
+          ? {
+              id: item.pallet.id,
+              pallet_code: item.pallet.pallet_code,
+              uom: item.pallet.uom,
+              currentQuantity: item.pallet.currentQuantity,
+            }
+          : undefined,
         itemId: item.itemId,
         quantity: item.quantity,
         uom: item.uom,
@@ -714,6 +722,14 @@ export class PalletUpdateService {
         scanDate: scan.scanDate,
         scanByUserId: scan.scanByUserId,
         palletId: scan.palletId,
+        pallet: scan.pallet
+          ? {
+              id: scan.pallet.id,
+              pallet_code: scan.pallet.pallet_code,
+              uom: scan.pallet.uom,
+              currentQuantity: scan.pallet.currentQuantity,
+            }
+          : undefined,
         itemId: scan.itemId,
         quantity: scan.quantity,
         uom: scan.uom,

@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PalletPopulatedDto } from './pallet-populated.dto';
 
 export class PalletUpdateScanResponseDto {
   @ApiProperty({ example: 'uuid-scan-123' })
@@ -18,6 +19,9 @@ export class PalletUpdateScanResponseDto {
 
   @ApiPropertyOptional({ example: 'uuid-pallet-123' })
   palletId?: string;
+
+  @ApiPropertyOptional({ description: 'Populated pallet details', type: PalletPopulatedDto })
+  pallet?: PalletPopulatedDto;
 
   @ApiPropertyOptional({ example: 'uuid-item-123' })
   itemId?: string;
