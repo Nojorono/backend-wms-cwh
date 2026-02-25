@@ -31,7 +31,7 @@ export class PalletUpdateRepository {
     }
     return await this.repository.find({
       where,
-      relations: ['items', 'scans', 'assigned', 'initiatedByUser', 'inspectionByUser'],
+      relations: ['items', 'items.pallet', 'scans', 'scans.pallet', 'assigned', 'initiatedByUser', 'inspectionByUser'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -39,14 +39,14 @@ export class PalletUpdateRepository {
   async findOne(id: string): Promise<PalletUpdate | null> {
     return await this.repository.findOne({
       where: { id },
-      relations: ['items', 'scans', 'assigned', 'initiatedByUser', 'inspectionByUser'],
+      relations: ['items', 'items.pallet', 'scans', 'scans.pallet', 'assigned', 'initiatedByUser', 'inspectionByUser'],
     });
   }
 
   async findOneByUpdateNumber(updateNumber: string): Promise<PalletUpdate | null> {
     return await this.repository.findOne({
       where: { updateNumber },
-      relations: ['items', 'scans', 'assigned', 'initiatedByUser', 'inspectionByUser'],
+      relations: ['items', 'items.pallet', 'scans', 'scans.pallet', 'assigned', 'initiatedByUser', 'inspectionByUser'],
     });
   }
 
@@ -74,7 +74,9 @@ export class PalletUpdateRepository {
     const qb = this.repository
       .createQueryBuilder('palletUpdate')
       .leftJoinAndSelect('palletUpdate.items', 'items')
+      .leftJoinAndSelect('items.pallet', 'itemsPallet')
       .leftJoinAndSelect('palletUpdate.scans', 'scans')
+      .leftJoinAndSelect('scans.pallet', 'scansPallet')
       .leftJoinAndSelect('palletUpdate.assigned', 'assigned')
       .leftJoinAndSelect('palletUpdate.initiatedByUser', 'initiatedByUser')
       .leftJoinAndSelect('palletUpdate.inspectionByUser', 'inspectionByUser');

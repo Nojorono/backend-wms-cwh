@@ -1,7 +1,6 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
-import { MasterItem } from './master-item.entity';
-import { MasterPallet } from './master-pallet.entity';
+import { AdjustmentStockItem } from './adjustment_stock_item.entity';
 
 export enum AdjustmentStockType {
     PHYSICAL_FIT = 'PHYSICAL_FIT',
@@ -36,26 +35,6 @@ export class AdjustmentStock extends BaseEntity {
     code: string;
 
     @Column({ nullable: true })
-    pallet_id: string;
-
-    @ManyToOne(() => MasterPallet, (pallet) => pallet.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'pallet_id' })
-    pallet: MasterPallet;
-
-    @Column({ nullable: true })
-    item_id: string;
-
-    @ManyToOne(() => MasterItem, (item) => item.id, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'item_id' })
-    item: MasterItem;
-
-    @Column({ nullable: true })
-    quantity: number;
-
-    @Column({ nullable: true })
-    uom: string;
-
-    @Column({ nullable: true })
     notes: string;
 
     @Column({ nullable: true })
@@ -63,4 +42,7 @@ export class AdjustmentStock extends BaseEntity {
 
     @Column({ nullable: true })
     is_inventory: AdjustmentStockIsInventory;
+
+    @OneToMany(() => AdjustmentStockItem, (adjustmentStockItem) => adjustmentStockItem.adjustmentStock)
+    adjustmentStockItems: AdjustmentStockItem[];
 }
