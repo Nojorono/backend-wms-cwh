@@ -20,11 +20,9 @@ export class CreateAdjustmentStockDto {
   @ApiPropertyOptional({
     example: 'DOC-2025-001',
     description: 'Document reference number',
-    maxLength: 255,
   })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
   document?: string;
 
   @ApiProperty({

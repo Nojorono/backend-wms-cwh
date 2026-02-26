@@ -25,7 +25,7 @@ export enum AdjustmentStockIsInventory {
 @Entity('adjustment_stock')
 export class AdjustmentStock extends BaseEntity {
 
-    @Column({ nullable: true })
+    @Column({ type: 'text', nullable: true })
     document: string;
 
     @Column({ nullable: true })
