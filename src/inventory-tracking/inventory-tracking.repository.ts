@@ -441,7 +441,6 @@ export class InventoryTrackingRepository {
               AND COALESCE(pth2.uom, '') = COALESCE(pth.uom, '')
               AND (pth2.week_number = pth.week_number OR (pth2.week_number IS NULL AND pth.week_number IS NULL))
               AND pth2.deleted_at IS NULL
-              AND pth2.status_inventory = 'READY'
           )
       ),
       item_inventory AS (
