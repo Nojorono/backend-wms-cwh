@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
 import { AssignedGate, AssignedGateStatus } from '../core/domain/entities/assigned-gate.entity';
 import { AssignedGateUser } from '../core/domain/entities/assigned-gate-user.entity';
 import { AssignedGatePallet } from '../core/domain/entities/assigned-gate-pallet.entity';
@@ -37,6 +38,7 @@ export class AssignedGateService {
     private readonly masterWarehouseSubService: MasterWarehouseSubService,
     private readonly outboundDoService: OutboundDoService,
     private readonly transactionPickingService: TransactionPickingService,
+    private readonly dataSource: DataSource,
   ) { }
 
   // AssignedGate CRUD operations
@@ -657,60 +659,95 @@ export class AssignedGateService {
   }
 
   async approve(id: string): Promise<AssignedGate> {
-    const assignedGate = await this.findOne(id);
-    if (!assignedGate) {
-      throw new NotFoundException('Assigned gate not found');
-    }
+    try {
+      return await this.dataSource.transaction(async (manager: EntityManager) => {
+        const assignedGate = await this.findOne(id);
+        if (!assignedGate) {
+          throw new NotFoundException('Assigned gate not found');
+        }
 
-    if (assignedGate.status !== AssignedGateStatus.DONE) {
-      throw new BadRequestException('Assigned gate is not done');
-    }
+        if (assignedGate.status !== AssignedGateStatus.DONE) {
+          throw new BadRequestException('Assigned gate is not done');
+        }
 
-    // find all assigned gate load
-    const assignedGateLoads = await this.assignedGateLoadRepo.findAllByAssignedGate(id);
-    for (const assignedGateLoad of assignedGateLoads) {
-      // clear memo_id in pallet
-      await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: null });
-      // update pallet quantity
-      await this.masterPalletService.updateQuantity(assignedGateLoad.pallet_id, {
-        item_id: assignedGateLoad.item_id,
-        quantity: assignedGateLoad.quantity_loaded,
-        operation_type: QuantityOperationType.REMOVE,
-        outbound_do_id: assignedGateLoad.outbound_memo_id,
-        notes: `Loaded quantity ${assignedGateLoad.quantity_loaded} to gate ${assignedGate.gate.name || assignedGate.gate.code}`,
-        uom: assignedGateLoad.uom,
-        week_number: assignedGateLoad.week_number,
-        production_date: assignedGateLoad.production_date,
-        reference_id: assignedGateLoad.id,
-        reference_type: 'ASSIGNED_GATE_LOAD',
-        status_inventory: StatusInventory.READY,
+        // find all assigned gate load
+        const assignedGateLoads = await this.assignedGateLoadRepo.findAllByAssignedGate(id);
+        for (const assignedGateLoad of assignedGateLoads) {
+          // clear memo_id in pallet
+          await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: null });
+
+          // update pallet quantity within the same DB transaction
+          await this.masterPalletService.updateQuantity(
+            assignedGateLoad.pallet_id,
+            {
+              item_id: assignedGateLoad.item_id,
+              quantity: assignedGateLoad.quantity_loaded,
+              operation_type: QuantityOperationType.REMOVE,
+              outbound_do_id: assignedGateLoad.outbound_memo_id,
+              notes: `Loaded quantity ${assignedGateLoad.quantity_loaded} to gate ${
+                assignedGate.gate.name || assignedGate.gate.code
+              }`,
+              uom: assignedGateLoad.uom,
+              week_number: assignedGateLoad.week_number,
+              production_date: assignedGateLoad.production_date,
+              reference_id: assignedGateLoad.id,
+              reference_type: 'ASSIGNED_GATE_LOAD',
+              status_inventory: StatusInventory.READY,
+            },
+            manager,
+          );
+
+          // update inventory tracking
+          await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
+            inventory_status: 'IN_INVENTORY',
+            progression_status: ProgressionStatus.COMPLETED,
+            inventory_note: `Loaded is done`,
+            inventory_date: new Date(),
+          });
+
+          // update assigned gate load status to approved
+          await this.assignedGateLoadRepo.update(assignedGateLoad.id, {
+            status: AssignedGateLoadStatus.APPROVED,
+          });
+        }
+
+        const updated = await this.assignedGateRepo.update(id, {
+          status: AssignedGateStatus.APPROVED,
+        });
+
+        // update outbound do status to approved
+        await this.outboundDoService.updateStatus(
+          assignedGate.outbound_do_id,
+          OutboundDoStatus.APPROVED_LOAD,
+        );
+
+        // update transaction picking status to approved
+        const transactionPickings = await this.transactionPickingService.findByDoId(
+          assignedGate.outbound_do_id,
+        );
+        for (const transactionPicking of transactionPickings) {
+          if (transactionPicking.status === Status.PENDING) {
+            await this.transactionPickingService.updateStatus(
+              transactionPicking.id,
+              Status.COMPLETED,
+            );
+          }
+        }
+
+        if (!updated) {
+          throw new NotFoundException('Assigned gate not found');
+        }
+
+        return updated;
       });
-
-      // update inventory tracking
-      await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
-        inventory_status: 'IN_INVENTORY',
-        progression_status: ProgressionStatus.COMPLETED,
-        inventory_note: `Loaded is done`,
-        inventory_date: new Date(),
-      });
-      // update assigned gate load status to approved
-      await this.assignedGateLoadRepo.update(assignedGateLoad.id, { status: AssignedGateLoadStatus.APPROVED });
-    }
-
-    const updated = await this.assignedGateRepo.update(id, { status: AssignedGateStatus.APPROVED });
-    // update outbound do status to approved
-    await this.outboundDoService.updateStatus(assignedGate.outbound_do_id, OutboundDoStatus.APPROVED_LOAD);
-    // update transaction picking status to approved
-    const transactionPickings = await this.transactionPickingService.findByDoId(assignedGate.outbound_do_id);
-    for (const transactionPicking of transactionPickings) {
-      if (transactionPicking.status === Status.PENDING) {
-        await this.transactionPickingService.updateStatus(transactionPicking.id, Status.COMPLETED);
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
       }
+
+      console.error(`Failed to approve assigned gate ${id}:`, error);
+      throw new BadRequestException('Failed to approve assigned gate');
     }
-    if (!updated) {
-      throw new NotFoundException('Assigned gate not found');
-    }
-    return updated;
   }
 }
 

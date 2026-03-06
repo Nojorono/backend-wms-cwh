@@ -127,236 +127,221 @@ export class MasterPalletService {
   async updateQuantity(
     palletId: string,
     updateQuantityDto: UpdatePalletQuantityDto,
-    existingManager?: EntityManager,
+    _existingManager?: EntityManager,
   ): Promise<MasterPallet> {
-    const run = async (transactionalEntityManager: EntityManager) => {
-      try {
-        // Lock the pallet row for update to prevent concurrent modifications
-        const pallet = await transactionalEntityManager.findOne(MasterPallet, {
-          where: { id: palletId },
-          lock: { mode: 'pessimistic_write' },
+    try {
+      const pallet = await this.repository.findOne(palletId);
+      if (!pallet) {
+        throw new NotFoundException(`Pallet with ID ${palletId} not found`);
+      }
+
+      if (!pallet.capacity || pallet.capacity <= 0) {
+        throw new BadRequestException('Pallet capacity must be set and greater than 0');
+      }
+
+      const currentItemQuantity = await this.getItemQuantityOnPallet(
+        palletId,
+        updateQuantityDto.item_id,
+        updateQuantityDto.uom,
+      );
+      const totalPalletQuantity = pallet.currentQuantity ?? 0;
+
+      // Validate UOM consistency if there's existing quantity for this item
+      if (currentItemQuantity > 0 && updateQuantityDto.uom) {
+        const existingUomRecord = await this.transactionHistoryRepository.findOne({
+          where: {
+            pallet_id: palletId,
+            item_id: updateQuantityDto.item_id,
+          },
+          order: { createdAt: 'DESC' },
         });
 
-        if (!pallet) {
-          throw new NotFoundException(`Pallet with ID ${palletId} not found`);
+        if (
+          existingUomRecord &&
+          existingUomRecord.uom &&
+          existingUomRecord.uom !== updateQuantityDto.uom
+        ) {
+          throw new BadRequestException(
+            `UOM mismatch. Existing UOM for this item is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`,
+          );
         }
+      }
 
-        if (!pallet.capacity || pallet.capacity <= 0) {
-          throw new BadRequestException('Pallet capacity must be set and greater than 0');
+      if (updateQuantityDto.operation_type === QuantityOperationType.ADD) {
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Quantity to add must be non-negative');
         }
-
-        const currentItemQuantity = await this.getItemQuantityOnPallet(
-          palletId,
-          updateQuantityDto.item_id,
-          updateQuantityDto.uom,
-        );
-        const totalPalletQuantity = pallet.currentQuantity ?? 0;
-
-        // Validate UOM consistency if there's existing quantity for this item
-        if (currentItemQuantity > 0 && updateQuantityDto.uom) {
-          const existingUomRecord = await this.transactionHistoryRepository.findOne({
-            where: {
-              pallet_id: palletId,
-              item_id: updateQuantityDto.item_id,
-            },
-            order: { createdAt: 'DESC' },
-          });
-
-          if (
-            existingUomRecord &&
-            existingUomRecord.uom &&
-            existingUomRecord.uom !== updateQuantityDto.uom
-          ) {
-            throw new BadRequestException(
-              `UOM mismatch. Existing UOM for this item is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`,
-            );
-          }
+      }
+      if (updateQuantityDto.operation_type === QuantityOperationType.PICK) {
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Quantity to pick must be non-negative');
         }
-
-        if (updateQuantityDto.operation_type === QuantityOperationType.ADD) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Quantity to add must be non-negative');
-          }
+        if (updateQuantityDto.quantity > currentItemQuantity) {
+          throw new BadRequestException(
+            `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+          );
         }
-        if (updateQuantityDto.operation_type === QuantityOperationType.PICK) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Quantity to pick must be non-negative');
-          }
+      }
+      if (updateQuantityDto.operation_type === QuantityOperationType.REMOVE) {
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Quantity to remove must be non-negative');
+        }
+        if (updateQuantityDto.quantity > currentItemQuantity) {
+          throw new BadRequestException(
+            `Cannot remove ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+          );
+        }
+      }
+      if (updateQuantityDto.operation_type === QuantityOperationType.ADJUST) {
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Adjusted item quantity cannot be negative');
+        }
+        const projectedTotal =
+          totalPalletQuantity - currentItemQuantity + updateQuantityDto.quantity;
+        if (projectedTotal > pallet.capacity) {
+          throw new BadRequestException(
+            `Adjusted total quantity ${projectedTotal} exceeds pallet capacity ${pallet.capacity}`,
+          );
+        }
+      }
+
+      let newItemQuantity: number;
+      let quantityChange: number;
+
+      switch (updateQuantityDto.operation_type) {
+        case QuantityOperationType.MERGE:
+          newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
+          quantityChange = updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.SPLIT:
+          newItemQuantity = currentItemQuantity - updateQuantityDto.quantity;
+          quantityChange = -updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.ADD:
+          newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
+          quantityChange = updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.PICK:
+          newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
+          quantityChange = -updateQuantityDto.quantity;
           if (updateQuantityDto.quantity > currentItemQuantity) {
             throw new BadRequestException(
               `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
             );
           }
-        }
-        if (updateQuantityDto.operation_type === QuantityOperationType.REMOVE) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Quantity to remove must be non-negative');
-          }
-          if (updateQuantityDto.quantity > currentItemQuantity) {
-            throw new BadRequestException(
-              `Cannot remove ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
-            );
-          }
-        }
-        if (updateQuantityDto.operation_type === QuantityOperationType.ADJUST) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Adjusted item quantity cannot be negative');
-          }
-          const projectedTotal = totalPalletQuantity - currentItemQuantity + updateQuantityDto.quantity;
-          if (projectedTotal > pallet.capacity) {
-            throw new BadRequestException(
-              `Adjusted total quantity ${projectedTotal} exceeds pallet capacity ${pallet.capacity}`,
-            );
-          }
-        }
-        let newItemQuantity: number;
-        let quantityChange: number;
-
-        switch (updateQuantityDto.operation_type) {
-          case QuantityOperationType.MERGE:
-            newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
-            quantityChange = updateQuantityDto.quantity;
-            break;
-          case QuantityOperationType.SPLIT:
-            newItemQuantity = currentItemQuantity - updateQuantityDto.quantity;
-            quantityChange = -updateQuantityDto.quantity;
-            break;
-          case QuantityOperationType.ADD:
-            newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
-            quantityChange = updateQuantityDto.quantity;
-            break;
-          case QuantityOperationType.PICK:
-            newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
-            quantityChange = -updateQuantityDto.quantity;
-            if (updateQuantityDto.quantity > currentItemQuantity) {
-              throw new BadRequestException(
-                `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
-              );
-            }
-            break;
-          case QuantityOperationType.REMOVE:
-            newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
-            quantityChange = -updateQuantityDto.quantity;
-            break;
-          case QuantityOperationType.ADJUST:
-            newItemQuantity = updateQuantityDto.quantity;
-            quantityChange = newItemQuantity - currentItemQuantity;
-            break;
-          case QuantityOperationType.RESET:
-            newItemQuantity = 0;
-            quantityChange = -currentItemQuantity;
-            break;
-          default:
-            throw new BadRequestException('Invalid operation type');
-        }
-
-        if (newItemQuantity < 0) {
-          throw new BadRequestException('Item quantity cannot be negative');
-        }
-
-        const newTotalQuantity = totalPalletQuantity - currentItemQuantity + newItemQuantity;
-
-        if (newTotalQuantity > pallet.capacity) {
-          throw new BadRequestException(
-            `Total pallet quantity ${newTotalQuantity} exceeds pallet capacity ${pallet.capacity}`,
-          );
-        }
-
-        let updatedWeekNumber = pallet.currentWeekNumber ?? 0;
-
-        const hasWeekInput =
-          updateQuantityDto.week_number !== undefined && updateQuantityDto.week_number !== null;
-
-        if (newTotalQuantity === 0) {
-          updatedWeekNumber = 0;
-        } else if (hasWeekInput) {
-          updatedWeekNumber = updateQuantityDto.week_number as number;
-        }
-
-        // Update pallet using transactional entity manager
-        await transactionalEntityManager.update(MasterPallet, palletId, {
-          currentQuantity: newTotalQuantity,
-          isFull: newTotalQuantity >= pallet.capacity,
-          currentWeekNumber: updatedWeekNumber,
-        });
-
-        if (updateQuantityDto.reference_type === 'PALLET_UPDATE_UOM') {
-          await transactionalEntityManager.update(MasterPallet, palletId, {
-            uom: updateQuantityDto.uom,
-          });
-        }
-
-        const productionDateStr =
-          typeof updateQuantityDto.production_date === 'string'
-            ? updateQuantityDto.production_date
-            : updateQuantityDto.production_date?.toISOString();
-
-        // Create quantity history using transactional entity manager
-        const historyEntity = transactionalEntityManager.create(PalletTransactionHistory, {
-          pallet_id: palletId,
-          item_id: updateQuantityDto.item_id,
-          previous_quantity: currentItemQuantity,
-          quantity_change: quantityChange,
-          new_quantity: newItemQuantity,
-          operation_type: updateQuantityDto.operation_type,
-          inbound_id: updateQuantityDto.inbound_id,
-          outbound_do_id: updateQuantityDto.outbound_do_id,
-          reference_id: updateQuantityDto.reference_id,
-          reference_type: updateQuantityDto.reference_type,
-          notes: updateQuantityDto.notes,
-          user_id: updateQuantityDto.user_id,
-          uom: updateQuantityDto.uom,
-          production_date: productionDateStr,
-          week_number: updateQuantityDto.week_number,
-          status_inventory: updateQuantityDto.status_inventory,
-        });
-        await transactionalEntityManager.save(historyEntity);
-
-        // Return updated pallet
-        const updatedPallet = await transactionalEntityManager.findOne(MasterPallet, {
-          where: { id: palletId },
-        });
-
-        if (!updatedPallet) {
-          throw new NotFoundException(`Pallet with ID ${palletId} not found after update`);
-        }
-
-        // if the pallet current quantity is 0, clear location in inventory tracking, clear PalletTransactionHistory and clear memo_id
-        if (updatedPallet.currentQuantity === 0) {
-          const inventoryTracking = await this.inventoryTrackingRepository.findOne({
-            where: { pallet_id: palletId },
-          });
-          if (inventoryTracking) {
-            await this.inventoryTrackingRepository.update(inventoryTracking.id, {
-              warehouse_sub_id: null as any,
-              warehouse_bin_id: null as any,
-              inventory_note: 'Pallet is empty',
-            });
-          }
-          await this.transactionHistoryRepository.delete({ pallet_id: palletId });
-          await this.repository.update(palletId, { memo_id: null as any, currentQuantity: 0, currentWeekNumber: 0 });
-        }
-
-        return updatedPallet;
-      } catch (error) {
-        // Transaction will automatically rollback on error
-        // Re-throw validation and business logic errors as-is
-        if (
-          error instanceof BadRequestException ||
-          error instanceof NotFoundException
-        ) {
-          throw error;
-        }
-
-        // Wrap other errors with context
-        console.error(`Error updating pallet quantity for ${palletId}:`, error);
-        throw new BadRequestException(`Failed to update pallet quantity: ${error.message}`);
+          break;
+        case QuantityOperationType.REMOVE:
+          newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
+          quantityChange = -updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.ADJUST:
+          newItemQuantity = updateQuantityDto.quantity;
+          quantityChange = newItemQuantity - currentItemQuantity;
+          break;
+        case QuantityOperationType.RESET:
+          newItemQuantity = 0;
+          quantityChange = -currentItemQuantity;
+          break;
+        default:
+          throw new BadRequestException('Invalid operation type');
       }
-    };
-    if (existingManager) {
-      return run(existingManager);
+
+      if (newItemQuantity < 0) {
+        throw new BadRequestException('Item quantity cannot be negative');
+      }
+
+      const newTotalQuantity = totalPalletQuantity - currentItemQuantity + newItemQuantity;
+
+      if (newTotalQuantity > pallet.capacity) {
+        throw new BadRequestException(
+          `Total pallet quantity ${newTotalQuantity} exceeds pallet capacity ${pallet.capacity}`,
+        );
+      }
+
+      let updatedWeekNumber = pallet.currentWeekNumber ?? 0;
+
+      const hasWeekInput =
+        updateQuantityDto.week_number !== undefined && updateQuantityDto.week_number !== null;
+
+      if (newTotalQuantity === 0) {
+        updatedWeekNumber = 0;
+      } else if (hasWeekInput) {
+        updatedWeekNumber = updateQuantityDto.week_number as number;
+      }
+
+      // Update pallet
+      await this.repository.update(palletId, {
+        currentQuantity: newTotalQuantity,
+        isFull: newTotalQuantity >= pallet.capacity,
+        currentWeekNumber: updatedWeekNumber,
+      } as any);
+
+      if (updateQuantityDto.reference_type === 'PALLET_UPDATE_UOM') {
+        await this.repository.update(palletId, {
+          uom: updateQuantityDto.uom,
+        } as any);
+      }
+
+      const productionDateStr =
+        typeof updateQuantityDto.production_date === 'string'
+          ? updateQuantityDto.production_date
+          : updateQuantityDto.production_date?.toISOString();
+
+      const historyEntity = this.transactionHistoryRepository.create({
+        pallet_id: palletId,
+        item_id: updateQuantityDto.item_id,
+        previous_quantity: currentItemQuantity,
+        quantity_change: quantityChange,
+        new_quantity: newItemQuantity,
+        operation_type: updateQuantityDto.operation_type,
+        inbound_id: updateQuantityDto.inbound_id,
+        outbound_do_id: updateQuantityDto.outbound_do_id,
+        reference_id: updateQuantityDto.reference_id,
+        reference_type: updateQuantityDto.reference_type,
+        notes: updateQuantityDto.notes,
+        user_id: updateQuantityDto.user_id,
+        uom: updateQuantityDto.uom,
+        production_date: productionDateStr,
+        week_number: updateQuantityDto.week_number,
+        status_inventory: updateQuantityDto.status_inventory,
+      });
+      await this.transactionHistoryRepository.save(historyEntity);
+
+      const updatedPallet = await this.repository.findOne(palletId);
+      if (!updatedPallet) {
+        throw new NotFoundException(`Pallet with ID ${palletId} not found after update`);
+      }
+
+      if (updatedPallet.currentQuantity === 0) {
+        const inventoryTracking = await this.inventoryTrackingRepository.findOne({
+          where: { pallet_id: palletId },
+        });
+        if (inventoryTracking) {
+          await this.inventoryTrackingRepository.update(inventoryTracking.id, {
+            warehouse_sub_id: null as any,
+            warehouse_bin_id: null as any,
+            inventory_note: 'Pallet is empty',
+          } as any);
+        }
+        await this.transactionHistoryRepository.delete({ pallet_id: palletId });
+        await this.repository.update(palletId, {
+          memo_id: null as any,
+          currentWeekNumber: 0,
+          currentQuantity: 0,
+        } as any);
+      }
+
+      return updatedPallet;
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+
+      console.error(`Error updating pallet quantity for ${palletId}:`, error);
+      throw new BadRequestException(
+        `Failed to update pallet quantity: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    return await this.dataSource.transaction(run);
   }
 
   async updateQuantityByPalletCode(
