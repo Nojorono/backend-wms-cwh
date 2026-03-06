@@ -322,15 +322,15 @@ export class MasterPalletService {
         }
 
         // if the pallet is current quantity is 0, then clear location in inventory tracking, clear PalletTransactionHistory and clear memo_id
-        // if (updatedPallet.currentQuantity === 0) {
-        //   await this.inventoryTrackingRepository.update(updatedPallet.inventory_trackings[0].id, {
-        //     warehouse_sub_id: null as any,
-        //     warehouse_bin_id: null as any,
-        //     inventory_note: 'Pallet is empty',
-        //   });
-        //   await this.transactionHistoryRepository.delete({ pallet_id: palletId });
-        //   await this.repository.update(palletId, { memo_id: null as any });
-        // }
+        if (updatedPallet.currentQuantity === 0) {
+          await this.inventoryTrackingRepository.update(updatedPallet.inventory_trackings[0].id, {
+            warehouse_sub_id: null as any,
+            warehouse_bin_id: null as any,
+            inventory_note: 'Pallet is empty',
+          });
+          await this.transactionHistoryRepository.delete({ pallet_id: palletId });
+          await this.repository.update(palletId, { memo_id: null as any, currentQuantity: 0, currentWeekNumber: 0 });
+        }
 
         return updatedPallet;
       } catch (error) {
