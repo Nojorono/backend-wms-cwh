@@ -240,6 +240,18 @@ export class InventoryTrackingService {
     return updated;
   }
 
+  /**
+   * Direct update of inventory_status to IN_INVENTORY (e.g. revert on transaction picking cancel).
+   * Bypasses full update/history flow to ensure status is persisted.
+   */
+  async updateStatusToInInventory(id: string, note: string): Promise<InventoryTracking> {
+    const updated = await this.repository.updateStatusToInInventory(id, note);
+    if (!updated) {
+      throw new NotFoundException(`InventoryTracking with ID ${id} not found`);
+    }
+    return updated;
+  }
+
   async createOrUpdateInventoryTracking(
     pallet_id: string,
     warehouse_sub_id: string,

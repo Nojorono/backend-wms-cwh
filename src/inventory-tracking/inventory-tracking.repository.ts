@@ -290,9 +290,16 @@ export class InventoryTrackingRepository {
     const updated = await this.findOne(id);
 
     if (updated) {
-      // Cek apakah sudah ada history dengan pallet_id dan inbound_id yang sama
+      // When inbound_id not provided (e.g. status revert), find latest history by pallet_id to avoid undefined in where
+      const historyWhere: { pallet_id: string; inbound_id?: string | null } = {
+        pallet_id: updated.pallet_id,
+      };
+      if (inbound_id !== undefined && inbound_id !== null) {
+        historyWhere.inbound_id = inbound_id;
+      }
+
       const existingHistory = await this.historyRepository.findOne({
-        where: { pallet_id: updated.pallet_id, inbound_id: inbound_id },
+        where: historyWhere as any,
         order: { createdAt: 'DESC' },
       });
 
@@ -301,6 +308,8 @@ export class InventoryTrackingRepository {
         existingHistory &&
         (existingHistory.warehouse_sub_id !== updated.warehouse_sub_id ||
           existingHistory.warehouse_bin_id !== updated.warehouse_bin_id);
+
+      const historyInboundId = inbound_id ?? existingHistory?.inbound_id ?? undefined;
 
       if (existingHistory && !isLocationChanged) {
         // Update existing history jika lokasi tidak berubah
@@ -314,7 +323,7 @@ export class InventoryTrackingRepository {
           inventory_status: updated.inventory_status,
           inventory_note: updated.inventory_note,
           action: InventoryTrackingAction.UPDATED,
-          inbound_id: inbound_id,
+          ...(historyInboundId !== undefined && { inbound_id: historyInboundId }),
         });
       } else {
         // Buat history baru jika lokasi berubah atau belum ada history
@@ -331,7 +340,7 @@ export class InventoryTrackingRepository {
             action: isLocationChanged
               ? InventoryTrackingAction.MOVED
               : InventoryTrackingAction.CREATED,
-            inbound_id: inbound_id,
+            ...(historyInboundId !== undefined && { inbound_id: historyInboundId }),
           }),
         );
       }
@@ -353,6 +362,31 @@ export class InventoryTrackingRepository {
     }
 
     await this.repository.update(id, { progression_status });
+    return await this.findOne(id);
+  }
+
+  /**
+   * Direct update of inventory_status to IN_INVENTORY (e.g. for revert on cancel).
+   * Uses QueryBuilder to ensure status is persisted without going through full update/history flow.
+   */
+  async updateStatusToInInventory(
+    id: string,
+    note: string,
+  ): Promise<InventoryTracking | null> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .update(InventoryTracking)
+      .set({
+        inventory_status: 'IN_INVENTORY',
+        inventory_note: note,
+        inventory_date: () => 'CURRENT_TIMESTAMP',
+      } as any)
+      .where('id = :id', { id })
+      .execute();
+
+    if (!result.affected || result.affected === 0) {
+      return null;
+    }
     return await this.findOne(id);
   }
 
