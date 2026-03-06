@@ -158,7 +158,7 @@ export class PickingSuggestionService {
       }
 
       // Calculate how much is already assigned to transaction-picking for this memo item
-      const alreadyPicked = await this.getAlreadyPickedQuantity(memo.id, item.item_id);
+      const alreadyPicked = await this.getAlreadyPickedQuantity(item.item_id, memo.id);
       const remainingRequired = Math.max(0, item.quantity_plan - alreadyPicked);
 
       // Find available inventory for this item
@@ -170,6 +170,16 @@ export class PickingSuggestionService {
       );
 
       if (availableInventory.length > 0) {
+        const suggestedLocations = this.getAllAvailableInventory(
+          availableInventory,
+          remainingRequired,
+          sortMethod,
+        );
+        const totalSuggested = suggestedLocations.reduce(
+          (sum, s) => sum + s.quantity_ready_to_pick, 0,
+        );
+        const netAvailable = this.computeNetAvailable(availableInventory);
+
         const suggestion = {
           memo_id: memo.id,
           item_id: item.item_id,
@@ -178,18 +188,13 @@ export class PickingSuggestionService {
           required_quantity: item.quantity_plan,
           already_picked_quantity: alreadyPicked,
           remaining_quantity_needed: remainingRequired,
-          suggested_locations: this.getAllAvailableInventory(
-            availableInventory,
-            remainingRequired,
-            sortMethod,
-          ),
-          total_suggested_quantity: this.calculateTotalSuggestedQuantity(
-            availableInventory,
-            remainingRequired,
-            sortMethod,
-          ),
+          available_quantity: netAvailable,
+          suggested_locations: suggestedLocations,
+          total_suggested_quantity: totalSuggested,
           priority: item.priority,
-          notes: this.generateNotes(item, memo, availableInventory, alreadyPicked, sortMethod),
+          notes: this.generateNotesFromSuggestions(
+            item, alreadyPicked, remainingRequired, suggestedLocations, netAvailable,
+          ),
         };
         suggestions.push(suggestion as any);
       } else {
@@ -308,9 +313,12 @@ export class PickingSuggestionService {
   ): any[] {
     return inventory
       .filter((inv) => {
-        // Filter based on quantity and utilization
-        const hasEnoughQuantity = inv.quantity >= requiredQuantity;
-        const hasPartialQuantity = inv.quantity > 0 && inv.pallet_utilization < 100;
+        const qty = parseFloat(inv.quantity) || 0;
+        if (qty <= 0) return false;
+        // If no specific quantity required, include all positive-quantity rows
+        if (!requiredQuantity || requiredQuantity <= 0) return true;
+        const hasEnoughQuantity = qty >= requiredQuantity;
+        const hasPartialQuantity = inv.pallet_utilization == null || parseFloat(inv.pallet_utilization) < 100;
         return hasEnoughQuantity || hasPartialQuantity;
       })
       .sort((a, b) => {
@@ -530,6 +538,7 @@ export class PickingSuggestionService {
           })),
       };
 
+
       return await this.generatePickingSuggestionsForMemo(memo, sortMethod);
     } catch (error) {
       console.error('Error in getPickingSuggestionsByMemo:', error);
@@ -554,18 +563,15 @@ export class PickingSuggestionService {
     requiredQuantity: number,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
   ): PickingSuggestionLocationDto[] {
-    // Group inventory by bin AND week_number to preserve week information
-    const binGroups = new Map();
+    // Group by unique physical bin (warehouse_sub_id + warehouse_bin_id).
+    // All pallets in the same bin are merged into ONE entry regardless of week_number.
+    const binGroups = new Map<string, any>();
 
-    // Group inventory by bin (warehouse_bin_id) or sub-warehouse (warehouse_sub_id) if no bin, AND week_number
     for (const inv of availableInventory) {
       const binKey = inv.warehouse_bin_id || `sub_${inv.warehouse_sub_id}`;
-      const weekNumber = inv.week_number || 0;
-      // Create a unique key combining bin and week_number
-      const groupKey = `${binKey}_week_${weekNumber}`;
 
-      if (!binGroups.has(groupKey)) {
-        binGroups.set(groupKey, {
+      if (!binGroups.has(binKey)) {
+        binGroups.set(binKey, {
           warehouse_name: inv.warehouse_name,
           warehouse_sub_name: inv.warehouse_sub_name,
           warehouse_sub_code: inv.warehouse_sub_code,
@@ -577,90 +583,99 @@ export class PickingSuggestionService {
           location_type: inv.location_type,
           location_priority: inv.location_priority,
           place: this.getLocationPlace(inv),
-          week_number: weekNumber,
-          production_date: inv.production_date,
           total_quantity: 0,
-          reserved_quantity: 0,
-          available_quantity: 0,
           items: [],
+          // track min/max week for FIFO/LIFO ordering of bins relative to each other
+          min_week_number: inv.week_number ?? 0,
+          max_week_number: inv.week_number ?? 0,
+          earliest_production_date: inv.production_date,
+          latest_production_date: inv.production_date,
         });
       }
 
-      const group = binGroups.get(groupKey);
+      const group = binGroups.get(binKey)!;
       group.total_quantity += parseFloat(inv.quantity || 0);
-      group.reserved_quantity += parseFloat(inv.reserved_quantity || 0);
-      group.available_quantity += parseFloat(inv.available_quantity || 0);
       group.items.push(inv);
+
+      const wn = inv.week_number ?? 0;
+      if (wn < group.min_week_number) group.min_week_number = wn;
+      if (wn > group.max_week_number) group.max_week_number = wn;
+      const pd = inv.production_date ? new Date(inv.production_date).getTime() : 0;
+      const epd = group.earliest_production_date ? new Date(group.earliest_production_date).getTime() : 0;
+      const lpd = group.latest_production_date ? new Date(group.latest_production_date).getTime() : 0;
+      if (pd && pd < epd) group.earliest_production_date = inv.production_date;
+      if (pd && pd > lpd) group.latest_production_date = inv.production_date;
     }
 
-    // Convert to array and sort by priority
+    // Sort bins by location_priority, then FIFO/LIFO week ordering
     const sortedBins = Array.from(binGroups.values()).sort((a, b) => {
-      // 1. Location priority (bin > sub > warehouse)
       if (a.location_priority !== b.location_priority) {
         return a.location_priority - b.location_priority;
       }
-
-      // 2. Week number (FIFO = ASC, LIFO = DESC)
-      if (a.week_number !== b.week_number) {
-        const weekA = a.week_number || 0;
-        const weekB = b.week_number || 0;
-        if (sortMethod === 'LIFO') {
-          return weekB - weekA; // DESC: highest week number first (LIFO)
-        } else {
-          return weekA - weekB; // ASC: lowest week number first (FIFO)
-        }
+      const weekA = sortMethod === 'FIFO' ? a.min_week_number : a.max_week_number;
+      const weekB = sortMethod === 'FIFO' ? b.min_week_number : b.max_week_number;
+      if (weekA !== weekB) {
+        return sortMethod === 'LIFO' ? weekB - weekA : weekA - weekB;
       }
-
-      // 3. Production date (FIFO = ASC, LIFO = DESC)
-      if (a.production_date !== b.production_date) {
-        const prodDateA = a.production_date ? new Date(a.production_date).getTime() : 0;
-        const prodDateB = b.production_date ? new Date(b.production_date).getTime() : 0;
-        if (sortMethod === 'LIFO') {
-          return prodDateB - prodDateA; // DESC: most recent first (LIFO)
-        } else {
-          return prodDateA - prodDateB; // ASC: oldest first (FIFO)
-        }
+      const pdA = sortMethod === 'FIFO'
+        ? (a.earliest_production_date ? new Date(a.earliest_production_date).getTime() : 0)
+        : (a.latest_production_date ? new Date(a.latest_production_date).getTime() : 0);
+      const pdB = sortMethod === 'FIFO'
+        ? (b.earliest_production_date ? new Date(b.earliest_production_date).getTime() : 0)
+        : (b.latest_production_date ? new Date(b.latest_production_date).getTime() : 0);
+      if (pdA !== pdB) {
+        return sortMethod === 'LIFO' ? pdB - pdA : pdA - pdB;
       }
-
-      // 4. Total quantity (higher first)
       return b.total_quantity - a.total_quantity;
     });
 
-    // Generate suggestions for each bin
+    // Per-bin net available from SQL (location_net_available = full bin READY total - reserved)
+    const binNetAvailable = new Map<string, { reserved: number; netAvailable: number }>();
+    for (const bin of sortedBins) {
+      const firstItem = bin.items[0];
+      binNetAvailable.set(bin.bin_id === 'N/A' ? `sub_${bin.warehouse_sub_id}` : bin.bin_id, {
+        reserved: parseFloat(firstItem?.reserved_quantity || 0),
+        netAvailable: Math.max(0, parseFloat(firstItem?.location_net_available || 0)),
+      });
+    }
+
+    const showAll = requiredQuantity <= 0;
     const allSuggestions: any[] = [];
     let remainingQuantity = requiredQuantity;
 
     for (const bin of sortedBins) {
-      if (remainingQuantity <= 0) break;
+      if (!showAll && remainingQuantity <= 0) break;
 
-      // Use available_quantity (after reservations) instead of total_quantity
-      const quantityToTake = Math.min(bin.available_quantity, remainingQuantity);
+      const netKey = bin.bin_id === 'N/A' ? `sub_${bin.warehouse_sub_id}` : bin.bin_id;
+      const { reserved, netAvailable } = binNetAvailable.get(netKey) ?? { reserved: 0, netAvailable: 0 };
 
-      // Skip if no available quantity after reservations
+      const quantityToTake = showAll
+        ? netAvailable
+        : Math.min(netAvailable, remainingQuantity);
+
       if (quantityToTake <= 0) continue;
 
-      // Find the most representative item for status and other details
       const representativeItem = bin.items[0];
 
       allSuggestions.push({
         total_quantity: bin.total_quantity,
-        reserved_quantity: bin.reserved_quantity,
-        available_quantity: bin.available_quantity,
+        reserved_quantity: reserved,
+        available_quantity: netAvailable,
         quantity_ready_to_pick: quantityToTake,
-        uom: representativeItem.uom || representativeItem.pth_uom || 'DUS',
+        uom: representativeItem.uom || 'N/A',
         warehouse_name: bin.warehouse_name,
         warehouse_sub_name: bin.warehouse_sub_name,
         warehouse_sub_code: bin.warehouse_sub_code,
         warehouse_sub_id: bin.warehouse_sub_id,
-        warehouse_bin_id: bin.warehouse_bin_id,
+        warehouse_bin_id: bin.bin_id !== 'N/A' ? bin.bin_id : null,
         bin_id: bin.bin_id,
         bin_name: bin.bin_name,
         bin_code: bin.bin_code,
         search_level: bin.search_level,
         location_type: bin.location_type,
         location_priority: bin.location_priority,
-        week_number: bin.week_number,
-        production_date: bin.production_date,
+        week_number: sortMethod === 'FIFO' ? bin.min_week_number : bin.max_week_number,
+        production_date: sortMethod === 'FIFO' ? bin.earliest_production_date : bin.latest_production_date,
         place: bin.place,
       });
 
@@ -670,67 +685,62 @@ export class PickingSuggestionService {
     return allSuggestions;
   }
 
-  private calculateTotalSuggestedQuantity(
-    availableInventory: any[],
-    requiredQuantity: number,
-    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
-  ): number {
-    const allSuggestions = this.getAllAvailableInventory(availableInventory, requiredQuantity, sortMethod);
-    return allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
+  /**
+   * Compute net available across unique bins using the SQL-provided location_net_available.
+   * This value is computed from the full bin total (including excluded pallets), so it's
+   * accurate even when some pallets are filtered out by progression_status / inventory_status.
+   * Takes the first row per unique (warehouse_sub_id, warehouse_bin_id) pair.
+   */
+  private computeNetAvailable(availableInventory: any[]): number {
+    const seen = new Set<string>();
+    let total = 0;
+    for (const inv of availableInventory) {
+      const locKey = `${inv.warehouse_sub_id}_${inv.warehouse_bin_id || 'none'}`;
+      if (!seen.has(locKey)) {
+        seen.add(locKey);
+        total += Math.max(0, parseFloat(inv.location_net_available || 0));
+      }
+    }
+    return total;
   }
 
-  private async getAlreadyPickedQuantity(memoId: string, itemId: string): Promise<number> {
-    return await this.repository.getAlreadyPickedQuantityForMemoItem(memoId, itemId);
+  private async getAlreadyPickedQuantity(itemId: string, memoId?: string): Promise<number> {
+    return await this.repository.getAlreadyPickedQuantityForMemoItem(itemId, memoId);
   }
 
-  private generateNotes(item: any, memo: any, availableInventory: any[], alreadyPicked: number = 0, sortMethod: 'FIFO' | 'LIFO' = 'FIFO'): string {
-    const remainingRequired = Math.max(0, item.quantity_plan - alreadyPicked);
-    const allSuggestions = this.getAllAvailableInventory(availableInventory, remainingRequired, sortMethod);
-    const totalFulfillable = allSuggestions.reduce(
-      (sum, suggestion) => sum + suggestion.quantity_ready_to_pick,
-      0,
-    );
-    const totalAvailable = allSuggestions.reduce(
-      (sum, suggestion) => sum + suggestion.available_quantity,
-      0,
+  private generateNotesFromSuggestions(
+    item: any,
+    alreadyPicked: number,
+    remainingRequired: number,
+    suggestedLocations: any[],
+    netAvailable: number,
+  ): string {
+    const totalFulfillable = suggestedLocations.reduce(
+      (sum, s) => sum + s.quantity_ready_to_pick, 0,
     );
 
-    // Build note with context about existing pickings
     let note = '';
 
     if (alreadyPicked > 0) {
       note = `Sudah di-pick: ${alreadyPicked} ${item.uom}. Sisa: ${remainingRequired} ${item.uom}. `;
     }
 
-    // Check for partial pick scenario
-    const hasPartialPick = allSuggestions.some(
-      (suggestion) => suggestion.available_quantity > suggestion.quantity_ready_to_pick,
-    );
+    const hasPartialPick = netAvailable > totalFulfillable;
 
-    // Partial pick scenario - inventory available but only partially ready (CHECK FIRST)
     if (hasPartialPick) {
-      note += `Item tersedia dengan partial pick. Tersedia: ${totalAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}`;
-    }
-    // Exact match - perfect fulfillment
-    else if (totalFulfillable === remainingRequired) {
+      note += `Item tersedia dengan partial pick. Tersedia: ${netAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}`;
+    } else if (totalFulfillable === remainingRequired) {
       note += `Item tersedia dengan jumlah yang tepat. Total tersedia: ${totalFulfillable} ${item.uom}`;
-    }
-    // More than required available
-    else if (totalFulfillable > remainingRequired) {
+    } else if (totalFulfillable > remainingRequired) {
       note += `Item tersedia dengan jumlah berlebih. Total tersedia: ${totalFulfillable} ${item.uom}`;
-    }
-    // Partial availability
-    else if (totalFulfillable > 0) {
+    } else if (totalFulfillable > 0) {
       note += `Item tersedia sebagian. Tersedia: ${totalFulfillable} ${item.uom}, Masih kurang: ${remainingRequired - totalFulfillable} ${item.uom}`;
-    }
-    // No inventory available
-    else {
+    } else {
       note += `Item tidak tersedia di inventory`;
     }
 
     return note;
   }
-
   async getPickingSuggestionsByItemId(itemId: string, uom?: string, sortMethod?: 'FIFO' | 'LIFO'): Promise<any> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
@@ -764,8 +774,9 @@ export class PickingSuggestionService {
       };
     }
 
-    // Get all available inventory grouped by location
-    const totalQuantity = availableInventory.reduce((sum, inv) => sum + inv.quantity, 0);
+    // Net available per bin using SQL-provided location_net_available (full bin total - reserved)
+    const totalQuantity = this.computeNetAvailable(availableInventory);
+
     const locations = this.getAllAvailableInventory(availableInventory, totalQuantity, sortMethod || 'FIFO');
 
     return {

@@ -7,7 +7,7 @@ import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
 @Controller('picking-suggestion')
 @ApiBearerAuth('JWT-auth')
 export class PickingSuggestionController {
-  constructor(private readonly pickingSuggestionService: PickingSuggestionService) {}
+  constructor(private readonly pickingSuggestionService: PickingSuggestionService) { }
 
   @Get('memo/:memoId')
   @ApiOperation({ summary: 'Get picking suggestions for a memo' })
