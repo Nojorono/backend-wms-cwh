@@ -23,7 +23,7 @@ export class TransactionPickingService {
     private readonly masterPalletService: MasterPalletService,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletHistoryRepository: Repository<PalletTransactionHistory>,
-  ) {}
+  ) { }
 
   async create(data: CreateTransactionPickingDto): Promise<PickingTransaction> {
     // Validasi quantity harus positif
@@ -157,33 +157,32 @@ export class TransactionPickingService {
 
   async cancelTransaction(transactionId: string): Promise<void> {
     await this.repository.cancelTransaction(transactionId);
-    
+
     // Update inventory tracking status from PICKED to IN_INVENTORY for related pallets
     await this.revertInventoryTrackingStatus(transactionId);
-    
+
     // Set items to READY status in transaction_pallet_history for pallet_use_id
     await this.setItemsToReadyStatus(transactionId);
   }
 
   async cancelTransactionByMemoId(memoId: string): Promise<void> {
     await this.repository.cancelTransactionByMemoId(memoId);
-    
-    // Get all transactions for this memo and revert their inventory tracking
+
     const transactions = await this.repository.findByMemoId(memoId);
     for (const transaction of transactions) {
       await this.revertInventoryTrackingStatus(transaction.id);
+      // Set status_inventory to READY for each item scan in transaction_pallet_history
+      await this.setItemsToReadyStatus(transaction.id);
     }
   }
 
   /**
-   * Revert inventory tracking status from PICKED to IN_INVENTORY
-   * for all pallets related to transaction-scan-picking records
-   * Only reverts if there are no other active transaction pickings (PENDING or COMPLETED)
-   * for the same pallet with different items
+   * Revert inventory tracking status from PICKED to IN_INVENTORY for all pallets
+   * related to this transaction picking (cancelled). Always reverts and clears memo_id
+   * so the pallet is freed for this cancelled transaction.
    */
   private async revertInventoryTrackingStatus(transactionPickingId: string): Promise<void> {
     try {
-      // Find all transaction-scan-picking records for this transaction picking
       const scanPickingTransactions = await this.transactionScanPickingRepository.findAll({
         transactionPickingId: transactionPickingId,
       });
@@ -192,7 +191,6 @@ export class TransactionPickingService {
         return;
       }
 
-      // Collect all unique pallet_use_id from scan picking transactions
       const palletIds = new Set<string>();
       for (const scanPicking of scanPickingTransactions) {
         if (scanPicking.pallet_use_id) {
@@ -200,58 +198,40 @@ export class TransactionPickingService {
         }
       }
 
-      // Update inventory tracking status for each pallet from PICKED to IN_INVENTORY
-      // Only revert if there are no other active transaction pickings for the same pallet
       for (const palletId of palletIds) {
         try {
-          // Check if there are other active transaction pickings (PENDING or COMPLETED)
-          // that use the same pallet but for different items
-          const otherActiveTransactions = await this.repository.findActiveByPalletId(
-            palletId,
-            transactionPickingId,
-          );
-
-          // If there are other active transaction pickings for this pallet, don't revert
-          // The pallet is still being used for other items
-          if (otherActiveTransactions.length > 0) {
-            console.log(
-              `Skipping inventory tracking revert for pallet ${palletId}: ` +
-                `Found ${otherActiveTransactions.length} other active transaction pickings for this pallet`,
-            );
-            continue;
+          // 1. Clear memo_id on pallet (cancelled transaction no longer ties pallet to memo)
+          try {
+            await this.masterPalletService.update(palletId, { memo_id: null as any });
+          } catch (palletError) {
+            console.error(`Failed to clear memo_id for pallet ${palletId}:`, palletError);
           }
 
-          // No other active transaction pickings found, safe to revert
-          // Find all inventory tracking records with status PICKED for this pallet
+          // 2. Revert inventory_status to IN_INVENTORY for this pallet (no skip)
           const inventoryTrackings = await this.inventoryTrackingService.findAllByPalletId(
             palletId,
             'PICKED',
           );
 
           if (inventoryTrackings.length === 0) {
-            // No PICKED records found, skip
             continue;
           }
 
-          // Update all PICKED records to IN_INVENTORY
+          const revertNote = `Reverted from PICKED to IN_INVENTORY due to transaction picking cancellation`;
           for (const inventoryTracking of inventoryTrackings) {
-            await this.inventoryTrackingService.update(inventoryTracking.id, {
-              inventory_status: 'IN_INVENTORY',
-              inventory_note: `Reverted from PICKED to IN_INVENTORY due to transaction picking cancellation`,
-              inventory_date: new Date(),
-            });
+            await this.inventoryTrackingService.updateStatusToInInventory(
+              inventoryTracking.id,
+              revertNote,
+            );
           }
         } catch (error) {
-          // If inventory tracking not found or other error, log and continue
           if (error instanceof NotFoundException) {
-            // Pallet doesn't have inventory tracking, skip
             continue;
           }
           console.error(`Failed to revert inventory tracking for pallet ${palletId}:`, error);
         }
       }
     } catch (error) {
-      // Log error but don't fail the cancellation
       console.error(`Failed to revert inventory tracking status for transaction ${transactionPickingId}:`, error);
     }
   }
