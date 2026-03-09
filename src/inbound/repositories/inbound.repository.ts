@@ -121,6 +121,29 @@ export class InboundRepository {
     await this.repository.softDelete(id);
   }
 
+  /**
+   * Returns a map of inbound id -> inbound_number for the given ids (for populating inbound_reference_number).
+   */
+  async findInboundNumbersByIds(ids: string[]): Promise<Map<string, string>> {
+    if (!ids.length) {
+      return new Map();
+    }
+    const distinctIds = [...new Set(ids)];
+    const rows = await this.repository
+      .createQueryBuilder('inbound')
+      .select('inbound.id', 'id')
+      .addSelect('inbound.inbound_number', 'inbound_number')
+      .where('inbound.id IN (:...ids)', { ids: distinctIds })
+      .getRawMany<{ id: string; inbound_number: string | null }>();
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.inbound_number != null) {
+        map.set(row.id, row.inbound_number);
+      }
+    }
+    return map;
+  }
+
   async getNextInboundNumberForDate(date: Date): Promise<string> {
     const y = date.getFullYear().toString();
     const m = (date.getMonth() + 1).toString().padStart(2, '0');

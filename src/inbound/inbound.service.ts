@@ -357,14 +357,35 @@ export class InboundService {
     }
   }
 
-  async findAll(status?: string): Promise<Inbound[]> {
-    // Relations are now loaded automatically through the repository
-    return await this.inboundRepo.findAll(status);
+  /**
+   * Enriches inbounds with inbound_reference_number from the referenced inbound (when inbound_id_reference is set).
+   */
+  private async enrichWithReferenceNumber(
+    inbounds: Inbound[],
+  ): Promise<(Inbound & { inbound_reference_number?: string | null })[]> {
+    const refIds = inbounds
+      .map((i) => i.inbound_id_reference)
+      .filter((id): id is string => Boolean(id));
+    if (refIds.length === 0) {
+      return inbounds.map((i) => ({ ...i, inbound_reference_number: undefined }));
+    }
+    const refMap = await this.inboundRepo.findInboundNumbersByIds(refIds);
+    return inbounds.map((i) => ({
+      ...i,
+      inbound_reference_number: i.inbound_id_reference
+        ? refMap.get(i.inbound_id_reference) ?? null
+        : undefined,
+    }));
+  }
+
+  async findAll(status?: string): Promise<(Inbound & { inbound_reference_number?: string | null })[]> {
+    const data = await this.inboundRepo.findAll(status);
+    return this.enrichWithReferenceNumber(data);
   }
 
   async findAllPaginated(
     paginationQuery: InboundPaginationQueryDto,
-  ): Promise<PaginatedResponseDto<Inbound>> {
+  ): Promise<PaginatedResponseDto<Inbound & { inbound_reference_number?: string | null }>> {
     const filters = {
       status: paginationQuery.status,
     };
@@ -378,25 +399,24 @@ export class InboundService {
       paginationQuery.sortOrder,
     );
 
-    // Relations are now loaded automatically through the repository
+    const enrichedData = await this.enrichWithReferenceNumber(data);
 
     const paginatedResponse = this.paginationService.createPaginatedResponse(
-      data,
+      enrichedData,
       paginationQuery,
       total,
     );
 
-    // Return the paginated response directly to avoid double wrapping
     return paginatedResponse;
   }
 
-  async findOne(id: string): Promise<Inbound> {
+  async findOne(id: string): Promise<Inbound & { inbound_reference_number?: string | null }> {
     const found = await this.inboundRepo.findOne(id);
     if (!found) {
       throw new NotFoundException('Inbound not found');
     }
-    // Relations are now loaded automatically through the repository
-    return found;
+    const [enriched] = await this.enrichWithReferenceNumber([found]);
+    return enriched;
   }
 
   async update(id: string, payload: UpdateInboundDto): Promise<Inbound> {
