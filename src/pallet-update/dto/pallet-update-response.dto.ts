@@ -26,6 +26,12 @@ export class PalletUpdateItemResponseDto {
   @ApiPropertyOptional({ example: 'uuid-item-123' })
   itemId?: string;
 
+  @ApiPropertyOptional({ example: 'SKU-001', description: 'Item SKU' })
+  itemSku?: string;
+
+  @ApiPropertyOptional({ example: 'Item description', description: 'Item name/description' })
+  itemDescription?: string;
+
   @ApiPropertyOptional({ example: 10 })
   quantity?: number;
 

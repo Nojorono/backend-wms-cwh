@@ -702,15 +702,18 @@ export class PalletUpdateService {
         palletId: item.palletId,
         pallet: item.pallet
           ? {
-              id: item.pallet.id,
-              pallet_code: item.pallet.pallet_code,
-              uom: item.pallet.uom,
-              currentQuantity: item.pallet.currentQuantity,
-            }
+            id: item.pallet.id,
+            pallet_code: item.pallet.pallet_code,
+            uom: item.pallet.uom,
+            currentQuantity: item.pallet.currentQuantity,
+          }
           : undefined,
         itemId: item.itemId,
+        itemSku: item.item?.sku,
+        itemDescription: item.item?.description,
         quantity: item.quantity,
         uom: item.uom,
+        weekNumber: item.weekNumber,
         productionDate: item.productionDate,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
@@ -724,15 +727,16 @@ export class PalletUpdateService {
         palletId: scan.palletId,
         pallet: scan.pallet
           ? {
-              id: scan.pallet.id,
-              pallet_code: scan.pallet.pallet_code,
-              uom: scan.pallet.uom,
-              currentQuantity: scan.pallet.currentQuantity,
-            }
+            id: scan.pallet.id,
+            pallet_code: scan.pallet.pallet_code,
+            uom: scan.pallet.uom,
+            currentQuantity: scan.pallet.currentQuantity,
+          }
           : undefined,
         itemId: scan.itemId,
         quantity: scan.quantity,
         uom: scan.uom,
+        weekNumber: scan.weekNumber,
         productionDate: scan.productionDate,
         notes: scan.notes,
         status: scan.status,
