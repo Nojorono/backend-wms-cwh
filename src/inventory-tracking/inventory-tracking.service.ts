@@ -65,9 +65,9 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id
-    if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id);
-    }
+    // if (dto.pallet_id) {
+    //   await this.validatePalletIdUniqueness(dto.pallet_id);
+    // }
 
     const created = await this.repository.create(dto);
     const enriched = await this.enrichPalletsWithCurrentItems([created]);
@@ -210,9 +210,9 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id jika ada perubahan
-    if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id, id);
-    }
+    // if (dto.pallet_id) {
+    //   await this.validatePalletIdUniqueness(dto.pallet_id, id);
+    // }
 
     const updated = await this.repository.update(id, dto);
     if (!updated) {
@@ -279,7 +279,7 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id sebelum create
-    await this.validatePalletIdUniqueness(pallet_id);
+    // await this.validatePalletIdUniqueness(pallet_id);
 
     // Create new tracking record
     return this.create({
@@ -315,9 +315,9 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id
-    if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id);
-    }
+    // if (dto.pallet_id) {
+    //   await this.validatePalletIdUniqueness(dto.pallet_id);
+    // }
 
     // Jika ada inbound_id, cek apakah sudah ada history dengan inbound_id yang sama
     if (dto.inbound_id) {
@@ -366,7 +366,7 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id sebelum createOrUpdate
-    await this.validatePalletIdUniqueness(pallet_id);
+    // await this.validatePalletIdUniqueness(pallet_id);
 
     // Lanjutkan dengan createOrUpdate normal
     return this.createOrUpdateInventoryTracking(
