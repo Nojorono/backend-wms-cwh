@@ -54,45 +54,32 @@ export class InventoryTrackingService {
   }
 
   /**
-   * Validasi dan resolve: jika existing record dengan lokasi null, currentQuantity 0, historyCount 0 → return existing (untuk di-update).
-   * Jika duplicate (existing dengan lokasi) atau invalid (quantity+history) → throw.
+   * Validasi dan resolve: jika existing record dengan lokasi null dan historyCount 0 → return existing (untuk di-update).
+   * Jika duplicate (existing dengan lokasi) → throw.
    * Lainnya → return null (akan create baru).
    */
   private async validatePalletIdUniqueness(
     pallet_id: string,
   ): Promise<InventoryTracking | null> {
-    const [existing, pallet] = await Promise.all([
+    const [existing, historyCount] = await Promise.all([
       this.repository.findOneByPalletId(pallet_id),
-      this.masterPalletService.findOne(pallet_id),
+      this.palletHistoryRepository.count({ where: { pallet_id } }),
     ]);
-    const currentQty = pallet.currentQuantity ?? 0;
-    const historyCount =
-      currentQty !== 0
-        ? await this.palletHistoryRepository.count({ where: { pallet_id } })
-        : 0;
 
-    const hasQuantityWithHistory = currentQty !== 0 && historyCount > 0;
     const hasExistingWithLocation =
       existing != null &&
       (existing.warehouse_sub_id != null || existing.warehouse_bin_id != null);
 
-    if (hasQuantityWithHistory) {
-      throw new BadRequestException(
-        `Pallet ${pallet_id} memiliki currentQuantity (${currentQty}) dan memiliki transaction history. ` +
-        `Tidak dapat membuat inventory tracking.`,
-      );
-    }
     if (hasExistingWithLocation) {
       throw new BadRequestException(
         `Pallet dengan ID ${pallet_id} sudah memiliki inventory tracking record di lokasi (warehouse_sub/bin). Tidak dapat membuat duplikasi.`,
       );
     }
-    // Existing dengan warehouse_sub_id & warehouse_bin_id null, currentQty 0, historyCount 0 → pakai update
+    // Existing dengan warehouse_sub_id & warehouse_bin_id null dan historyCount 0 → pakai update
     if (
       existing != null &&
       existing.warehouse_sub_id == null &&
       existing.warehouse_bin_id == null &&
-      currentQty === 0 &&
       historyCount === 0
     ) {
       return existing;
