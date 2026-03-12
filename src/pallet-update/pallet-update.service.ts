@@ -549,14 +549,8 @@ export class PalletUpdateService {
   async createMergeOrSplit(
     createPalletUpdateDto: CreateMergePalletDto | CreateSplitPalletDto,
   ): Promise<PalletUpdate> {
-    // Generate updateNumber if not provided
-    // For SPLIT_PALLET and MERGE_PALLET, updateNumber is required (will be auto-generated if not provided)
-    if (!createPalletUpdateDto.updateNumber) {
-      createPalletUpdateDto.updateNumber = await this.repository.getNextUpdateNumber(
-        createPalletUpdateDto.updateType,
-      );
-    } else {
-      // Validate uniqueness if updateNumber is provided
+    // If updateNumber provided, validate early
+    if (createPalletUpdateDto.updateNumber) {
       const existing = await this.repository.findOneByUpdateNumber(
         createPalletUpdateDto.updateNumber,
       );
@@ -594,51 +588,88 @@ export class PalletUpdateService {
       await this.validateScanAndPalletItem(scansForValidation, itemsForValidation);
     }
 
-    return await this.dataSource.transaction(async (manager) => {
-      const { items, item, assigned, ...palletUpdatePayload } =
-        createPalletUpdateDto as CreateMergePalletDto & { item?: unknown };
-      const palletUpdate = manager.create(PalletUpdate, {
-        ...palletUpdatePayload,
-        status: createPalletUpdateDto.status || PalletUpdateStatus.PENDING_ASSIGNMENT,
-      });
+    // Retry to avoid race condition on update_number generation (unique constraint)
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // Generate updateNumber if not provided (inside retry loop)
+        if (!createPalletUpdateDto.updateNumber) {
+          createPalletUpdateDto.updateNumber = await this.repository.getNextUpdateNumber(
+            createPalletUpdateDto.updateType,
+          );
+        }
 
-      const savedPalletUpdate = await manager.save(PalletUpdate, palletUpdate);
+        return await this.dataSource.transaction(async (manager) => {
+          const { items, item, assigned, ...palletUpdatePayload } =
+            createPalletUpdateDto as CreateMergePalletDto & { item?: unknown };
+          const palletUpdate = manager.create(PalletUpdate, {
+            ...palletUpdatePayload,
+            status: createPalletUpdateDto.status || PalletUpdateStatus.PENDING_ASSIGNMENT,
+          });
 
-      // Normalize items: split uses `item` (singular), merge uses `items` (array)
-      const itemsToCreate = itemsToValidate;
+          const savedPalletUpdate = await manager.save(PalletUpdate, palletUpdate);
 
-      if (itemsToCreate.length > 0) {
-        const items = itemsToCreate.map((item) =>
-          manager.create(PalletUpdateItem, {
-            ...item,
-            palletUpdateId: savedPalletUpdate.id,
-          }),
-        );
-        await manager.save(PalletUpdateItem, items);
+          // Normalize items: split uses `item` (singular), merge uses `items` (array)
+          const itemsToCreate = itemsToValidate;
+
+          if (itemsToCreate.length > 0) {
+            const items = itemsToCreate.map((item) =>
+              manager.create(PalletUpdateItem, {
+                ...item,
+                palletUpdateId: savedPalletUpdate.id,
+              }),
+            );
+            await manager.save(PalletUpdateItem, items);
+          }
+
+          if (
+            'assigned' in createPalletUpdateDto &&
+            createPalletUpdateDto.assigned &&
+            createPalletUpdateDto.assigned.length > 0
+          ) {
+            const assigned = createPalletUpdateDto.assigned.map((assign) =>
+              manager.create(PalletUpdateAssigned, {
+                userId: assign.userId,
+                palletUpdate: savedPalletUpdate,
+                assignedAt: assign.assignedAt ? new Date(assign.assignedAt) : new Date(),
+              }),
+            );
+            await manager.save(PalletUpdateAssigned, assigned);
+          }
+
+          const result = await manager.getRepository(PalletUpdate).findOne({
+            where: { id: savedPalletUpdate.id },
+            relations: ['items', 'scans', 'assigned', 'initiatedByUser', 'inspectionByUser'],
+          });
+          if (!result) {
+            throw new NotFoundException(
+              `Failed to retrieve created pallet update with ID ${savedPalletUpdate.id}`,
+            );
+          }
+          return result;
+        });
+      } catch (err) {
+        const pgCode = (err as any)?.code ?? (err as any)?.driverError?.code;
+        const constraint =
+          (err as any)?.constraint ?? (err as any)?.driverError?.constraint;
+        const isDuplicateUpdateNumber =
+          pgCode === '23505' &&
+          (constraint === 'UQ_8f3021fc5c8fecb5c7a8e961dc7' ||
+            String((err as any)?.detail ?? (err as any)?.driverError?.detail ?? '').includes(
+              'update_number',
+            ));
+
+        if (isDuplicateUpdateNumber && attempt < maxAttempts) {
+          // regenerate for next loop
+          createPalletUpdateDto.updateNumber = undefined as any;
+          continue;
+        }
+        throw err;
       }
+    }
 
-      if ('assigned' in createPalletUpdateDto && createPalletUpdateDto.assigned && createPalletUpdateDto.assigned.length > 0) {
-        const assigned = createPalletUpdateDto.assigned.map((assign) =>
-          manager.create(PalletUpdateAssigned, {
-            userId: assign.userId,
-            palletUpdate: savedPalletUpdate,
-            assignedAt: assign.assignedAt ? new Date(assign.assignedAt) : new Date(),
-          }),
-        );
-        await manager.save(PalletUpdateAssigned, assigned);
-      }
-
-      const result = await manager.getRepository(PalletUpdate).findOne({
-        where: { id: savedPalletUpdate.id },
-        relations: ['items', 'scans', 'assigned', 'initiatedByUser', 'inspectionByUser'],
-      });
-      if (!result) {
-        throw new NotFoundException(
-          `Failed to retrieve created pallet update with ID ${savedPalletUpdate.id}`,
-        );
-      }
-      return result;
-    });
+    // Should never reach here
+    throw new BadRequestException('Failed to generate unique update number');
   }
 
   /**

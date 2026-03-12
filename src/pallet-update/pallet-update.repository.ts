@@ -171,9 +171,11 @@ export class PalletUpdateRepository {
     const prefix = prefixMap[updateType];
     const searchPrefix = `${prefix}-${yearStr}-`;
 
-    // Find the latest update number for this type and year
+    // Find the latest update number for this type and year.
+    // Use withDeleted() because update_number has a DB unique constraint and cannot be reused even if soft-deleted.
     const row = await this.repository
       .createQueryBuilder('palletUpdate')
+      .withDeleted()
       .select('palletUpdate.updateNumber', 'num')
       .where('palletUpdate.updateType = :updateType', { updateType })
       .andWhere('palletUpdate.updateNumber LIKE :prefix', { prefix: `${searchPrefix}%` })
