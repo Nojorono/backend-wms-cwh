@@ -54,17 +54,14 @@ export class InventoryTrackingService {
   }
 
   /**
-   * Validasi dan resolve: jika existing record dengan lokasi null dan historyCount 0 → return existing (untuk di-update).
-   * Jika duplicate (existing dengan lokasi) → throw.
+   * Validasi dan resolve: jika existing record dengan lokasi null → return existing (untuk di-update).
+   * Jika duplicate (existing dengan lokasi warehouse_sub/bin) → throw.
    * Lainnya → return null (akan create baru).
    */
   private async validatePalletIdUniqueness(
     pallet_id: string,
   ): Promise<InventoryTracking | null> {
-    const [existing, historyCount] = await Promise.all([
-      this.repository.findOneByPalletId(pallet_id),
-      this.palletHistoryRepository.count({ where: { pallet_id } }),
-    ]);
+    const existing = await this.repository.findOneByPalletId(pallet_id);
 
     const hasExistingWithLocation =
       existing != null &&
@@ -75,12 +72,11 @@ export class InventoryTrackingService {
         `Pallet dengan ID ${pallet_id} sudah memiliki inventory tracking record di lokasi (warehouse_sub/bin). Tidak dapat membuat duplikasi.`,
       );
     }
-    // Existing dengan warehouse_sub_id & warehouse_bin_id null dan historyCount 0 → pakai update
+    // Existing dengan warehouse_sub_id & warehouse_bin_id null → pakai update (ignore historyCount)
     if (
       existing != null &&
       existing.warehouse_sub_id == null &&
-      existing.warehouse_bin_id == null &&
-      historyCount === 0
+      existing.warehouse_bin_id == null
     ) {
       return existing;
     }
@@ -298,19 +294,19 @@ export class InventoryTrackingService {
     warehouse_id: string,
     inventory_status: string,
     inbound_id?: string,
-  ): Promise<InventoryTracking> {
+  ): Promise<any> {
     // Validasi status
     this.validateInventoryStatus(inventory_status);
 
-    const existing = await this.repository.findOneByParams(
-      pallet_id,
-      warehouse_sub_id,
-      warehouse_id,
-    );
+    const existing = await this.validatePalletIdUniqueness(pallet_id);
+
+    console.log("existing", existing);
 
     if (existing) {
       // Jika sudah ada di lokasi yang sama, update saja
       return this.update(existing.id, {
+        warehouse_sub_id,
+        warehouse_id,
         inventory_status: inventory_status,
         inventory_note: 'Inventory tracking updated',
         inventory_date: new Date(),

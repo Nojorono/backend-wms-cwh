@@ -26,7 +26,7 @@ export class TransactionScanInboundService {
     private readonly warehouseSubService: MasterWarehouseSubService,
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly notificationService: NotificationService,
-  ) {}
+  ) { }
 
   async create(data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
     const item = await this.itemService.findOne(data.item_id);
@@ -105,11 +105,6 @@ export class TransactionScanInboundService {
   ): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
     if (!existing) throw new NotFoundException('Transaction scan inbound not found');
-    const updated = await this.repository.update(id, {
-      ...existing,
-      status: status,
-      inspection_by: inspection_by,
-    });
     // if status is COMPLETED, create or update inventory tracking
     if (status === ScanInboundStatus.COMPLETED) {
       const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
@@ -143,6 +138,13 @@ export class TransactionScanInboundService {
         rooms,
       });
     }
+
+    const updated = await this.repository.update(id, {
+      ...existing,
+      status: status,
+      inspection_by: inspection_by,
+    });
+
     return updated;
   }
 
