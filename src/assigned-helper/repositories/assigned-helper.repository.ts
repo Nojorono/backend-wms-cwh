@@ -9,7 +9,7 @@ export class AssignedHelperRepository {
   constructor(
     @InjectRepository(AssignedHelper)
     private readonly repository: Repository<AssignedHelper>,
-  ) {}
+  ) { }
 
   async create(data: Partial<AssignedHelper>): Promise<AssignedHelper> {
     const entity = this.repository.create(data);
@@ -30,10 +30,17 @@ export class AssignedHelperRepository {
   }
 
   async findAllByInbound(inboundId: string): Promise<AssignedHelper[]> {
-    return await this.repository.find({
-      where: { inbound_id: inboundId },
-      relations: ['inbound'],
-    });
+    return await this.repository
+      .createQueryBuilder('helper')
+      .leftJoinAndSelect('helper.inbound', 'inbound')
+      .leftJoinAndMapOne(
+        'helper.user',
+        User,
+        'user',
+        '"user"."id" = helper.helper_user_id::uuid',
+      )
+      .where('helper.inbound_id = :inboundId', { inboundId })
+      .getMany();
   }
 
   async findOne(id: string): Promise<AssignedHelper | null> {

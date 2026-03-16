@@ -32,7 +32,7 @@ export class InboundService {
     private readonly paginationService: PaginationService,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletTransactionHistoryRepository: Repository<PalletTransactionHistory>,
-  ) {}
+  ) { }
 
   private async generateSequentialInboundNumber(now: Date): Promise<string> {
     return await this.inboundRepo.getNextInboundNumberForDate(now);
