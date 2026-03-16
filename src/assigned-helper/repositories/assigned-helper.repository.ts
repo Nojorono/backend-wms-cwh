@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AssignedHelper } from '../../core/domain/entities/assigned-helper.entity';
+import { User } from '../../core/domain/entities/user.entity';
 
 @Injectable()
 export class AssignedHelperRepository {
@@ -16,9 +17,16 @@ export class AssignedHelperRepository {
   }
 
   async findAll(): Promise<AssignedHelper[]> {
-    return await this.repository.find({
-      relations: ['inbound'],
-    });
+    return await this.repository
+      .createQueryBuilder('helper')
+      .leftJoinAndSelect('helper.inbound', 'inbound')
+      .leftJoinAndMapOne(
+        'helper.user',
+        User,
+        'user',
+        '"user"."id" = helper.helper_user_id::uuid',
+      )
+      .getMany();
   }
 
   async findAllByInbound(inboundId: string): Promise<AssignedHelper[]> {
