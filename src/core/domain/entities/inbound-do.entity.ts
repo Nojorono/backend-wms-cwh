@@ -20,6 +20,9 @@ export class InboundDo extends BaseEntity {
   inbound: Inbound;
 
   @Column({ nullable: true })
+  principal: string;
+
+  @Column({ nullable: true })
   inbound_do_number: string;
 
   @Column({ nullable: true })
