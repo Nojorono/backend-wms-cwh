@@ -465,6 +465,7 @@ export class InboundService {
           for (const doDto of payload.inbound_dos) {
             const inboundDo = await this.inboundDoRepo.create({
               inbound_id: id,
+              principal: doDto.principal,
               inbound_do_number: doDto.inbound_do_number,
               inbound_do_date: doDto.inbound_do_date ? new Date(doDto.inbound_do_date) : undefined,
               attachment: doDto.attachment,
