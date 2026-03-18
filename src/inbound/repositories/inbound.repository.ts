@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../core/domain/entities/inbound.entity';
-import { ScanInboundStatus } from 'src/core/domain/entities/transaction-scan-inbound.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
@@ -10,7 +9,7 @@ export class InboundRepository {
   constructor(
     @InjectRepository(Inbound)
     private readonly repository: Repository<Inbound>,
-  ) {}
+  ) { }
 
   async create(data: Partial<Inbound>): Promise<Inbound> {
     const entity = this.repository.create(data);
@@ -85,6 +84,9 @@ export class InboundRepository {
         'item.id::varchar = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
+      .leftJoinAndSelect('transaction_scan_inbounds.item', 'transaction_scan_inbounds_item')
+      .leftJoinAndSelect('transaction_scan_inbounds.pallet', 'transaction_scan_inbounds_pallet')
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)
