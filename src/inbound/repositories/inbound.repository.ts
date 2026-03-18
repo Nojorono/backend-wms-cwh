@@ -43,6 +43,8 @@ export class InboundRepository {
       inbound_type?: string;
       driver_name?: string;
       license_plate?: string;
+      start_date?: string;
+      end_date?: string;
     },
     page: number = 1,
     limit: number = 10,
@@ -54,6 +56,14 @@ export class InboundRepository {
 
     if (filters.status) {
       queryBuilder.andWhere('inbound.status = :status', { status: filters.status });
+    }
+
+    if (filters.start_date) {
+      queryBuilder.andWhere('inbound.createdAt >= :startDate', { startDate: filters.start_date });
+    }
+
+    if (filters.end_date) {
+      queryBuilder.andWhere('inbound.createdAt <= :endDate', { endDate: filters.end_date });
     }
 
     if (search) {

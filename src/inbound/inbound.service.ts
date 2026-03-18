@@ -389,6 +389,8 @@ export class InboundService {
   ): Promise<PaginatedResponseDto<Inbound & { inbound_reference_number?: string | null }>> {
     const filters = {
       status: paginationQuery.status,
+      start_date: paginationQuery.start_date,
+      end_date: paginationQuery.end_date,
     };
 
     const { data, total } = await this.inboundRepo.findAllPaginated(
