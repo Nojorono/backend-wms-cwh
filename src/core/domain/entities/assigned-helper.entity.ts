@@ -1,6 +1,7 @@
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
+import { User } from './user.entity';
 
 @Entity('assigned_helper')
 export class AssignedHelper extends BaseEntity {
@@ -19,4 +20,7 @@ export class AssignedHelper extends BaseEntity {
 
   @Column({ nullable: true })
   helper_phone: string;
+
+  // Populated via query builder left join on helper_user_id
+  user?: User;
 }

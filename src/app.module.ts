@@ -47,6 +47,7 @@ import { UsersActivityModule } from './users-activity/users-activity.module';
 import { PalletUpdateModule } from './pallet-update/pallet-update.module';
 import { AdjustmentStockModule } from './adjustment-stock/adjustment-stock.module';
 import { LoggerModule } from './infrastructure/modules/logger.module';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     UsersActivityModule,
     PalletUpdateModule,
     AdjustmentStockModule,
+    ReportModule,
   ],
   providers: [
     {

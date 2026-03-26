@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
@@ -7,6 +9,7 @@ import {
   ProgressionStatus,
 } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingHistory } from '../core/domain/entities/inventory-tracking-history.entity';
+import { PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
@@ -20,6 +23,8 @@ export class InventoryTrackingService {
     private readonly repository: InventoryTrackingRepository,
     private readonly paginationService: PaginationService,
     private readonly masterPalletService: MasterPalletService,
+    @InjectRepository(PalletTransactionHistory)
+    private readonly palletHistoryRepository: Repository<PalletTransactionHistory>,
   ) { }
 
   // Validasi status yang diperbolehkan
@@ -48,25 +53,56 @@ export class InventoryTrackingService {
     }
   }
 
-  // Validasi duplikasi pallet_id
-  private async validatePalletIdUniqueness(pallet_id: string, excludeId?: string): Promise<void> {
+  /**
+   * Validasi dan resolve: jika existing record dengan lokasi null → return existing (untuk di-update).
+   * Jika duplicate (existing dengan lokasi warehouse_sub/bin) → throw.
+   * Lainnya → return null (akan create baru).
+   */
+  private async validatePalletIdUniqueness(
+    pallet_id: string,
+  ): Promise<InventoryTracking | null> {
     const existing = await this.repository.findOneByPalletId(pallet_id);
-    if (existing && existing.id !== excludeId) {
+
+    const hasExistingWithLocation =
+      existing != null &&
+      (existing.warehouse_sub_id != null || existing.warehouse_bin_id != null);
+
+    if (hasExistingWithLocation) {
       throw new BadRequestException(
-        `Pallet dengan ID ${pallet_id} sudah memiliki inventory tracking record. Tidak dapat membuat duplikasi.`,
+        `Pallet dengan ID ${pallet_id} sudah memiliki inventory tracking record di lokasi (warehouse_sub/bin). Tidak dapat membuat duplikasi.`,
       );
     }
+    // Existing dengan warehouse_sub_id & warehouse_bin_id null → pakai update (ignore historyCount)
+    if (
+      existing != null &&
+      existing.warehouse_sub_id == null &&
+      existing.warehouse_bin_id == null
+    ) {
+      return existing;
+    }
+    return null;
   }
 
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
-    // Validasi status jika ada
     if (dto.inventory_status) {
       this.validateInventoryStatus(dto.inventory_status);
     }
 
-    // Validasi duplikasi pallet_id
     if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id);
+      const existingToUpdate = await this.validatePalletIdUniqueness(dto.pallet_id);
+      if (existingToUpdate != null) {
+        const updatePayload: UpdateInventoryTrackingDto = {};
+        if (dto.warehouse_id !== undefined) updatePayload.warehouse_id = dto.warehouse_id;
+        if (dto.warehouse_sub_id !== undefined) updatePayload.warehouse_sub_id = dto.warehouse_sub_id;
+        if (dto.warehouse_bin_id !== undefined) updatePayload.warehouse_bin_id = dto.warehouse_bin_id;
+        if (dto.inventory_status !== undefined) updatePayload.inventory_status = dto.inventory_status;
+        if (dto.inventory_note !== undefined) updatePayload.inventory_note = dto.inventory_note;
+        if (dto.inventory_date !== undefined) updatePayload.inventory_date = dto.inventory_date;
+        if (dto.progression_status !== undefined) updatePayload.progression_status = dto.progression_status;
+        const updated = await this.update(existingToUpdate.id, updatePayload);
+        const [enriched] = await this.enrichPalletsWithCurrentItems([updated]);
+        return enriched;
+      }
     }
 
     const created = await this.repository.create(dto);
@@ -210,9 +246,9 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id jika ada perubahan
-    if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id, id);
-    }
+    // if (dto.pallet_id) {
+    //   const await this.validatePalletIdUniqueness(dto.pallet_id);
+    // }
 
     const updated = await this.repository.update(id, dto);
     if (!updated) {
@@ -258,19 +294,19 @@ export class InventoryTrackingService {
     warehouse_id: string,
     inventory_status: string,
     inbound_id?: string,
-  ): Promise<InventoryTracking> {
+  ): Promise<any> {
     // Validasi status
     this.validateInventoryStatus(inventory_status);
 
-    const existing = await this.repository.findOneByParams(
-      pallet_id,
-      warehouse_sub_id,
-      warehouse_id,
-    );
+    const existing = await this.validatePalletIdUniqueness(pallet_id);
+
+    console.log("existing", existing);
 
     if (existing) {
       // Jika sudah ada di lokasi yang sama, update saja
       return this.update(existing.id, {
+        warehouse_sub_id,
+        warehouse_id,
         inventory_status: inventory_status,
         inventory_note: 'Inventory tracking updated',
         inventory_date: new Date(),
@@ -279,7 +315,7 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id sebelum create
-    await this.validatePalletIdUniqueness(pallet_id);
+    // await this.validatePalletIdUniqueness(pallet_id);
 
     // Create new tracking record
     return this.create({
@@ -315,9 +351,9 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id
-    if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id);
-    }
+    // if (dto.pallet_id) {
+    //   await this.validatePalletIdUniqueness(dto.pallet_id);
+    // }
 
     // Jika ada inbound_id, cek apakah sudah ada history dengan inbound_id yang sama
     if (dto.inbound_id) {
@@ -366,7 +402,7 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id sebelum createOrUpdate
-    await this.validatePalletIdUniqueness(pallet_id);
+    // await this.validatePalletIdUniqueness(pallet_id);
 
     // Lanjutkan dengan createOrUpdate normal
     return this.createOrUpdateInventoryTracking(

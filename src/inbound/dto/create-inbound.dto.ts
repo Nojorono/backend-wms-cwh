@@ -59,6 +59,13 @@ export class CreateInboundDoDto {
   @IsUUID(4, { message: 'inbound_id must be a valid UUID' })
   inbound_id?: string;
 
+  @ApiPropertyOptional({ example: 'Principal 1' })
+  @IsOptional()
+  @IsString({ message: 'principal must be a string' })
+  @MinLength(1, { message: 'principal must be at least 1 character' })
+  @MaxLength(100, { message: 'principal must not exceed 100 characters' })
+  principal?: string;
+
   @ApiPropertyOptional({ example: false })
   @IsNotEmpty({ message: 'validation_surat_jalan is required' })
   @IsBoolean({ message: 'validation_surat_jalan must be a boolean' })
@@ -181,6 +188,7 @@ export class CreateInboundDto {
         attachment: 's3://bucket/path/to/attachment.pdf',
         inbound_po_number: 'PO-123',
         inbound_po_date: '2025-08-31T00:00:00.000Z',
+        principal: 'Principal 1',
         flag_validated: false,
         validation_surat_jalan: false,
         inbound_items: [

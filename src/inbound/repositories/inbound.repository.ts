@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../core/domain/entities/inbound.entity';
-import { ScanInboundStatus } from 'src/core/domain/entities/transaction-scan-inbound.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 
 @Injectable()
@@ -10,7 +9,7 @@ export class InboundRepository {
   constructor(
     @InjectRepository(Inbound)
     private readonly repository: Repository<Inbound>,
-  ) {}
+  ) { }
 
   async create(data: Partial<Inbound>): Promise<Inbound> {
     const entity = this.repository.create(data);
@@ -43,6 +42,8 @@ export class InboundRepository {
       inbound_type?: string;
       driver_name?: string;
       license_plate?: string;
+      start_date?: string;
+      end_date?: string;
     },
     page: number = 1,
     limit: number = 10,
@@ -54,6 +55,14 @@ export class InboundRepository {
 
     if (filters.status) {
       queryBuilder.andWhere('inbound.status = :status', { status: filters.status });
+    }
+
+    if (filters.start_date) {
+      queryBuilder.andWhere('inbound.createdAt >= :startDate', { startDate: filters.start_date });
+    }
+
+    if (filters.end_date) {
+      queryBuilder.andWhere('inbound.createdAt <= :endDate', { endDate: filters.end_date });
     }
 
     if (search) {
@@ -75,6 +84,9 @@ export class InboundRepository {
         'item.id::varchar = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
+      .leftJoinAndSelect('transaction_scan_inbounds.item', 'transaction_scan_inbounds_item')
+      .leftJoinAndSelect('transaction_scan_inbounds.pallet', 'transaction_scan_inbounds_pallet')
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)
@@ -119,6 +131,29 @@ export class InboundRepository {
       throw new NotFoundException('Inbound not found');
     }
     await this.repository.softDelete(id);
+  }
+
+  /**
+   * Returns a map of inbound id -> inbound_number for the given ids (for populating inbound_reference_number).
+   */
+  async findInboundNumbersByIds(ids: string[]): Promise<Map<string, string>> {
+    if (!ids.length) {
+      return new Map();
+    }
+    const distinctIds = [...new Set(ids)];
+    const rows = await this.repository
+      .createQueryBuilder('inbound')
+      .select('inbound.id', 'id')
+      .addSelect('inbound.inbound_number', 'inbound_number')
+      .where('inbound.id IN (:...ids)', { ids: distinctIds })
+      .getRawMany<{ id: string; inbound_number: string | null }>();
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.inbound_number != null) {
+        map.set(row.id, row.inbound_number);
+      }
+    }
+    return map;
   }
 
   async getNextInboundNumberForDate(date: Date): Promise<string> {

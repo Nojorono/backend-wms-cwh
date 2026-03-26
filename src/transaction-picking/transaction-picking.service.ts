@@ -130,7 +130,7 @@ export class TransactionPickingService {
 
     this.validateStatusTransition(existing.status, status);
 
-    return this.repository.updateStatus(id, status);
+    return this.repository.updateStatus(id, status); 
   }
 
   async findAllByMemoId(memoId: string): Promise<PickingTransaction[]> {
