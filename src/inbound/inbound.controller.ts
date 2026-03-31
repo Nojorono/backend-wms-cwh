@@ -134,9 +134,35 @@ export class InboundController {
     return this.service.findByAssignedHelperId(id);
   }
 
-  // find by surat jalan
+  // find by surat jalan (query param friendly, supports "/" safely)
+  @Get('do-validation/:type')
+  @ApiOperation({ summary: 'Find inbound by do validation surat jalan (via query param)' })
+  @ApiParam({
+    name: 'type',
+    required: true,
+    type: String,
+    description: 'Validation type',
+    example: 'SO',
+    enum: ['SO', 'PO'],
+  })
+  @ApiQuery({
+    name: 'suratJalan',
+    required: true,
+    type: String,
+    description: 'Delivery order number / surat jalan',
+    example: 'DO-SHP-SMD2026/03/00100',
+  })
+  @ApiResponse({ status: 200, type: Inbound })
+  findByDoValidationSuratJalan(
+    @Param('type') type: 'SO' | 'PO',
+    @Query('suratJalan') suratJalan: string,
+  ) {
+    return this.doValidationIntegrationService.getDoValidation(suratJalan, type);
+  }
+
+  // legacy path param route kept for backward compatibility
   @Get('do-validation/:type/:suratJalan')
-  @ApiOperation({ summary: 'Find inbound by do validation surat jalan' })
+  @ApiOperation({ summary: 'Find inbound by do validation surat jalan (legacy path param)' })
   @ApiParam({
     name: 'type',
     required: true,
@@ -146,7 +172,7 @@ export class InboundController {
     enum: ['SO', 'PO'],
   })
   @ApiResponse({ status: 200, type: Inbound })
-  findByDoValidationSuratJalan(
+  findByDoValidationSuratJalanLegacy(
     @Param('type') type: 'SO' | 'PO',
     @Param('suratJalan') suratJalan: string,
   ) {
