@@ -7,6 +7,7 @@ import {
   ApiExtraModels,
   ApiBody,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { InboundService } from './inbound.service';
 import {
@@ -31,7 +32,7 @@ export class InboundController {
   constructor(
     private readonly service: InboundService,
     private readonly doValidationIntegrationService: DoValidationIntegrationService,
-  ) {}
+  ) { }
 
   @Post()
   @ApiOperation({ summary: 'Create inbound with optional DOs and Items' })
@@ -65,13 +66,13 @@ export class InboundController {
   })
   findAll(@Query() paginationQuery: InboundPaginationQueryDto) {
     // Check if any pagination parameters are provided
-    const hasPaginationParams = paginationQuery.search || paginationQuery.page || paginationQuery.limit || 
-                               paginationQuery.sortBy || paginationQuery.sortOrder || paginationQuery.status;
-    
+    const hasPaginationParams = paginationQuery.search || paginationQuery.page || paginationQuery.limit ||
+      paginationQuery.sortBy || paginationQuery.sortOrder || paginationQuery.status;
+
     if (hasPaginationParams) {
       return this.service.findAllPaginated(paginationQuery);
     }
-    
+
     return this.service.findAll();
   }
 
@@ -134,11 +135,22 @@ export class InboundController {
   }
 
   // find by surat jalan
-  @Get('do-validation/:suratJalan')
+  @Get('do-validation/:type/:suratJalan')
   @ApiOperation({ summary: 'Find inbound by do validation surat jalan' })
+  @ApiParam({
+    name: 'type',
+    required: true,
+    type: String,
+    description: 'Validation type',
+    example: 'SO',
+    enum: ['SO', 'PO'],
+  })
   @ApiResponse({ status: 200, type: Inbound })
-  findByDoValidationSuratJalan(@Param('suratJalan') suratJalan: string) {
-    return this.doValidationIntegrationService.getDoValidationBySuratJalan(suratJalan);
+  findByDoValidationSuratJalan(
+    @Param('type') type: 'SO' | 'PO',
+    @Param('suratJalan') suratJalan: string,
+  ) {
+    return this.doValidationIntegrationService.getDoValidation(suratJalan, type);
   }
 
   // bulk update saldo inspection
