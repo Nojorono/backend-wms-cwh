@@ -21,7 +21,7 @@ export class DoValidationIntegrationService implements OnModuleInit {
   private readonly MAX_CONNECTION_ATTEMPTS = 5;
   private readonly CONNECTION_RETRY_DELAY = 2000; // 2 seconds
 
-  constructor(@Inject('DO_VALIDATION_SERVICE') private readonly doValidationClient: ClientProxy) {}
+  constructor(@Inject('DO_VALIDATION_SERVICE') private readonly doValidationClient: ClientProxy) { }
 
   async onModuleInit() {
     this.logger.log('Initializing connection to RabbitMQ do validation service...');
@@ -127,6 +127,25 @@ export class DoValidationIntegrationService implements OnModuleInit {
     }
   }
 
+  async getDoValidation(
+    suratJalan: string,
+    type: string,
+  ): Promise<{ data_so: DoValidationDto[]; data_po: DoValidationDto[] }> {
+    if (type === 'SO') {
+      const response = await this.getDoValidationBySuratJalanSO(suratJalan);
+      return {
+        data_so: response.data || [],
+        data_po: [],
+      };
+    }
+
+    const response = await this.getDoValidationBySuratJalan(suratJalan);
+    return {
+      data_so: [],
+      data_po: response.data || [],
+    };
+  }
+
   async getDoValidationBySuratJalan(suratJalan: string): Promise<DoValidationResponseDto> {
     try {
       this.logger.log(
@@ -139,6 +158,49 @@ export class DoValidationIntegrationService implements OnModuleInit {
       const doValidationResponse = await firstValueFrom(
         this.doValidationClient
           .send<DoValidationResponseDto>('do_validation_find_by_no_surat_jalan', {
+            noSuratJalan: suratJalan,
+          })
+          .pipe(
+            timeout(timeoutMs),
+            catchError((error) => {
+              this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
+              this.connectionEstablished = false;
+              throw error; // Let the catch block handle fallback
+            }),
+          ),
+      );
+
+      return (
+        doValidationResponse || {
+          data: [],
+          count: 0,
+          status: false,
+          message: 'Failed to retrieve data from do validation integration service (null response)',
+        }
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error getting do validation integration by surat jalan ${suratJalan} via RabbitMQ, falling back to local integration service:`,
+        error,
+      );
+      this.connectionEstablished = false;
+      throw error;
+    }
+  }
+
+
+  async getDoValidationBySuratJalanSO(suratJalan: string): Promise<any> {
+    try {
+      this.logger.log(
+        `Sending request to get do validation integration by surat jalan: ${suratJalan}`,
+      );
+
+      const timeoutMs = 20000;
+      this.logger.log(`Using timeout of ${timeoutMs}ms for RabbitMQ request`);
+
+      const doValidationResponse = await firstValueFrom(
+        this.doValidationClient
+          .send<any>('do_validation_find_by_surat_jalan_so', {
             noSuratJalan: suratJalan,
           })
           .pipe(

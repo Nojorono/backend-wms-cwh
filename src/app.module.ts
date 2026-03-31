@@ -48,6 +48,7 @@ import { PalletUpdateModule } from './pallet-update/pallet-update.module';
 import { AdjustmentStockModule } from './adjustment-stock/adjustment-stock.module';
 import { LoggerModule } from './infrastructure/modules/logger.module';
 import { ReportModule } from './report/report.module';
+import { ShipmentPlanModule } from './shipment-plan/shipment-plan.module';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { ReportModule } from './report/report.module';
     PalletUpdateModule,
     AdjustmentStockModule,
     ReportModule,
+    ShipmentPlanModule,
   ],
   providers: [
     {
