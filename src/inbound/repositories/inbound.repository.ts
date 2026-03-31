@@ -58,11 +58,11 @@ export class InboundRepository {
     }
 
     if (filters.start_date) {
-      queryBuilder.andWhere('inbound.createdAt >= :startDate', { startDate: filters.start_date });
+      queryBuilder.andWhere('DATE(inbound.createdAt) >= :startDate', { startDate: filters.start_date });
     }
 
     if (filters.end_date) {
-      queryBuilder.andWhere('inbound.createdAt <= :endDate', { endDate: filters.end_date });
+      queryBuilder.andWhere('DATE(inbound.createdAt) <= :endDate', { endDate: filters.end_date });
     }
 
     if (search) {
