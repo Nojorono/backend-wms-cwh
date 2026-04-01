@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsOptional, IsEnum, IsBoolean, IsDateString } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { BasePaginationQueryDto } from '../../core/dto/base-pagination.dto';
 import { OutboundDoStatus, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
@@ -46,6 +46,22 @@ export class OutboundDoPaginationDto extends BasePaginationQueryDto {
   @IsOptional()
   @IsEnum(TransactionPickingStatus)
   transaction_picking_status?: TransactionPickingStatus;
+
+  @ApiPropertyOptional({
+    description: 'Filter by created date (start, inclusive, ISO date)',
+    example: '2026-03-01',
+  })
+  @IsOptional()
+  @IsDateString()
+  start_date?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by created date (end, inclusive, ISO date)',
+    example: '2026-03-31',
+  })
+  @IsOptional()
+  @IsDateString()
+  end_date?: string;
 }
 
 

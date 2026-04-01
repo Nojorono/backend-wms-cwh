@@ -306,6 +306,8 @@ export class OutboundDoRepository {
       outbound_type,
       has_transaction_scan_picking,
       transaction_picking_status,
+      start_date,
+      end_date,
     } = paginationDto;
 
     const qb = this.buildQueryWithAllRelations();
@@ -338,6 +340,14 @@ export class OutboundDoRepository {
         transaction_picking_status,
       });
       qb.distinct(true);
+    }
+
+    if (start_date) {
+      qb.andWhere('DATE(outbound_do.createdAt) >= :startDate', { startDate: start_date });
+    }
+
+    if (end_date) {
+      qb.andWhere('DATE(outbound_do.createdAt) <= :endDate', { endDate: end_date });
     }
 
     if (search) {
