@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsUUID, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsUUID, IsEnum, IsBoolean } from 'class-validator';
 import { WarehouseSubStagingType } from 'src/core/domain/entities/master-warehouse-sub.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -48,4 +48,14 @@ export class UpdateMasterWarehouseSubDto {
   @IsEnum(WarehouseSubStagingType)
   @IsOptional()
   is_staging?: WarehouseSubStagingType;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_good_stock?: boolean;
+
+  @ApiProperty({ example: true, required: false })
+  @IsBoolean()
+  @IsOptional()
+  is_gate?: boolean;
 }
