@@ -94,6 +94,7 @@ export class MasterPalletService {
       isActive: dto.isActive ?? true,
       isFull: false,
       currentQuantity: 0,
+      uom: dto.uom,
     }));
 
     return this.repository.createMany(payloads);

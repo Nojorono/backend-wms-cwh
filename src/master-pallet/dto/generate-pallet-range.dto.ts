@@ -38,4 +38,9 @@ export class GeneratePalletRangeDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean = true;
+
+  @ApiPropertyOptional({ example: 'PCS', default: 'PCS' })
+  @IsOptional()
+  @IsString()
+  uom?: string;
 }
