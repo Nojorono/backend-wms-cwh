@@ -43,4 +43,14 @@ export class CreateUserDto {
   @IsOptional()
   @IsUUID()
   warehouseSubId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  lastName?: string;
 }

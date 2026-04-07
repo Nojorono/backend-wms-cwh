@@ -18,11 +18,11 @@ export class UserRepository {
   }
 
   async findAll(): Promise<User[]> {
-    return await this.repository.find();
+    return await this.repository.find({ relations: ['userDetail'] });
   }
 
   async findAllWithDeleted(): Promise<User[]> {
-    return await this.repository.find({ withDeleted: true });
+    return await this.repository.find({ withDeleted: true, relations: ['userDetail'] });
   }
 
   async findByUsername(username: string, includeDeleted: boolean = false): Promise<User | null> {

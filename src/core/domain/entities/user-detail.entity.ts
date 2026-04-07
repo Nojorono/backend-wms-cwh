@@ -1,7 +1,6 @@
 import { Entity, Column, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { MasterIO } from './master-io.entity';
-import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { User } from './user.entity';
 
 @Entity('user_details')
@@ -23,17 +22,16 @@ export class UserDetail extends BaseEntity {
   @Column({ nullable: true })
   phone: string;
 
+  @Column({ nullable: true })
+  firstName: string;
+
+  @Column({ nullable: true })
+  lastName: string;
+
   @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'organization_id' })
   organization: MasterIO;
 
   @Column({ name: 'organization_id', nullable: true })
   organizationId: string;
-
-  @Column({ name: 'warehouse_sub_id', nullable: true })
-  warehouseSubId: string;
-
-  @ManyToOne(() => MasterWarehouseSub, { onDelete: 'RESTRICT', nullable: true })
-  @JoinColumn({ name: 'warehouse_sub_id' })
-  warehouseSub: MasterWarehouseSub;
 }

@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, QueryFailedError } from 'typeorm';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
 import {
@@ -59,7 +59,17 @@ export class MasterWarehouseSubRepository {
     if (!warehouseSub) {
       throw new NotFoundException('Warehouse not found');
     }
-    await this.repository.delete(id);
+    try {
+      await this.repository.delete(id);
+    } catch (error) {
+      // PostgreSQL foreign key violation: record is still referenced by other tables.
+      if (error instanceof QueryFailedError && (error as any).driverError?.code === '23503') {
+        throw new ConflictException(
+          'Warehouse sub cannot be deleted because it is still used by other data.',
+        );
+      }
+      throw error;
+    }
   }
 
   async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {

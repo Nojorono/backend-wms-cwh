@@ -7,7 +7,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '../core/domain/entities/user.entity';
 import { UserDetail } from '../core/domain/entities/user-detail.entity';
 import * as bcrypt from 'bcrypt';
-import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-sub.entity';
 
 @Injectable()
 export class UserService {
@@ -28,29 +27,31 @@ export class UserService {
     createUserDto.password = hashedPassword;
 
     try {
-    const user = await this.repository.create(createUserDto);
+      const user = await this.repository.create(createUserDto);
 
-    if (
-      createUserDto.employeeId ||
-      createUserDto.email ||
-      createUserDto.phone ||
-      createUserDto.organizationId ||
-      createUserDto.warehouseSubId
-    ) {
-      const userDetail = this.userDetailRepository.create({
-        userId: user.id,
-        employee_id: createUserDto.employeeId || `EMP_${user.username}`,
-        email: createUserDto.email || `${user.username}@default.com`,
-        phone: createUserDto.phone || '0000000000',
-        organizationId: createUserDto.organizationId,
-        warehouseSubId: createUserDto.warehouseSubId,
-      });
+      if (
+        createUserDto.employeeId ||
+        createUserDto.email ||
+        createUserDto.phone ||
+        createUserDto.organizationId ||
+        createUserDto.firstName ||
+        createUserDto.lastName
+      ) {
+        const userDetail = this.userDetailRepository.create({
+          userId: user.id,
+          employee_id: createUserDto.employeeId || `EMP_${user.username}`,
+          email: createUserDto.email || `${user.username}@default.com`,
+          phone: createUserDto.phone || '0000000000',
+          organizationId: createUserDto.organizationId,
+          firstName: createUserDto.firstName,
+          lastName: createUserDto.lastName,
+        });
 
-      await this.userDetailRepository.save(userDetail);
-    }
+        await this.userDetailRepository.save(userDetail);
+      }
 
-    // Reload user with relationships
-    return await this.findOne(user.id);
+      // Reload user with relationships
+      return await this.findOne(user.id);
     } catch (error) {
       // Handle database constraint violations (e.g., duplicate username)
       if (error instanceof QueryFailedError) {
@@ -125,14 +126,14 @@ export class UserService {
       updateUserDto.email !== undefined ||
       updateUserDto.phone !== undefined ||
       updateUserDto.organizationId !== undefined ||
-      updateUserDto.warehouseSubId !== undefined
+      updateUserDto.firstName !== undefined ||
+      updateUserDto.lastName !== undefined
     ) {
       const userDetailUpdateData: Partial<UserDetail> = {};
       if (updateUserDto.employeeId !== undefined) userDetailUpdateData.employee_id = updateUserDto.employeeId;
       if (updateUserDto.email !== undefined) userDetailUpdateData.email = updateUserDto.email;
       if (updateUserDto.phone !== undefined) userDetailUpdateData.phone = updateUserDto.phone;
       if (updateUserDto.organizationId !== undefined) userDetailUpdateData.organizationId = updateUserDto.organizationId;
-      if (updateUserDto.warehouseSubId !== undefined) userDetailUpdateData.warehouseSubId = updateUserDto.warehouseSubId;
 
       let userDetail = await this.userDetailRepository.findOne({ where: { userId: user.id } });
       if (!userDetail) {
@@ -142,7 +143,8 @@ export class UserService {
           email: updateUserDto.email,
           phone: updateUserDto.phone,
           organizationId: updateUserDto.organizationId,
-          warehouseSubId: updateUserDto.warehouseSubId,
+          firstName: updateUserDto.firstName,
+          lastName: updateUserDto.lastName,
         });
         await this.userDetailRepository.save(userDetail);
       } else {
