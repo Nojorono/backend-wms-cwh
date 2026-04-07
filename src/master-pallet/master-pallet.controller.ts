@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels, ApiBody } from '@nestjs/swagger';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
+import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
 import {
   PalletQuantityHistoryResponseDto,
@@ -38,6 +39,21 @@ export class MasterPalletController {
   })
   create(@Body() createMasterPalletDto: CreateMasterPalletDto) {
     return this.masterPalletService.create(createMasterPalletDto);
+  }
+
+  @Post('generate-range')
+  @ApiOperation({ summary: 'Generate pallet data by numeric range (e.g. PAL-0001 to PAL-1000)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Pallets generated successfully.',
+    type: [MasterPallet],
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'One or more pallet codes in the range already exist.',
+  })
+  generateRange(@Body() dto: GeneratePalletRangeDto) {
+    return this.masterPalletService.generateRange(dto);
   }
 
   @Get()

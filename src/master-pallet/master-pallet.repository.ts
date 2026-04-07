@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
@@ -61,5 +61,22 @@ export class MasterPalletRepository {
 
   async remove(id: string): Promise<void> {
     await this.repository.delete(id);
+  }
+
+  async findByPalletCodes(palletCodes: string[]): Promise<MasterPallet[]> {
+    if (!palletCodes.length) {
+      return [];
+    }
+    return this.repository.find({
+      where: { pallet_code: In(palletCodes) },
+    });
+  }
+
+  async createMany(payloads: CreateMasterPalletDto[]): Promise<MasterPallet[]> {
+    if (!payloads.length) {
+      return [];
+    }
+    const entities = this.repository.create(payloads);
+    return this.repository.save(entities);
   }
 }

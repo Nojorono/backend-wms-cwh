@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { MasterPalletRepository } from './master-pallet.repository';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
+import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
 import {
   UpdatePalletQuantityDto,
@@ -58,6 +59,44 @@ export class MasterPalletService {
     });
 
     return pallet;
+  }
+
+  async generateRange(dto: GeneratePalletRangeDto): Promise<MasterPallet[]> {
+    const padding = dto.padding ?? 4;
+    const isAscending = dto.start <= dto.end;
+
+    if (!isAscending) {
+      throw new BadRequestException('start must be less than or equal to end');
+    }
+
+    const total = dto.end - dto.start + 1;
+    if (total > 10000) {
+      throw new BadRequestException('Maximum allowed range is 10000 pallet codes per request');
+    }
+
+    const palletCodes = Array.from({ length: total }, (_, idx) => {
+      const num = dto.start + idx;
+      return `${dto.prefix}${String(num).padStart(padding, '0')}`;
+    });
+
+    const existing = await this.repository.findByPalletCodes(palletCodes);
+    if (existing.length > 0) {
+      const existingCodes = existing.map((item) => item.pallet_code).sort();
+      throw new ConflictException(
+        `Some pallet codes already exist: ${existingCodes.slice(0, 20).join(', ')}${existingCodes.length > 20 ? ' ...' : ''}`,
+      );
+    }
+
+    const payloads: CreateMasterPalletDto[] = palletCodes.map((palletCode) => ({
+      pallet_code: palletCode,
+      organization_id: dto.organization_id,
+      capacity: dto.capacity,
+      isActive: dto.isActive ?? true,
+      isFull: false,
+      currentQuantity: 0,
+    }));
+
+    return this.repository.createMany(payloads);
   }
 
   async findAll(): Promise<MasterPallet[]> {
