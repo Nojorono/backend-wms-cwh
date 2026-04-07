@@ -134,6 +134,8 @@ export class UserService {
       if (updateUserDto.email !== undefined) userDetailUpdateData.email = updateUserDto.email;
       if (updateUserDto.phone !== undefined) userDetailUpdateData.phone = updateUserDto.phone;
       if (updateUserDto.organizationId !== undefined) userDetailUpdateData.organizationId = updateUserDto.organizationId;
+      if (updateUserDto.firstName !== undefined) userDetailUpdateData.firstName = updateUserDto.firstName;
+      if (updateUserDto.lastName !== undefined) userDetailUpdateData.lastName = updateUserDto.lastName;
 
       let userDetail = await this.userDetailRepository.findOne({ where: { userId: user.id } });
       if (!userDetail) {
