@@ -1,16 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { MasterWarehouseBinRepository } from './master-warehouse-bin.repository';
 import { CreateMasterWarehouseBinDto } from './dto/create-master-warehouse-bin.dto';
 import { UpdateMasterWarehouseBinDto } from './dto/update-master-warehouse-bin.dto';
 import { MasterWarehouseBin } from 'src/core/domain/entities/master-warehouse-bin.entity';
 import { BarcodeService } from 'src/infrastructure/services/barcode.service';
+import { QueryFailedError } from 'typeorm';
 
 @Injectable()
 export class MasterWarehouseBinService {
   constructor(
     private readonly repository: MasterWarehouseBinRepository,
     private readonly barcodeService: BarcodeService,
-  ) {}
+  ) { }
 
   async create(
     createMasterWarehouseBinDto: CreateMasterWarehouseBinDto,
@@ -56,7 +57,17 @@ export class MasterWarehouseBinService {
 
   async remove(id: string): Promise<void> {
     await this.findOne(id);
-    await this.repository.remove(id);
+    try {
+      await this.repository.remove(id);
+    } catch (error) {
+      // PostgreSQL foreign key violation: record is still referenced by other tables.
+      if (error instanceof QueryFailedError && (error as any).driverError?.code === '23503') {
+        throw new ConflictException(
+          'Warehouse bin cannot be deleted because it is still used by other data.',
+        );
+      }
+      throw error;
+    }
   }
 
 }
