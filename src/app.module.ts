@@ -1,5 +1,4 @@
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { join } from 'path';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -41,8 +40,6 @@ import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion
 import { NotificationModule } from './notification/notification.module';
 import { InventoryMovementModule } from './inventory-movement/inventory-movement.module';
 import { MoveOrderModule } from './move-order/move-order.module';
-import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
-import { ApprovalModule } from './approval/approval.module';
 import { UsersActivityModule } from './users-activity/users-activity.module';
 import { PalletUpdateModule } from './pallet-update/pallet-update.module';
 import { AdjustmentStockModule } from './adjustment-stock/adjustment-stock.module';
@@ -97,8 +94,6 @@ import { ShipmentPlanModule } from './shipment-plan/shipment-plan.module';
     NotificationModule,
     InventoryMovementModule,
     MoveOrderModule,
-    ApprovalSetupModule,
-    ApprovalModule,
     UsersActivityModule,
     PalletUpdateModule,
     AdjustmentStockModule,
