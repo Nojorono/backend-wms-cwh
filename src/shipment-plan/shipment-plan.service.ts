@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
+import { ShipmentPlanRepository } from './shipment-plan.repository';
+import { ShipmentPlanItemRepository } from './shipment-plan-item.repository';
+import { MasterWeek } from '../core/domain/entities/master-week.entity';
+import { ShipmentPlanUploadResponseDto } from './dto/shipment-plan-upload-response.dto';
 
 export interface ShipmentPlanExcelFile {
   originalname: string;
@@ -9,17 +15,21 @@ export interface ShipmentPlanExcelFile {
 }
 
 interface ShipmentPlanExtractedRow {
+  source: string;
   type: string;
   reg: string;
   code: string;
-  name: string;
-  destination: string;
+  /** Name column from sheet (e.g. city / AMO label). */
+  amo: string;
+  /** Destination / SKU code from column header (e.g. MD10). */
+  sku: string;
   metric: string;
   quantity: number;
 }
 
 interface ShipmentPlanHeaderPosition {
   rowIndex: number;
+  sourceCol: number;
   typeCol: number;
   regCol: number;
   codeCol: number;
@@ -33,14 +43,14 @@ interface ShipmentPlanColumnMapCandidate {
 
 @Injectable()
 export class ShipmentPlanService {
-  uploadExcel(file: ShipmentPlanExcelFile): {
+  constructor(
+    private readonly shipmentPlanRepository: ShipmentPlanRepository,
+    private readonly shipmentPlanItemRepository: ShipmentPlanItemRepository,
+    @InjectRepository(MasterWeek)
+    private readonly masterWeekRepository: Repository<MasterWeek>,
+  ) { }
 
-    fileName: string;
-    size: number;
-    mimeType: string;
-    totalExtractedRows: number;
-    rows: ShipmentPlanExtractedRow[];
-  } {
+  async uploadExcel(file: ShipmentPlanExcelFile): Promise<ShipmentPlanUploadResponseDto> {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
@@ -58,14 +68,84 @@ export class ShipmentPlanService {
     }
 
     const rows = this.extractRowsFromExcel(file.buffer);
+    return this.saveShipmentPlan(file, rows);
+  }
+
+  private async saveShipmentPlan(
+    file: ShipmentPlanExcelFile,
+    rows: ShipmentPlanExtractedRow[],
+  ): Promise<ShipmentPlanUploadResponseDto> {
+    const now = new Date();
+    const weekData = await this.masterWeekRepository.findOne({
+      where: {
+        TANGGAL_AWAL_MINGGU_REAL: LessThanOrEqual(now),
+        TANGGAL_AKHIR_MINGGU_REAL: MoreThanOrEqual(now),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!weekData) {
+      throw new BadRequestException('Master week data not found for current date');
+    }
+
+    const weekNumber = weekData.MINGGU;
+    const year = weekData.TAHUN;
+    const batchNumber = await this.generateBatchNumber(year, weekNumber);
+
+    const shipmentPlan = await this.shipmentPlanRepository.create({
+      fileName: file.originalname,
+      fileSize: file.size,
+      totalExtractedRows: rows.length,
+      weekNumber,
+      batchNumber,
+    });
+
+    await this.shipmentPlanItemRepository.createMany(
+      rows.map((row) => ({
+        shipmentPlanId: shipmentPlan.id,
+        source: row.source,
+        type: row.type,
+        reg: row.reg,
+        code: row.code,
+        amo: row.amo,
+        sku: row.sku,
+        metric: row.metric,
+        quantity: row.quantity,
+        uom: 'DUS',
+      })),
+    );
 
     return {
+      shipmentPlanId: shipmentPlan.id,
       fileName: file.originalname,
       size: file.size,
       mimeType: file.mimetype,
+      weekNumber,
+      batchNumber,
       totalExtractedRows: rows.length,
       rows,
     };
+  }
+
+  private async generateBatchNumber(year: number, weekNumber: number): Promise<string> {
+    const yearPart = String(year);
+    const weekPart = String(weekNumber).padStart(2, '0');
+    const prefix = `${yearPart}-${weekPart}-`;
+
+    const latestBatchNumber = await this.shipmentPlanRepository.findLatestBatchNumberForPrefix(
+      prefix,
+    );
+
+    let nextIncrement = 1;
+    if (latestBatchNumber) {
+      const lastPart = latestBatchNumber.split('-').pop() || '0';
+      const parsed = Number.parseInt(lastPart, 10);
+      if (Number.isFinite(parsed)) {
+        nextIncrement = parsed + 1;
+      }
+    }
+
+    return `${prefix}${String(nextIncrement).padStart(4, '0')}`;
   }
 
   private extractRowsFromExcel(buffer: Buffer): ShipmentPlanExtractedRow[] {
@@ -128,12 +208,13 @@ export class ShipmentPlanService {
 
       for (let i = dataStartIndex; i < dataEndExclusive; i++) {
         const row = matrix[i] || [];
+        const source = this.normalizeCell(row[headerPosition.sourceCol]);
         const type = this.normalizeCell(row[headerPosition.typeCol]);
         const reg = this.normalizeCell(row[headerPosition.regCol]);
         const code = this.normalizeCell(row[headerPosition.codeCol]);
-        const name = this.normalizeCell(row[headerPosition.nameCol]);
+        const amo = this.normalizeCell(row[headerPosition.nameCol]);
 
-        const hasIdentity = Boolean(type || reg || code || name);
+        const hasIdentity = Boolean(type || reg || code || amo);
         if (!hasIdentity) {
           continue;
         }
@@ -148,11 +229,12 @@ export class ShipmentPlanService {
           }
 
           extractedRows.push({
+            source,
             type,
             reg,
             code,
-            name,
-            destination: column.destination,
+            amo,
+            sku: column.destination,
             metric: column.metric,
             quantity,
           });
@@ -202,18 +284,20 @@ export class ShipmentPlanService {
       const row = matrix[rowIndex] || [];
 
       for (let col = 0; col < row.length; col++) {
-        const maybeType = this.normalizeHeader(row[col]);
-        const maybeReg = this.normalizeHeader(row[col + 1]);
-        const maybeCode = this.normalizeHeader(row[col + 2]);
-        const maybeFourth = this.normalizeHeader(row[col + 3]);
+        const maybeSource = this.normalizeHeader(row[col]);
+        const maybeType = this.normalizeHeader(row[col + 1]);
+        const maybeReg = this.normalizeHeader(row[col + 2]);
+        const maybeCode = this.normalizeHeader(row[col + 3]);
+        const maybeFourth = this.normalizeHeader(row[col + 4]);
 
-        if (maybeType === 'TYPE' && maybeReg === 'REG' && maybeCode === 'CODE' && maybeFourth) {
+        if (maybeSource === 'SOURCE' && maybeType === 'TYPE' && maybeReg === 'REG' && maybeCode === 'CODE' && maybeFourth) {
           const candidate: ShipmentPlanHeaderPosition = {
             rowIndex,
-            typeCol: col,
-            regCol: col + 1,
-            codeCol: col + 2,
-            nameCol: col + 3,
+            sourceCol: col,
+            typeCol: col + 1,
+            regCol: col + 2,
+            codeCol: col + 3,
+            nameCol: col + 4,
           };
           const exists = headers.some(
             (item) =>
@@ -286,5 +370,16 @@ export class ShipmentPlanService {
 
     const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private extractUomFromMetric(metric: string): string {
+    const normalized = this.normalizeCell(metric).toUpperCase();
+    if (!normalized) {
+      return '';
+    }
+    if (normalized.startsWith('MIX PC')) {
+      return 'MIX PC';
+    }
+    return normalized.split(' ')[0] || '';
   }
 }
