@@ -35,7 +35,6 @@ export class AuthService implements IAuthService {
       organizationId: user.userDetail?.organizationId ?? null,
       type: 'access',
     };
-    console.log(payload);
     return this.jwtService.sign(payload);
   }
 

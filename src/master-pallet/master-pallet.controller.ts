@@ -1,6 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels, ApiBody } from '@nestjs/swagger';
-import { Request } from 'express';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
@@ -17,6 +16,7 @@ import {
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
 
@@ -64,19 +64,13 @@ export class MasterPalletController {
     description: 'Return all Pallets.',
     type: [MasterPallet],
   })
-  findAll(@Req() req: Request & { user?: { organizationId?: string | number } }) {
-    const organizationId = req.user?.organizationId;
+  findAll(@OrganizationId() organizationId: string | number | null) {
+
     if (organizationId === undefined || organizationId === null || organizationId === '') {
       return this.masterPalletService.findAll();
     }
 
-    const parsedOrganizationId =
-      typeof organizationId === 'string' ? organizationId : String(organizationId);
-    if (!parsedOrganizationId) {
-      return this.masterPalletService.findAll();
-    }
-
-    return this.masterPalletService.findAllByOrganizationId(parsedOrganizationId);
+    return this.masterPalletService.findAllByOrganizationId(String(organizationId));
   }
 
   @Get(':id')
