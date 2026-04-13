@@ -14,7 +14,7 @@ export class AuthService implements IAuthService {
     private readonly configService: ConfigService,
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
-  ) {}
+  ) { }
 
   async validateUser(username: string, password: string): Promise<User | null> {
     const user = await this.userRepository.findByUsername(username);
@@ -28,12 +28,25 @@ export class AuthService implements IAuthService {
   }
 
   async generateToken(user: User): Promise<string> {
-    const payload = { sub: user.id, username: user.username, type: 'access' };
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      roleId: user.roleId,
+      organizationId: user.userDetail?.organizationId ?? null,
+      type: 'access',
+    };
+    console.log(payload);
     return this.jwtService.sign(payload);
   }
 
   async generateRefreshToken(user: User): Promise<string> {
-    const payload = { sub: user.id, username: user.username, type: 'refresh' };
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      roleId: user.roleId,
+      organizationId: user.userDetail?.organizationId ?? null,
+      type: 'refresh',
+    };
     const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d');
     return this.jwtService.sign(payload, {
       expiresIn: refreshTokenExpiresIn,

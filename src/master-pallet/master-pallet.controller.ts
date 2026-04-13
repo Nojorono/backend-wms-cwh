@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels, ApiBody } from '@nestjs/swagger';
+import { Request } from 'express';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
@@ -24,7 +25,7 @@ import { QuantityOperationType } from '../core/domain/entities/transaction-palle
 @ApiBearerAuth('JWT-auth')
 @ApiExtraModels(PalletQuantityHistoryResponseDto, PaginatedResponseDto, UpdatePalletItemStockDto)
 export class MasterPalletController {
-  constructor(private readonly masterPalletService: MasterPalletService) {}
+  constructor(private readonly masterPalletService: MasterPalletService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new UOM' })
@@ -63,8 +64,19 @@ export class MasterPalletController {
     description: 'Return all Pallets.',
     type: [MasterPallet],
   })
-  findAll() {
-    return this.masterPalletService.findAll();
+  findAll(@Req() req: Request & { user?: { organizationId?: string | number } }) {
+    const organizationId = req.user?.organizationId;
+    if (organizationId === undefined || organizationId === null || organizationId === '') {
+      return this.masterPalletService.findAll();
+    }
+
+    const parsedOrganizationId =
+      typeof organizationId === 'string' ? organizationId : String(organizationId);
+    if (!parsedOrganizationId) {
+      return this.masterPalletService.findAll();
+    }
+
+    return this.masterPalletService.findAllByOrganizationId(parsedOrganizationId);
   }
 
   @Get(':id')
@@ -209,7 +221,7 @@ export class MasterPalletController {
   }
 
   @Patch('by-code/:palletCode/item/:itemId/quantity')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update quantity for specific item on pallet by pallet code and item ID',
     description: 'Direct stock adjustment for pallet item. This endpoint adjusts the item quantity to the specified value. Only quantity is required. Operation type is automatically set to ADJUST.'
   })

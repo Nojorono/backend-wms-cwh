@@ -2,10 +2,10 @@ import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateMasterPalletDto {
-  @ApiProperty({ example: 1, required: false })
-  @IsNumber()
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false })
+  @IsString()
   @IsOptional()
-  organization_id?: number;
+  organization_id?: string;
 
   @ApiProperty({ example: 'PALLET001' })
   @IsString()

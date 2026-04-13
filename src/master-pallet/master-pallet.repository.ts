@@ -21,6 +21,12 @@ export class MasterPalletRepository {
     return await this.repository.find();
   }
 
+  async findAllByOrganizationId(organizationId: string): Promise<MasterPallet[]> {
+    return this.repository.find({
+      where: { organization_id: organizationId },
+    });
+  }
+
   async findOne(id: string): Promise<MasterPallet | null> {
     const pallet = await this.repository.findOne({ where: { id } });
     if (!pallet) {

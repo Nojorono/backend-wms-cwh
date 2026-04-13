@@ -104,6 +104,10 @@ export class MasterPalletService {
     return await this.repository.findAll();
   }
 
+  async findAllByOrganizationId(organizationId: string): Promise<MasterPallet[]> {
+    return this.repository.findAllByOrganizationId(organizationId);
+  }
+
   async findOne(id: string): Promise<MasterPallet> {
     const pallet = await this.repository.findOne(id);
     if (!pallet) {
