@@ -112,50 +112,6 @@ export class MasterPalletController {
     return this.masterPalletService.remove(id);
   }
 
-  @Patch(':palletCode/quantity')
-  @ApiOperation({ summary: 'Update pallet quantity' })
-  @ApiResponse({
-    status: 200,
-    description: 'The Pallet quantity has been successfully updated.',
-    type: MasterPallet,
-  })
-  @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  updateQuantity(
-    @Param('palletCode') palletCode: string,
-    @Body() updateQuantityDto: UpdatePalletQuantityDto,
-  ) {
-    return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
-  }
-
-  @Patch(':id/production-date')
-  @ApiOperation({ summary: 'Update production date for an item line on a pallet' })
-  @ApiResponse({
-    status: 200,
-    description: 'Production date updated. A new history record is created with the same quantity.',
-    type: MasterPallet,
-  })
-  @ApiResponse({ status: 400, description: 'No quantity found for the item/UOM on this pallet.' })
-  @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  updateProductionDate(
-    @Param('id') id: string,
-    @Body() dto: UpdateProductionDateDto,
-  ) {
-    return this.masterPalletService.updateProductionDate(id, dto);
-  }
-
-  @Patch(':id/uom')
-  @ApiOperation({ summary: 'Change UOM for an item line on a pallet' })
-  @ApiResponse({
-    status: 200,
-    description: 'UOM updated. Quantity is removed from from_uom and added to to_uom.',
-    type: MasterPallet,
-  })
-  @ApiResponse({ status: 400, description: 'No quantity found for item/from_uom or from_uom equals to_uom.' })
-  @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  updateUOM(@Param('id') id: string, @Body() dto: UpdateUOMDto) {
-    return this.masterPalletService.updateUOM(id, dto);
-  }
-
   @Get('by-code/:palletCode/quantity-history')
   @ApiOperation({ summary: 'Get pallet quantity history by pallet code' })
   @ApiFlexiblePaginationQuery([
@@ -210,45 +166,8 @@ export class MasterPalletController {
     type: [PalletItemQuantityDto],
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  getPalletItemLatestQuantityByPalletCode(@Param('palletCode') palletCode: string) {
+  getPalletItemLatestQuantityByPalletCode( @Param('palletCode') palletCode: string) {
     return this.masterPalletService.getPalletItemLatestQuantityByPalletCode(palletCode);
-  }
-
-  @Patch('by-code/:palletCode/item/:itemId/quantity')
-  @ApiOperation({
-    summary: 'Update quantity for specific item on pallet by pallet code and item ID',
-    description: 'Direct stock adjustment for pallet item. This endpoint adjusts the item quantity to the specified value. Only quantity is required. Operation type is automatically set to ADJUST.'
-  })
-  @ApiBody({ type: UpdatePalletItemStockDto })
-  @ApiResponse({
-    status: 200,
-    description: 'The quantity for item on pallet has been successfully updated.',
-    type: MasterPallet,
-  })
-  @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  @ApiResponse({ status: 400, description: 'Invalid request body or validation error.' })
-  updateItemQuantityByPalletCode(
-    @Param('palletCode') palletCode: string,
-    @Param('itemId') itemId: string,
-    @Body() stockDto: UpdatePalletItemStockDto,
-  ) {
-    // Map to UpdatePalletQuantityDto for service call
-    // Automatically use ADJUST operation type for stock adjustments
-    const updateQuantityDto: UpdatePalletQuantityDto = {
-      item_id: itemId,
-      quantity: stockDto.quantity,
-      operation_type: QuantityOperationType.ADJUST,
-      uom: stockDto.uom,
-      production_date: stockDto.production_date,
-      week_number: stockDto.week_number,
-      notes: stockDto.notes,
-      user_id: stockDto.user_id,
-      reference_type: 'STOCK_ADJUSTMENT',
-      // Explicitly exclude inbound/outbound references
-      inbound_id: undefined,
-      outbound_do_id: undefined,
-    };
-    return this.masterPalletService.updateQuantityByPalletCode(palletCode, updateQuantityDto);
   }
 
   @Get('by-code/:palletCode/item/:itemId/history')
