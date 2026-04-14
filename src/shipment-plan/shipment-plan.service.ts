@@ -7,6 +7,7 @@ import { ShipmentPlanItemRepository } from './shipment-plan-item.repository';
 import { MasterWeek } from '../core/domain/entities/master-week.entity';
 import { ShipmentPlanUploadResponseDto } from './dto/shipment-plan-upload-response.dto';
 import { ShipmentPlan } from 'src/core/domain/entities/shipment-plan.entity';
+import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.entity';
 
 export interface ShipmentPlanExcelFile {
   originalname: string;
@@ -49,6 +50,8 @@ export interface ShipmentPlanDspSummary {
   code: string;
   amo: string;
   totalDsp: number;
+  totalMemo: number;
+  totalOutbound: number;
 }
 
 export interface ShipmentPlanDspResponse {
@@ -63,6 +66,8 @@ export class ShipmentPlanService {
     private readonly shipmentPlanItemRepository: ShipmentPlanItemRepository,
     @InjectRepository(MasterWeek)
     private readonly masterWeekRepository: Repository<MasterWeek>,
+    @InjectRepository(OutboundMemoItem)
+    private readonly outboundMemoItemRepository: Repository<OutboundMemoItem>,
   ) { }
 
   async uploadExcel(file: ShipmentPlanExcelFile, organizationId: string): Promise<ShipmentPlanUploadResponseDto> {
@@ -432,12 +437,31 @@ export class ShipmentPlanService {
     }
 
     const grouped = new Map<string, ShipmentPlanDspSummary>();
+    const outboundMemoCache = new Map<string, { totalMemo: number; totalOutbound: number }>();
 
     for (const item of latestPlan.items) {
       const key = `${item.source}|${item.type}|${item.reg}|${item.code}|${item.amo}`;
+      let totalMemo = 0;
+      let totalOutbound = 0;
+      if (item.source === 'CWH' && item.type === 'AMO') {
+        const centerCode = this.extractCenterCode(item.code);
+        if (centerCode) {
+          const cached = outboundMemoCache.get(centerCode);
+          if (cached !== undefined) {
+            totalMemo = cached.totalMemo;
+            totalOutbound = cached.totalOutbound;
+          } else {
+            totalMemo = await this.countMemoByCenterCode(centerCode);
+            totalOutbound = await this.sumDeliveredOutboundMemoByCenterCode(centerCode);
+            outboundMemoCache.set(centerCode, { totalMemo, totalOutbound });
+          }
+        }
+      }
       const current = grouped.get(key);
       if (current) {
         current.totalDsp += item.quantity;
+        current.totalMemo = totalMemo;
+        current.totalOutbound = totalOutbound;
         continue;
       }
 
@@ -448,6 +472,8 @@ export class ShipmentPlanService {
         code: item.code,
         amo: item.amo,
         totalDsp: item.quantity,
+        totalMemo,
+        totalOutbound,
       });
     }
 
@@ -471,5 +497,47 @@ export class ShipmentPlanService {
       reg,
       code,
     );
+  }
+
+  private extractCenterCode(code: string): string {
+    const normalized = this.normalizeCell(code).toUpperCase();
+    if (!normalized) {
+      return '';
+    }
+
+    const chunks = normalized.split('_').filter(Boolean);
+    if (chunks.length >= 3) {
+      return chunks[1];
+    }
+
+    return chunks[0] || normalized;
+  }
+
+  private async countMemoByCenterCode(centerCode: string): Promise<number> {
+    const destinationPattern = `%${centerCode.toUpperCase()}%`;
+    const result = await this.outboundMemoItemRepository
+      .createQueryBuilder('memo_item')
+      .innerJoin('memo_item.outbound_memo', 'memo')
+      .select('COUNT(DISTINCT memo.id)', 'total')
+      .where('memo.origin = :origin', { origin: 'CWH' })
+      .andWhere('memo.type = :type', { type: 'AMO' })
+      .andWhere('UPPER(memo.destination) LIKE :destinationPattern', { destinationPattern })
+      .getRawOne<{ total: string }>();
+
+    return Number(result?.total ?? 0);
+  }
+
+  private async sumDeliveredOutboundMemoByCenterCode(centerCode: string): Promise<number> {
+    const destinationPattern = `%${centerCode.toUpperCase()}%`;
+    const result = await this.outboundMemoItemRepository
+      .createQueryBuilder('memo_item')
+      .innerJoin('memo_item.outbound_memo', 'memo')
+      .select('COALESCE(SUM(memo_item.quantity_delivered), 0)', 'total')
+      .where('memo.origin = :origin', { origin: 'CWH' })
+      .andWhere('memo.type = :type', { type: 'AMO' })
+      .andWhere('UPPER(memo.destination) LIKE :destinationPattern', { destinationPattern })
+      .getRawOne<{ total: string }>();
+
+    return Number(result?.total ?? 0);
   }
 }
