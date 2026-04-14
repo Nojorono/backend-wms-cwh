@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
     ApiBody,
@@ -12,6 +12,7 @@ import {
 import { ShipmentPlanExcelFile, ShipmentPlanService } from './shipment-plan.service';
 import { ShipmentPlanExtractedRowDto } from './dto/shipment-plan-extracted-row.dto';
 import { ShipmentPlanUploadResponseDto } from './dto/shipment-plan-upload-response.dto';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Shipment Plan')
 @Controller('shipment-plan')
@@ -39,14 +40,29 @@ export class ShipmentPlanController {
     })
     @ApiResponse({ status: 400, description: 'Invalid file request' })
     @UseInterceptors(FileInterceptor('file'))
-    uploadExcel(
+    uploadExcel(@OrganizationId() organizationId: string | number | null,
         @UploadedFile() file: ShipmentPlanExcelFile,
     ): ReturnType<ShipmentPlanService['uploadExcel']> {
         if (!file) {
             throw new BadRequestException('No file provided');
         }
 
-        return this.shipmentPlanService.uploadExcel(file);
+        return this.shipmentPlanService.uploadExcel(file, String(organizationId));
+    }
+
+
+    @Get('dsp')
+    getDspShipmentPlan(@OrganizationId() organizationId: string | number | null) {
+        if (organizationId === undefined || organizationId === null || organizationId === '') {
+            throw new BadRequestException('Organization ID is required');
+        }
+
+        return this.shipmentPlanService.findAllByOrganizationId(String(organizationId));
+    }
+
+    @Get('dsp-all')
+    getDspShipmentPlanAll() {
+        return this.shipmentPlanService.findAll();
     }
 
 }

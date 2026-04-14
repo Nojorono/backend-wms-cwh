@@ -6,6 +6,7 @@ import { ShipmentPlanRepository } from './shipment-plan.repository';
 import { ShipmentPlanItemRepository } from './shipment-plan-item.repository';
 import { MasterWeek } from '../core/domain/entities/master-week.entity';
 import { ShipmentPlanUploadResponseDto } from './dto/shipment-plan-upload-response.dto';
+import { ShipmentPlan } from 'src/core/domain/entities/shipment-plan.entity';
 
 export interface ShipmentPlanExcelFile {
   originalname: string;
@@ -41,6 +42,20 @@ interface ShipmentPlanColumnMapCandidate {
   score: number;
 }
 
+export interface ShipmentPlanDspSummary {
+  source: string;
+  type: string;
+  reg: string;
+  code: string;
+  amo: string;
+  totalDsp: number;
+}
+
+export interface ShipmentPlanDspResponse {
+  header: Omit<ShipmentPlan, 'items'> | null;
+  rows: ShipmentPlanDspSummary[];
+}
+
 @Injectable()
 export class ShipmentPlanService {
   constructor(
@@ -50,7 +65,7 @@ export class ShipmentPlanService {
     private readonly masterWeekRepository: Repository<MasterWeek>,
   ) { }
 
-  async uploadExcel(file: ShipmentPlanExcelFile): Promise<ShipmentPlanUploadResponseDto> {
+  async uploadExcel(file: ShipmentPlanExcelFile, organizationId: string): Promise<ShipmentPlanUploadResponseDto> {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
@@ -68,12 +83,13 @@ export class ShipmentPlanService {
     }
 
     const rows = this.extractRowsFromExcel(file.buffer);
-    return this.saveShipmentPlan(file, rows);
+    return this.saveShipmentPlan(file, rows, organizationId);
   }
 
   private async saveShipmentPlan(
     file: ShipmentPlanExcelFile,
     rows: ShipmentPlanExtractedRow[],
+    organizationId: string,
   ): Promise<ShipmentPlanUploadResponseDto> {
     const now = new Date();
     const weekData = await this.masterWeekRepository.findOne({
@@ -90,7 +106,7 @@ export class ShipmentPlanService {
 
     const weekNumber = weekData.MINGGU;
     const year = weekData.TAHUN;
-    const batchNumber = await this.generateBatchNumber(year, weekNumber);
+    const batchNumber = await this.generateBatchNumber(year, weekNumber, organizationId);
 
     const shipmentPlan = await this.shipmentPlanRepository.create({
       fileName: file.originalname,
@@ -98,6 +114,7 @@ export class ShipmentPlanService {
       totalExtractedRows: rows.length,
       weekNumber,
       batchNumber,
+      organizationId,
     });
 
     await this.shipmentPlanItemRepository.createMany(
@@ -119,6 +136,7 @@ export class ShipmentPlanService {
       shipmentPlanId: shipmentPlan.id,
       fileName: file.originalname,
       size: file.size,
+      organizationId,
       mimeType: file.mimetype,
       weekNumber,
       batchNumber,
@@ -127,13 +145,14 @@ export class ShipmentPlanService {
     };
   }
 
-  private async generateBatchNumber(year: number, weekNumber: number): Promise<string> {
+  private async generateBatchNumber(year: number, weekNumber: number, organizationId: string | null): Promise<string> {
     const yearPart = String(year);
     const weekPart = String(weekNumber).padStart(2, '0');
     const prefix = `${yearPart}-${weekPart}-`;
 
     const latestBatchNumber = await this.shipmentPlanRepository.findLatestBatchNumberForPrefix(
       prefix,
+      organizationId,
     );
 
     let nextIncrement = 1;
@@ -381,5 +400,76 @@ export class ShipmentPlanService {
       return 'MIX PC';
     }
     return normalized.split(' ')[0] || '';
+  }
+
+  async findAll(): Promise<ShipmentPlan[]> {
+    return await this.shipmentPlanRepository.findAll();
+  }
+
+  async findAllByOrganizationId(organizationId: string): Promise<ShipmentPlanDspResponse> {
+    const latestPlans = await this.shipmentPlanRepository.findAllByOrganizationId(organizationId);
+    const latestPlan = latestPlans[0];
+    const header = latestPlan
+      ? {
+        id: latestPlan.id,
+        createdAt: latestPlan.createdAt,
+        updatedAt: latestPlan.updatedAt,
+        deletedAt: latestPlan.deletedAt,
+        organizationId: latestPlan.organizationId,
+        fileName: latestPlan.fileName,
+        fileSize: latestPlan.fileSize,
+        totalExtractedRows: latestPlan.totalExtractedRows,
+        weekNumber: latestPlan.weekNumber,
+        batchNumber: latestPlan.batchNumber,
+      }
+      : null;
+
+    if (!latestPlan?.items?.length) {
+      return {
+        header,
+        rows: [],
+      };
+    }
+
+    const grouped = new Map<string, ShipmentPlanDspSummary>();
+
+    for (const item of latestPlan.items) {
+      const key = `${item.source}|${item.type}|${item.reg}|${item.code}|${item.amo}`;
+      const current = grouped.get(key);
+      if (current) {
+        current.totalDsp += item.quantity;
+        continue;
+      }
+
+      grouped.set(key, {
+        source: item.source,
+        type: item.type,
+        reg: item.reg,
+        code: item.code,
+        amo: item.amo,
+        totalDsp: item.quantity,
+      });
+    }
+
+    return {
+      header,
+      rows: Array.from(grouped.values()),
+    };
+  }
+
+  async sumQuantityFromLatestBatchByOrganizationId(
+    organizationId: string,
+    source: string,
+    type: string,
+    reg: string,
+    code: string,
+  ): Promise<number> {
+    return this.shipmentPlanRepository.sumQuantityFromLatestBatchByOrganizationId(
+      organizationId,
+      source,
+      type,
+      reg,
+      code,
+    );
   }
 }

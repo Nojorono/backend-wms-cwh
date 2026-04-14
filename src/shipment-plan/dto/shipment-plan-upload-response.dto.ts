@@ -11,6 +11,9 @@ export class ShipmentPlanUploadResponseDto {
   @ApiProperty({ example: 108992 })
   size: number;
 
+  @ApiProperty({ example: '1234567890' })
+  organizationId: string;
+
   @ApiProperty({ example: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   mimeType: string;
 
