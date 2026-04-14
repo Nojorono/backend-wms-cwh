@@ -25,7 +25,7 @@ export class GeneratePalletRangeDto {
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
-  @IsInt()
+  @IsString()
   organization_id?: string;
 
   @ApiPropertyOptional({ example: 100 })
