@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
@@ -8,10 +8,7 @@ import {
   PalletQuantityHistoryResponseDto,
   PalletCapacityValidationDto,
   PalletItemQuantityDto,
-  UpdatePalletQuantityDto,
   UpdatePalletItemStockDto,
-  UpdateProductionDateDto,
-  UpdateUOMDto,
 } from './dto/pallet-quantity.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
 import { PalletHistoryPaginationDto } from './dto/pallet-history-pagination.dto';
@@ -166,7 +163,7 @@ export class MasterPalletController {
     type: [PalletItemQuantityDto],
   })
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
-  getPalletItemLatestQuantityByPalletCode( @Param('palletCode') palletCode: string) {
+  getPalletItemLatestQuantityByPalletCode(@Param('palletCode') palletCode: string) {
     return this.masterPalletService.getPalletItemLatestQuantityByPalletCode(palletCode);
   }
 

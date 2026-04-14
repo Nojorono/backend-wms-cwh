@@ -4,6 +4,8 @@ import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '../core/domain/entities/user.entity';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
+
 
 @ApiTags('User')
 @Controller('user')
@@ -29,8 +31,12 @@ export class UserController {
   @Get()
   @ApiOperation({ summary: 'Get all Users' })
   @ApiResponse({ status: 200, description: 'Return all Users.', type: [User] })
-  findAll() {
-    return this.userService.findAll();
+  findAll(@OrganizationId() organizationId: string | number | null) {
+    if (organizationId === undefined || organizationId === null || organizationId === '') {
+      return this.userService.findAll();
+    }
+
+    return this.userService.findAllByOrganizationId(String(organizationId));
   }
 
   @Get('deleted')

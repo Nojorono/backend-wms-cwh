@@ -21,6 +21,10 @@ export class UserRepository {
     return await this.repository.find({ relations: ['userDetail'] });
   }
 
+  async findAllByOrganizationId(organizationId: string): Promise<User[]> {
+    return await this.repository.find({ where: { userDetail: { organizationId } }, relations: ['userDetail'] });
+  }
+
   async findAllWithDeleted(): Promise<User[]> {
     return await this.repository.find({ withDeleted: true, relations: ['userDetail'] });
   }
