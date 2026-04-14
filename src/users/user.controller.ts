@@ -1,17 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Put, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '../core/domain/entities/user.entity';
 import { OrganizationId } from '../core/decorators/organization-id.decorator';
+import { EmployeeIntegrationService } from './integration/employee-integration';
 
 
 @ApiTags('User')
 @Controller('user')
 @ApiBearerAuth('JWT-auth')
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService, private readonly employeeIntegrationService: EmployeeIntegrationService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new User' })
@@ -48,6 +49,13 @@ export class UserController {
   })
   findAllWithDeleted() {
     return this.userService.findAllWithDeleted();
+  }
+
+  @Get('employee')
+  @ApiOperation({ summary: 'Get an Employee by employee number' })
+  @ApiResponse({ status: 200, description: 'Return employee meta by employee number.' })
+  findAllEmployees(@Query('employeeNumber') employeeNumber: string) {
+    return this.employeeIntegrationService.getEmployeeByEmployeeNumber({ employee_number: employeeNumber });
   }
 
   @Get(':id')
@@ -120,4 +128,5 @@ export class UserController {
   hardDelete(@Param('id') id: string) {
     return this.userService.hardDelete(id);
   }
+
 }
