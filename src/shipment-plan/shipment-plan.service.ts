@@ -396,17 +396,6 @@ export class ShipmentPlanService {
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  private extractUomFromMetric(metric: string): string {
-    const normalized = this.normalizeCell(metric).toUpperCase();
-    if (!normalized) {
-      return '';
-    }
-    if (normalized.startsWith('MIX PC')) {
-      return 'MIX PC';
-    }
-    return normalized.split(' ')[0] || '';
-  }
-
   async findAll(): Promise<ShipmentPlan[]> {
     return await this.shipmentPlanRepository.findAll();
   }
