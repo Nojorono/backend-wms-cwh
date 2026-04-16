@@ -16,7 +16,7 @@ export class InboundRepository {
     return await this.repository.save(entity);
   }
 
-  async findAll(status?: string): Promise<Inbound[]> {
+  async findAll(organizationId: string | number | null, status?: string): Promise<Inbound[]> {
     const qb = this.repository.createQueryBuilder('inbound');
     if (status) {
       qb.andWhere('inbound.status = :status', { status });
@@ -31,6 +31,7 @@ export class InboundRepository {
         'item.id::varchar = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .where('inbound.organization_id = :organizationId', { organizationId })
       .getMany();
   }
 
@@ -44,6 +45,7 @@ export class InboundRepository {
       license_plate?: string;
       start_date?: string;
       end_date?: string;
+      organization_id?: string;
     },
     page: number = 1,
     limit: number = 10,
@@ -87,6 +89,7 @@ export class InboundRepository {
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
       .leftJoinAndSelect('transaction_scan_inbounds.item', 'transaction_scan_inbounds_item')
       .leftJoinAndSelect('transaction_scan_inbounds.pallet', 'transaction_scan_inbounds_pallet')
+      .where('inbound.organization_id = :organizationId', { organizationId: filters.organization_id })
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)

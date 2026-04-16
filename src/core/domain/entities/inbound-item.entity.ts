@@ -44,4 +44,7 @@ export class InboundItem extends BaseEntity {
 
   @Column({ nullable: true })
   uom: string;
+
+  @Column({ nullable: true })
+  line_number: number;
 }

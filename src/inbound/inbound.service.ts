@@ -14,7 +14,6 @@ import { UpdateInboundDto, UpdateInboundStatusDto } from './dto/update-inbound.d
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
-import { UpdateSaldoInspectionDto } from './dto/update-saldo-inspection.dto';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem, InspectionStatus } from '../core/domain/entities/inbound-item.entity';
 import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
@@ -379,18 +378,20 @@ export class InboundService {
     }));
   }
 
-  async findAll(status?: string): Promise<(Inbound & { inbound_reference_number?: string | null })[]> {
-    const data = await this.inboundRepo.findAll(status);
+  async findAll(organizationId: string | number | null, status?: string): Promise<(Inbound & { inbound_reference_number?: string | null })[]> {
+    const data = await this.inboundRepo.findAll(organizationId, status);
     return this.enrichWithReferenceNumber(data);
   }
 
   async findAllPaginated(
     paginationQuery: InboundPaginationQueryDto,
+    organizationId: string | number | null,
   ): Promise<PaginatedResponseDto<Inbound & { inbound_reference_number?: string | null }>> {
     const filters = {
       status: paginationQuery.status,
       start_date: paginationQuery.start_date,
       end_date: paginationQuery.end_date,
+      organization_id: organizationId as string,
     };
 
     const { data, total } = await this.inboundRepo.findAllPaginated(

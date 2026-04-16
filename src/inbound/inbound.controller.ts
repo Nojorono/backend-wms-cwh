@@ -23,6 +23,7 @@ import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-paginati
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem } from '../core/domain/entities/inbound-item.entity';
+import { OrganizationId } from 'src/core/decorators/organization-id.decorator';
 
 @ApiTags('Inbound')
 @Controller('inbound')
@@ -64,16 +65,16 @@ export class InboundController {
       ]
     }
   })
-  findAll(@Query() paginationQuery: InboundPaginationQueryDto) {
+  findAll(@Query() paginationQuery: InboundPaginationQueryDto, @OrganizationId() organizationId: string | number | null) {
     // Check if any pagination parameters are provided
     const hasPaginationParams = paginationQuery.search || paginationQuery.page || paginationQuery.limit ||
       paginationQuery.sortBy || paginationQuery.sortOrder || paginationQuery.status;
 
     if (hasPaginationParams) {
-      return this.service.findAllPaginated(paginationQuery);
+      return this.service.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.service.findAll();
+    return this.service.findAll(organizationId as string);
   }
 
   @Get('all')
@@ -83,8 +84,8 @@ export class InboundController {
     description: 'Return all inbounds.',
     type: [Inbound],
   })
-  findAllInbounds() {
-    return this.service.findAll();
+  findAllInbounds(@OrganizationId() organizationId: string | number | null) {
+    return this.service.findAll(organizationId as string);
   }
 
   @Get('inspection')

@@ -35,6 +35,15 @@ export class InboundDo extends BaseEntity {
   inbound_po_number: string;
 
   @Column({ nullable: true })
+  vendor_id: number;
+
+  @Column({ nullable: true })
+  vendor_site_id: number;
+
+  @Column({ nullable: true })
+  total_line_items: number;
+
+  @Column({ nullable: true })
   inbound_po_date: Date;
 
   @Column({ default: false })
