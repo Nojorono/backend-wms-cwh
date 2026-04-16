@@ -74,7 +74,7 @@ export class InboundController {
       return this.service.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.service.findAll(organizationId as string);
+    return this.service.findAll(organizationId);
   }
 
   @Get('all')
@@ -85,7 +85,7 @@ export class InboundController {
     type: [Inbound],
   })
   findAllInbounds(@OrganizationId() organizationId: string | number | null) {
-    return this.service.findAll(organizationId as string);
+    return this.service.findAll(organizationId);
   }
 
   @Get('inspection')

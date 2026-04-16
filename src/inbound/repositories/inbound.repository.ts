@@ -21,6 +21,9 @@ export class InboundRepository {
     if (status) {
       qb.andWhere('inbound.status = :status', { status });
     }
+    if (organizationId !== null) {
+      qb.andWhere('inbound.organization_id = :organizationId', { organizationId });
+    }
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
@@ -31,7 +34,6 @@ export class InboundRepository {
         'item.id::varchar = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
-      .where('inbound.organization_id = :organizationId', { organizationId })
       .getMany();
   }
 
@@ -45,7 +47,7 @@ export class InboundRepository {
       license_plate?: string;
       start_date?: string;
       end_date?: string;
-      organization_id?: string;
+      organization_id?: string | number | null;
     },
     page: number = 1,
     limit: number = 10,
@@ -74,6 +76,12 @@ export class InboundRepository {
       );
     }
 
+    if (filters.organization_id !== null && filters.organization_id !== undefined) {
+      queryBuilder.andWhere('inbound.organization_id = :organizationId', {
+        organizationId: filters.organization_id,
+      });
+    }
+
     const total = await queryBuilder.getCount();
 
     const data = await queryBuilder
@@ -89,7 +97,6 @@ export class InboundRepository {
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
       .leftJoinAndSelect('transaction_scan_inbounds.item', 'transaction_scan_inbounds_item')
       .leftJoinAndSelect('transaction_scan_inbounds.pallet', 'transaction_scan_inbounds_pallet')
-      .where('inbound.organization_id = :organizationId', { organizationId: filters.organization_id })
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)

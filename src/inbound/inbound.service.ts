@@ -391,7 +391,7 @@ export class InboundService {
       status: paginationQuery.status,
       start_date: paginationQuery.start_date,
       end_date: paginationQuery.end_date,
-      organization_id: organizationId as string,
+      organization_id: organizationId,
     };
 
     const { data, total } = await this.inboundRepo.findAllPaginated(
