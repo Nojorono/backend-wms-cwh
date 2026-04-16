@@ -1,61 +1,6 @@
-import { IsString, IsOptional, IsNumber, IsUUID, IsEnum, IsBoolean } from 'class-validator';
-import { WarehouseSubStagingType } from 'src/core/domain/entities/master-warehouse-sub.entity';
-import { ApiProperty } from '@nestjs/swagger';
+import { PartialType } from '@nestjs/swagger';
+import { CreateMasterWarehouseSubDto } from './create-master-warehouse-sub.dto';
 
-export class UpdateMasterWarehouseSubDto {
-  @ApiProperty({ example: 1, required: false })
-  @IsNumber()
-  @IsOptional()
-  organization_id?: number;
+export class UpdateMasterWarehouseSubDto extends PartialType(CreateMasterWarehouseSubDto) {
 
-  @ApiProperty({ example: '1234567890', required: false })
-  @IsUUID()
-  @IsOptional()
-  warehouse_id?: string;
-
-  @ApiProperty({ example: 'WH001', required: false })
-  @IsString()
-  @IsOptional()
-  code?: string;
-
-  @ApiProperty({
-    example: 'Primary warehouse for storing inventory',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiProperty({
-    example: 'Primary warehouse for storing inventory',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @ApiProperty({ example: 3, required: false })
-  @IsNumber()
-  @IsOptional()
-  capacity_bin?: number;
-
-  @ApiProperty({ example: 'https://example.com/barcode.png', required: false })
-  @IsString()
-  @IsOptional()
-  barcode_image_url?: string;
-
-  @ApiProperty({ example: WarehouseSubStagingType.INBOUND, required: false })
-  @IsEnum(WarehouseSubStagingType)
-  @IsOptional()
-  is_staging?: WarehouseSubStagingType;
-
-  @ApiProperty({ example: true, required: false })
-  @IsBoolean()
-  @IsOptional()
-  is_good_stock?: boolean;
-
-  @ApiProperty({ example: true, required: false })
-  @IsBoolean()
-  @IsOptional()
-  is_gate?: boolean;
 }

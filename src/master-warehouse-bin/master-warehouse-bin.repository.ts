@@ -10,7 +10,7 @@ export class MasterWarehouseBinRepository {
   constructor(
     @InjectRepository(MasterWarehouseBin)
     private readonly repository: Repository<MasterWarehouseBin>,
-  ) {}
+  ) { }
 
   async create(
     createMasterWarehouseBinDto: CreateMasterWarehouseBinDto,
@@ -29,10 +29,6 @@ export class MasterWarehouseBinRepository {
       return null;
     }
     return warehouseBin;
-  }
-
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseBin[]> {
-    return await this.repository.find({ where: { organization_id } });
   }
 
   async findByWarehouseSubId(warehouse_sub_id: string): Promise<MasterWarehouseBin[]> {

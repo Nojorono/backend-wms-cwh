@@ -5,8 +5,11 @@ import { BaseEntity } from './base.entity';
 
 @Entity('m_warehouse_bin')
 export class MasterWarehouseBin extends BaseEntity {
-  @Column({ nullable: true, name: 'organization_id' })
-  organization_id: number;
+  @Column({ nullable: true, name: 'locator_id' })
+  locator_id: number;
+
+  @Column({ nullable: true, name: 'locator_name' })
+  locator_name: string;
 
   @Column({ nullable: true, name: 'warehouse_sub_id' })
   warehouse_sub_id: string;
@@ -22,9 +25,6 @@ export class MasterWarehouseBin extends BaseEntity {
 
   @Column({ nullable: true, name: 'capacity_pallet' })
   capacity_pallet: number;
-
-  @Column({ nullable: true, name: 'barcode_image_url' })
-  barcode_image_url: string;
 
   @Column({ nullable: true, name: 'current_pallet' })
   current_pallet: number;

@@ -29,7 +29,7 @@ export class MasterWarehouseRepository {
     return warehouse;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse[]> {
+  async findByOrganizationId(organization_id: string): Promise<MasterWarehouse[]> {
     return await this.repository.find({ where: { organization_id } });
   }
 

@@ -31,10 +31,6 @@ export class MasterWarehouseBinService {
     return warehouseBin;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseBin[]> {
-    return await this.repository.findByOrganizationId(organization_id);
-  }
-
   async findByWarehouseSubId(warehouse_sub_id: string): Promise<MasterWarehouseBin[]> {
     return await this.repository.findByWarehouseSubId(warehouse_sub_id);
   }

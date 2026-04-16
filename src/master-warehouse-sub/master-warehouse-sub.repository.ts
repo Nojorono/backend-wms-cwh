@@ -13,7 +13,7 @@ export class MasterWarehouseSubRepository {
   constructor(
     @InjectRepository(MasterWarehouseSub)
     private readonly repository: Repository<MasterWarehouseSub>,
-  ) {}
+  ) { }
 
   async create(
     createMasterWarehouseSubDto: CreateMasterWarehouseSubDto,
@@ -32,10 +32,6 @@ export class MasterWarehouseSubRepository {
       return null;
     }
     return warehouseSub;
-  }
-
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseSub[]> {
-    return await this.repository.find({ where: { organization_id } });
   }
 
   async findByWarehouseId(warehouse_id: string): Promise<MasterWarehouseSub[]> {

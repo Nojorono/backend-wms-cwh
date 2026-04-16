@@ -25,7 +25,7 @@ export class MasterWarehouseService {
     return warehouse;
   }
 
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouse[]> {
+  async findByOrganizationId(organization_id: string): Promise<MasterWarehouse[]> {
     return await this.repository.findByOrganizationId(organization_id);
   }
 

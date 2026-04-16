@@ -9,7 +9,7 @@ import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin
 @Controller('master-warehouse-bin')
 @ApiBearerAuth('JWT-auth')
 export class MasterWarehouseBinController {
-  constructor(private readonly masterWarehouseBinService: MasterWarehouseBinService) {}
+  constructor(private readonly masterWarehouseBinService: MasterWarehouseBinService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new Warehouse Bin' })
@@ -47,18 +47,6 @@ export class MasterWarehouseBinController {
   @ApiResponse({ status: 404, description: 'Warehouse Bin not found.' })
   findOne(@Param('id') id: string) {
     return this.masterWarehouseBinService.findOne(id);
-  }
-
-  @Get('organization/:organization_id')
-  @ApiOperation({ summary: 'Get a Warehouse Bin by organization ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Return the Warehouse Bin.',
-    type: [MasterWarehouseBin],
-  })
-  @ApiResponse({ status: 404, description: 'Warehouse Bin not found.' })
-  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
-    return this.masterWarehouseBinService.findByOrganizationId(organization_id);
   }
 
   @Get('warehouse-sub/:warehouse_sub_id')

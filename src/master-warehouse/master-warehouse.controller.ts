@@ -1,15 +1,56 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MasterWarehouseService } from './master-warehouse.service';
 import { CreateMasterWarehouseDto } from './dto/create-master-warehouse.dto';
 import { UpdateMasterWarehouseDto } from './dto/update-master-warehouse.dto';
 import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
+import { WarehouseLocatorIntegrationService } from './integration/warehouse-locator.integration';
 
 @ApiTags('Master Warehouse')
 @Controller('master-warehouse')
 @ApiBearerAuth('JWT-auth')
 export class MasterWarehouseController {
-  constructor(private readonly masterWarehouseService: MasterWarehouseService) {}
+  constructor(
+    private readonly masterWarehouseService: MasterWarehouseService,
+    private readonly warehouseIntegration: WarehouseLocatorIntegrationService
+  ) { }
+
+  @Get('locator')
+    @ApiOperation({
+        summary: 'Get inventory locator list',
+        description:
+            'Retrieve unique locator list (SUBINVENTORY_CODE, LOCATOR_ID, LOCATOR) filtered by organization_code and optional subinventory_code. Defaults to JAT when organization_code is omitted.',
+    })
+    @ApiQuery({
+        name: 'organization_code',
+        required: false,
+        type: String,
+        description: 'Organization code to filter locator data (default: JAT)',
+        example: 'JAT',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Inventory locator data retrieved successfully',
+    })
+    @ApiQuery({
+        name: 'subinventory_code',
+        required: false,
+        type: String,
+        description: 'Subinventory code to filter locator data',
+        example: 'GOOD-RK-1',
+    })
+    async getInvLocator(
+        @Query('organization_code') organizationCode?: string,
+        @Query('subinventory_code') subinventoryCode?: string,
+    ): Promise<any> {
+      const response = await this.warehouseIntegration.getInventoryLocator({
+        organization_code: organizationCode,
+        subinventory_code: subinventoryCode,
+      });
+
+      // Return only payload list; global response wrapper will place it into top-level data.
+      return response.data ?? [];
+    }
 
   @Post()
   @ApiOperation({ summary: 'Create a new Warehouse' })
@@ -57,7 +98,7 @@ export class MasterWarehouseController {
     type: [MasterWarehouse],
   })
   @ApiResponse({ status: 404, description: 'Warehouse not found.' })
-  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
+  findByOrganizationId(@Param('organization_id') organization_id: string) {
     return this.masterWarehouseService.findByOrganizationId(organization_id);
   }
 

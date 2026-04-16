@@ -22,7 +22,7 @@ import {
 @Controller('master-warehouse-sub')
 @ApiBearerAuth('JWT-auth')
 export class MasterWarehouseSubController {
-  constructor(private readonly masterWarehouseSubService: MasterWarehouseSubService) {}
+  constructor(private readonly masterWarehouseSubService: MasterWarehouseSubService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new Warehouse Sub' })
@@ -50,7 +50,7 @@ export class MasterWarehouseSubController {
   @ApiQuery({ name: 'is_gate', required: false, type: Boolean })
   findAll(@Query('is_staging') is_staging?: WarehouseSubStagingType, @Query('is_gate') is_gate?: string) {
     const isGateBoolean = is_gate !== undefined ? is_gate === 'true' : undefined;
-    
+
     if (is_staging !== undefined || isGateBoolean !== undefined) {
       return this.masterWarehouseSubService.findByFilters(is_staging, isGateBoolean);
     } else {
@@ -86,18 +86,6 @@ export class MasterWarehouseSubController {
   @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
   findOne(@Param('id') id: string) {
     return this.masterWarehouseSubService.findOne(id);
-  }
-
-  @Get('organization/:organization_id')
-  @ApiOperation({ summary: 'Get a Warehouse Sub by organization ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Return the Warehouse Sub.',
-    type: [MasterWarehouseSub],
-  })
-  @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
-    return this.masterWarehouseSubService.findByOrganizationId(organization_id);
   }
 
   @Get('warehouse/:warehouse_id')

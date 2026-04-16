@@ -3,13 +3,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { WarehouseSubStagingType } from 'src/core/domain/entities/master-warehouse-sub.entity';
 
 export class CreateMasterWarehouseSubDto {
-  @ApiProperty({ example: 1, required: false })
-  @IsNumber()
-  @IsOptional()
-  organization_id?: number;
-
   @ApiProperty({ example: '1234567890', required: false })
-  @IsUUID()
+  @IsUUID(4, { message: 'warehouse_id must be a valid UUID' })
   @IsOptional()
   warehouse_id?: string;
 
@@ -39,11 +34,6 @@ export class CreateMasterWarehouseSubDto {
   @IsOptional()
   capacity_bin?: number;
 
-  @ApiProperty({ example: 'https://example.com/barcode.png', required: false })
-  @IsString()
-  @IsOptional()
-  barcode_image_url?: string;
-
   @ApiProperty({ example: WarehouseSubStagingType.INBOUND, required: false })
   @IsEnum(WarehouseSubStagingType)
   @IsOptional()
@@ -58,4 +48,14 @@ export class CreateMasterWarehouseSubDto {
   @IsBoolean()
   @IsOptional()
   is_gate?: boolean;
+
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  locator_id?: number;
+
+  @ApiProperty({ example: 'Locator Name', required: false })
+  @IsString()
+  @IsOptional()
+  locator_name?: string;
 }
