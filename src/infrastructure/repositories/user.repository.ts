@@ -14,12 +14,15 @@ export class UserRepository implements IUserRepository {
   async findById(id: string): Promise<User | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ['userDetail'],
+      relations: ['userDetail', 'userDetail.organization'],
     });
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    return this.repository.findOne({ where: { username }, relations: ['userDetail'] });
+    return this.repository.findOne({
+      where: { username },
+      relations: ['userDetail', 'userDetail.organization'],
+    });
   }
 
   async create(user: Partial<User>): Promise<User> {
