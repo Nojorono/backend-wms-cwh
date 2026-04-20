@@ -31,7 +31,7 @@ export class InboundRepository {
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .getMany();
@@ -91,7 +91,7 @@ export class InboundRepository {
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
@@ -115,7 +115,7 @@ export class InboundRepository {
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
@@ -199,7 +199,7 @@ export class InboundRepository {
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .getMany();
@@ -214,7 +214,7 @@ export class InboundRepository {
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
