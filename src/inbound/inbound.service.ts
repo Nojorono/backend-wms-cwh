@@ -293,6 +293,7 @@ export class InboundService {
 
         // Create the inbound record
         const inbound = await this.inboundRepo.create({
+          organization_id: payload.organization_id,
           inbound_id_reference: payload.inbound_id_reference,
           inbound_number,
           expedition: payload.expedition,
