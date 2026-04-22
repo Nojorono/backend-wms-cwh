@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { DoValidationDto, DoValidationQueryDto } from '../dto/do-validation.dto';
-import { firstValueFrom, timeout, catchError, of } from 'rxjs';
+import { firstValueFrom, timeout, catchError } from 'rxjs';
+import { ensureRmqConnection } from 'src/core/helpers/rmq-connection.helper';
 
 export interface DoValidationResponseDto {
   data: DoValidationDto[];
@@ -30,39 +31,24 @@ export class DoValidationIntegrationService implements OnModuleInit {
   }
 
   private async ensureConnection(): Promise<void> {
-    if (this.connectionEstablished) {
-      return;
-    }
+    const state = {
+      connectionEstablished: this.connectionEstablished,
+      connectionAttempts: this.connectionAttempts,
+    };
 
-    this.connectionAttempts++;
+    await ensureRmqConnection(
+      this.doValidationClient,
+      this.logger,
+      state,
+      {
+        maxAttempts: this.MAX_CONNECTION_ATTEMPTS,
+        baseRetryDelayMs: this.CONNECTION_RETRY_DELAY,
+        serviceName: 'do_validation',
+      },
+    );
 
-    try {
-      this.logger.log(
-        `Connection attempt ${this.connectionAttempts}/${this.MAX_CONNECTION_ATTEMPTS} to RabbitMQ do validation service...`,
-      );
-
-      await this.doValidationClient.connect();
-
-      this.logger.log('RabbitMQ connection established successfully');
-      this.connectionEstablished = true;
-    } catch (error) {
-      this.logger.error(
-        `Failed to establish connection to RabbitMQ: ${error?.message || 'Unknown error'}`,
-      );
-
-      if (this.connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
-        const delay = this.CONNECTION_RETRY_DELAY * Math.pow(1.5, this.connectionAttempts - 1);
-        this.logger.log(`Retrying connection in ${delay}ms...`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        return this.ensureConnection();
-      } else {
-        this.logger.error(
-          `Maximum connection attempts (${this.MAX_CONNECTION_ATTEMPTS}) reached. Service will work in fallback mode.`,
-        );
-        this.connectionAttempts = 0;
-        // Don't throw error, allow service to work in fallback mode
-      }
-    }
+    this.connectionEstablished = state.connectionEstablished;
+    this.connectionAttempts = state.connectionAttempts;
   }
 
   async getItemLists(params?: DoValidationQueryDto): Promise<DoValidationResponseDto> {

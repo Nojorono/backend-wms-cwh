@@ -13,10 +13,16 @@ import { ClientsModule } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Transport } from '@nestjs/microservices';
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
+import { IntegrationToOracleService } from './integration/integration-to-oracle.service';
+import { SalesOrderIntegrationService } from './integration/sales-order.integration';
+import { RcvReceiptIntegrationService } from './integration/rcv-receipt.integration';
+import { PurchaseOrderIntegrationService } from 'src/inbound/integration/purchase-order.integration';
+import { InboundIntegrationModule } from 'src/inbound-integration/inbound-integration.module';
 
 @Module({
   imports: [
     ConfigModule,
+    InboundIntegrationModule,
     TypeOrmModule.forFeature([Inbound, InboundDo, InboundItem, PalletTransactionHistory]),
     ClientsModule.registerAsync([
       {
@@ -33,6 +39,48 @@ import { DoValidationIntegrationService } from './integration/do-validation.inte
         }),
         inject: [ConfigService],
       },
+      {
+        name: 'RCV_RECEIPT_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.rcvReceipt', 'rcv_receipt_queue'),
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'PURCHASE_ORDER_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.purchaseOrder') || 'purchase_order_queue',
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'SALES_ORDER_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.salesOrder', 'sales_order_queue'),
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [InboundController],
@@ -42,7 +90,11 @@ import { DoValidationIntegrationService } from './integration/do-validation.inte
     InboundDoRepository,
     InboundItemRepository,
     DoValidationIntegrationService,
+    RcvReceiptIntegrationService,
+    PurchaseOrderIntegrationService,
+    SalesOrderIntegrationService,
+    IntegrationToOracleService,
   ],
   exports: [InboundService],
 })
-export class InboundModule {}
+export class InboundModule { }

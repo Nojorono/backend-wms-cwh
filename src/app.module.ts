@@ -46,6 +46,7 @@ import { AdjustmentStockModule } from './adjustment-stock/adjustment-stock.modul
 import { LoggerModule } from './infrastructure/modules/logger.module';
 import { ReportModule } from './report/report.module';
 import { ShipmentPlanModule } from './shipment-plan/shipment-plan.module';
+import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { ShipmentPlanModule } from './shipment-plan/shipment-plan.module';
     AdjustmentStockModule,
     ReportModule,
     ShipmentPlanModule,
+    InboundIntegrationModule,
   ],
   providers: [
     {

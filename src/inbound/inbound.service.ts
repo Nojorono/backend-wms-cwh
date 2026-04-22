@@ -20,6 +20,20 @@ import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 import { InboundStatus } from 'src/core/domain/entities/inbound.entity';
 import { PalletTransactionHistory, StatusInventory } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { InjectRepository } from '@nestjs/typeorm';
+import {
+  IntegrationToOracleService,
+  InboundIntegrationToOracleResult,
+} from './integration/integration-to-oracle.service';
+import {
+  InboundIntegrationService,
+  InboundIntegrationHeaderWithLines,
+} from 'src/inbound-integration/inbound-integration.service';
+import { RcvReceiptTransactionType } from 'src/core/domain/entities/inbound-integration.entity';
+import {
+  CreateRcvReceiptDto,
+  RcvReceiptIntegrationService,
+  RcvReceiptResponseDto,
+} from './integration/rcv-receipt.integration';
 
 @Injectable()
 export class InboundService {
@@ -29,6 +43,9 @@ export class InboundService {
     private readonly inboundItemRepo: InboundItemRepository,
     private readonly dataSource: DataSource,
     private readonly paginationService: PaginationService,
+    private readonly integrationToOracleService: IntegrationToOracleService,
+    private readonly inboundIntegrationService: InboundIntegrationService,
+    private readonly rcvReceiptIntegrationService: RcvReceiptIntegrationService,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletTransactionHistoryRepository: Repository<PalletTransactionHistory>,
   ) { }
@@ -547,89 +564,6 @@ export class InboundService {
     return await this.inboundRepo.findAllTransactionScanInbound(status);
   }
 
-  async sequentialStatus(id: string): Promise<Inbound> {
-    const inbound = await this.findOne(id);
-    if (!inbound) {
-      throw new NotFoundException('Inbound not found');
-    }
-
-    // Validate that inbound has DOs
-    if (!inbound.inbound_dos || inbound.inbound_dos.length === 0) {
-      throw new BadRequestException('Inbound has no delivery orders to process');
-    }
-
-    // Count statuses with proper validation
-    const statusCounts = {
-      ready: 0,
-      success: 0,
-      failed: 0,
-      pending: 0,
-      total: inbound.inbound_dos.length,
-    };
-
-    // Count each status type
-    for (const inboundDo of inbound.inbound_dos) {
-      switch (inboundDo.integration_status) {
-        case IntegrationStatus.READY:
-          statusCounts.ready++;
-          break;
-        case IntegrationStatus.SUCCESS:
-          statusCounts.success++;
-          break;
-        case IntegrationStatus.FAILED:
-          statusCounts.failed++;
-          break;
-        case IntegrationStatus.PENDING:
-        default:
-          statusCounts.pending++;
-          break;
-      }
-    }
-
-    // Determine overall inbound status based on DO statuses
-    let newStatus: InboundStatus;
-    let statusReason: string;
-
-    if (statusCounts.failed > 0) {
-      // If any DO failed, inbound is failed
-      newStatus = InboundStatus.FAILED;
-      statusReason = `${statusCounts.failed} delivery order(s) failed integration`;
-    } else if (statusCounts.success === statusCounts.total) {
-      // All DOs successfully integrated
-      newStatus = InboundStatus.INTEGRATED;
-      statusReason = 'All delivery orders successfully integrated';
-    } else if (statusCounts.ready === statusCounts.total) {
-      // All DOs ready for integration
-      newStatus = InboundStatus.READY_INTEGRATION;
-      statusReason = 'All delivery orders ready for integration';
-    } else if (statusCounts.success > 0 && statusCounts.pending === 0) {
-      // Some success, no pending - partial success
-      newStatus = InboundStatus.INSPECTION;
-      statusReason = `${statusCounts.success}/${statusCounts.total} delivery orders integrated`;
-    } else {
-      // Default to inspection for mixed or pending states
-      newStatus = InboundStatus.INSPECTION;
-      statusReason = `Processing ${statusCounts.pending} pending delivery order(s)`;
-    }
-
-    // Update inbound status with timestamp
-    const updateData = {
-      status: newStatus,
-      updatedAt: new Date(),
-    };
-
-    await this.inboundRepo.update(id, updateData);
-
-    // Log status change for audit
-    console.log(`Inbound ${id} status updated to ${newStatus}: ${statusReason}`);
-    console.log(
-      `Status breakdown: Ready=${statusCounts.ready}, Success=${statusCounts.success}, Failed=${statusCounts.failed}, Pending=${statusCounts.pending}`,
-    );
-
-    // Return updated inbound
-    return await this.findOne(id);
-  }
-
   async bulkUpdateInboundItemSaldoInspection(
     payload: BulkUpdateSaldoInspectionDto,
   ): Promise<InboundItem[]> {
@@ -657,33 +591,181 @@ export class InboundService {
     return updateSaldo;
   }
 
-  async integrationToOracle(id: string): Promise<Inbound> {
+  /**
+   * Like `findOne`, but `transaction_scan_inbounds` are nested under each `inbound_item` (matched by
+   * `item_id`) and omitted from the inbound root. `quantity_inspection` is numeric in JSON.
+   */
+  async integrationToOracle(
+    id: string,
+  ): Promise<
+    InboundIntegrationToOracleResult & {
+      rcv_receipt_results: RcvReceiptResponseDto[];
+    }
+  > {
     const inbound = await this.findOne(id);
     if (!inbound) {
       throw new NotFoundException('Inbound not found');
     }
 
     // update pallet history status inventory to READY
-    const palletHistories = await this.palletTransactionHistoryRepository.find({
-      where: {
-        inbound_id: id,
-      },
-    });
+    // const palletHistories = await this.palletTransactionHistoryRepository.find({
+    //   where: {
+    //     inbound_id: id,
+    //   },
+    // });
 
-    if (palletHistories.length === 0) {
-      throw new BadRequestException('Pallet history not found');
-    }
+    // if (palletHistories.length === 0) {
+    //   throw new BadRequestException('Pallet history not found');
+    // }
 
-    for (const palletHistory of palletHistories) {
-      await this.palletTransactionHistoryRepository.update(palletHistory.id, {
-        status_inventory: StatusInventory.READY,
+    // for (const palletHistory of palletHistories) {
+    //   await this.palletTransactionHistoryRepository.update(palletHistory.id, {
+    //     status_inventory: StatusInventory.READY,
+    //   });
+    // }
+
+    // // update inbound status to READY_INTEGRATION
+    // await this.inboundRepo.update(id, {
+    //   status: InboundStatus.INTEGRATED,
+    // });
+
+    const dataIntegration = await this.integrationToOracleService.build(inbound);
+    await this.createInboundIntegrationRecords(dataIntegration);
+    const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
+    const rcv_receipt_results =
+      await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
+    await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
+
+    return { ...dataIntegration, rcv_receipt_results };
+  }
+
+  private async createInboundIntegrationRecords(
+    inbound: InboundIntegrationToOracleResult,
+  ): Promise<void> {
+    type InboundItemWithWarehouse = InboundItem & {
+      warehouse?: { name?: string; locator_id?: number | string | null };
+    };
+
+    const toOptionalNumber = (value: unknown): number | undefined => {
+      if (value == null || value === '') {
+        return undefined;
+      }
+      const n = typeof value === 'string' ? Number(value) : Number(value);
+      return Number.isNaN(n) ? undefined : n;
+    };
+
+    const isSoInternalOrSubdist = ['SO_INTERNAL', 'SO_SUBDIST'].includes(
+      (inbound.inbound_type ?? '').toUpperCase(),
+    );
+
+    for (const inboundDo of inbound.inbound_dos ?? []) {
+      const inboundItems = (inboundDo.inbound_items ?? []) as InboundItemWithWarehouse[];
+      const lines = inboundItems.map((item) => ({
+        source_line_id: item.id,
+        source_header_id: inboundDo.id,
+        po_number: inboundDo.inbound_po_number ?? undefined,
+        po_line_number: toOptionalNumber(item.line_number),
+        iso_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
+        iso_line_number: isSoInternalOrSubdist ? toOptionalNumber(item.line_number) : undefined,
+        inventory_item_id: toOptionalNumber(item.item?.inventory_item_id),
+        uom_code: item.uom ?? undefined,
+        quantity: toOptionalNumber(item.quantity_inspection ?? item.quantity),
+        subinventory: item.warehouse?.name ?? undefined,
+        locator_id: toOptionalNumber(item.warehouse?.locator_id),
+      }));
+
+      await this.inboundIntegrationService.createOrReplaceByInboundDo({
+        organization_id: inbound.organization_id,
+        inbound_id: inbound.id,
+        inbound_do_id: inboundDo.id,
+        source_system: 'WMS',
+        transaction_type: isSoInternalOrSubdist ? RcvReceiptTransactionType.INBOUND_GS_MUTASI_SO_INTERNAL : RcvReceiptTransactionType.INBOUND_GS_PRINCIPAL,
+        receipt_source_code: isSoInternalOrSubdist ? 'INTERNAL ORDER' : 'VENDOR',
+        source_header_id: inboundDo.id,
+        do_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
+        vendor_id: toOptionalNumber(inboundDo.vendor_id),
+        vendor_site_id: toOptionalNumber(inboundDo.vendor_site_id),
+        total_lines: toOptionalNumber(inboundDo.total_line_items) ?? lines.length,
+        rsh_attribute1: inbound.license_plate ?? undefined,
+        rsh_attribute2: inbound.driver_name ?? undefined,
+        rsh_attribute3: inbound.expedition ?? undefined,
+        status: 'CREATED',
+        lines,
       });
     }
+  }
 
-    // update inbound status to READY_INTEGRATION
-    await this.inboundRepo.update(id, {
-      status: InboundStatus.INTEGRATED,
-    });
-    return inbound;
+  private async createRcvReceiptsFromInboundIntegrations(
+    inboundIntegrations: InboundIntegrationHeaderWithLines[],
+  ): Promise<RcvReceiptResponseDto[]> {
+    const asNumberRequired = (value: unknown, field: string, ctx: string): number => {
+      const n = typeof value === 'string' ? Number(value) : Number(value);
+      if (value == null || Number.isNaN(n)) {
+        throw new BadRequestException(`${ctx}: ${field} is required and must be a number`);
+      }
+      return n;
+    };
+
+    const asStringRequired = (value: unknown, field: string, ctx: string): string => {
+      if (typeof value !== 'string' || value.trim() === '') {
+        throw new BadRequestException(`${ctx}: ${field} is required and must be a string`);
+      }
+      return value;
+    };
+
+    const responses: RcvReceiptResponseDto[] = [];
+    for (const header of inboundIntegrations) {
+      const ctx = `Inbound integration ${header.id}`;
+      const payload: CreateRcvReceiptDto = {
+        TRANSACTION_TYPE: header.transaction_type as RcvReceiptTransactionType,
+        SOURCE_SYSTEM: asStringRequired(header.source_system, 'SOURCE_SYSTEM', ctx),
+        RECEIPT_SOURCE_CODE: asStringRequired(
+          header.receipt_source_code,
+          'RECEIPT_SOURCE_CODE',
+          ctx,
+        ),
+        SOURCE_HEADER_ID: asStringRequired(header.source_header_id, 'SOURCE_HEADER_ID', ctx),
+        DO_NUMBER: header.do_number ?? undefined,
+        VENDOR_ID:
+          header.vendor_id != null ? asNumberRequired(header.vendor_id, 'VENDOR_ID', ctx) : undefined,
+        VENDOR_SITE_ID:
+          header.vendor_site_id != null
+            ? asNumberRequired(header.vendor_site_id, 'VENDOR_SITE_ID', ctx)
+            : undefined,
+        RSH_ATTRIBUTE1: header.rsh_attribute1 ?? undefined,
+        RSH_ATTRIBUTE2: header.rsh_attribute2 ?? undefined,
+        RSH_ATTRIBUTE3: header.rsh_attribute3 ?? undefined,
+        RECEIPT_NUMBER: header.receipt_number ?? undefined,
+        TOTAL_LINES: asNumberRequired(header.total_lines, 'TOTAL_LINES', ctx),
+        LINES: (header.lines ?? []).map((line) => ({
+          SOURCE_LINE_ID: asStringRequired(line.source_line_id, 'SOURCE_LINE_ID', ctx),
+          SOURCE_HEADER_ID: asStringRequired(line.source_header_id, 'SOURCE_HEADER_ID', ctx),
+          PO_NUMBER: line.po_number ?? undefined,
+          PO_LINE_NUMBER:
+            line.po_line_number != null
+              ? asNumberRequired(line.po_line_number, 'PO_LINE_NUMBER', ctx)
+              : undefined,
+          ISO_NUMBER: line.iso_number ?? undefined,
+          ISO_LINE_NUMBER:
+            line.iso_line_number != null
+              ? asNumberRequired(line.iso_line_number, 'ISO_LINE_NUMBER', ctx)
+              : undefined,
+          INVENTORY_ITEM_ID: asNumberRequired(
+            line.inventory_item_id,
+            'INVENTORY_ITEM_ID',
+            ctx,
+          ),
+          UOM_CODE: asStringRequired(line.uom_code, 'UOM_CODE', ctx),
+          QUANTITY: asNumberRequired(line.quantity, 'QUANTITY', ctx),
+          SUBINVENTORY: asStringRequired(line.subinventory, 'SUBINVENTORY', ctx),
+          LOCATOR_ID: asNumberRequired(line.locator_id, 'LOCATOR_ID', ctx),
+        })),
+      };
+
+      const response = await this.rcvReceiptIntegrationService.createRcvReceipt(payload);
+      responses.push(response);
+    }
+
+    return responses;
   }
 }
