@@ -653,6 +653,16 @@ export class InboundService {
       const n = typeof value === 'string' ? Number(value) : Number(value);
       return Number.isNaN(n) ? undefined : n;
     };
+    const toCamelCaseWord = (value: string | null | undefined): string | undefined => {
+      if (!value) {
+        return undefined;
+      }
+      const normalized = value.trim().toLowerCase();
+      if (!normalized) {
+        return undefined;
+      }
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    };
 
     const isSoInternalOrSubdist = ['SO_INTERNAL', 'SO_SUBDIST'].includes(
       (inbound.inbound_type ?? '').toUpperCase(),
@@ -668,7 +678,7 @@ export class InboundService {
         iso_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
         iso_line_number: isSoInternalOrSubdist ? toOptionalNumber(item.line_number) : undefined,
         inventory_item_id: toOptionalNumber(item.item?.inventory_item_id),
-        uom_code: item.uom ?? undefined,
+        uom_code: isSoInternalOrSubdist ? item.uom : toCamelCaseWord(item.uom),
         quantity: toOptionalNumber(item.quantity_inspection ?? item.quantity),
         subinventory: item.warehouse?.name ?? undefined,
         locator_id: toOptionalNumber(item.warehouse?.locator_id),
