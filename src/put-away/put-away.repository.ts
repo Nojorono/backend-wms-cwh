@@ -11,7 +11,7 @@ export class PutAwayRepository {
   constructor(
     @InjectRepository(PutAwayTransaction)
     private readonly repository: Repository<PutAwayTransaction>,
-  ) {}
+  ) { }
 
   async create(data: CreatePutAwayDto): Promise<PutAwayTransaction> {
     const entity = this.repository.create(data);
@@ -23,9 +23,10 @@ export class PutAwayRepository {
     return await this.repository.save(entities);
   }
 
-  async findAll(): Promise<PutAwayTransaction[]> {
+  async findAll(organizationId: string): Promise<PutAwayTransaction[]> {
     const queryBuilder = this.repository
       .createQueryBuilder('pta')
+      .where('pta.organization_id = :organizationId', { organizationId })
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
@@ -42,6 +43,7 @@ export class PutAwayRepository {
 
   async findAllPaginated(
     paginationDto: PutAwayPaginationDto,
+    organizationId: string | number | null,
   ): Promise<{ data: PutAwayTransaction[]; total: number }> {
     const {
       page = 1,
@@ -56,6 +58,7 @@ export class PutAwayRepository {
 
     const qb = this.repository
       .createQueryBuilder('pta')
+      .where('pta.organization_id = :organizationId', { organizationId })
       .leftJoinAndSelect('pta.inventoryTracking', 'inventoryTracking')
       .leftJoinAndSelect('inventoryTracking.pallet', 'pallet')
       .leftJoinAndSelect('inventoryTracking.warehouseSub', 'warehouseSub')
