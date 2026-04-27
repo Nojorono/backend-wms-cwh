@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { PickingSuggestionService } from './picking-suggestion.service';
 import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Picking Suggestion')
 @Controller('picking-suggestion')
@@ -109,8 +110,8 @@ export class PickingSuggestionController {
       },
     },
   })
-  async getPutAwaySuggestions() {
-    return this.pickingSuggestionService.getPutAwaySuggestions();
+  async getPutAwaySuggestions(@OrganizationId() organizationId: string) {
+    return this.pickingSuggestionService.getPutAwaySuggestions(organizationId);
   }
 }
 

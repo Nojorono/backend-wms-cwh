@@ -10,6 +10,7 @@ import {
 } from '../core/domain/entities/inventory-tracking.entity';
 import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
 import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
+import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { PalletItemQuantityDto } from '../master-pallet/dto/pallet-quantity.dto';
 import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
@@ -791,7 +792,7 @@ export class PickingSuggestionService {
     };
   }
 
-  async getPutAwaySuggestions(): Promise<{
+  async getPutAwaySuggestions(organizationId: string): Promise<{
     palletSuggestions: Array<{
       stagingPallet: InventoryTracking;
       suggestedBin: MasterWarehouseBin | null;
@@ -799,6 +800,14 @@ export class PickingSuggestionService {
       palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
     }>;
   }> {
+    if (!organizationId || organizationId.trim() === '') {
+      throw new Error('Organization ID is required');
+    }
+
+    if (!this.isValidUUID(organizationId)) {
+      throw new Error('Organization ID is not a valid UUID');
+    }
+
     const stagingPallets = await this.inventoryTrackingRepository
       .createQueryBuilder('tracking')
       .leftJoinAndSelect('tracking.pallet', 'pallet')
@@ -806,6 +815,7 @@ export class PickingSuggestionService {
       .leftJoinAndSelect('tracking.warehouse', 'warehouse')
       .leftJoinAndSelect('tracking.warehouseBin', 'warehouseBin')
       .where('warehouseSub.is_staging = :staging', { staging: 'INBOUND' })
+      .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
       .andWhere('tracking.progression_status = :progression_status', {
         progression_status: ProgressionStatus.NOT_STARTED,
       })
@@ -838,9 +848,11 @@ export class PickingSuggestionService {
     const availableBins = await this.masterWarehouseBinRepository
       .createQueryBuilder('bin')
       .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
+      .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
       .leftJoin('bin.inventory_trackings', 'tracking')
       .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
       .where('warehouseSub.is_staging IS NULL')
+      .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
       .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
         status: 'IN_INVENTORY',
       })
@@ -851,10 +863,14 @@ export class PickingSuggestionService {
       .orderBy('(bin.capacity_pallet - COUNT(DISTINCT tracking.pallet_id))', 'DESC')
       .getMany();
 
+    console.log('availableBins', availableBins);
+
     const availableZones = await this.masterWarehouseSubRepository
       .createQueryBuilder('zone')
+      .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = zone.warehouse_id')
       .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
       .where('zone.is_staging IS NULL')
+      .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
       .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
       .having('COUNT(bin.id) > 0')
       .orderBy('zone.name', 'ASC')
@@ -907,9 +923,11 @@ export class PickingSuggestionService {
           .leftJoin('tracking.pallet', 'pallet')
           .leftJoin(TransactionScanInbound, 'scan', 'scan.pallet_id = pallet.id')
           .leftJoin('bin.warehouseSub', 'warehouseSub')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .addSelect('COUNT(scan.id)', 'matching_items_count')
           .where('warehouseSub.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
             status: 'IN_INVENTORY',
           })
@@ -952,10 +970,12 @@ export class PickingSuggestionService {
         const emptyBins = await this.masterWarehouseBinRepository
           .createQueryBuilder('bin')
           .leftJoin('bin.warehouseSub', 'warehouseSub')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
           .leftJoin('bin.inventory_trackings', 'tracking')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .where('bin.capacity_pallet > 0')
           .andWhere('warehouseSub.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
             status: 'IN_INVENTORY',
           })
@@ -995,7 +1015,9 @@ export class PickingSuggestionService {
         const anyBin = await this.masterWarehouseBinRepository
           .createQueryBuilder('bin')
           .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
           .where('warehouseSub.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('bin.capacity_pallet > 0')
           .orderBy('bin.capacity_pallet', 'DESC')
           .limit(1)
@@ -1023,8 +1045,10 @@ export class PickingSuggestionService {
         // Final fallback: Get any regular warehouse zone
         const anyZone = await this.masterWarehouseSubRepository
           .createQueryBuilder('zone')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = zone.warehouse_id')
           .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
           .where('zone.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('bin.id IS NOT NULL')
           .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
           .limit(1)
