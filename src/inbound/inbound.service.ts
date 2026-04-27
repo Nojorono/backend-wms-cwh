@@ -570,6 +570,8 @@ export class InboundService {
     const updates = payload.items.map((item) => ({
       id: item.id,
       quantity_inspection: item.quantity_inspection,
+      quantity_difference: item.quantity_difference ?? 0,
+      sub_inventory_difference: item.sub_inventory_difference ?? '',
     }));
 
     const updateSaldo = await this.inboundItemRepo.bulkUpdateSaldoInspection(updates);

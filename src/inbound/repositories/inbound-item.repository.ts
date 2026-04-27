@@ -8,7 +8,7 @@ export class InboundItemRepository {
   constructor(
     @InjectRepository(InboundItem)
     private readonly repository: Repository<InboundItem>,
-  ) {}
+  ) { }
 
   async create(data: Partial<InboundItem>): Promise<InboundItem> {
     const entity = this.repository.create(data);
@@ -57,7 +57,7 @@ export class InboundItemRepository {
   }
 
   async bulkUpdateSaldoInspection(
-    updates: Array<{ id: string; quantity_inspection: number }>,
+    updates: Array<{ id: string; quantity_inspection: number, quantity_difference: number, sub_inventory_difference: string }>,
   ): Promise<InboundItem[]> {
     const results: InboundItem[] = [];
 
@@ -69,6 +69,8 @@ export class InboundItemRepository {
       await this.repository.update(update.id, {
         quantity_inspection: update.quantity_inspection,
         inspection_status: InspectionStatus.APPROVED,
+        quantity_difference: update.quantity_difference,
+        sub_inventory_difference: update.sub_inventory_difference,
       });
       const updated = await this.findOne(update.id);
       if (updated) {

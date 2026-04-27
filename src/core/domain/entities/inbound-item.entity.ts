@@ -3,7 +3,7 @@ import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
 import { InboundDo } from './inbound-do.entity';
 import { MasterItem } from './master-item.entity';
-
+import { MasterWarehouse } from './master-warehouse.entity';
 export enum InspectionStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
@@ -37,6 +37,16 @@ export class InboundItem extends BaseEntity {
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   quantity_inspection: number;
+
+  @Column({ type: 'int', nullable: true })
+  quantity_difference: number;
+
+  @Column({ nullable: true })
+  sub_inventory_difference: string;
+
+  @ManyToOne(() => MasterWarehouse, (warehouse) => warehouse.id, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'sub_inventory_difference' })
+  warehouse: MasterWarehouse;
 
   @Column({ nullable: true, default: InspectionStatus.PENDING })
   inspection_status: InspectionStatus;
