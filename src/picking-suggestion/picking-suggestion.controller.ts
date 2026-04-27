@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  HttpException,
+  InternalServerErrorException,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { PickingSuggestionService } from './picking-suggestion.service';
 import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
@@ -111,7 +119,19 @@ export class PickingSuggestionController {
     },
   })
   async getPutAwaySuggestions(@OrganizationId() organizationId: string) {
-    return this.pickingSuggestionService.getPutAwaySuggestions(organizationId);
+    try {
+      return await this.pickingSuggestionService.getPutAwaySuggestions(organizationId);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (error instanceof Error) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw new InternalServerErrorException('Failed to get put away suggestions');
+    }
   }
 }
 
