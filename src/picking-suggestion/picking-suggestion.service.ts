@@ -863,8 +863,6 @@ export class PickingSuggestionService {
       .orderBy('(bin.capacity_pallet - COUNT(DISTINCT tracking.pallet_id))', 'DESC')
       .getMany();
 
-    console.log('availableBins', availableBins);
-
     const availableZones = await this.masterWarehouseSubRepository
       .createQueryBuilder('zone')
       .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = zone.warehouse_id')
