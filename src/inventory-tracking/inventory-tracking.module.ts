@@ -14,7 +14,6 @@ import { InventoryTrackingService } from './inventory-tracking.service';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
 import { InventoryTrackingBadRepository } from './inventory-tracking-bad.repository';
 import { InventoryTrackingBadService } from './inventory-tracking-bad.service';
-import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 import { PaginationService } from '../core/services/pagination.service';
 import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-tracking-bad.entity';
@@ -41,13 +40,11 @@ import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-trackin
     InventoryTrackingRepository,
     InventoryTrackingBadRepository,
     InventoryTrackingBadService,
-    InventoryAutoSuggestionService,
     PaginationService,
   ],
   exports: [
     InventoryTrackingService,
     InventoryTrackingBadService,
-    InventoryAutoSuggestionService,
   ],
 })
 export class InventoryTrackingModule { }

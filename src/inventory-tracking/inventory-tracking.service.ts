@@ -110,13 +110,14 @@ export class InventoryTrackingService {
     return enriched[0];
   }
 
-  async findAll(): Promise<InventoryTracking[]> {
-    const inventoryTrackings = await this.repository.findAll();
+  async findAll(organizationId: string): Promise<InventoryTracking[]> {
+    const inventoryTrackings = await this.repository.findAll(organizationId);
     return await this.enrichPalletsWithCurrentItems(inventoryTrackings);
   }
 
   async findAllPaginated(
     paginationQuery: InventoryTrackingPaginationQueryDto,
+    organizationId: string,
   ): Promise<PaginatedResponseDto<InventoryTracking>> {
     const filters = {
       inventory_status: paginationQuery.inventory_status,
@@ -135,6 +136,7 @@ export class InventoryTrackingService {
       paginationQuery.search,
       paginationQuery.sortBy,
       paginationQuery.sortOrder,
+      organizationId,
     );
 
     const enrichedData = await this.enrichPalletsWithCurrentItems(data);

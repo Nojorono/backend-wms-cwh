@@ -33,6 +33,7 @@ import {
   ValidatePalletErrorResponseDto,
 } from './dto/validate-pallet-response.dto';
 import { ItemInventoryTrackingDto } from './dto/item-inventory-tracking-response.dto';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Inventory Tracking')
 @Controller('inventory-tracking')
@@ -114,7 +115,7 @@ export class InventoryTrackingController {
       ],
     },
   })
-  findAll(@Query() paginationQuery: InventoryTrackingPaginationQueryDto) {
+  findAll(@OrganizationId() organizationId: string, @Query() paginationQuery: InventoryTrackingPaginationQueryDto) {
     // Check if any pagination parameters are provided
     const hasPaginationParams =
       paginationQuery.search ||
@@ -131,10 +132,10 @@ export class InventoryTrackingController {
       paginationQuery.item_id;
 
     if (hasPaginationParams) {
-      return this.service.findAllPaginated(paginationQuery);
+      return this.service.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.service.findAll();
+    return this.service.findAll(organizationId);
   }
 
   @Get('warehouse')

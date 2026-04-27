@@ -69,10 +69,15 @@ export class InventoryTrackingRepository {
     return inventoryTracking;
   }
 
-  async findAll(): Promise<InventoryTracking[]> {
-    return await this.repository.find({
-      relations: ['pallet', 'warehouse', 'warehouseSub', 'warehouseBin'],
-    });
+  async findAll(organizationId: string): Promise<InventoryTracking[]> {
+    return await this.repository
+      .createQueryBuilder('inventory')
+      .leftJoinAndSelect('inventory.pallet', 'pallet')
+      .leftJoinAndSelect('inventory.warehouse', 'warehouse')
+      .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
+      .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin')
+      .where('warehouse.organization_id = :organizationId::uuid', { organizationId })
+      .getMany();
   }
 
   async findAllPaginated(
@@ -90,8 +95,15 @@ export class InventoryTrackingRepository {
     search?: string,
     sortBy: string = 'createdAt',
     sortOrder: 'ASC' | 'DESC' = 'DESC',
+    organizationId?: string,
   ): Promise<{ data: InventoryTracking[]; total: number }> {
-    const queryBuilder = this.repository.createQueryBuilder('inventory');
+    const queryBuilder = this.repository
+      .createQueryBuilder('inventory')
+      .leftJoinAndSelect('inventory.warehouse', 'warehouse');
+
+    if (organizationId) {
+      queryBuilder.andWhere('warehouse.organization_id = :organizationId::uuid', { organizationId });
+    }
 
     // Apply filters
     if (filters.inventory_status) {
@@ -167,7 +179,6 @@ export class InventoryTrackingRepository {
     // Apply joins and pagination
     queryBuilder
       .leftJoinAndSelect('inventory.pallet', 'pallet')
-      .leftJoinAndSelect('inventory.warehouse', 'warehouse')
       .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
       .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin')
       .leftJoinAndSelect('inventory.inventoryTrackingBad', 'inventoryTrackingBad')
