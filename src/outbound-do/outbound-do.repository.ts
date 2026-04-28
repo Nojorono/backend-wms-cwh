@@ -112,8 +112,9 @@ export class OutboundDoRepository {
       .leftJoinAndSelect('outbound_memos.assigned_pickings', 'assigned_pickings');
   }
 
-  async findAll(): Promise<OutboundDo[]> {
+  async findAll(organizationId: string): Promise<OutboundDo[]> {
     const outboundDos = await this.buildQueryWithAllRelations()
+      .where('outbound_do.organization_id = :organizationId::uuid', { organizationId })
       .orderBy('outbound_do.createdAt', 'DESC')
       .distinct(true)
       .getMany();
@@ -295,6 +296,7 @@ export class OutboundDoRepository {
 
   async findAllPaginated(
     paginationDto: OutboundDoPaginationDto,
+    organizationId: string,
   ): Promise<{ data: OutboundDo[]; total: number }> {
     const {
       page = 1,
@@ -311,6 +313,7 @@ export class OutboundDoRepository {
     } = paginationDto;
 
     const qb = this.buildQueryWithAllRelations();
+    qb.andWhere('outbound_do.organization_id = :organizationId::uuid', { organizationId });
 
     if (status) {
       qb.andWhere('outbound_do.status = :status', { status });

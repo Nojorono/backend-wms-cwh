@@ -51,14 +51,15 @@ export class OutboundMemoService {
     return this.repository.create(data);
   }
 
-  async findAll(): Promise<OutboundMemo[]> {
-    return this.repository.findAll();
+  async findAll(organizationId: string): Promise<OutboundMemo[]> {
+    return this.repository.findAll(organizationId);
   }
 
   async findAllPaginated(
     paginationDto: OutboundMemoPaginationDto,
+    organizationId: string,
   ): Promise<PaginatedResponseDto<OutboundMemo>> {
-    const result = await this.repository.findAllPaginated(paginationDto);
+    const result = await this.repository.findAllPaginated(paginationDto, organizationId);
     return this.paginationService.createPaginatedResponse(
       result.data,
       paginationDto,
@@ -127,8 +128,8 @@ export class OutboundMemoService {
     return this.repository.remove(id);
   }
 
-  async findByStatus(status: string): Promise<OutboundMemo[]> {
-    return this.repository.findByStatus(status);
+  async findByStatus(status: string, organizationId: string): Promise<OutboundMemo[]> {
+    return this.repository.findByStatus(status, organizationId);
   }
 
   async updateStatus(id: string, status: OutboundMemoStatus): Promise<OutboundMemo> {

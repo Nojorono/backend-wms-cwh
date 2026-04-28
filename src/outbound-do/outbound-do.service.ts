@@ -61,14 +61,15 @@ export class OutboundDoService {
     return this.repository.create(data);
   }
 
-  async findAll(): Promise<OutboundDo[]> {
-    return this.repository.findAll();
+  async findAll(organizationId: string): Promise<OutboundDo[]> {
+    return this.repository.findAll(organizationId);
   }
 
   async findAllPaginated(
     paginationDto: OutboundDoPaginationDto,
+    organizationId: string,
   ): Promise<PaginatedResponseDto<OutboundDo>> {
-    const result = await this.repository.findAllPaginated(paginationDto);
+    const result = await this.repository.findAllPaginated(paginationDto, organizationId);
     return this.paginationService.createPaginatedResponse(
       result.data,
       paginationDto,

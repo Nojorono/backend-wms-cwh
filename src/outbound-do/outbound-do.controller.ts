@@ -28,6 +28,7 @@ import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbou
 import { Status as TransactionPickingStatus } from '../core/domain/entities/transaction-picking.entity';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Outbound DO')
 @Controller('outbound-do')
@@ -106,7 +107,10 @@ export class OutboundDoController {
     description: 'Daftar outbound DO',
     type: [OutboundDoResponseDto],
   })
-  async findAll(@Query() paginationQuery: OutboundDoPaginationDto) {
+  async findAll(
+    @Query() paginationQuery: OutboundDoPaginationDto,
+    @OrganizationId() organizationId: string,
+  ) {
     const hasPaginationParams =
       paginationQuery.page ||
       paginationQuery.limit ||
@@ -119,10 +123,10 @@ export class OutboundDoController {
       paginationQuery.transaction_picking_status;
 
     if (hasPaginationParams) {
-      return this.outboundDoService.findAllPaginated(paginationQuery);
+      return this.outboundDoService.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.outboundDoService.findAll();
+    return this.outboundDoService.findAll(organizationId);
   }
 
   @Get(':id')

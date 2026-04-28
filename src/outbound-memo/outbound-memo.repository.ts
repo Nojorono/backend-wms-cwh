@@ -41,8 +41,9 @@ export class OutboundMemoRepository {
     return this.findOne(savedOutboundMemo.id);
   }
 
-  async findAll(): Promise<OutboundMemo[]> {
+  async findAll(organizationId: string): Promise<OutboundMemo[]> {
     return await this.outboundMemoRepository.find({
+      where: { organization_id: organizationId as any },
       relations: ['outbound_memo_items', 'outbound_memo_items.item'],
       order: { createdAt: 'DESC' },
     });
@@ -90,8 +91,9 @@ export class OutboundMemoRepository {
     await this.outboundMemoRepository.delete(id);
   }
 
-  async findByStatus(status: string): Promise<OutboundMemo[]> {
+  async findByStatus(status: string, organizationId: string): Promise<OutboundMemo[]> {
     const where: Partial<OutboundMemo> = { status: status as OutboundMemoStatus };
+    where.organization_id = organizationId;
 
     if (status === OutboundMemoStatus.APPROVED) {
       where.has_do = false;
@@ -106,6 +108,7 @@ export class OutboundMemoRepository {
 
   async findAllPaginated(
     paginationDto: OutboundMemoPaginationDto,
+    organizationId: string,
   ): Promise<{ data: OutboundMemo[]; total: number }> {
     const {
       page = 1,
@@ -137,6 +140,8 @@ export class OutboundMemoRepository {
       .leftJoinAndSelect('items.item', 'item')
       .leftJoinAndSelect('memo.transaction_pickings', 'transaction_pickings')
       .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking');
+
+    qb.andWhere('memo.organization_id = :organizationId::uuid', { organizationId });
 
     if (status) {
       qb.andWhere('memo.status = :status', { status });

@@ -25,6 +25,7 @@ import { OutboundMemoResponseDto } from './dto/outbound-memo-response.dto';
 import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundMemoPaginationDto } from './dto/outbound-memo-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Outbound Memo')
 @Controller('outbound-memo')
@@ -89,7 +90,10 @@ export class OutboundMemoController {
     description: 'Daftar outbound memo',
     type: [OutboundMemoResponseDto],
   })
-  async findAll(@Query() paginationQuery: OutboundMemoPaginationDto) {
+  async findAll(
+    @Query() paginationQuery: OutboundMemoPaginationDto,
+    @OrganizationId() organizationId: string,
+  ) {
     const hasPaginationParams =
       paginationQuery.page ||
       paginationQuery.limit ||
@@ -103,14 +107,14 @@ export class OutboundMemoController {
       paginationQuery.item_id !== undefined;
 
     if (hasPaginationParams) {
-      return this.outboundMemoService.findAllPaginated(paginationQuery);
+      return this.outboundMemoService.findAllPaginated(paginationQuery, organizationId);
     }
 
     if (paginationQuery.status) {
-      return this.outboundMemoService.findByStatus(paginationQuery.status);
+      return this.outboundMemoService.findByStatus(paginationQuery.status, organizationId);
     }
 
-    return this.outboundMemoService.findAll();
+    return this.outboundMemoService.findAll(organizationId);
   }
 
   @Get(':id')
