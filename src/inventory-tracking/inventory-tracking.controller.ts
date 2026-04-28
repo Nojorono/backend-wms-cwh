@@ -267,7 +267,7 @@ export class InventoryTrackingController {
     description: 'Dashboard visibility data with item quantities and pending bookings',
     type: VisibilityDashboardResponseDto,
   })
-  async getVisibilityInventoryTrackingAllItemInWarehouse(@Query('item_id') item_id?: string) {
-    return await this.service.getVisibilityInventoryTrackingAllItemInWarehouse(item_id);
+  async getVisibilityInventoryTrackingAllItemInWarehouse(@OrganizationId() organizationId: string, @Query('item_id') item_id?: string) {
+    return await this.service.getVisibilityInventoryTrackingAllItemInWarehouse(organizationId, item_id);
   }
 }

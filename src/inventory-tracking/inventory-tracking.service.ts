@@ -545,7 +545,7 @@ export class InventoryTrackingService {
     }
   }
 
-  async getVisibilityInventoryTrackingAllItemInWarehouse(item_id?: string): Promise<{
+  async getVisibilityInventoryTrackingAllItemInWarehouse(organizationId: string, item_id?: string): Promise<{
     summary: {
       total_items: number;
       total_quantity: number;
@@ -556,7 +556,7 @@ export class InventoryTrackingService {
     items: any[];
   }> {
     try {
-      const items = await this.repository.getVisibilityDashboard(item_id);
+      const items = await this.repository.getVisibilityDashboard(organizationId, item_id);
 
       // Calculate summary statistics (ensure numeric conversion)
       const summary = {

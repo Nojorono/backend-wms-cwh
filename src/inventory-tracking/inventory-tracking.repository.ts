@@ -456,9 +456,9 @@ export class InventoryTrackingRepository {
     return results;
   }
 
-  async getVisibilityDashboard(item_id?: string): Promise<any[]> {
-    const itemFilter = item_id ? `AND pth.item_id::uuid = $1::uuid` : '';
-    const itemFilterParams = item_id ? [item_id] : [];
+  async getVisibilityDashboard(organizationId: string, item_id?: string): Promise<any[]> {
+    const itemFilter = item_id ? `AND pth.item_id::uuid = $2::uuid` : '';
+    const queryParams = item_id ? [organizationId, item_id] : [organizationId];
 
     const query = `
       WITH latest_pallet_items AS (
@@ -518,6 +518,7 @@ export class InventoryTrackingRepository {
         WHERE lpi.new_quantity > 0
           AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED')
           AND it.deleted_at IS NULL
+          AND w.organization_id = $1::uuid
       ),
       item_totals AS (
         -- Aggregate total quantity per item (ensure numeric sum)
@@ -581,7 +582,7 @@ export class InventoryTrackingRepository {
         LEFT JOIN m_warehouse_bin wb_source ON wb_source.id = tp.source_bin_id
         WHERE tp.status = 'PENDING'
           AND tp.deleted_at IS NULL
-          ${item_id ? `AND tp.item_id::uuid = $1::uuid` : ''}
+          ${item_id ? `AND tp.item_id::uuid = $2::uuid` : ''}
         GROUP BY tp.item_id::uuid, COALESCE(tp.uom, '')
       ),
       combined_items AS (
@@ -623,11 +624,11 @@ export class InventoryTrackingRepository {
       LEFT JOIN pending_bookings pb 
         ON pb.item_id = ci.item_id 
         AND pb.uom = ci.uom
-      ${item_id ? 'WHERE ci.item_id = $1::uuid' : ''}
+      ${item_id ? 'WHERE ci.item_id = $2::uuid' : ''}
       ORDER BY it.sku, ci.uom
     `;
 
-    const results = (await this.repository.query(query, itemFilterParams)) as any[];
+    const results = (await this.repository.query(query, queryParams)) as any[];
     return results;
   }
 
