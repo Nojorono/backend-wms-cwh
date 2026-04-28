@@ -24,6 +24,11 @@ export class OutboundMemoItemDto {
 }
 
 export class CreateOutboundDoDto {
+  @ApiPropertyOptional({ example: 'uuid-organization-123' })
+  @IsOptional()
+  @IsUUID(4, { message: 'organization_id must be a valid UUID' })
+  organization_id?: string;
+
   @ApiPropertyOptional({ example: 'DO-2025-001', description: 'Auto-generated if not provided' })
   @IsOptional()
   @IsString()

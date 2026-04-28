@@ -1,6 +1,7 @@
-import { Entity, Column, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, Column, ManyToMany, JoinTable, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OutboundMemo } from './outbound-memo.entity';
+import { MasterIO } from './master-io.entity';
 
 export enum OutboundDoStatus {
   PENDING = 'PENDING',
@@ -18,6 +19,13 @@ export enum OutboundDoType {
 
 @Entity('outbound_do')
 export class OutboundDo extends BaseEntity {
+  @Column({ nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
   @Column({ nullable: true, unique: true })
   outbound_do_number: string;
 

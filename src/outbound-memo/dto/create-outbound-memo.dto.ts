@@ -7,6 +7,7 @@ import {
   IsString,
   IsArray,
   ValidateNested,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OutboundMemoStatus, OutboundMemoType } from '../../core/domain/entities/outbound-memo.entity';
@@ -29,6 +30,11 @@ export class CreateOutboundMemoItemDto {
 }
 
 export class CreateOutboundMemoDto {
+  @ApiPropertyOptional({ example: 'uuid-organization-123' })
+  @IsOptional()
+  @IsUUID(4, { message: 'organization_id must be a valid UUID' })
+  organization_id?: string;
+
   @ApiProperty({ example: 'OM-2025-001' })
   @IsOptional()
   @IsString()

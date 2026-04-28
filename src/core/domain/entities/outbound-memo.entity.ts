@@ -1,8 +1,9 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OutboundMemoItem } from './outbound-memo-item.entity';
 import { AssignedPicking } from './assigned-picking.entity';
 import { PickingTransaction } from './transaction-picking.entity';
+import { MasterIO } from './master-io.entity';
 
 export enum OutboundMemoStatus {
   PENDING = 'PENDING',
@@ -18,6 +19,13 @@ export enum OutboundMemoType {
 
 @Entity('outbound_memo')
 export class OutboundMemo extends BaseEntity {
+  @Column({ nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
   @Column({ nullable: true, unique: true })
   outbound_memo_number: string;
 
