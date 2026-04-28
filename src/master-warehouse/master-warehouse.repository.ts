@@ -10,15 +10,22 @@ export class MasterWarehouseRepository {
   constructor(
     @InjectRepository(MasterWarehouse)
     private readonly repository: Repository<MasterWarehouse>,
-  ) {}
+  ) { }
 
   async create(createMasterWarehouseDto: CreateMasterWarehouseDto): Promise<MasterWarehouse> {
     const warehouse = this.repository.create(createMasterWarehouseDto);
     return await this.repository.save(warehouse);
   }
 
-  async findAll(): Promise<MasterWarehouse[]> {
-    return await this.repository.find();
+  async findAll(organizationId: string): Promise<MasterWarehouse[]> {
+    if (!organizationId) {
+      return await this.repository.find();
+    }
+    return await this.repository.find({
+      where: {
+        organization_id: organizationId,
+      },
+    });
   }
 
   async findOne(id: string): Promise<MasterWarehouse | null> {

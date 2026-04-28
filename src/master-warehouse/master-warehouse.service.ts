@@ -13,8 +13,8 @@ export class MasterWarehouseService {
     return await this.repository.create(createMasterWarehouseDto);
   }
 
-  async findAll(): Promise<MasterWarehouse[]> {
-    return await this.repository.findAll();
+  async findAll(organizationId: string): Promise<MasterWarehouse[]> {
+    return await this.repository.findAll(organizationId);
   }
 
   async findOne(id: string): Promise<MasterWarehouse> {

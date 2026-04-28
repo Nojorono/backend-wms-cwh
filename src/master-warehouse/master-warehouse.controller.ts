@@ -5,6 +5,7 @@ import { CreateMasterWarehouseDto } from './dto/create-master-warehouse.dto';
 import { UpdateMasterWarehouseDto } from './dto/update-master-warehouse.dto';
 import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
 import { WarehouseLocatorIntegrationService } from './integration/warehouse-locator.integration';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Master Warehouse')
 @Controller('master-warehouse')
@@ -74,8 +75,8 @@ export class MasterWarehouseController {
     description: 'Return all Warehouses.',
     type: [MasterWarehouse],
   })
-  findAll() {
-    return this.masterWarehouseService.findAll();
+  findAll(@OrganizationId() organizationId: string ) {
+    return this.masterWarehouseService.findAll(organizationId);
   }
 
   @Get(':id')
