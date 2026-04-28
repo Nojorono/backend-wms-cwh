@@ -599,46 +599,43 @@ export class InboundService {
    */
   async integrationToOracle(
     id: string,
-  ): Promise<
-    InboundIntegrationToOracleResult & {
-      rcv_receipt_results: RcvReceiptResponseDto[];
-    }
-  > {
+  ): Promise<void> {
     const inbound = await this.findOne(id);
     if (!inbound) {
       throw new NotFoundException('Inbound not found');
     }
 
     // update pallet history status inventory to READY
-    // const palletHistories = await this.palletTransactionHistoryRepository.find({
-    //   where: {
-    //     inbound_id: id,
-    //   },
-    // });
+    const palletHistories = await this.palletTransactionHistoryRepository.find({
+      where: {
+        inbound_id: id,
+      },
+    });
 
-    // if (palletHistories.length === 0) {
-    //   throw new BadRequestException('Pallet history not found');
-    // }
+    if (palletHistories.length === 0) {
+      throw new BadRequestException('Pallet history not found');
+    }
 
-    // for (const palletHistory of palletHistories) {
-    //   await this.palletTransactionHistoryRepository.update(palletHistory.id, {
-    //     status_inventory: StatusInventory.READY,
-    //   });
-    // }
+    for (const palletHistory of palletHistories) {
+      await this.palletTransactionHistoryRepository.update(palletHistory.id, {
+        status_inventory: StatusInventory.READY,
+      });
+    }
 
-    // // update inbound status to READY_INTEGRATION
-    // await this.inboundRepo.update(id, {
-    //   status: InboundStatus.INTEGRATED,
-    // });
+    // update inbound status to READY_INTEGRATION
+    await this.inboundRepo.update(id, {
+      status: InboundStatus.INTEGRATED,
+    });
 
-    const dataIntegration = await this.integrationToOracleService.build(inbound);
-    await this.createInboundIntegrationRecords(dataIntegration);
-    const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
-    const rcv_receipt_results =
-      await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
-    await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
+    // const dataIntegration = await this.integrationToOracleService.build(inbound);
+    // await this.createInboundIntegrationRecords(dataIntegration);
+    // const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
+    // const rcv_receipt_results =
+    //   await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
+    // await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
 
-    return { ...dataIntegration, rcv_receipt_results };
+    // return { ...dataIntegration, rcv_receipt_results };
+    return;
   }
 
   private async createInboundIntegrationRecords(
