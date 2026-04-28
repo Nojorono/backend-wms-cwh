@@ -140,6 +140,7 @@ export class PickingSuggestionService {
   private async generatePickingSuggestionsForMemo(
     memo: any,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<PickingSuggestionDto[]> {
     const suggestions: PickingSuggestionDto[] = [];
 
@@ -168,6 +169,7 @@ export class PickingSuggestionService {
         remainingRequired,
         item.uom,
         sortMethod,
+        organizationId,
       );
 
       if (availableInventory.length > 0) {
@@ -229,6 +231,7 @@ export class PickingSuggestionService {
     requiredQuantity: number,
     uom?: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<any[]> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
@@ -244,7 +247,9 @@ export class PickingSuggestionService {
 
     try {
       // Try multiple search strategies in order of preference
-      const searchStrategies = [() => this.searchInventoryWithPalletHistory(itemId, uom, sortMethod)];
+      const searchStrategies = [
+        () => this.searchInventoryWithPalletHistory(itemId, uom, sortMethod, organizationId),
+      ];
 
       let results: any[] = [];
 
@@ -279,9 +284,15 @@ export class PickingSuggestionService {
     itemId: string,
     uom?: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<any[]> {
     try {
-      return await this.repository.searchInventoryWithPalletHistory(itemId, uom, sortMethod);
+      return await this.repository.searchInventoryWithPalletHistory(
+        itemId,
+        uom,
+        sortMethod,
+        organizationId,
+      );
     } catch (error) {
       console.warn('searchInventoryWithPalletHistory failed:', error.message);
       return [];
@@ -507,6 +518,7 @@ export class PickingSuggestionService {
   async getPickingSuggestionsByMemo(
     memoId: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<PickingSuggestionDto[]> {
     // Validate memoId before proceeding
     if (!memoId || memoId.trim() === '') {
@@ -540,7 +552,7 @@ export class PickingSuggestionService {
       };
 
 
-      return await this.generatePickingSuggestionsForMemo(memo, sortMethod);
+      return await this.generatePickingSuggestionsForMemo(memo, sortMethod, organizationId);
     } catch (error) {
       console.error('Error in getPickingSuggestionsByMemo:', error);
       console.error('Query parameters:', { memoId, sortMethod });
@@ -742,7 +754,12 @@ export class PickingSuggestionService {
 
     return note;
   }
-  async getPickingSuggestionsByItemId(itemId: string, uom?: string, sortMethod?: 'FIFO' | 'LIFO'): Promise<any> {
+  async getPickingSuggestionsByItemId(
+    itemId: string,
+    uom?: string,
+    sortMethod?: 'FIFO' | 'LIFO',
+    organizationId?: string,
+  ): Promise<any> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
       throw new Error('Item ID is required');
@@ -760,7 +777,13 @@ export class PickingSuggestionService {
 
     // Find all available inventory for this item
     const preferredUom = uom || undefined;
-    const availableInventory = await this.findAvailableInventoryForItem(itemId, 0, preferredUom, sortMethod);
+    const availableInventory = await this.findAvailableInventoryForItem(
+      itemId,
+      0,
+      preferredUom,
+      sortMethod,
+      organizationId,
+    );
 
     if (availableInventory.length === 0) {
       return {

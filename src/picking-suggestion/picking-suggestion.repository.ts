@@ -83,7 +83,9 @@ export class PickingSuggestionRepository {
     itemId: string,
     uom?: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<any[]> {
+    const organizationFilter = organizationId ? 'AND w.organization_id = $3::uuid' : '';
     // Determine sort direction: FIFO = ASC (oldest first), LIFO = DESC (newest first)
     const weekNumberSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
     const dateSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
@@ -256,6 +258,7 @@ export class PickingSuggestionRepository {
       LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
       WHERE pth.item_id = $1
         AND ($2::text IS NULL OR pth.uom::text = $2::text)
+        ${organizationFilter}
         AND pth.deleted_at IS NULL
         AND it.deleted_at IS NULL
         AND pth.status_inventory = 'READY'
@@ -332,7 +335,8 @@ export class PickingSuggestionRepository {
 
 
 
-    const result = await this.inventoryTrackingRepository.query(query, [itemId, uom ?? null]);
+    const params = organizationId ? [itemId, uom ?? null, organizationId] : [itemId, uom ?? null];
+    const result = await this.inventoryTrackingRepository.query(query, params);
     console.log('result', result);
     return result;
   }
