@@ -769,6 +769,14 @@ export class PickingSuggestionService {
       throw new Error('Item ID is not a valid UUID');
     }
 
+    if (!organizationId || organizationId.trim() === '') {
+      throw new Error('Organization ID is required');
+    }
+
+    if (!this.isValidUUID(organizationId)) {
+      throw new Error('Organization ID is not a valid UUID');
+    }
+
     // Get item details
     const item = await this.repository.findItemById(itemId);
     if (!item) {

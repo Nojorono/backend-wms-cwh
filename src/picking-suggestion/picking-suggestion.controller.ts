@@ -79,6 +79,10 @@ export class PickingSuggestionController {
     @Query('sortMethod') sortMethod?: 'FIFO' | 'LIFO',
     @OrganizationId() organizationId?: string,
   ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     return this.pickingSuggestionService.getPickingSuggestionsByItemId(
       itemId,
       uom,
