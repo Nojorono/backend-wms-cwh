@@ -57,7 +57,12 @@ export class InboundItemRepository {
   }
 
   async bulkUpdateSaldoInspection(
-    updates: Array<{ id: string; quantity_inspection: number, quantity_difference: number, sub_inventory_difference: string }>,
+    updates: Array<{
+      id: string;
+      quantity_inspection: number;
+      quantity_difference: number | null;
+      sub_inventory_difference: string | null;
+    }>,
   ): Promise<InboundItem[]> {
     const results: InboundItem[] = [];
 
@@ -66,11 +71,23 @@ export class InboundItemRepository {
       if (!existing) {
         throw new NotFoundException(`Inbound Item with id ${update.id} not found`);
       }
+
+      const normalizedSubInventoryDifference =
+        update.sub_inventory_difference && update.sub_inventory_difference.trim() !== ''
+          ? update.sub_inventory_difference
+          : null;
+
+      const normalizedQuantityDifference =
+        update.quantity_difference === null ||
+        (typeof update.quantity_difference === 'number' && Number.isNaN(update.quantity_difference))
+          ? null
+          : update.quantity_difference;
+
       await this.repository.update(update.id, {
         quantity_inspection: update.quantity_inspection,
         inspection_status: InspectionStatus.APPROVED,
-        quantity_difference: update.quantity_difference,
-        sub_inventory_difference: update.sub_inventory_difference,
+        quantity_difference: normalizedQuantityDifference as any,
+        sub_inventory_difference: normalizedSubInventoryDifference as any,
       });
       const updated = await this.findOne(update.id);
       if (updated) {

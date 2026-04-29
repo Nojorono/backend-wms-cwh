@@ -571,7 +571,7 @@ export class InboundService {
       id: item.id,
       quantity_inspection: item.quantity_inspection,
       quantity_difference: item.quantity_difference ?? 0,
-      sub_inventory_difference: item.sub_inventory_difference ?? '',
+      sub_inventory_difference: item.sub_inventory_difference ?? null,
     }));
 
     const updateSaldo = await this.inboundItemRepo.bulkUpdateSaldoInspection(updates);
