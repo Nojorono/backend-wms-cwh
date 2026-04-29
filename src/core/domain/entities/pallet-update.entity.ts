@@ -4,6 +4,7 @@ import { User } from './user.entity';
 import { PalletUpdateItem } from './pallet-update-item.entity';
 import { PalletUpdateScan } from './pallet-update-scan.entity';
 import { PalletUpdateAssigned } from './pallet-update-assigned.entity';
+import { MasterIO } from './master-io.entity';
 
 /**
  * Update types per flowchart:
@@ -35,6 +36,13 @@ export enum InspectionStatus {
 
 @Entity('pallet_update')
 export class PalletUpdate extends BaseEntity {
+  @Column({ nullable: true, name: 'organization_id' })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
   /** Unique reference (e.g. IPU-YYYY-NNNN). Generate when creating; required for Split/Merge. */
   @Column({ name: 'update_number', nullable: true, unique: true })
   updateNumber: string;

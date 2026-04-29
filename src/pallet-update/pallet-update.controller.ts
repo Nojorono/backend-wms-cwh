@@ -31,6 +31,7 @@ import {
 } from '../core/domain/entities/pallet-update.entity';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { CreatePalletUpdateDto } from './dto/create-pallet-update.dto';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Pallet Update')
 @Controller('pallet-update')
@@ -118,7 +119,14 @@ export class PalletUpdateController {
       ],
     },
   })
-  findAll(@Query() paginationQuery: PalletUpdatePaginationQueryDto) {
+  findAll(
+    @Query() paginationQuery: PalletUpdatePaginationQueryDto,
+    @OrganizationId() organizationId?: string,
+  ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     const hasPaginationParams =
       paginationQuery.search ||
       paginationQuery.page ||
@@ -129,10 +137,10 @@ export class PalletUpdateController {
       paginationQuery.status;
 
     if (hasPaginationParams) {
-      return this.palletUpdateService.findAllPaginated(paginationQuery);
+      return this.palletUpdateService.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.palletUpdateService.findAll(paginationQuery.updateType);
+    return this.palletUpdateService.findAll(organizationId, paginationQuery.updateType);
   }
 
   @Get('/approve-split-pallet/:palletUpdateId')

@@ -686,12 +686,14 @@ export class PalletUpdateService {
     return await this.repository.getNextUpdateNumber(updateType, year);
   }
 
-  async findAll(updateType?: PalletUpdateType): Promise<PalletUpdate[]> {
-    return await this.repository.findAll(updateType);
+  async findAll(organizationId: string, updateType?: PalletUpdateType): Promise<PalletUpdate[]> {
+    const palletUpdates = await this.repository.findAll(updateType as any);
+    return palletUpdates.filter((palletUpdate) => palletUpdate.organization_id === organizationId);
   }
 
   async findAllPaginated(
     paginationDto: PalletUpdatePaginationQueryDto,
+    organizationId: string,
     updateType?: PalletUpdateType,
   ): Promise<PaginatedResponseDto<PalletUpdateResponseDto>> {
     const filters = {
@@ -702,6 +704,7 @@ export class PalletUpdateService {
       limit: paginationDto.limit,
       sortBy: paginationDto.sortBy,
       sortOrder: paginationDto.sortOrder,
+      organizationId,
     };
 
     const { data, total } = await this.repository.findAllPaginated(filters);

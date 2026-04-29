@@ -20,6 +20,11 @@ import { CreatePalletUpdateItemDto } from './create-pallet-update-item.dto';
 import { CreatePalletUpdateAssignedDto } from './create-pallet-update-assigned.dto';
 
 export class CreateSplitPalletDto {
+    @ApiPropertyOptional({ example: 'uuid-organization-123' })
+    @IsOptional()
+    @IsUUID(4, { message: 'organization_id must be a valid UUID' })
+    organization_id?: string;
+
     @ApiPropertyOptional({ example: 'IPU-2025-0001', description: 'Unique reference number (e.g. IPU-YYYY-NNNN). Generate when creating; required for Split/Merge.' })
     @IsOptional()
     @IsString({ message: 'updateNumber must be a string' })

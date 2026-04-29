@@ -79,6 +79,7 @@ export class PalletUpdateRepository {
 
   async findAllPaginated(
     filters: {
+      organizationId: string;
       updateType?: PalletUpdateType;
       status?: string;
       search?: string;
@@ -89,6 +90,7 @@ export class PalletUpdateRepository {
     },
   ): Promise<{ data: PalletUpdate[]; total: number }> {
     const {
+      organizationId,
       updateType,
       status,
       search,
@@ -108,6 +110,8 @@ export class PalletUpdateRepository {
       .leftJoinAndSelect('palletUpdate.assigned', 'assigned')
       .leftJoinAndSelect('palletUpdate.initiatedByUser', 'initiatedByUser')
       .leftJoinAndSelect('palletUpdate.inspectionByUser', 'inspectionByUser');
+
+    qb.andWhere('palletUpdate.organization_id = :organizationId::uuid', { organizationId });
 
     if (updateType) {
       qb.andWhere('palletUpdate.updateType = :updateType', { updateType });
