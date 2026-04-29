@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -17,6 +18,7 @@ import {
   MasterWarehouseSub,
   WarehouseSubStagingType,
 } from '../core/domain/entities/master-warehouse-sub.entity';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Master Warehouse Sub')
 @Controller('master-warehouse-sub')
@@ -48,13 +50,21 @@ export class MasterWarehouseSubController {
   })
   @ApiQuery({ name: 'is_staging', required: false, enum: WarehouseSubStagingType })
   @ApiQuery({ name: 'is_gate', required: false, type: Boolean })
-  findAll(@Query('is_staging') is_staging?: WarehouseSubStagingType, @Query('is_gate') is_gate?: string) {
+  findAll(
+    @Query('is_staging') is_staging?: WarehouseSubStagingType,
+    @Query('is_gate') is_gate?: string,
+    @OrganizationId() organizationId?: string,
+  ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     const isGateBoolean = is_gate !== undefined ? is_gate === 'true' : undefined;
 
     if (is_staging !== undefined || isGateBoolean !== undefined) {
-      return this.masterWarehouseSubService.findByFilters(is_staging, isGateBoolean);
+      return this.masterWarehouseSubService.findByFilters(organizationId, is_staging, isGateBoolean);
     } else {
-      return this.masterWarehouseSubService.findAll();
+      return this.masterWarehouseSubService.findAll(organizationId);
     }
   }
 
@@ -66,13 +76,20 @@ export class MasterWarehouseSubController {
     type: [MasterWarehouseSub],
   })
   @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findByIsStaging(@Query('is_staging') is_staging: string) {
+  findByIsStaging(@Query('is_staging') is_staging: string, @OrganizationId() organizationId?: string) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     if (is_staging === 'null') {
-      return this.masterWarehouseSubService.findByIsStagingNull();
+      return this.masterWarehouseSubService.findByIsStagingNull(organizationId);
     } else if (is_staging && is_staging !== 'null') {
-      return this.masterWarehouseSubService.findByIsStaging(is_staging as WarehouseSubStagingType);
+      return this.masterWarehouseSubService.findByIsStaging(
+        is_staging as WarehouseSubStagingType,
+        organizationId,
+      );
     } else {
-      return this.masterWarehouseSubService.findAll();
+      return this.masterWarehouseSubService.findAll(organizationId);
     }
   }
 

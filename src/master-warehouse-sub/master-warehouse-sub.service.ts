@@ -19,8 +19,8 @@ export class MasterWarehouseSubService {
     return await this.repository.create(createMasterWarehouseSubDto);
   }
 
-  async findAll(): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findAll();
+  async findAll(organizationId: string): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findAll(organizationId);
   }
 
   async findOne(id: string): Promise<MasterWarehouseSub> {
@@ -55,12 +55,15 @@ export class MasterWarehouseSubService {
     await this.repository.remove(id);
   }
 
-  async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findByIsStaging(is_staging);
+  async findByIsStaging(
+    is_staging: WarehouseSubStagingType,
+    organizationId: string,
+  ): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByIsStaging(is_staging, organizationId);
   }
 
-  async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findByIsStagingNull();
+  async findByIsStagingNull(organizationId: string): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByIsStagingNull(organizationId);
   }
 
   async findByIsGate(is_gate: boolean): Promise<MasterWarehouseSub[]> {
@@ -68,9 +71,10 @@ export class MasterWarehouseSubService {
   }
 
   async findByFilters(
+    organizationId: string,
     is_staging?: WarehouseSubStagingType,
     is_gate?: boolean,
   ): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findByFilters(is_staging, is_gate);
+    return await this.repository.findByFilters(organizationId, is_staging, is_gate);
   }
 }

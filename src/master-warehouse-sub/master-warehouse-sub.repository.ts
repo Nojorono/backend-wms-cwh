@@ -1,12 +1,13 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, QueryFailedError } from 'typeorm';
+import { Repository, QueryFailedError } from 'typeorm';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
 import {
   MasterWarehouseSub,
   WarehouseSubStagingType,
 } from '../core/domain/entities/master-warehouse-sub.entity';
+import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
 
 @Injectable()
 export class MasterWarehouseSubRepository {
@@ -22,8 +23,8 @@ export class MasterWarehouseSubRepository {
     return await this.repository.save(warehouseSub);
   }
 
-  async findAll(): Promise<MasterWarehouseSub[]> {
-    return await this.repository.find();
+  async findAll(organizationId: string): Promise<MasterWarehouseSub[]> {
+    return await this.buildOrganizationScopedQuery(organizationId).getMany();
   }
 
   async findOne(id: string): Promise<MasterWarehouseSub | null> {
@@ -68,12 +69,19 @@ export class MasterWarehouseSubRepository {
     }
   }
 
-  async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
-    return await this.repository.find({ where: { is_staging } });
+  async findByIsStaging(
+    is_staging: WarehouseSubStagingType,
+    organizationId: string,
+  ): Promise<MasterWarehouseSub[]> {
+    return await this.buildOrganizationScopedQuery(organizationId)
+      .andWhere('warehouseSub.is_staging = :is_staging', { is_staging })
+      .getMany();
   }
 
-  async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
-    return await this.repository.find({ where: { is_staging: IsNull() } });
+  async findByIsStagingNull(organizationId: string): Promise<MasterWarehouseSub[]> {
+    return await this.buildOrganizationScopedQuery(organizationId)
+      .andWhere('warehouseSub.is_staging IS NULL')
+      .getMany();
   }
 
   async findByIsGate(is_gate: boolean): Promise<MasterWarehouseSub[]> {
@@ -81,16 +89,26 @@ export class MasterWarehouseSubRepository {
   }
 
   async findByFilters(
+    organizationId: string,
     is_staging?: WarehouseSubStagingType,
     is_gate?: boolean,
   ): Promise<MasterWarehouseSub[]> {
-    const where: Partial<MasterWarehouseSub> = {};
+    const qb = this.buildOrganizationScopedQuery(organizationId);
+
     if (is_staging !== undefined) {
-      where.is_staging = is_staging;
+      qb.andWhere('warehouseSub.is_staging = :is_staging', { is_staging });
     }
     if (is_gate !== undefined) {
-      where.is_gate = is_gate;
+      qb.andWhere('warehouseSub.is_gate = :is_gate', { is_gate });
     }
-    return await this.repository.find({ where });
+
+    return await qb.getMany();
+  }
+
+  private buildOrganizationScopedQuery(organizationId: string) {
+    return this.repository
+      .createQueryBuilder('warehouseSub')
+      .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
+      .where('warehouse.organization_id = :organizationId::uuid', { organizationId });
   }
 }
