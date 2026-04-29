@@ -39,10 +39,10 @@ export class CreateUserDto {
   @IsUUID()
   organizationId?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, nullable: true })
   @IsOptional()
   @IsUUID()
-  warehouseSubId?: string;
+  warehouseSubId?: string | null;
 
   @ApiProperty({ required: false })
   @IsOptional()

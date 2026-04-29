@@ -37,6 +37,9 @@ export class UserService {
         createUserDto.firstName ||
         createUserDto.lastName
       ) {
+        const normalizedWarehouseSubId =
+          createUserDto.warehouseSubId === null ? undefined : createUserDto.warehouseSubId;
+
         const userDetail = this.userDetailRepository.create({
           userId: user.id,
           employee_id: createUserDto.employeeId || `EMP_${user.username}`,
@@ -45,7 +48,7 @@ export class UserService {
           organizationId: createUserDto.organizationId,
           firstName: createUserDto.firstName,
           lastName: createUserDto.lastName,
-          warehouse_sub_id: createUserDto.warehouseSubId,
+          warehouse_sub_id: normalizedWarehouseSubId,
         });
 
         await this.userDetailRepository.save(userDetail);
@@ -132,7 +135,8 @@ export class UserService {
       updateUserDto.phone !== undefined ||
       updateUserDto.organizationId !== undefined ||
       updateUserDto.firstName !== undefined ||
-      updateUserDto.lastName !== undefined
+      updateUserDto.lastName !== undefined ||
+      updateUserDto.warehouseSubId !== undefined
     ) {
       const userDetailUpdateData: Partial<UserDetail> = {};
       if (updateUserDto.employeeId !== undefined) userDetailUpdateData.employee_id = updateUserDto.employeeId;
@@ -141,6 +145,13 @@ export class UserService {
       if (updateUserDto.organizationId !== undefined) userDetailUpdateData.organizationId = updateUserDto.organizationId;
       if (updateUserDto.firstName !== undefined) userDetailUpdateData.firstName = updateUserDto.firstName;
       if (updateUserDto.lastName !== undefined) userDetailUpdateData.lastName = updateUserDto.lastName;
+      const normalizedWarehouseSubId =
+        updateUserDto.warehouseSubId === '' || updateUserDto.warehouseSubId === null
+          ? undefined
+          : updateUserDto.warehouseSubId;
+      if (updateUserDto.warehouseSubId !== undefined) {
+        userDetailUpdateData.warehouse_sub_id = (normalizedWarehouseSubId ?? null) as any;
+      }
 
       let userDetail = await this.userDetailRepository.findOne({ where: { userId: user.id } });
       if (!userDetail) {
@@ -152,7 +163,7 @@ export class UserService {
           organizationId: updateUserDto.organizationId,
           firstName: updateUserDto.firstName,
           lastName: updateUserDto.lastName,
-          warehouse_sub_id: updateUserDto.warehouseSubId,
+          warehouse_sub_id: normalizedWarehouseSubId,
         });
         await this.userDetailRepository.save(userDetail);
       } else {
