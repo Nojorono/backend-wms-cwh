@@ -45,6 +45,7 @@ export class UserService {
           organizationId: createUserDto.organizationId,
           firstName: createUserDto.firstName,
           lastName: createUserDto.lastName,
+          warehouse_sub_id: createUserDto.warehouseSubId,
         });
 
         await this.userDetailRepository.save(userDetail);
@@ -151,6 +152,7 @@ export class UserService {
           organizationId: updateUserDto.organizationId,
           firstName: updateUserDto.firstName,
           lastName: updateUserDto.lastName,
+          warehouse_sub_id: updateUserDto.warehouseSubId,
         });
         await this.userDetailRepository.save(userDetail);
       } else {
