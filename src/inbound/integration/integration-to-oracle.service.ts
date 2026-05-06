@@ -18,7 +18,10 @@ import { SalesOrderIntegrationService } from './sales-order.integration';
 type InboundIntegrationItem = InboundItem & {
   transaction_scan_inbounds?: TransactionScanInbound[];
   warehouse_sub?: MasterWarehouseSub;
+  /** Physical location from scan (warehouse sub → parent warehouse). */
   warehouse?: MasterWarehouse;
+  /** Sub-inventory / locator for quantity difference (`sub_inventory_difference` → `m_warehouse`). */
+  warehouse_diff?: MasterWarehouse;
 };
 export type InboundIntegrationToOracleResult = Omit<
   Inbound,
@@ -259,9 +262,13 @@ export class IntegrationToOracleService {
       transaction_scan_inbounds?: TransactionScanInbound[];
       warehouse_sub?: MasterWarehouseSub;
       warehouse?: MasterWarehouse;
+      warehouse_diff?: MasterWarehouse;
     };
 
     const warehouseSubIds = new Set<string>();
+    /** `inbound_item.sub_inventory_difference` stores FK to `m_warehouse.id` (difference / selisih warehouse). */
+    const warehouseIdsFromSubInventoryDifference = new Set<string>();
+
     for (const inboundDo of inbound.inbound_dos ?? []) {
       for (const inboundItem of inboundDo.inbound_items ?? []) {
         const scans = (inboundItem as InboundItemWithScansAndWarehouse).transaction_scan_inbounds ?? [];
@@ -270,25 +277,39 @@ export class IntegrationToOracleService {
             warehouseSubIds.add(scan.m_warehouse_sub_id);
           }
         }
+        const wid =
+          inboundItem.sub_inventory_difference &&
+            String(inboundItem.sub_inventory_difference).trim() !== ''
+            ? String(inboundItem.sub_inventory_difference).trim()
+            : null;
+        if (wid) {
+          warehouseIdsFromSubInventoryDifference.add(wid);
+        }
       }
     }
 
-    if (!warehouseSubIds.size) {
+    const warehouseSubs = warehouseSubIds.size
+      ? await this.dataSource.getRepository(MasterWarehouseSub).find({
+        where: { id: In([...warehouseSubIds]) },
+      })
+      : [];
+    const warehouseSubMap = new Map(warehouseSubs.map((s) => [s.id, s]));
+
+    const warehouseIds = new Set<string>(warehouseIdsFromSubInventoryDifference);
+    for (const s of warehouseSubs) {
+      if (s.warehouse_id) {
+        warehouseIds.add(s.warehouse_id);
+      }
+    }
+
+    if (!warehouseIds.size && !warehouseSubIds.size) {
       return inbound;
     }
 
-    const warehouseSubs = await this.dataSource.getRepository(MasterWarehouseSub).find({
-      where: { id: In([...warehouseSubIds]) },
-    });
-    const warehouseSubMap = new Map(warehouseSubs.map((s) => [s.id, s]));
-
-    const warehouseIds = Array.from(
-      new Set(warehouseSubs.map((s) => s.warehouse_id).filter((id): id is string => Boolean(id))),
-    );
-    const warehouses = warehouseIds.length
+    const warehouses = warehouseIds.size
       ? await this.dataSource.getRepository(MasterWarehouse).find({
-          where: { id: In(warehouseIds) },
-        })
+        where: { id: In([...warehouseIds]) },
+      })
       : [];
     const warehouseMap = new Map(warehouses.map((w) => [w.id, w]));
 
@@ -297,17 +318,28 @@ export class IntegrationToOracleService {
         const item = inboundItem as InboundItemWithScansAndWarehouse;
         const scans = item.transaction_scan_inbounds ?? [];
         const firstSubId = scans.find((s) => s.m_warehouse_sub_id)?.m_warehouse_sub_id;
-        if (!firstSubId) {
-          continue;
-        }
-        const sub = warehouseSubMap.get(firstSubId);
-        if (sub) {
-          item.warehouse_sub = sub;
-          if (sub.warehouse_id) {
-            const wh = warehouseMap.get(sub.warehouse_id);
-            if (wh) {
-              item.warehouse = wh;
+        if (firstSubId) {
+          const sub = warehouseSubMap.get(firstSubId);
+          if (sub) {
+            item.warehouse_sub = sub;
+            if (sub.warehouse_id) {
+              const wh = warehouseMap.get(sub.warehouse_id);
+              if (wh) {
+                item.warehouse = wh;
+              }
             }
+          }
+        }
+
+        const warehouseIdFromDiff =
+          inboundItem.sub_inventory_difference &&
+            String(inboundItem.sub_inventory_difference).trim() !== ''
+            ? String(inboundItem.sub_inventory_difference).trim()
+            : null;
+        if (warehouseIdFromDiff) {
+          const whDiff = warehouseMap.get(warehouseIdFromDiff);
+          if (whDiff) {
+            item.warehouse_diff = whDiff;
           }
         }
       }
@@ -331,7 +363,7 @@ export class IntegrationToOracleService {
         (r) =>
           inboundDo.inbound_po_number &&
           this.normalizePoItemCode(r.NOMOR_PO) ===
-            this.normalizePoItemCode(inboundDo.inbound_po_number),
+          this.normalizePoItemCode(inboundDo.inbound_po_number),
       ) ?? rows[0];
     if (!po) {
       return;
@@ -351,15 +383,21 @@ export class IntegrationToOracleService {
       }
     }
 
-    const lines = po.ITEM ?? [];
-    if (inboundDo.total_line_items == null && lines.length > 0) {
-      inboundDo.total_line_items = lines.length;
+    // total count from purchase order
+    // const lines = po.ITEM ?? [];
+    // if (inboundDo.total_line_items == null && lines.length > 0) {
+    //   inboundDo.total_line_items = lines.length;
+    // }
+
+    const inboundItemCount = inboundDo.inbound_items?.length ?? 0;
+    if (inboundDo.total_line_items == null && inboundItemCount > 0) {
+      inboundDo.total_line_items = inboundItemCount;
     }
 
     const unresolvedItemIds = Array.from(
       new Set(
         (inboundDo.inbound_items ?? [])
-          .filter((i) => i.line_number == null && !i.item?.sku && i.item_id)
+          .filter((i) => !i.item?.sku && i.item_id)
           .map((i) => i.item_id as string),
       ),
     );
@@ -373,69 +411,69 @@ export class IntegrationToOracleService {
       }
     }
 
-    const usedPoLineNumbers = new Set<number>();
-    const unresolvedInboundItems: InboundItem[] = [];
+    // const usedPoLineNumbers = new Set<number>();
+    // const unresolvedInboundItems: InboundItem[] = [];
 
-    for (const inboundItem of inboundDo.inbound_items ?? []) {
-      if (inboundItem.line_number != null) {
-        usedPoLineNumbers.add(inboundItem.line_number);
-        continue;
-      }
-      const item =
-        inboundItem.item ??
-        (inboundItem.item_id ? itemLookup.get(inboundItem.item_id) : undefined);
-      if (item && !inboundItem.item) {
-        inboundItem.item = item;
-      }
-      const sku =
-        item?.sku != null ? this.normalizePoItemCode(item.sku) : '';
-      const kode =
-        item?.item_number != null
-          ? this.normalizePoItemCode(item.item_number)
-          : '';
+    // for (const inboundItem of inboundDo.inbound_items ?? []) {
+    //   if (inboundItem.line_number != null) {
+    //     usedPoLineNumbers.add(inboundItem.line_number);
+    //     continue;
+    //   }
+    //   const item =
+    //     inboundItem.item ??
+    //     (inboundItem.item_id ? itemLookup.get(inboundItem.item_id) : undefined);
+    //   if (item && !inboundItem.item) {
+    //     inboundItem.item = item;
+    //   }
+    //   const sku =
+    //     item?.sku != null ? this.normalizePoItemCode(item.sku) : '';
+    //   const kode =
+    //     item?.item_number != null
+    //       ? this.normalizePoItemCode(item.item_number)
+    //       : '';
 
-      const matched = lines.find((line) => {
-        if (sku && this.normalizePoItemCode(line.SKU) === sku) {
-          return true;
-        }
-        if (kode && this.normalizePoItemCode(line.KODE_ITEM) === kode) {
-          return true;
-        }
-        return false;
-      });
+    //   const matched = lines.find((line) => {
+    //     if (sku && this.normalizePoItemCode(line.SKU) === sku) {
+    //       return true;
+    //     }
+    //     if (kode && this.normalizePoItemCode(line.KODE_ITEM) === kode) {
+    //       return true;
+    //     }
+    //     return false;
+    //   });
 
-      const fallbackLine =
-        matched ??
-        (lines.length === 1 && (inboundDo.inbound_items?.length ?? 0) === 1
-          ? lines[0]
-          : undefined);
+    //   const fallbackLine =
+    //     matched ??
+    //     (lines.length === 1 && (inboundDo.inbound_items?.length ?? 0) === 1
+    //       ? lines[0]
+    //       : undefined);
 
-      if (fallbackLine != null) {
-        const num = Number(fallbackLine.PO_LINE_NUM);
-        if (!Number.isNaN(num)) {
-          inboundItem.line_number = num;
-          usedPoLineNumbers.add(num);
-        }
-      } else {
-        unresolvedInboundItems.push(inboundItem);
-      }
-    }
+    //   if (fallbackLine != null) {
+    //     const num = Number(fallbackLine.PO_LINE_NUM);
+    //     if (!Number.isNaN(num)) {
+    //       inboundItem.line_number = num;
+    //       usedPoLineNumbers.add(num);
+    //     }
+    //   } else {
+    //     unresolvedInboundItems.push(inboundItem);
+    //   }
+    // }
 
-    if (unresolvedInboundItems.length > 0) {
-      const remainingPoLines = lines
-        .map((line) => ({ line, num: Number(line.PO_LINE_NUM) }))
-        .filter((x) => !Number.isNaN(x.num) && !usedPoLineNumbers.has(x.num))
-        .sort((a, b) => a.num - b.num);
+    // if (unresolvedInboundItems.length > 0) {
+    //   const remainingPoLines = lines
+    //     .map((line) => ({ line, num: Number(line.PO_LINE_NUM) }))
+    //     .filter((x) => !Number.isNaN(x.num) && !usedPoLineNumbers.has(x.num))
+    //     .sort((a, b) => a.num - b.num);
 
-      const orderedInboundItems = [...unresolvedInboundItems].sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
+    //   const orderedInboundItems = [...unresolvedInboundItems].sort(
+    //     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    //   );
 
-      const pairCount = Math.min(orderedInboundItems.length, remainingPoLines.length);
-      for (let i = 0; i < pairCount; i++) {
-        orderedInboundItems[i].line_number = remainingPoLines[i].num;
-      }
-    }
+    //   const pairCount = Math.min(orderedInboundItems.length, remainingPoLines.length);
+    //   for (let i = 0; i < pairCount; i++) {
+    //     orderedInboundItems[i].line_number = remainingPoLines[i].num;
+    //   }
+    // }
   }
 
   private normalizePoItemCode(value: string | null | undefined): string {

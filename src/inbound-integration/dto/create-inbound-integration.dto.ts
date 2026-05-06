@@ -90,6 +90,11 @@ export class CreateInboundIntegrationDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsString()
+  receipt_number_selisih?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsNumber()
   group_id?: number;
 
@@ -117,6 +122,16 @@ export class CreateInboundIntegrationDto {
   @IsOptional()
   @IsString()
   message?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  status_selisih?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  message_selisih?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

@@ -52,6 +52,21 @@ export class InboundIntegrationLines extends BaseEntity {
     @Column({ name: 'locator_id', type: 'bigint', nullable: true })
     locator_id: number;
 
+    @Column({ name: 'quantity_selisih', type: 'bigint', nullable: true })
+    quantity_selisih: number;
+
+    @Column({ name: 'subinventory_selisih', type: 'varchar', length: 10, nullable: true })
+    subinventory_selisih: string;
+
+    @Column({ name: 'locator_id_selisih', type: 'bigint', nullable: true })
+    locator_id_selisih: number;
+
+    @Column({ name: 'status_selisih', type: 'varchar', length: 30, nullable: true })
+    status_selisih: string;
+
+    @Column({ name: 'message_selisih', type: 'varchar', length: 240, nullable: true })
+    message_selisih: string;
+
     @Column({ name: 'shipment_line_id', type: 'bigint', nullable: true })
     shipment_line_id: number;
 

@@ -599,7 +599,7 @@ export class InboundService {
    */
   async integrationToOracle(
     id: string,
-  ): Promise<void> {
+  ): Promise<any> {
     const inbound = await this.findOne(id);
     if (!inbound) {
       throw new NotFoundException('Inbound not found');
@@ -630,12 +630,12 @@ export class InboundService {
     // const dataIntegration = await this.integrationToOracleService.build(inbound);
     // await this.createInboundIntegrationRecords(dataIntegration);
     // const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
-    // const rcv_receipt_results =
-    //   await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
+    // const rcv_receipt_results = await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
     // await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
 
+    // return rcv_receipt_results;
     // return { ...dataIntegration, rcv_receipt_results };
-    return;
+    return inbound;
   }
 
   private async createInboundIntegrationRecords(
@@ -643,6 +643,7 @@ export class InboundService {
   ): Promise<void> {
     type InboundItemWithWarehouse = InboundItem & {
       warehouse?: { name?: string; locator_id?: number | string | null };
+      warehouse_diff?: { name?: string; locator_id?: number | string | null };
     };
 
     const toOptionalNumber = (value: unknown): number | undefined => {
@@ -652,16 +653,16 @@ export class InboundService {
       const n = typeof value === 'string' ? Number(value) : Number(value);
       return Number.isNaN(n) ? undefined : n;
     };
-    const toCamelCaseWord = (value: string | null | undefined): string | undefined => {
-      if (!value) {
-        return undefined;
-      }
-      const normalized = value.trim().toLowerCase();
-      if (!normalized) {
-        return undefined;
-      }
-      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-    };
+    // const toCamelCaseWord = (value: string | null | undefined): string | undefined => {
+    //   if (!value) {
+    //     return undefined;
+    //   }
+    //   const normalized = value.trim().toLowerCase();
+    //   if (!normalized) {
+    //     return undefined;
+    //   }
+    //   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    // };
 
     const isSoInternalOrSubdist = ['SO_INTERNAL', 'SO_SUBDIST'].includes(
       (inbound.inbound_type ?? '').toUpperCase(),
@@ -677,10 +678,16 @@ export class InboundService {
         iso_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
         iso_line_number: isSoInternalOrSubdist ? toOptionalNumber(item.line_number) : undefined,
         inventory_item_id: toOptionalNumber(item.item?.inventory_item_id),
-        uom_code: isSoInternalOrSubdist ? item.uom : toCamelCaseWord(item.uom),
+        uom_code: item.uom,
         quantity: toOptionalNumber(item.quantity_inspection ?? item.quantity),
+        /** Scan location; if no scans, falls back to difference warehouse (legacy single-warehouse lines). */
         subinventory: item.warehouse?.name ?? undefined,
-        locator_id: toOptionalNumber(item.warehouse?.locator_id),
+        locator_id: toOptionalNumber(
+          item.warehouse?.locator_id
+        ),
+        quantity_selisih: toOptionalNumber(item.quantity_difference),
+        subinventory_selisih: item.warehouse_diff?.name ?? undefined,
+        locator_id_selisih: toOptionalNumber(item.warehouse_diff?.locator_id),
       }));
 
       await this.inboundIntegrationService.createOrReplaceByInboundDo({
@@ -722,7 +729,15 @@ export class InboundService {
       return value;
     };
 
-    const responses: RcvReceiptResponseDto[] = [];
+    const toOptionalNumber = (value: unknown): number | undefined => {
+      if (value == null || value === '') {
+        return undefined;
+      }
+      const n = typeof value === 'string' ? Number(value) : Number(value);
+      return Number.isNaN(n) ? undefined : n;
+    };
+
+    const payloads: CreateRcvReceiptDto[] = [];
     for (const header of inboundIntegrations) {
       const ctx = `Inbound integration ${header.id}`;
       const payload: CreateRcvReceiptDto = {
@@ -768,13 +783,31 @@ export class InboundService {
           QUANTITY: asNumberRequired(line.quantity, 'QUANTITY', ctx),
           SUBINVENTORY: asStringRequired(line.subinventory, 'SUBINVENTORY', ctx),
           LOCATOR_ID: asNumberRequired(line.locator_id, 'LOCATOR_ID', ctx),
+          QUANTITY_SELISIH: toOptionalNumber(line.quantity_selisih),
+          SUBINVENTORY_SELISIH:
+            line.subinventory_selisih != null && String(line.subinventory_selisih).trim() !== ''
+              ? String(line.subinventory_selisih).trim()
+              : undefined,
+          LOCATOR_ID_SELISIH: toOptionalNumber(line.locator_id_selisih),
         })),
       };
 
-      const response = await this.rcvReceiptIntegrationService.createRcvReceipt(payload);
-      responses.push(response);
+      payloads.push(payload);
     }
 
-    return responses;
+    if (!payloads.length) {
+      return [];
+    }
+
+    console.log('payloads', payloads);
+
+    const response = await this.rcvReceiptIntegrationService.createRcvReceipt(
+      payloads.length === 1 ? payloads[0] : payloads,
+    );
+    if (Array.isArray(response)) {
+      return response as RcvReceiptResponseDto[];
+    }
+    return [response];
+    return [];
   }
 }

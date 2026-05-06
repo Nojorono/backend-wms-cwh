@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { RcvReceiptTransactionType } from 'src/core/domain/entities/inbound-integration.entity';
@@ -58,6 +59,22 @@ export class CreateRcvReceiptLinesDto {
   @ApiProperty({ example: 100200300 })
   @IsNumber()
   LOCATOR_ID: number;
+
+  @ApiProperty({ example: 2, required: false, description: 'Oracle NUMBER: quantity difference / selisih' })
+  @IsOptional()
+  @IsNumber()
+  QUANTITY_SELISIH?: number;
+
+  @ApiProperty({ example: 'GOOD-RK-2', required: false, maxLength: 10, description: 'Oracle VARCHAR2(10)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  SUBINVENTORY_SELISIH?: string;
+
+  @ApiProperty({ example: 100200301, required: false, description: 'Oracle NUMBER: locator id for selisih' })
+  @IsOptional()
+  @IsNumber()
+  LOCATOR_ID_SELISIH?: number;
 }
 
 export class CreateRcvReceiptDto {

@@ -75,6 +75,31 @@ export class CreateInboundIntegrationLineDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsNumber()
+  quantity_selisih?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  subinventory_selisih?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  locator_id_selisih?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  status_selisih?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  message_selisih?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
   shipment_line_id?: number;
 
   @ApiProperty({ required: false })

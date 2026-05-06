@@ -81,6 +81,9 @@ export class InboundIntegration extends BaseEntity {
     @Column({ name: 'receipt_number', type: 'varchar', length: 30, nullable: true })
     receipt_number: string;
 
+    @Column({ name: 'receipt_number_selisih', type: 'varchar', length: 30, nullable: true })
+    receipt_number_selisih: string;
+
     @Column({ name: 'group_id', type: 'bigint', nullable: true })
     group_id: number;
 
@@ -98,6 +101,12 @@ export class InboundIntegration extends BaseEntity {
 
     @Column({ name: 'message', type: 'varchar', length: 240, nullable: true })
     message: string;
+
+    @Column({ name: 'status_selisih', type: 'varchar', length: 30, nullable: true })
+    status_selisih: string;
+
+    @Column({ name: 'message_selisih', type: 'varchar', length: 240, nullable: true })
+    message_selisih: string;
 
     @Column({ name: 'created_by', type: 'bigint', nullable: true })
     created_by: number;

@@ -11,6 +11,9 @@ export { CreateRcvReceiptDto, CreateRcvReceiptLinesDto };
 
 export type RcvReceiptResponseDto = Record<string, unknown>;
 
+/** Matches RCV microservice `@Payload() CreateRcvReceiptDto | CreateRcvReceiptDto[]`. */
+export type CreateRcvReceiptPayload = CreateRcvReceiptDto | CreateRcvReceiptDto[];
+
 @Injectable()
 export class RcvReceiptIntegrationService implements OnModuleInit {
   private readonly logger = new Logger(RcvReceiptIntegrationService.name);
@@ -46,7 +49,7 @@ export class RcvReceiptIntegrationService implements OnModuleInit {
     this.connectionAttempts = state.connectionAttempts;
   }
 
-  async createRcvReceipt(payload: CreateRcvReceiptDto): Promise<RcvReceiptResponseDto> {
+  async createRcvReceipt(payload: CreateRcvReceiptPayload): Promise<RcvReceiptResponseDto> {
     try {
       const timeoutMs = 30000;
       return await firstValueFrom(
@@ -65,6 +68,34 @@ export class RcvReceiptIntegrationService implements OnModuleInit {
       this.connectionEstablished = false;
       this.logger.error(
         `Error calling rcv-receipt.create: ${error?.message || 'Unknown error'}`,
+        error?.stack,
+      );
+      throw error;
+    }
+  }
+
+  /** RMQ `rcv-receipt.findBySourceHeaderId` → payload `{ source_header_id }` (handler lives on the RCV service). */
+  async findBySourceHeaderId(source_header_id: string): Promise<RcvReceiptResponseDto> {
+    try {
+      const timeoutMs = 30000;
+      return await firstValueFrom(
+        this.rcvReceiptClient
+          .send<RcvReceiptResponseDto>('rcv-receipt.findBySourceHeaderId', {
+            source_header_id,
+          })
+          .pipe(
+            timeout(timeoutMs),
+            catchError((error) => {
+              this.logger.error(`RCV_RECEIPT_SERVICE request failed: ${error.message || 'Unknown error'}`);
+              this.connectionEstablished = false;
+              throw error;
+            }),
+          ),
+      );
+    } catch (error) {
+      this.connectionEstablished = false;
+      this.logger.error(
+        `Error calling rcv-receipt.findBySourceHeaderId: ${error?.message || 'Unknown error'}`,
         error?.stack,
       );
       throw error;
