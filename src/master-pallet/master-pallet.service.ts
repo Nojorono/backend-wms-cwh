@@ -172,6 +172,7 @@ export class MasterPalletService {
     palletId: string,
     updateQuantityDto: UpdatePalletQuantityDto,
     _existingManager?: EntityManager,
+    skipEmptyPalletCleanup: boolean = false,
   ): Promise<MasterPallet> {
     try {
       const pallet = await this.repository.findOne(palletId);
@@ -356,7 +357,7 @@ export class MasterPalletService {
         throw new NotFoundException(`Pallet with ID ${palletId} not found after update`);
       }
 
-      if (updatedPallet.currentQuantity === 0) {
+      if (updatedPallet.currentQuantity === 0 && !skipEmptyPalletCleanup) {
         const inventoryTracking = await this.inventoryTrackingRepository.findOne({
           where: { pallet_id: palletId },
         });
@@ -541,14 +542,14 @@ export class MasterPalletService {
           operation_type: QuantityOperationType.REMOVE,
           quantity: dto.from_quantity,
           uom: dto.from_uom,
-        });
+        }, undefined, true);
 
         return await this.updateQuantity(palletId, {
           ...basePayload,
           operation_type: QuantityOperationType.ADD,
           quantity: dto.to_quantity,
           uom: dto.to_uom,
-        });
+        }, undefined, true);
       } catch (err) {
         if (
           err instanceof BadRequestException ||
