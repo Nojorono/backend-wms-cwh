@@ -242,6 +242,11 @@ export class PalletQuantityHistoryResponseDto {
 }
 
 export class PalletItemQuantityDto {
+  @ApiPropertyOptional({ example: 'uuid-organization-123' })
+  @IsOptional()
+  @IsString()
+  organization_id?: string;
+
   @ApiPropertyOptional({ example: 'uuid-pallet-123' })
   @IsOptional()
   @IsString()

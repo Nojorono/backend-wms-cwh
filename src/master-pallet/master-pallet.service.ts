@@ -785,6 +785,7 @@ export class MasterPalletService {
           warehouse_bin_id: latestInventory?.warehouse_bin_id,
           warehouse_bin_name: latestInventory?.warehouseBin?.code,
           memo_id: pallet.memo_id,
+          organization_id: pallet.organization_id,
         },
       ];
     }
@@ -804,6 +805,7 @@ export class MasterPalletService {
       warehouse_bin_name: latestInventory?.warehouseBin?.code,
       memo_id: pallet.memo_id,
       status_inventory: history.status_inventory,
+      organization_id: pallet.organization_id,
     }));
   }
 
