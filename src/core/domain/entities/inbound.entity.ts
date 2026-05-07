@@ -12,6 +12,7 @@ export enum InboundStatus {
   READY_INTEGRATION = 'READY_INTEGRATION',
   INTEGRATED = 'INTEGRATED',
   FAILED = 'FAILED',
+  TIMEOUT = 'TIMEOUT',
 }
 
 @Entity('inbound')

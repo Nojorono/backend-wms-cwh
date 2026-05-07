@@ -38,7 +38,7 @@ type InboundWithDos = {
 };
 
 @Injectable()
-export class IntegrationToOracleService {
+export class InboundMappingIntegrationService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly purchaseOrderIntegrationService: PurchaseOrderIntegrationService,

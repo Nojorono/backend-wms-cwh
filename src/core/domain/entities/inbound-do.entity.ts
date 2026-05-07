@@ -1,7 +1,8 @@
-import { Entity, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, OneToMany, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
 import { InboundItem } from './inbound-item.entity';
 import { BaseEntity } from './base.entity';
 import { Inbound } from './inbound.entity';
+import { InboundIntegration } from './inbound-integration.entity';
 
 export enum IntegrationStatus {
   PENDING = 'PENDING',
@@ -35,6 +36,9 @@ export class InboundDo extends BaseEntity {
   inbound_po_number: string;
 
   @Column({ nullable: true })
+  add_to_receipt_number: string;
+
+  @Column({ nullable: true })
   vendor_id: number;
 
   @Column({ nullable: true })
@@ -54,6 +58,9 @@ export class InboundDo extends BaseEntity {
 
   @OneToMany(() => InboundItem, (inboundItem) => inboundItem.inbound_do)
   inbound_items: InboundItem[];
+
+  @OneToOne(() => InboundIntegration, (inboundIntegration) => inboundIntegration.inbound_do)
+  inbound_integration: InboundIntegration;
 
   @Column({ nullable: true, default: null })
   integration_status: IntegrationStatus;

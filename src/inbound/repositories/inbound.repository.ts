@@ -26,6 +26,7 @@ export class InboundRepository {
     }
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -86,6 +87,7 @@ export class InboundRepository {
 
     const data = await queryBuilder
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -110,6 +112,7 @@ export class InboundRepository {
     qb.where('inbound.id = :id', { id });
     const entity = await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -194,6 +197,7 @@ export class InboundRepository {
     qb.andWhere('assigned_helpers.helper_user_id = :id', { id });
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -209,6 +213,7 @@ export class InboundRepository {
     return await this.repository
       .createQueryBuilder('inbound')
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',

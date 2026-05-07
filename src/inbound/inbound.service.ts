@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { Inbound } from '../core/domain/entities/inbound.entity';
@@ -21,9 +22,9 @@ import { InboundStatus } from 'src/core/domain/entities/inbound.entity';
 import { PalletTransactionHistory, StatusInventory } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
-  IntegrationToOracleService,
+  InboundMappingIntegrationService,
   InboundIntegrationToOracleResult,
-} from './integration/integration-to-oracle.service';
+} from './integration/inbound-mapping-integration.service';
 import {
   InboundIntegrationService,
   InboundIntegrationHeaderWithLines,
@@ -34,18 +35,22 @@ import {
   RcvReceiptIntegrationService,
   RcvReceiptResponseDto,
 } from './integration/rcv-receipt.integration';
+import { InboundIntegrationQueueProducer } from './integration/inbound-integration-queue.producer';
 
 @Injectable()
 export class InboundService {
+  private readonly logger = new Logger(InboundService.name);
+
   constructor(
     private readonly inboundRepo: InboundRepository,
     private readonly inboundDoRepo: InboundDoRepository,
     private readonly inboundItemRepo: InboundItemRepository,
     private readonly dataSource: DataSource,
     private readonly paginationService: PaginationService,
-    private readonly integrationToOracleService: IntegrationToOracleService,
+    private readonly inboundMappingIntegrationService: InboundMappingIntegrationService,
     private readonly inboundIntegrationService: InboundIntegrationService,
     private readonly rcvReceiptIntegrationService: RcvReceiptIntegrationService,
+    private readonly inboundIntegrationQueueProducer: InboundIntegrationQueueProducer,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletTransactionHistoryRepository: Repository<PalletTransactionHistory>,
   ) { }
@@ -336,6 +341,7 @@ export class InboundService {
               inbound_po_date: doDto.inbound_po_date ? new Date(doDto.inbound_po_date) : undefined,
               flag_validated: doDto.flag_validated ?? false,
               validation_surat_jalan: doDto.validation_surat_jalan ?? false,
+              add_to_receipt_number: doDto.add_to_receipt_number,
             });
 
             if (doDto.inbound_items?.length) {
@@ -597,6 +603,47 @@ export class InboundService {
    * Like `findOne`, but `transaction_scan_inbounds` are nested under each `inbound_item` (matched by
    * `item_id`) and omitted from the inbound root. `quantity_inspection` is numeric in JSON.
    */
+  async integrationToOracleV1(
+    id: string,
+  ): Promise<any> {
+    const inbound = await this.findOne(id);
+    if (!inbound) {
+      throw new NotFoundException('Inbound not found');
+    }
+
+    // // update pallet history status inventory to READY
+    // const palletHistories = await this.palletTransactionHistoryRepository.find({
+    //   where: {
+    //     inbound_id: id,
+    //   },
+    // });
+
+    // if (palletHistories.length === 0) {
+    //   throw new BadRequestException('Pallet history not found');
+    // }
+
+    // for (const palletHistory of palletHistories) {
+    //   await this.palletTransactionHistoryRepository.update(palletHistory.id, {
+    //     status_inventory: StatusInventory.READY,
+    //   });
+    // }
+
+    // // update inbound status to READY_INTEGRATION
+    // await this.inboundRepo.update(id, {
+    //   status: InboundStatus.INTEGRATED,
+    // });
+
+    const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
+    await this.createInboundIntegrationRecords(dataIntegration);
+    const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
+    const rcv_receipt_results = await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
+    // await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
+
+    return rcv_receipt_results;
+    // return { ...dataIntegration, rcv_receipt_results };
+    // return inbound;
+  }
+
   async integrationToOracle(
     id: string,
   ): Promise<any> {
@@ -605,38 +652,39 @@ export class InboundService {
       throw new NotFoundException('Inbound not found');
     }
 
-    // update pallet history status inventory to READY
-    const palletHistories = await this.palletTransactionHistoryRepository.find({
-      where: {
-        inbound_id: id,
-      },
+    const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
+    await this.createInboundIntegrationRecords(dataIntegration);
+    const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
+    const rcv_receipt_results =
+      await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
+    const requestId = this.extractRequestIdFromRcvResults(rcv_receipt_results);
+
+    // await this.inboundRepo.update(id, {
+    //   status: InboundStatus.READY_INTEGRATION,
+    //   notes: requestId
+    //     ? `Oracle request submitted with request_id=${requestId}`
+    //     : 'Oracle request submitted. Waiting for Oracle concurrent process',
+    // });
+
+    await this.inboundIntegrationQueueProducer.publish({
+      inboundId: id,
+      requestId: requestId ?? undefined,
+      retryCount: 0,
+      maxRetry: 20,
     });
 
-    if (palletHistories.length === 0) {
-      throw new BadRequestException('Pallet history not found');
-    }
+    this.logger.log(
+      `Queued inbound integration job inboundId=${id} requestId=${requestId ?? 'N/A'} retryCount=0`,
+    );
 
-    for (const palletHistory of palletHistories) {
-      await this.palletTransactionHistoryRepository.update(palletHistory.id, {
-        status_inventory: StatusInventory.READY,
-      });
-    }
-
-    // update inbound status to READY_INTEGRATION
-    await this.inboundRepo.update(id, {
-      status: InboundStatus.INTEGRATED,
-    });
-
-    // const dataIntegration = await this.integrationToOracleService.build(inbound);
-    // await this.createInboundIntegrationRecords(dataIntegration);
-    // const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
-    // const rcv_receipt_results = await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
-    // await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
-
-    // return rcv_receipt_results;
-    // return { ...dataIntegration, rcv_receipt_results };
-    return inbound;
+    return {
+      status: 'PROCESSING',
+      inboundId: id,
+      requestId: requestId ?? null,
+    };
   }
+
+
 
   private async createInboundIntegrationRecords(
     inbound: InboundIntegrationToOracleResult,
@@ -799,15 +847,76 @@ export class InboundService {
       return [];
     }
 
-    console.log('payloads', payloads);
-
     const response = await this.rcvReceiptIntegrationService.createRcvReceipt(
-      payloads.length === 1 ? payloads[0] : payloads,
+      payloads,
     );
     if (Array.isArray(response)) {
       return response as RcvReceiptResponseDto[];
     }
+    const responseData = (response as Record<string, unknown>).data;
+    if (Array.isArray(responseData)) {
+      return responseData as RcvReceiptResponseDto[];
+    }
     return [response];
-    return [];
+  }
+
+  private extractRequestIdFromRcvResults(
+    responses: RcvReceiptResponseDto[],
+  ): number | null {
+    for (const row of responses) {
+      const result = this.extractRequestIdFromUnknown(row);
+      if (result != null) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  private extractRequestIdFromUnknown(value: unknown): number | null {
+    if (value == null) {
+      return null;
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const nested = this.extractRequestIdFromUnknown(entry);
+        if (nested != null) {
+          return nested;
+        }
+      }
+      return null;
+    }
+    if (typeof value !== 'object') {
+      return null;
+    }
+    const obj = value as Record<string, unknown>;
+    const candidates = [
+      obj.request_id,
+      obj.requestId,
+      obj.REQUEST_ID,
+      obj.REQUEST_ID_IR,
+      obj.REQUEST_ID_IO,
+      obj.REQUEST_ID_OI,
+      obj.data,
+    ];
+    for (const candidate of candidates) {
+      if (candidate == null) {
+        continue;
+      }
+      if (typeof candidate === 'number') {
+        return Number.isNaN(candidate) ? null : candidate;
+      }
+      if (typeof candidate === 'string') {
+        const n = Number(candidate);
+        if (!Number.isNaN(n)) {
+          return n;
+        }
+      } else {
+        const nested = this.extractRequestIdFromUnknown(candidate);
+        if (nested != null) {
+          return nested;
+        }
+      }
+    }
+    return null;
   }
 }

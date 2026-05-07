@@ -13,11 +13,16 @@ import { ClientsModule } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Transport } from '@nestjs/microservices';
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
-import { IntegrationToOracleService } from './integration/integration-to-oracle.service';
+import { InboundMappingIntegrationService } from './integration/inbound-mapping-integration.service';
 import { SalesOrderIntegrationService } from './integration/sales-order.integration';
 import { RcvReceiptIntegrationService } from './integration/rcv-receipt.integration';
 import { PurchaseOrderIntegrationService } from 'src/inbound/integration/purchase-order.integration';
 import { InboundIntegrationModule } from 'src/inbound-integration/inbound-integration.module';
+import { InboundIntegrationQueueProducer } from './integration/inbound-integration-queue.producer';
+import { InboundIntegrationQueueConsumer } from './integration/inbound-integration-queue.consumer';
+import { OracleInboundStatusCheckerService } from './integration/oracle-inbound-status-checker.service';
+import { InboundIntegrationQueueWorker } from './integration/inbound-integration-queue.worker';
+import { getInboundIntegrationRmqOptions } from './integration/inbound-integration-rmq.config';
 
 @Module({
   imports: [
@@ -81,6 +86,14 @@ import { InboundIntegrationModule } from 'src/inbound-integration/inbound-integr
         }),
         inject: [ConfigService],
       },
+      {
+        name: 'INBOUND_INTEGRATION_QUEUE_CLIENT',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: getInboundIntegrationRmqOptions(configService),
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [InboundController],
@@ -93,7 +106,11 @@ import { InboundIntegrationModule } from 'src/inbound-integration/inbound-integr
     RcvReceiptIntegrationService,
     PurchaseOrderIntegrationService,
     SalesOrderIntegrationService,
-    IntegrationToOracleService,
+    InboundMappingIntegrationService,
+    InboundIntegrationQueueProducer,
+    InboundIntegrationQueueConsumer,
+    InboundIntegrationQueueWorker,
+    OracleInboundStatusCheckerService,
   ],
   exports: [InboundService],
 })

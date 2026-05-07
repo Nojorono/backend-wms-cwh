@@ -138,6 +138,13 @@ export class CreateInboundDoDto {
   @ValidateNested({ each: true })
   @Type(() => CreateInboundItemDto)
   inbound_items?: CreateInboundItemDto[];
+
+  @ApiPropertyOptional({ example: 'ADD-001' })
+  @IsOptional()
+  @IsString({ message: 'add_to_receipt_number must be a string' })
+  @MinLength(1, { message: 'add_to_receipt_number must be at least 1 character' })
+  @MaxLength(50, { message: 'add_to_receipt_number must not exceed 50 characters' })
+  add_to_receipt_number?: string;
 }
 
 export class CreateInboundDto {

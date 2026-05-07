@@ -2,8 +2,8 @@ import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './create-inbound.dto';
 
-export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) {}
-export class UpdateInboundDoDto extends PartialType(CreateInboundDoDto) {}
+export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) { }
+export class UpdateInboundDoDto extends PartialType(CreateInboundDoDto) { }
 export class UpdateInboundDto extends PartialType(CreateInboundDto) {
   @ApiPropertyOptional({ description: 'Photo Condition' })
   @IsOptional()
