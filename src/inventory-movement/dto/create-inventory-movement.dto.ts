@@ -53,6 +53,15 @@ export class CreateInventoryMovementUserDto {
 }
 
 export class CreateInventoryMovementDto {
+  @ApiProperty({
+    description: 'ID organization',
+    type: String,
+    example: 'uuid-organization-1',
+  })
+  @IsNotEmpty()
+  @IsString()
+  organization_id: string;
+
   @ApiPropertyOptional({
     description: 'Nomor movement (auto-generated if not provided)',
     type: String,
