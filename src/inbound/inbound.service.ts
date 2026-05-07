@@ -599,11 +599,8 @@ export class InboundService {
     return updateSaldo;
   }
 
-  /**
-   * Like `findOne`, but `transaction_scan_inbounds` are nested under each `inbound_item` (matched by
-   * `item_id`) and omitted from the inbound root. `quantity_inspection` is numeric in JSON.
-   */
-  async integrationToOracleV1(
+
+  async updateStatusInventoryReadyByInboundId(
     id: string,
   ): Promise<any> {
     const inbound = await this.findOne(id);
@@ -611,77 +608,93 @@ export class InboundService {
       throw new NotFoundException('Inbound not found');
     }
 
-    // // update pallet history status inventory to READY
-    // const palletHistories = await this.palletTransactionHistoryRepository.find({
-    //   where: {
-    //     inbound_id: id,
-    //   },
-    // });
+    // update pallet history status inventory to READY
+    const palletHistories = await this.palletTransactionHistoryRepository.find({
+      where: {
+        inbound_id: id,
+      },
+    });
 
-    // if (palletHistories.length === 0) {
-    //   throw new BadRequestException('Pallet history not found');
-    // }
+    if (palletHistories.length === 0) {
+      throw new BadRequestException('Pallet history not found');
+    }
 
-    // for (const palletHistory of palletHistories) {
-    //   await this.palletTransactionHistoryRepository.update(palletHistory.id, {
-    //     status_inventory: StatusInventory.READY,
-    //   });
-    // }
+    for (const palletHistory of palletHistories) {
+      await this.palletTransactionHistoryRepository.update(palletHistory.id, {
+        status_inventory: StatusInventory.READY,
+      });
+    }
 
-    // // update inbound status to READY_INTEGRATION
-    // await this.inboundRepo.update(id, {
-    //   status: InboundStatus.INTEGRATED,
-    // });
-
-    const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
-    await this.createInboundIntegrationRecords(dataIntegration);
-    const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
-    const rcv_receipt_results = await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
-    // await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
-
-    return rcv_receipt_results;
-    // return { ...dataIntegration, rcv_receipt_results };
-    // return inbound;
   }
 
   async integrationToOracle(
     id: string,
   ): Promise<any> {
-    const inbound = await this.findOne(id);
-    if (!inbound) {
-      throw new NotFoundException('Inbound not found');
+    try {
+      const inbound = await this.findOneForIntegration(id);
+      if (!inbound) {
+        throw new NotFoundException(
+          'Inbound not found or no inbound_do with integration_status READY/FAILED',
+        );
+      }
+
+      const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
+      await this.createInboundIntegrationRecords(dataIntegration);
+      const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
+
+      let rcv_receipt_results: RcvReceiptResponseDto[];
+      try {
+        rcv_receipt_results =
+          await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Failed to create RCV receipt for inboundId=${id}: ${errorMessage}`);
+        throw new BadRequestException(`Failed to create RCV receipt: ${errorMessage}`);
+      }
+
+      const requestId = this.extractRequestIdFromRcvResults(rcv_receipt_results);
+
+      await this.inboundIntegrationQueueProducer.publish({
+        inboundId: id,
+        requestId: requestId ?? undefined,
+        retryCount: 0,
+        maxRetry: 20,
+      });
+
+      this.logger.log(
+        `Queued inbound integration job inboundId=${id} requestId=${requestId ?? 'N/A'} retryCount=0`,
+      );
+
+      await this.inboundRepo.update(id, {
+        status: InboundStatus.PROCESSING,
+      });
+
+      return {
+        status: 'PROCESSING',
+        inboundId: id,
+        requestId: requestId ?? null,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to integrate inbound to oracle for inboundId=${id}: ${errorMessage}`);
+      throw new BadRequestException(`Failed to integrate inbound to oracle: ${errorMessage}`);
     }
+  }
 
-    const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
-    await this.createInboundIntegrationRecords(dataIntegration);
-    const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
-    const rcv_receipt_results =
-      await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
-    const requestId = this.extractRequestIdFromRcvResults(rcv_receipt_results);
-
-    // await this.inboundRepo.update(id, {
-    //   status: InboundStatus.READY_INTEGRATION,
-    //   notes: requestId
-    //     ? `Oracle request submitted with request_id=${requestId}`
-    //     : 'Oracle request submitted. Waiting for Oracle concurrent process',
-    // });
-
-    await this.inboundIntegrationQueueProducer.publish({
-      inboundId: id,
-      requestId: requestId ?? undefined,
-      retryCount: 0,
-      maxRetry: 20,
-    });
-
-    this.logger.log(
-      `Queued inbound integration job inboundId=${id} requestId=${requestId ?? 'N/A'} retryCount=0`,
-    );
-
-    return {
-      status: 'PROCESSING',
-      inboundId: id,
-      requestId: requestId ?? null,
-    };
+  async findOneForIntegration(
+    id: string,
+  ): Promise<Inbound & { inbound_reference_number?: string | null }> {
+    const found = await this.inboundRepo.findOneForIntegration(id);
+    if (!found) {
+      throw new NotFoundException(
+        'Inbound not found or no inbound_do with integration_status READY/FAILED',
+      );
+    }
+    const [enriched] = await this.enrichWithReferenceNumber([found]);
+    return enriched;
   }
 
 

@@ -7,6 +7,7 @@ import { InboundIntegrationQueueProducer } from './inbound-integration-queue.pro
 import { InboundJobPayload } from './inbound-integration-queue.types';
 import { OracleInboundStatusCheckerService } from './oracle-inbound-status-checker.service';
 import { InboundIntegrationService } from 'src/inbound-integration/inbound-integration.service';
+import { InboundService } from '../inbound.service';
 
 @Injectable()
 export class InboundIntegrationQueueConsumer {
@@ -18,6 +19,7 @@ export class InboundIntegrationQueueConsumer {
     private readonly inboundIntegrationService: InboundIntegrationService,
     private readonly producer: InboundIntegrationQueueProducer,
     private readonly statusChecker: OracleInboundStatusCheckerService,
+    private readonly inboundService: InboundService,
   ) { }
 
   async handleInboundProcess(data: InboundJobPayload): Promise<void> {
@@ -49,6 +51,9 @@ export class InboundIntegrationQueueConsumer {
             inboundId,
             this.mapToDoIntegrationStatus(result.status),
           );
+          if (result.status === 'SUCCESS') {
+            await this.updateInventoryReadyIfAllDoSuccess(inboundId);
+          }
           this.logger.log(
             `Inbound retry check on INTEGRATED status inboundId=${inboundId} requestId=${requestId ?? 'N/A'} resultStatus=${result.status} reason=${result.reason}`,
           );
@@ -91,6 +96,7 @@ export class InboundIntegrationQueueConsumer {
           inboundId,
           IntegrationStatus.SUCCESS,
         );
+        await this.updateInventoryReadyIfAllDoSuccess(inboundId);
         this.logger.log(
           `Inbound queue status=SUCCESS inboundId=${inboundId} requestId=${requestId ?? 'N/A'} retryCount=${retryCount}`,
         );
@@ -192,5 +198,21 @@ export class InboundIntegrationQueueConsumer {
         `No inbound_do_id found in inbound_integration headers for inboundId=${inboundId}; skip inbound_do integration_status update`,
       );
     }
+  }
+
+  private async updateInventoryReadyIfAllDoSuccess(inboundId: string): Promise<void> {
+    const inboundDos = await this.inboundDoRepo.findAllByInbound(inboundId);
+    if (!inboundDos.length) {
+      return;
+    }
+    const allSuccess = inboundDos.every((item) => item.integration_status === IntegrationStatus.SUCCESS);
+    if (!allSuccess) {
+      return;
+    }
+
+    await this.inboundService.updateStatusInventoryReadyByInboundId(inboundId);
+    this.logger.log(
+      `All inbound_dos are SUCCESS, inventory status set to READY for inboundId=${inboundId}`,
+    );
   }
 }
