@@ -730,6 +730,10 @@ export class InboundService {
     );
 
     for (const inboundDo of inbound.inbound_dos ?? []) {
+      const hasAddToReceiptNumber =
+        typeof inboundDo.add_to_receipt_number === 'string' &&
+        inboundDo.add_to_receipt_number.trim() !== '';
+
       const inboundItems = (inboundDo.inbound_items ?? []) as InboundItemWithWarehouse[];
       const lines = inboundItems.map((item) => ({
         source_line_id: item.id,
@@ -751,16 +755,24 @@ export class InboundService {
         locator_id_selisih: toOptionalNumber(item.warehouse_diff?.locator_id),
       }));
 
+
       await this.inboundIntegrationService.createOrReplaceByInboundDo({
         organization_id: inbound.organization_id,
         inbound_id: inbound.id,
         inbound_do_id: inboundDo.id,
         source_system: 'WMS',
-        transaction_type: isSoInternalOrSubdist ? RcvReceiptTransactionType.INBOUND_GS_MUTASI_SO_INTERNAL : RcvReceiptTransactionType.INBOUND_GS_PRINCIPAL,
+        transaction_type: hasAddToReceiptNumber
+          ? RcvReceiptTransactionType.ADD_TO_RECEIPT
+          : isSoInternalOrSubdist
+            ? RcvReceiptTransactionType.INBOUND_GS_MUTASI_SO_INTERNAL
+            : RcvReceiptTransactionType.INBOUND_GS_PRINCIPAL,
         receipt_source_code: isSoInternalOrSubdist ? 'INTERNAL ORDER' : 'VENDOR',
         source_header_id: inboundDo.id,
         do_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
         vendor_id: toOptionalNumber(inboundDo.vendor_id),
+        receipt_number: hasAddToReceiptNumber
+          ? inboundDo.add_to_receipt_number!.trim()
+          : undefined,
         vendor_site_id: toOptionalNumber(inboundDo.vendor_site_id),
         total_lines: toOptionalNumber(inboundDo.total_line_items) ?? lines.length,
         rsh_attribute1: inbound.license_plate ?? undefined,
