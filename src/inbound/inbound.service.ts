@@ -740,7 +740,7 @@ export class InboundService {
         source_header_id: inboundDo.id,
         po_number: inboundDo.inbound_po_number ?? undefined,
         po_line_number: toOptionalNumber(item.line_number),
-        iso_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
+        iso_number: inboundDo.inbound_po_number ?? undefined,
         iso_line_number: isSoInternalOrSubdist ? toOptionalNumber(item.line_number) : undefined,
         inventory_item_id: toOptionalNumber(item.item?.inventory_item_id),
         uom_code: item.uom,
