@@ -116,8 +116,8 @@ export class MasterIOService {
 
   private mapIntegrationRowToDto(row: Record<string, unknown>): CreateMasterIODto {
     return {
-      organization_code: this.asString(row.ORGANIZATION_CODE),
-      organization_name: this.asString(row.ORGANIZATION_NAME),
+      organization_code: this.asString(row.ORGANIZATION_NAME),
+      organization_name: this.asString(row.ORGANIZATION_CODE),
       organization_id: this.asNumber(row.ORGANIZATION_ID) ?? undefined,
       org_name: this.asString(row.ORG_NAME),
       org_id: this.asString(row.ORG_ID),
@@ -156,14 +156,12 @@ export class MasterIOService {
 
   private async findExistingForSync(dto: CreateMasterIODto): Promise<MasterIO | null> {
 
-    if (dto.organization_code) {
-      const byCode = await this.repository.findByOrganizationCode(dto.organization_code);
-      if (byCode) {
-        return byCode;
+    if (dto.organization_id) {
+      const byId = await this.repository.findByOrganizationId(dto.organization_id ?? 0);
+      if (byId) {
+        return byId;
       }
-
     }
-
     return null;
   }
 }
