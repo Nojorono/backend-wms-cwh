@@ -729,6 +729,10 @@ export class InboundService {
       (inbound.inbound_type ?? '').toUpperCase(),
     );
 
+    const isPo = ['PO'].includes(
+      (inbound.inbound_type ?? '').toUpperCase(),
+    );
+
     for (const inboundDo of inbound.inbound_dos ?? []) {
       const hasAddToReceiptNumber =
         typeof inboundDo.add_to_receipt_number === 'string' &&
@@ -738,9 +742,9 @@ export class InboundService {
       const lines = inboundItems.map((item) => ({
         source_line_id: item.id,
         source_header_id: inboundDo.id,
-        po_number: inboundDo.inbound_po_number ?? undefined,
+        po_number: isPo ? inboundDo.inbound_po_number : undefined,
         po_line_number: toOptionalNumber(item.line_number),
-        iso_number: inboundDo.inbound_po_number ?? undefined,
+        iso_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
         iso_line_number: isSoInternalOrSubdist ? toOptionalNumber(item.line_number) : undefined,
         inventory_item_id: toOptionalNumber(item.item?.inventory_item_id),
         uom_code: item.uom,
@@ -768,7 +772,7 @@ export class InboundService {
             : RcvReceiptTransactionType.INBOUND_GS_PRINCIPAL,
         receipt_source_code: isSoInternalOrSubdist ? 'INTERNAL ORDER' : 'VENDOR',
         source_header_id: inboundDo.id,
-        do_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
+        do_number: inboundDo.inbound_do_number ?? undefined,
         vendor_id: toOptionalNumber(inboundDo.vendor_id),
         receipt_number: hasAddToReceiptNumber
           ? inboundDo.add_to_receipt_number!.trim()
