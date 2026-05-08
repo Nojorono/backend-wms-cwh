@@ -654,6 +654,10 @@ export class InboundService {
 
       const requestId = this.extractRequestIdFromRcvResults(rcv_receipt_results);
 
+      await this.inboundRepo.update(id, {
+        status: InboundStatus.PROCESSING,
+      });
+
       await this.inboundIntegrationQueueProducer.publish({
         inboundId: id,
         requestId: requestId ?? undefined,
@@ -664,10 +668,6 @@ export class InboundService {
       this.logger.log(
         `Queued inbound integration job inboundId=${id} requestId=${requestId ?? 'N/A'} retryCount=0`,
       );
-
-      await this.inboundRepo.update(id, {
-        status: InboundStatus.PROCESSING,
-      });
 
       return {
         status: 'PROCESSING',
