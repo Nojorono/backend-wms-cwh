@@ -56,6 +56,11 @@ export class CreateOutboundMemoDto {
   @IsString()
   destination: string;
 
+  @ApiProperty({ example: 'uuid-destination-io-123' })
+  @IsString()
+  @IsUUID(4, { message: 'destination_io_id must be a valid UUID' })
+  destination_io_id?: string;
+
   @ApiProperty({ example: '2025-01-15T00:00:00.000Z' })
   @IsDate()
   @Type(() => Date)

@@ -42,6 +42,13 @@ export class OutboundMemo extends BaseEntity {
   destination: string;
 
   @Column({ nullable: true })
+  destination_io_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'destination_io_id' })
+  destination_io: MasterIO;
+
+  @Column({ nullable: true })
   delivery_date: Date;
 
   @Column({ nullable: true })

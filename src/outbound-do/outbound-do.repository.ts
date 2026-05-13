@@ -84,6 +84,57 @@ export class OutboundDoRepository {
     return this.findOne(savedOutboundDo.id);
   }
 
+  private buildQueryWithAllRelationsForIntegration() {
+    return this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .leftJoin('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoin('outbound_memos.organization', 'organization_io')
+      .leftJoin('outbound_memos.destination_io', 'destination_io')
+      .leftJoin('outbound_memos.outbound_memo_items', 'outbound_memo_items')
+      .leftJoin('outbound_memo_items.item', 'memo_item')
+      .leftJoinAndMapMany(
+        'outbound_memo_items.assigned_gate_load',
+        AssignedGateLoad,
+        'assigned_gate_load',
+        'assigned_gate_load.outbound_memo_id = outbound_memo_items.outbound_memo_id AND assigned_gate_load.item_id = outbound_memo_items.item_id',
+      )
+      .leftJoin('assigned_gate_load.item', 'assigned_gate_load_item')
+      .leftJoin('assigned_gate_load.pallet', 'assigned_gate_load_pallet')
+      .leftJoin('assigned_gate_load.assigned_gate', 'assigned_gate')
+      .select(['outbound_do'])
+      .addSelect('outbound_memos')
+      .addSelect('organization_io')
+      .addSelect('destination_io')
+      .addSelect([
+        'outbound_memo_items.id',
+        'outbound_memo_items.item_id',
+        'outbound_memo_items.item',
+        'outbound_memo_items.quantity_plan',
+        'outbound_memo_items.quantity_delivered',
+        'outbound_memo_items.uom',
+      ])
+      .addSelect([
+        'memo_item.id',
+        'memo_item.sku',
+        'memo_item.item_number',
+        'memo_item.inventory_item_id',
+      ])
+      .addSelect([
+        'assigned_gate_load.id',
+        'assigned_gate_load.item_id',
+        'assigned_gate_load.quantity_picked',
+        'assigned_gate_load.quantity_loaded',
+        'assigned_gate_load.quantity_unloaded',
+        'assigned_gate_load.production_date',
+        'assigned_gate_load.week_number',
+        'assigned_gate_load.uom',
+        'assigned_gate_load.status',
+      ])
+      .addSelect([
+        'assigned_gate_load_item',
+      ])
+  }
+
   private buildQueryWithAllRelations() {
     return this.outboundDoRepository
       .createQueryBuilder('outbound_do')
@@ -126,6 +177,16 @@ export class OutboundDoRepository {
         return await this.nestAssignedGateLoad(processed);
       }),
     );
+  }
+
+  async findOneForIntegration(id: string): Promise<OutboundDo> {
+    const entity = await this.buildQueryWithAllRelationsForIntegration()
+      .where('outbound_do.id = :id', { id })
+      .distinct(true)
+      .getOne();
+    if (!entity) throw new NotFoundException('Outbound DO not found');
+    const processed = this.addSequenceToMemos(entity);
+    return processed;
   }
 
   async findOne(id: string): Promise<OutboundDo> {
@@ -398,10 +459,9 @@ export class OutboundDoRepository {
       const memosWithSequence = outboundDo.outbound_memos.map((memo) => {
         const memoIndex = outboundDo.memo_id.indexOf(memo.id);
         const sequence = outboundDo.memo_sequence[memoIndex] || memoIndex + 1;
-
         return {
-          ...memo,
           sequence: sequence,
+          ...memo,
         } as any;
       });
 
@@ -473,6 +533,27 @@ export class OutboundDoRepository {
     });
 
     return outboundDo;
+  }
+
+  /**
+   * Dedicated second-query function for assigned_gate_load enrichment.
+   * Keep field selection adjustments in this single place.
+   */
+  private async findAssignedGateLoadsByMemoIds(memoIds: string[]): Promise<AssignedGateLoad[]> {
+    if (memoIds.length === 0) {
+      return [];
+    }
+
+    return this.outboundDoRepository.manager
+      .getRepository(AssignedGateLoad)
+      .createQueryBuilder('assigned_gate_load')
+      .leftJoinAndSelect('assigned_gate_load.item', 'item')
+      .leftJoinAndSelect('assigned_gate_load.pallet', 'pallet')
+      .leftJoinAndSelect('assigned_gate_load.assigned_gate', 'assigned_gate')
+      .where('assigned_gate_load.outbound_memo_id IN (:...memoIds)', {
+        memoIds,
+      })
+      .getMany();
   }
 
   async getMemoSequence(outboundDoId: string): Promise<{ memoId: string; sequence: number }[]> {

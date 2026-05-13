@@ -1,8 +1,20 @@
 import { Entity, Column, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OutboundMemoItem } from './outbound-memo-item.entity';
+import { OutboundIntegrationIrReq } from './outbound-integration-ir-req.entity';
+
 @Entity('outbound_integration_ir_req_lines')
 export class OutboundIntegrationIrReqLines extends BaseEntity {
+    @Column({ nullable: true })
+    outbound_integration_ir_req_id: string;
+
+    @ManyToOne(() => OutboundIntegrationIrReq, {
+        onDelete: 'SET NULL',
+        nullable: true,
+    })
+    @JoinColumn({ name: 'outbound_integration_ir_req_id' })
+    outbound_integration_ir_req: OutboundIntegrationIrReq;
+
     @Column({ nullable: true })
     outbound_memo_item_id: string;
 

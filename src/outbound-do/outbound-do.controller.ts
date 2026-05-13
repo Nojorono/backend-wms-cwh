@@ -388,4 +388,16 @@ export class OutboundDoController {
   async cancel(@Param('id') id: string) {
     return this.outboundDoService.cancel(id);
   }
+
+  // integration by outbound do id
+  @Post('integration/:id')
+  @ApiOperation({ summary: 'Integration by outbound do id' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiResponse({
+    status: 200,
+    description: 'Integration by outbound do id',
+  })
+  async integration(@Param('id') id: string) {
+    return this.outboundDoService.integration(id);
+  }
 }

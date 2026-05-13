@@ -47,6 +47,7 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
 import { ReportModule } from './report/report.module';
 import { ShipmentPlanModule } from './shipment-plan/shipment-plan.module';
 import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
+import { OutboundIntegrationIrReqModule } from './outbound-integration-ir-req/outbound-integration-ir-req.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { InboundIntegrationModule } from './inbound-integration/inbound-integrat
     ReportModule,
     ShipmentPlanModule,
     InboundIntegrationModule,
+    OutboundIntegrationIrReqModule,
   ],
   providers: [
     {

@@ -61,6 +61,8 @@ export class OutboundMemoRepository {
   async update(id: string, data: UpdateOutboundMemoDto): Promise<OutboundMemo> {
     const existing = await this.findOne(id);
 
+    if (!existing) throw new NotFoundException('Outbound memo not found');
+
     const { outbound_memo_items, ...outboundMemoData } = data;
 
     // Update outbound memo
