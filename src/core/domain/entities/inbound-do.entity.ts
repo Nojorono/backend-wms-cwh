@@ -9,6 +9,7 @@ export enum IntegrationStatus {
   READY = 'READY',
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
 }
 
 @Entity('inbound_do')

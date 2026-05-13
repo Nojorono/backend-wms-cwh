@@ -110,7 +110,12 @@ export class InboundMappingIntegrationService {
     return inbound;
   }
 
-  private nestTransactionScansUnderInboundItems(
+  /**
+   * Mutates `inbound` in place: copies root `transaction_scan_inbounds` onto `inbound_items`
+   * using the same pairing rules as Oracle integration (item_id, then qty/uom for lines without item).
+   * Call with a single-DO `inbound_dos` slice to resolve scans for one delivery order only.
+   */
+  nestTransactionScansUnderInboundItems(
     inbound: Inbound & { inbound_reference_number?: string | null },
   ): InboundIntegrationToOracleResult {
     const scans = inbound.transaction_scan_inbounds ?? [];

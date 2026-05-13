@@ -23,11 +23,13 @@ import { InboundIntegrationQueueConsumer } from './integration/inbound-integrati
 import { OracleInboundStatusCheckerService } from './integration/oracle-inbound-status-checker.service';
 import { InboundIntegrationQueueWorker } from './integration/inbound-integration-queue.worker';
 import { getInboundIntegrationRmqOptions } from './integration/inbound-integration-rmq.config';
+import { TransactionScanInboundModule } from 'src/transaction-scan-inbound/transaction-scan-inbound.module';
 
 @Module({
   imports: [
     ConfigModule,
     InboundIntegrationModule,
+    TransactionScanInboundModule,
     TypeOrmModule.forFeature([Inbound, InboundDo, InboundItem, PalletTransactionHistory]),
     ClientsModule.registerAsync([
       {

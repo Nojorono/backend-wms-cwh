@@ -24,6 +24,7 @@ import { DoValidationIntegrationService } from './integration/do-validation.inte
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem } from '../core/domain/entities/inbound-item.entity';
 import { OrganizationId } from 'src/core/decorators/organization-id.decorator';
+import { InboundDo } from '../core/domain/entities/inbound-do.entity';
 
 @ApiTags('Inbound')
 @Controller('inbound')
@@ -195,5 +196,14 @@ export class InboundController {
   @ApiResponse({ status: 200, type: Inbound })
   integrationToOracle(@Param('id') id: string) {
     return this.service.integrationToOracle(id);
+  }
+
+  // cancel inbound-do
+  @Patch('cancel-inbound-do/:id')
+  @ApiOperation({ summary: 'Cancel inbound-do' })
+  @ApiResponse({ status: 200, type: InboundDo })
+  @ApiParam({ name: 'id', description: 'ID inbound-do' })
+  cancelInboundDo(@Param('id') id: string) {
+    return this.service.cancelInboundDo(id);
   }
 }

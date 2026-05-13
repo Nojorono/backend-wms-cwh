@@ -17,7 +17,7 @@ import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem, InspectionStatus } from '../core/domain/entities/inbound-item.entity';
-import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
+import { InboundDo, IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 import { InboundStatus } from 'src/core/domain/entities/inbound.entity';
 import { PalletTransactionHistory, StatusInventory } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -36,6 +36,11 @@ import {
   RcvReceiptResponseDto,
 } from './integration/rcv-receipt.integration';
 import { InboundIntegrationQueueProducer } from './integration/inbound-integration-queue.producer';
+import { TransactionScanInboundService } from 'src/transaction-scan-inbound/transaction-scan-inbound.service';
+import {
+  ScanInboundStatus,
+  TransactionScanInbound,
+} from 'src/core/domain/entities/transaction-scan-inbound.entity';
 
 @Injectable()
 export class InboundService {
@@ -51,6 +56,7 @@ export class InboundService {
     private readonly inboundIntegrationService: InboundIntegrationService,
     private readonly rcvReceiptIntegrationService: RcvReceiptIntegrationService,
     private readonly inboundIntegrationQueueProducer: InboundIntegrationQueueProducer,
+    private readonly transactionScanInboundService: TransactionScanInboundService,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletTransactionHistoryRepository: Repository<PalletTransactionHistory>,
   ) { }
@@ -947,5 +953,90 @@ export class InboundService {
       }
     }
     return null;
+  }
+
+  async cancelInboundDo(id: string): Promise<InboundDo> {
+    const inboundDo = await this.inboundDoRepo.findOne(id);
+    if (!inboundDo) {
+      throw new NotFoundException('Inbound DO not found');
+    }
+
+    if (inboundDo.integration_status === IntegrationStatus.CANCELLED) {
+      const unchanged = await this.inboundDoRepo.findOne(id);
+      if (!unchanged) {
+        throw new NotFoundException('Inbound DO not found');
+      }
+      return unchanged;
+    }
+
+    if (inboundDo.integration_status === IntegrationStatus.SUCCESS) {
+      throw new BadRequestException(
+        'Cannot cancel inbound DO that has already been integrated successfully',
+      );
+    }
+
+    if (!inboundDo.inbound_id) {
+      throw new BadRequestException('Inbound DO is not linked to an inbound');
+    }
+
+    const inbound = await this.inboundRepo.findOne(inboundDo.inbound_id);
+    if (!inbound) {
+      throw new NotFoundException('Inbound not found');
+    }
+
+    const targetDo = inbound.inbound_dos?.find((d) => d.id === id);
+    if (!targetDo) {
+      throw new NotFoundException('Inbound DO not found on parent inbound');
+    }
+
+    const inboundForDoScans: Inbound = {
+      ...inbound,
+      inbound_dos: [targetDo],
+    };
+    this.inboundMappingIntegrationService.nestTransactionScansUnderInboundItems(inboundForDoScans);
+
+    const scansToRemove: TransactionScanInbound[] = [];
+    const seenScanIds = new Set<string>();
+    for (const item of targetDo.inbound_items ?? []) {
+      const withScans = item as InboundItem & {
+        transaction_scan_inbounds?: TransactionScanInbound[];
+      };
+      for (const scan of withScans.transaction_scan_inbounds ?? []) {
+        if (scan?.id && !seenScanIds.has(scan.id)) {
+          seenScanIds.add(scan.id);
+          scansToRemove.push(scan);
+        }
+      }
+    }
+
+    if (scansToRemove.length > 0) {
+      // for (const item of targetDo.inbound_items ?? []) {
+      //   if (item.inspection_status === InspectionStatus.APPROVED) {
+      //     throw new BadRequestException(
+      //       'Cannot cancel: at least one inbound line has inspection approved',
+      //     );
+      //   }
+      // }
+
+      // for (const scan of scansToRemove) {
+      //   if (scan.status === ScanInboundStatus.COMPLETED) {
+      //     throw new BadRequestException(
+      //       'Cannot cancel: at least one transaction scan inbound is already completed (inspection)',
+      //     );
+      //   }
+      // }
+
+      for (const scan of scansToRemove) {
+        await this.transactionScanInboundService.remove(scan.id);
+      }
+    }
+
+    const updated = await this.inboundDoRepo.update(id, {
+      integration_status: IntegrationStatus.CANCELLED,
+    });
+    if (!updated) {
+      throw new NotFoundException('Inbound DO not found');
+    }
+    return updated;
   }
 }
