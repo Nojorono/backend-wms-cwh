@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { OutboundDoRepository } from './outbound-do.repository';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
@@ -24,9 +24,12 @@ import {
   PoInternalReqCreateResponseDto,
 } from './integration/ir-request.integration';
 import { CreatePoInternalReqDto, CreatePoInternalReqLinesDto } from './integration/dto/create-po-internal-req.dto';
+import { OutboundIntegrationQueueProducer } from './integration/outbound-integration-queue.producer';
 
 export type OutboundDoIntegrationResult = {
+  status: 'PROCESSING';
   outbound_do: OutboundDo;
+  outboundDoId: string;
   outbound_integration_ir_req: OutboundIntegrationIrReqAggregateResult[];
   integration_ir_req: OutboundIntegrationIrReqHeaderWithLines[];
   po_internal_req: PoInternalReqCreateResponseDto;
@@ -34,12 +37,15 @@ export type OutboundDoIntegrationResult = {
 
 @Injectable()
 export class OutboundDoService {
+  private readonly logger = new Logger(OutboundDoService.name);
+
   constructor(
     private readonly repository: OutboundDoRepository,
     private readonly paginationService: PaginationService,
     private readonly transactionPickingService: TransactionPickingService,
     private readonly outboundIntegrationIrReqService: OutboundIntegrationIrReqService,
     private readonly irRequestIntegrationService: IrRequestIntegrationService,
+    private readonly outboundIntegrationQueueProducer: OutboundIntegrationQueueProducer,
   ) { }
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
@@ -306,8 +312,20 @@ export class OutboundDoService {
       );
     }
 
+    await this.outboundIntegrationQueueProducer.publish({
+      outboundDoId: id,
+      retryCount: 0,
+      maxRetry: 20,
+    });
+
+    this.logger.log(
+      `Queued outbound integration job outboundDoId=${id} retryCount=0`,
+    );
+
     return {
+      status: 'PROCESSING',
       outbound_do: outboundDo,
+      outboundDoId: id,
       outbound_integration_ir_req,
       integration_ir_req: integrationIrReq,
       po_internal_req,
@@ -473,7 +491,7 @@ export class OutboundDoService {
       io_dest_name: destIo?.organization_code,
       io_dest_id: Number(destIo?.organization_id) ?? undefined,
       source_code: 'WMS',
-      source_header_id: memo.outbound_memo_number,
+      source_header_id: memo.id,
       transaction_type: 'Outbound GS Mutasi SO Internal',
       total_lines: items.length,
       header_attribute_category: 'INTERNAL',
@@ -500,7 +518,7 @@ export class OutboundDoService {
 
     return {
       outbound_memo_item_id: row.id,
-      source_header_id: memo.outbound_memo_number,
+      source_header_id: memo.id,
       source_line_id: row.id,
       inventory_item_id: this.parseNumericInventoryItemId(master?.inventory_item_id),
       item: master?.item_number,

@@ -11,6 +11,11 @@ import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.ent
 import { TransactionPickingModule } from '../transaction-picking/transaction-picking.module';
 import { OutboundIntegrationIrReqModule } from '../outbound-integration-ir-req/outbound-integration-ir-req.module';
 import { IrRequestIntegrationService } from './integration/ir-request.integration';
+import { OutboundIntegrationQueueProducer } from './integration/outbound-integration-queue.producer';
+import { OutboundIntegrationQueueConsumer } from './integration/outbound-integration-queue.consumer';
+import { OutboundIntegrationQueueWorker } from './integration/outbound-integration-queue.worker';
+import { PoInternalReqStatusCheckerService } from './integration/po-internal-req-status-checker.service';
+import { getOutboundIntegrationRmqOptions } from './integration/outbound-integration-rmq.config';
 
 @Module({
   imports: [
@@ -33,10 +38,26 @@ import { IrRequestIntegrationService } from './integration/ir-request.integratio
         }),
         inject: [ConfigService],
       },
+      {
+        name: 'OUTBOUND_INTEGRATION_QUEUE_CLIENT',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: getOutboundIntegrationRmqOptions(configService),
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [OutboundDoController],
-  providers: [OutboundDoService, OutboundDoRepository, IrRequestIntegrationService],
+  providers: [
+    OutboundDoService,
+    OutboundDoRepository,
+    IrRequestIntegrationService,
+    OutboundIntegrationQueueProducer,
+    OutboundIntegrationQueueConsumer,
+    OutboundIntegrationQueueWorker,
+    PoInternalReqStatusCheckerService,
+  ],
   exports: [OutboundDoService, OutboundDoRepository, IrRequestIntegrationService],
 })
 export class OutboundDoModule {}
