@@ -34,6 +34,10 @@ import {
 } from './dto/validate-pallet-response.dto';
 import { ItemInventoryTrackingDto } from './dto/item-inventory-tracking-response.dto';
 import { OrganizationId } from '../core/decorators/organization-id.decorator';
+import {
+  InvOnHandMappingDetailItemDto,
+  InvOnHandMappingDetailQueryDto,
+} from './dto/inv-on-hand-mapping.dto';
 
 @ApiTags('Inventory Tracking')
 @Controller('inventory-tracking')
@@ -54,7 +58,8 @@ import { OrganizationId } from '../core/decorators/organization-id.decorator';
 export class InventoryTrackingController {
   constructor(
     private readonly service: InventoryTrackingService,
-  ) { }
+  ) {
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create an inventory tracking record' })
@@ -201,6 +206,55 @@ export class InventoryTrackingController {
     return this.service.validatePallet(pallet_code);
   }
 
+  @Get('on-hand-mapping-detail')
+  @ApiOperation({
+    summary: 'Get Oracle on-hand mapping detail (organization_code, subinventory_code)',
+  })
+  @ApiResponse({ status: 200, description: 'OK', type: [InvOnHandMappingDetailItemDto] })
+  async getOnHandMappingDetail(
+    @Query() query: InvOnHandMappingDetailQueryDto,
+  ): Promise<InvOnHandMappingDetailItemDto[]> {
+    const response = await this.service.getOnHandMappingDetail(query);
+    // Return list only; global ResponseInterceptor wraps it in top-level `data`.
+    return response.data ?? [];
+  }
+
+  @Get('item/:item_id')
+  @ApiOperation({ summary: 'Get inventory tracking by item ID' })
+  @ApiParam({ name: 'item_id', description: 'Item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory tracking records for specific item',
+    type: [ItemInventoryTrackingDto],
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No inventory tracking found for this item',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'No inventory tracking found for this item' },
+        statusCode: { type: 'number', example: 404 },
+      },
+    },
+  })
+  async findByItemId(@Param('item_id') item_id: string) {
+    return this.service.findByItemId(item_id);
+  }
+
+  @Get('visibility/warehouse')
+  @ApiOperation({ summary: 'Get dashboard visibility for all items in warehouse with pending booking status' })
+  @ApiQuery({ name: 'item_id', required: false, type: String, description: 'Filter by specific item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard visibility data with item quantities and pending bookings',
+    type: VisibilityDashboardResponseDto,
+  })
+  async getVisibilityInventoryTrackingAllItemInWarehouse(@OrganizationId() organizationId: string, @Query('item_id') item_id?: string) {
+    return await this.service.getVisibilityInventoryTrackingAllItemInWarehouse(organizationId, item_id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get inventory tracking by id' })
   @ApiResponse({ status: 200, description: 'OK', type: InventoryTracking })
@@ -232,42 +286,5 @@ export class InventoryTrackingController {
   @ApiResponse({ status: 404, description: 'Not found' })
   remove(@Param('id') id: string) {
     return this.service.remove(id);
-  }
-
-  @Get('item/:item_id')
-  @ApiOperation({ summary: 'Get inventory tracking by item ID' })
-  @ApiParam({ name: 'item_id', description: 'Item ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Inventory tracking records for specific item',
-    type: [ItemInventoryTrackingDto],
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'No inventory tracking found for this item',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'No inventory tracking found for this item' },
-        statusCode: { type: 'number', example: 404 },
-      },
-    },
-  })
-  async findByItemId(@Param('item_id') item_id: string) {
-    return this.service.findByItemId(item_id);
-  }
-
-  // visibility inventory tracking all item in warehouse
-  @Get('visibility/warehouse')
-  @ApiOperation({ summary: 'Get dashboard visibility for all items in warehouse with pending booking status' })
-  @ApiQuery({ name: 'item_id', required: false, type: String, description: 'Filter by specific item ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Dashboard visibility data with item quantities and pending bookings',
-    type: VisibilityDashboardResponseDto,
-  })
-  async getVisibilityInventoryTrackingAllItemInWarehouse(@OrganizationId() organizationId: string, @Query('item_id') item_id?: string) {
-    return await this.service.getVisibilityInventoryTrackingAllItemInWarehouse(organizationId, item_id);
   }
 }

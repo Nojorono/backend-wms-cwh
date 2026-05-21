@@ -400,4 +400,16 @@ export class OutboundDoController {
   async integration(@Param('id') id: string) {
     return this.outboundDoService.integration(id);
   }
+
+  // ship confirm internal
+  @Patch(':id/ship-confirm-internal')
+  @ApiOperation({ summary: 'Ship confirm internal' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ship confirm internal',
+  })
+  async shipConfirmInternal(@Param('id') id: string) {
+    // return this.outboundDoService.shipConfirmInternal(id);
+  }
 }

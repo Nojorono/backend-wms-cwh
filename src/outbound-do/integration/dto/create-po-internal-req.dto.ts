@@ -129,6 +129,11 @@ export class CreatePoInternalReqDto {
   @IsNotEmpty()
   HEADER_ATTRIBUTE7: string;
 
+  @ApiProperty({ example: 'batch-001' })
+  @IsString()
+  @IsNotEmpty()
+  HEADER_ATTRIBUTE15: string;
+
   @ApiProperty({ example: 2 })
   @IsNumber()
   TOTAL_LINES: number;

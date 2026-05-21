@@ -366,6 +366,7 @@ export class OutboundDoService {
         row.id,
       ),
       HEADER_ATTRIBUTE7: this.requireNonEmptyString(row.header_attribute7, 'HEADER_ATTRIBUTE7', row.id),
+      HEADER_ATTRIBUTE15: this.requireNonEmptyString(row.outbound_do_id, 'HEADER_ATTRIBUTE15', row.id),
       TOTAL_LINES: this.requirePositiveInt(
         this.coerceToNumber(row.total_lines) ?? rawLines.length,
         'TOTAL_LINES',

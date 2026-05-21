@@ -1,4 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InvOnHandMappingIntegrationService } from './integration/inv-on-hand-mapping.integration';
+import {
+  InvOnHandMappingDetailQueryDto,
+  InvOnHandMappingDetailResponseDto,
+} from './dto/inv-on-hand-mapping.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
@@ -23,6 +28,7 @@ export class InventoryTrackingService {
     private readonly repository: InventoryTrackingRepository,
     private readonly paginationService: PaginationService,
     private readonly masterPalletService: MasterPalletService,
+    private readonly invOnHandMappingIntegrationService: InvOnHandMappingIntegrationService,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletHistoryRepository: Repository<PalletTransactionHistory>,
   ) { }
@@ -578,5 +584,11 @@ export class InventoryTrackingService {
 
   async createInventoryTrackingBad(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
     return this.repository.createInventoryTrackingBad(dto);
+  }
+
+  async getOnHandMappingDetail(
+    query: InvOnHandMappingDetailQueryDto,
+  ): Promise<InvOnHandMappingDetailResponseDto> {
+    return this.invOnHandMappingIntegrationService.getOnHandMappingDetail(query);
   }
 }

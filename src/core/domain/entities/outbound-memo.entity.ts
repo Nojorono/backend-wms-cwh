@@ -10,6 +10,9 @@ export enum OutboundMemoStatus {
   APPROVED = 'APPROVED',
   CANCELLED = 'CANCELLED',
   COMPLETED = 'COMPLETED',
+  INTEGRATED = 'INTEGRATED',
+  FAILED = 'FAILED',
+  TIMEOUT = 'TIMEOUT',
 }
 
 export enum OutboundMemoType {
