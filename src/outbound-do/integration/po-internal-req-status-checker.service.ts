@@ -4,7 +4,12 @@ import {
   OutboundIntegrationIrReqHeaderWithLines,
 } from 'src/outbound-integration-ir-req/outbound-integration-ir-req.service';
 import { IrRequestIntegrationService } from './ir-request.integration';
-import { OutboundJobPayload, OutboundJobProcessStatus } from './outbound-integration-queue.types';
+import {
+  OutboundDoCheckResult,
+  OutboundJobPayload,
+  OutboundJobProcessStatus,
+  OutboundMemoCheckResult,
+} from './outbound-integration-queue.types';
 
 type CheckResult = {
   status: OutboundJobProcessStatus;
@@ -33,13 +38,18 @@ export class PoInternalReqStatusCheckerService {
     private readonly irRequestIntegrationService: IrRequestIntegrationService,
   ) {}
 
-  async checkOutboundDoStatus(payload: OutboundJobPayload): Promise<CheckResult> {
+  async checkOutboundDoStatus(payload: OutboundJobPayload): Promise<OutboundDoCheckResult> {
     const headers =
       (await this.outboundIntegrationIrReqService.findAllByOutboundDoId(payload.outboundDoId)) ?? [];
     if (!headers.length) {
-      return { status: 'PENDING', reason: 'No outbound integration IR req headers found yet' };
+      return {
+        status: 'PENDING',
+        reason: 'No outbound integration IR req headers found yet',
+        memos: [],
+      };
     }
 
+    const memos: OutboundMemoCheckResult[] = [];
     let hasSuccess = false;
     let hasPending = false;
     let hasError = false;
@@ -47,6 +57,13 @@ export class PoInternalReqStatusCheckerService {
 
     for (const header of headers) {
       const perHeaderResult = await this.checkPerHeader(header);
+      if (header.outbound_memo_id) {
+        memos.push({
+          outboundMemoId: header.outbound_memo_id,
+          status: perHeaderResult.status,
+          reason: perHeaderResult.reason,
+        });
+      }
       if (perHeaderResult.status === 'ERROR') {
         hasError = true;
         if (!firstErrorReason) {
@@ -64,15 +81,49 @@ export class PoInternalReqStatusCheckerService {
       return {
         status: 'ERROR',
         reason: firstErrorReason || 'One or more PO internal requisition headers are in error',
+        memos,
       };
     }
     if (hasPending) {
-      return { status: 'PENDING', reason: 'PO internal requisition still in progress' };
+      return {
+        status: 'PENDING',
+        reason: 'PO internal requisition still in progress',
+        memos,
+      };
     }
     if (hasSuccess) {
-      return { status: 'SUCCESS', reason: 'All PO internal requisition headers are successful' };
+      return {
+        status: 'SUCCESS',
+        reason: 'All PO internal requisition headers are successful',
+        memos,
+      };
     }
-    return { status: 'PENDING', reason: 'No terminal status found yet' };
+    return { status: 'PENDING', reason: 'No terminal status found yet', memos };
+  }
+
+  /** Derives process status from synced iface fields (no Oracle call). */
+  deriveProcessStatusFromHeader(
+    header: OutboundIntegrationIrReqHeaderWithLines,
+  ): OutboundJobProcessStatus {
+    const statuses = [
+      header.iface_status_ir,
+      header.iface_status_io,
+      header.iface_status_oi,
+      ...(header.lines ?? []).map((line) => line.iface_line_status_ir),
+    ]
+      .map((s) => this.normalizeStatus(s))
+      .filter(Boolean);
+
+    if (statuses.length === 0) {
+      return 'PENDING';
+    }
+    if (!this.areAllTerminalStatuses(statuses)) {
+      return 'PENDING';
+    }
+    if (statuses.some((s) => this.errorOneCharStatuses.has(s))) {
+      return 'ERROR';
+    }
+    return 'SUCCESS';
   }
 
   private async checkPerHeader(header: OutboundIntegrationIrReqHeaderWithLines): Promise<CheckResult> {

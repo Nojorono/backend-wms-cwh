@@ -3,7 +3,7 @@ import { OutboundDoRepository } from './outbound-do.repository';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDo, OutboundDoStatus } from '../core/domain/entities/outbound-do.entity';
-import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
+import { OutboundMemo, OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.entity';
 import { MasterItem } from '../core/domain/entities/master-item.entity';
 import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
@@ -285,9 +285,14 @@ export class OutboundDoService {
   async integration(id: string): Promise<OutboundDoIntegrationResult> {
     const outboundDo = await this.repository.findOneForIntegration(id);
 
-    const memos = outboundDo.outbound_memos ?? [];
+    const memos = (outboundDo.outbound_memos ?? []).filter(
+      (memo) => memo.status !== OutboundMemoStatus.INTEGRATED,
+    );
+    outboundDo.outbound_memos = memos;
     if (memos.length === 0) {
-      throw new BadRequestException('Outbound DO has no outbound memos to integrate');
+      throw new BadRequestException(
+        'Outbound DO has no outbound memos to integrate (all memos are already INTEGRATED)',
+      );
     }
 
     const outbound_integration_ir_req: OutboundIntegrationIrReqAggregateResult[] = [];
@@ -298,10 +303,15 @@ export class OutboundDoService {
       );
     }
 
+    const memoIdsToIntegrate = new Set(memos.map((memo) => memo.id));
     const integrationIrReq =
-      (await this.outboundIntegrationIrReqService.findAllByOutboundDoId(id)) ?? [];
+      ((await this.outboundIntegrationIrReqService.findAllByOutboundDoId(id)) ?? []).filter(
+        (row) => row.outbound_memo_id && memoIdsToIntegrate.has(row.outbound_memo_id),
+      );
     if (integrationIrReq.length === 0) {
-      throw new BadRequestException('Integration IR req not found for this outbound DO');
+      throw new BadRequestException(
+        'Integration IR req not found for non-INTEGRATED memos on this outbound DO',
+      );
     }
 
     const poDtos = integrationIrReq.map((row) => this.mapOutboundIntegrationIrReqToCreatePoInternalReq(row));
@@ -550,12 +560,5 @@ export class OutboundDoService {
     }
     const n = Number(raw);
     return Number.isFinite(n) ? n : undefined;
-  }
-
-  private truncateField(value: string | null | undefined, max: number): string | undefined {
-    if (value == null || value === '') {
-      return undefined;
-    }
-    return value.length <= max ? value : value.slice(0, max);
   }
 }

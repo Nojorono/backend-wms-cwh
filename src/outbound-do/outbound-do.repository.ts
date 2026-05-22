@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
-import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
+import { OutboundMemo, OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
 import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
@@ -182,10 +182,19 @@ export class OutboundDoRepository {
   async findOneForIntegration(id: string): Promise<OutboundDo> {
     const entity = await this.buildQueryWithAllRelationsForIntegration()
       .where('outbound_do.id = :id', { id })
+      .andWhere(
+        '(outbound_memos.id IS NULL OR outbound_memos.status IS NULL OR outbound_memos.status != :integratedStatus)',
+        { integratedStatus: OutboundMemoStatus.INTEGRATED },
+      )
       .distinct(true)
       .getOne();
     if (!entity) throw new NotFoundException('Outbound DO not found');
     const processed = this.addSequenceToMemos(entity);
+    if (processed.outbound_memos?.length) {
+      processed.outbound_memos = processed.outbound_memos.filter(
+        (memo) => memo.status !== OutboundMemoStatus.INTEGRATED,
+      );
+    }
     return processed;
   }
 
@@ -535,27 +544,6 @@ export class OutboundDoRepository {
     return outboundDo;
   }
 
-  /**
-   * Dedicated second-query function for assigned_gate_load enrichment.
-   * Keep field selection adjustments in this single place.
-   */
-  private async findAssignedGateLoadsByMemoIds(memoIds: string[]): Promise<AssignedGateLoad[]> {
-    if (memoIds.length === 0) {
-      return [];
-    }
-
-    return this.outboundDoRepository.manager
-      .getRepository(AssignedGateLoad)
-      .createQueryBuilder('assigned_gate_load')
-      .leftJoinAndSelect('assigned_gate_load.item', 'item')
-      .leftJoinAndSelect('assigned_gate_load.pallet', 'pallet')
-      .leftJoinAndSelect('assigned_gate_load.assigned_gate', 'assigned_gate')
-      .where('assigned_gate_load.outbound_memo_id IN (:...memoIds)', {
-        memoIds,
-      })
-      .getMany();
-  }
-
   async getMemoSequence(outboundDoId: string): Promise<{ memoId: string; sequence: number }[]> {
     const outboundDo = await this.findOne(outboundDoId);
 
@@ -724,5 +712,9 @@ export class OutboundDoRepository {
 
   async updateMemoHasDo(memoId: string, hasDo: boolean): Promise<void> {
     await this.outboundMemoRepository.update({ id: memoId }, { has_do: hasDo });
+  }
+
+  async updateMemoStatus(memoId: string, status: OutboundMemoStatus): Promise<void> {
+    await this.outboundMemoRepository.update({ id: memoId }, { status });
   }
 }

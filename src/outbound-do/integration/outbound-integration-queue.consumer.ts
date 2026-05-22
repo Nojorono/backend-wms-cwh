@@ -1,22 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OutboundIntegrationQueueProducer } from './outbound-integration-queue.producer';
-import { OutboundJobPayload } from './outbound-integration-queue.types';
+import {
+  OutboundJobPayload,
+  OutboundJobProcessStatus,
+  OutboundMemoCheckResult,
+} from './outbound-integration-queue.types';
 import { PoInternalReqStatusCheckerService } from './po-internal-req-status-checker.service';
 import {
   OutboundIntegrationIrReqService,
   OutboundIntegrationIrReqHeaderWithLines,
 } from 'src/outbound-integration-ir-req/outbound-integration-ir-req.service';
+import { OutboundDoRepository } from '../outbound-do.repository';
+import { OutboundMemoStatus } from 'src/core/domain/entities/outbound-memo.entity';
 
 @Injectable()
 export class OutboundIntegrationQueueConsumer {
   private readonly logger = new Logger(OutboundIntegrationQueueConsumer.name);
   private readonly terminalStatuses = new Set(['S', 'E', 'SUCCESS', 'COMPLETED', 'ERROR', 'FAILED']);
+  private readonly terminalMemoStatuses = new Set<OutboundMemoStatus>([
+    OutboundMemoStatus.INTEGRATED,
+    OutboundMemoStatus.FAILED,
+    OutboundMemoStatus.TIMEOUT,
+  ]);
 
   constructor(
     private readonly outboundIntegrationIrReqService: OutboundIntegrationIrReqService,
     private readonly producer: OutboundIntegrationQueueProducer,
     private readonly statusChecker: PoInternalReqStatusCheckerService,
-  ) {}
+    private readonly outboundDoRepository: OutboundDoRepository,
+  ) { }
 
   async handleOutboundProcess(data: OutboundJobPayload): Promise<void> {
     try {
@@ -41,6 +53,14 @@ export class OutboundIntegrationQueueConsumer {
       }
 
       if (this.isAllHeadersTerminal(headers)) {
+        const memoResults = headers
+          .filter((header) => Boolean(header.outbound_memo_id))
+          .map((header) => ({
+            outboundMemoId: header.outbound_memo_id as string,
+            status: this.statusChecker.deriveProcessStatusFromHeader(header),
+            reason: 'Synced integration header already terminal',
+          }));
+        await this.applyMemoStatusUpdates(memoResults);
         this.logger.log(
           `Outbound integration already terminal outboundDoId=${outboundDoId} retryCount=${retryCount}`,
         );
@@ -48,6 +68,7 @@ export class OutboundIntegrationQueueConsumer {
       }
 
       if (retryCount >= maxRetry) {
+        await this.applyMemoTimeoutForPendingMemos(headers);
         this.logger.error(
           `Outbound queue timeout outboundDoId=${outboundDoId} retryCount=${retryCount}`,
         );
@@ -59,6 +80,8 @@ export class OutboundIntegrationQueueConsumer {
         retryCount,
         maxRetry,
       });
+
+      await this.applyMemoStatusUpdates(result.memos);
 
       if (result.status === 'SUCCESS') {
         this.logger.log(
@@ -99,6 +122,72 @@ export class OutboundIntegrationQueueConsumer {
         );
       }
     }
+  }
+
+  private async applyMemoStatusUpdates(memoResults: OutboundMemoCheckResult[]): Promise<void> {
+    for (const memoResult of memoResults) {
+      const memoStatus = this.mapProcessStatusToMemoStatus(memoResult.status);
+      if (!memoStatus) {
+        continue;
+      }
+
+      const memo = await this.outboundDoRepository.findMemoById(memoResult.outboundMemoId);
+      if (!memo) {
+        this.logger.warn(
+          `Skip memo status update; memo not found outboundMemoId=${memoResult.outboundMemoId}`,
+        );
+        continue;
+      }
+
+      if (memo.status && this.terminalMemoStatuses.has(memo.status)) {
+        continue;
+      }
+
+      await this.outboundDoRepository.updateMemoStatus(memoResult.outboundMemoId, memoStatus);
+      this.logger.log(
+        `Outbound memo status updated outboundMemoId=${memoResult.outboundMemoId} status=${memoStatus} reason=${memoResult.reason}`,
+      );
+    }
+  }
+
+  private async applyMemoTimeoutForPendingMemos(
+    headers: OutboundIntegrationIrReqHeaderWithLines[],
+  ): Promise<void> {
+    for (const header of headers) {
+      if (!header.outbound_memo_id) {
+        continue;
+      }
+
+      const memo = await this.outboundDoRepository.findMemoById(header.outbound_memo_id);
+      if (!memo || (memo.status && this.terminalMemoStatuses.has(memo.status))) {
+        continue;
+      }
+
+      const processStatus = this.statusChecker.deriveProcessStatusFromHeader(header);
+      const memoStatus =
+        processStatus === 'SUCCESS'
+          ? OutboundMemoStatus.INTEGRATED
+          : processStatus === 'ERROR'
+            ? OutboundMemoStatus.FAILED
+            : OutboundMemoStatus.TIMEOUT;
+
+      await this.outboundDoRepository.updateMemoStatus(header.outbound_memo_id, memoStatus);
+      this.logger.warn(
+        `Outbound memo timeout status updated outboundMemoId=${header.outbound_memo_id} status=${memoStatus} processStatus=${processStatus}`,
+      );
+    }
+  }
+
+  private mapProcessStatusToMemoStatus(
+    status: OutboundJobProcessStatus,
+  ): OutboundMemoStatus | null {
+    if (status === 'SUCCESS') {
+      return OutboundMemoStatus.INTEGRATED;
+    }
+    if (status === 'ERROR') {
+      return OutboundMemoStatus.FAILED;
+    }
+    return null;
   }
 
   private isAllHeadersTerminal(headers: OutboundIntegrationIrReqHeaderWithLines[]): boolean {
