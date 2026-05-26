@@ -75,6 +75,11 @@ export class CreateOutboundDoDto {
   @IsString()
   vendor_po_number: string;
 
+  @ApiProperty({ example: 'Truck Utilitas' })
+  @IsOptional()
+  @IsString()
+  truck_utilitas: string;
+
   @ApiProperty({ example: 'Ekspedisi Eksternal' })
   @IsString()
   delivery_category: OutboundDoDeliveryCategory;

@@ -70,6 +70,9 @@ export class OutboundDo extends BaseEntity {
   @Column({ nullable: true, type: 'bigint' })
   qty_utilitas: number;
 
+  @Column({ nullable: true, type: 'varchar', length: 150 })
+  truck_utilitas: string;
+
   @Column({ nullable: true, type: 'enum', enum: OutboundDoTypeCalculation })
   type_calculation: OutboundDoTypeCalculation;
 
