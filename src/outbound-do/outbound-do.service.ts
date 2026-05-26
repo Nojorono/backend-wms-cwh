@@ -33,6 +33,7 @@ import { OutboundIntegrationDeliveriesRepository } from '../outbound-integration
 import { OutboundIntegrationIrReq } from '../core/domain/entities/outbound-integration-ir-req.entity';
 import {
   OutboundIntegrationDeliveries,
+  DeliveryAttributeCategory,
   ShipConfirmInternalTransactionType,
 } from '../core/domain/entities/outbound-integration-deliveries.entity';
 import { CreateOutboundIntegrationDeliveriesDto } from '../outbound-integration-deliveries/dto/create-outbound-integration-deliveries.dto';
@@ -508,11 +509,11 @@ export class OutboundDoService {
       organization_id: outboundDo.organization_id ?? memo.organization_id,
       outbound_do_id: outboundDo.id,
       outbound_memo_id: memo.id,
-      preparer_number: memo.sequence,
+      preparer_number: memo.requestor,
       need_by_date: needBy ? (needBy as Date) : undefined,
       requestor_number: memo.requestor,
-      org_name: org?.org_name,
-      org_id: Number(org?.org_id) ?? undefined,
+      org_name: destIo?.org_name,
+      org_id: Number(destIo?.org_id) ?? undefined,
       io_source_name: org?.organization_code,
       io_source_id: Number(org?.organization_id) ?? undefined,
       io_dest_name: destIo?.organization_code,
@@ -591,8 +592,7 @@ export class OutboundDoService {
       );
     }
 
-    // const outbound_integration_deliveries =
-    //   await this.createMutasiSoInternalDeliveries(shipConfirmData, shipConfirmData.outbound_integration_ir_req);
+    // const outbound_integration_deliveries = await this.createMutasiSoInternalDeliveries(shipConfirmData, shipConfirmData.outbound_integration_ir_req);
 
     return {
       ...shipConfirmData,
@@ -611,6 +611,12 @@ export class OutboundDoService {
       if (!lines.length) {
         throw new BadRequestException(
           `Outbound integration IR req ${header.id} has no lines for ship confirm`,
+        );
+      }
+
+      if (header.so_header_id == null) {
+        throw new BadRequestException(
+          `SO header id is required for header memo ${header.outbound_memo_id} for ship confirm`,
         );
       }
 
@@ -638,13 +644,6 @@ export class OutboundDoService {
     header: OutboundIntegrationIrReq,
     line: OutboundIntegrationIrReqLines,
   ): CreateOutboundIntegrationDeliveriesDto {
-    const isoHeaderId = header.so_header_id ?? header.ir_header_id;
-    if (isoHeaderId == null) {
-      throw new BadRequestException(
-        `ISO_HEADER_ID is required for header ${header.id} (provide in request or ensure SO/IR header id exists)`,
-      );
-    }
-
     return {
       organization_id: header.organization_id ?? undefined,
       outbound_do_id: shipConfirmData.id,
@@ -653,16 +652,18 @@ export class OutboundDoService {
       transaction_type: ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL,
       source_system: 'WMS',
       source_header_id: header.source_header_id,
-      iso_header_id: isoHeaderId,
-      // delivery_attribute_category: shipConfirmData.DELIVERY_ATTRIBUTE_CATEGORY,
-      // delivery_attribute6: dto.DELIVERY_ATTRIBUTE6,
-      // delivery_attribute7: dto.DELIVERY_ATTRIBUTE7,
-      // delivery_attribute8: dto.DELIVERY_ATTRIBUTE8,
-      // delivery_attribute9: dto.DELIVERY_ATTRIBUTE9,
-      // delivery_attribute10: dto.DELIVERY_ATTRIBUTE10,
-      // delivery_attribute11: dto.DELIVERY_ATTRIBUTE11,
-      // delivery_attribute12: dto.DELIVERY_ATTRIBUTE12,
-      // delivery_attribute13: dto.DELIVERY_ATTRIBUTE13,
+      iso_header_id: header.so_header_id,
+      delivery_attribute_category: shipConfirmData.delivery_category as unknown as DeliveryAttributeCategory,
+      delivery_attribute6: shipConfirmData.vendor_id,
+      delivery_attribute7: shipConfirmData.driver_name,
+      delivery_attribute8: shipConfirmData.license_plate,
+      delivery_attribute9: shipConfirmData.seal_number,
+      delivery_attribute10: shipConfirmData.truck_utilitas,
+      delivery_attribute11: shipConfirmData.container_number,
+      delivery_attribute12: shipConfirmData.vendor_po_number,
+      delivery_attribute13: shipConfirmData.delivery_date.toISOString(),
+      delivery_attribute14: shipConfirmData.qty_utilitas.toString(),
+      delivery_attribute15: shipConfirmData.type_calculation,
     };
   }
 }

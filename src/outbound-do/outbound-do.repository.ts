@@ -168,6 +168,10 @@ export class OutboundDoRepository {
         'outbound_do.status',
         'outbound_do.outbound_type',
         'outbound_do.delivery_date',
+        'outbound_do.qty_utilitas',
+        'outbound_do.truck_utilitas',
+        'outbound_do.delivery_category',
+        'outbound_do.type_calculation',
       ]);
   }
 
