@@ -3,10 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
 import { OutboundMemo, OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
+import { OutboundIntegrationIrReq } from '../core/domain/entities/outbound-integration-ir-req.entity';
 import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
+
+export type ShipConfirmInternalQueryResult = OutboundDo & {
+  outbound_integration_ir_req: OutboundIntegrationIrReq[];
+};
 
 @Injectable()
 export class OutboundDoRepository {
@@ -15,6 +20,8 @@ export class OutboundDoRepository {
     private readonly outboundDoRepository: Repository<OutboundDo>,
     @InjectRepository(OutboundMemo)
     private readonly outboundMemoRepository: Repository<OutboundMemo>,
+    @InjectRepository(OutboundIntegrationIrReq)
+    private readonly outboundIntegrationIrReqRepository: Repository<OutboundIntegrationIrReq>,
   ) { }
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
@@ -135,6 +142,35 @@ export class OutboundDoRepository {
       ])
   }
 
+  private buildQueryWithAllRelationsForShipConfirmInternal() {
+    return this.outboundIntegrationIrReqRepository
+      .createQueryBuilder('outbound_integration_ir_req')
+      .leftJoin('outbound_integration_ir_req.outbound_do', 'outbound_do')
+      .leftJoinAndSelect('outbound_integration_ir_req.lines', 'lines')
+      .select(['outbound_integration_ir_req'])
+      .addSelect('lines')
+      .addSelect([
+        'outbound_do.id',
+        'outbound_do.createdAt',
+        'outbound_do.updatedAt',
+        'outbound_do.deletedAt',
+        'outbound_do.organization_id',
+        'outbound_do.outbound_do_number',
+        'outbound_do.expedition',
+        'outbound_do.origin',
+        'outbound_do.license_plate',
+        'outbound_do.container_number',
+        'outbound_do.seal_number',
+        'outbound_do.driver_name',
+        'outbound_do.driver_phone',
+        'outbound_do.vendor_id',
+        'outbound_do.vendor_po_number',
+        'outbound_do.status',
+        'outbound_do.outbound_type',
+        'outbound_do.delivery_date',
+      ]);
+  }
+
   private buildQueryWithAllRelations() {
     return this.outboundDoRepository
       .createQueryBuilder('outbound_do')
@@ -196,6 +232,33 @@ export class OutboundDoRepository {
       );
     }
     return processed;
+  }
+
+  async findOneForShipConfirmInternal(id: string): Promise<ShipConfirmInternalQueryResult> {
+    const integrationHeaders = await this.buildQueryWithAllRelationsForShipConfirmInternal()
+      .where('outbound_integration_ir_req.outbound_do_id = :id', { id })
+      .orderBy('outbound_integration_ir_req.createdAt', 'ASC')
+      .getMany();
+
+    if (!integrationHeaders.length) {
+      throw new NotFoundException(
+        'No outbound integration IR req found for this outbound DO',
+      );
+    }
+
+    const outboundDo = integrationHeaders[0].outbound_do;
+    if (!outboundDo) {
+      throw new NotFoundException('Outbound DO not found');
+    }
+
+    for (const header of integrationHeaders) {
+      header.outbound_do = undefined as unknown as OutboundDo;
+    }
+
+    return {
+      ...outboundDo,
+      outbound_integration_ir_req: integrationHeaders,
+    };
   }
 
   async findOne(id: string): Promise<OutboundDo> {

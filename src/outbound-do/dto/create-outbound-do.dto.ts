@@ -10,7 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OutboundDoStatus, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
+import { OutboundDoDeliveryCategory, OutboundDoStatus, OutboundDoTypeCalculation, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
 
 export class OutboundMemoItemDto {
   @ApiProperty({ example: 'b3a2d84c-7d29-4f47-bfb9-8158b17c5b8b' })
@@ -37,7 +37,6 @@ export class CreateOutboundDoDto {
   @ApiProperty({ example: 'JNE Express' })
   @IsString()
   expedition: string;
-
   @ApiProperty({ example: 'Jakarta' })
   @IsString()
   origin: string;
@@ -75,6 +74,18 @@ export class CreateOutboundDoDto {
   @IsOptional()
   @IsString()
   vendor_po_number: string;
+
+  @ApiProperty({ example: 'Ekspedisi Eksternal' })
+  @IsString()
+  delivery_category: OutboundDoDeliveryCategory;
+
+  @ApiProperty({ example: 'MULTIDROP' })
+  @IsString()
+  type_calculation: OutboundDoTypeCalculation;
+
+  @ApiProperty({ example: 100 })
+  @IsNumber()
+  qty_utilitas: number;
 
   @ApiPropertyOptional({ enum: OutboundDoStatus, example: OutboundDoStatus.PENDING })
   @IsOptional()

@@ -17,6 +17,17 @@ export enum OutboundDoType {
   AMO = 'AMO',
 }
 
+export enum OutboundDoTypeCalculation {
+  MULTIDROP = 'MULTIDROP',
+  SINGLEDROP = 'SINGLEDROP',
+}
+
+export enum OutboundDoDeliveryCategory {
+  EKSPEDISI_EKSTERNAL = 'Ekspedisi Eksternal',
+  EKSPEDISI_INTERNAL = 'Ekspedisi Internal',
+  EKSPEDISI_VENDOR = 'Ekspedisi Vendor',
+}
+
 @Entity('outbound_do')
 export class OutboundDo extends BaseEntity {
   @Column({ nullable: true })
@@ -55,6 +66,15 @@ export class OutboundDo extends BaseEntity {
 
   @Column({ nullable: true })
   vendor_po_number: string;
+
+  @Column({ nullable: true, type: 'bigint' })
+  qty_utilitas: number;
+
+  @Column({ nullable: true, type: 'enum', enum: OutboundDoTypeCalculation })
+  type_calculation: OutboundDoTypeCalculation;
+
+  @Column({ nullable: true, type: 'enum', enum: OutboundDoDeliveryCategory })
+  delivery_category: OutboundDoDeliveryCategory;
 
   @Column({
     nullable: true,

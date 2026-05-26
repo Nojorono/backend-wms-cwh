@@ -10,19 +10,22 @@ import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.entity';
 import { TransactionPickingModule } from '../transaction-picking/transaction-picking.module';
 import { OutboundIntegrationIrReqModule } from '../outbound-integration-ir-req/outbound-integration-ir-req.module';
+import { OutboundIntegrationDeliveriesModule } from '../outbound-integration-deliveries/outbound-integration-deliveries.module';
 import { IrRequestIntegrationService } from './integration/ir-request.integration';
 import { OutboundIntegrationQueueProducer } from './integration/outbound-integration-queue.producer';
 import { OutboundIntegrationQueueConsumer } from './integration/outbound-integration-queue.consumer';
 import { OutboundIntegrationQueueWorker } from './integration/outbound-integration-queue.worker';
 import { PoInternalReqStatusCheckerService } from './integration/po-internal-req-status-checker.service';
 import { getOutboundIntegrationRmqOptions } from './integration/outbound-integration-rmq.config';
+import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-integration-ir-req.entity';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([OutboundDo, OutboundMemo, OutboundMemoItem]),
+    TypeOrmModule.forFeature([OutboundDo, OutboundMemo, OutboundMemoItem, OutboundIntegrationIrReq  ]),
     TransactionPickingModule,
     OutboundIntegrationIrReqModule,
+    OutboundIntegrationDeliveriesModule,
     ClientsModule.registerAsync([
       {
         name: 'PO_INTERNAL_REQ_SERVICE',

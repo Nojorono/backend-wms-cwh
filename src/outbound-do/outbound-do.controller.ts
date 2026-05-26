@@ -29,6 +29,7 @@ import { Status as TransactionPickingStatus } from '../core/domain/entities/tran
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { OrganizationId } from '../core/decorators/organization-id.decorator';
+import { CreateShipConfirmInternalDto } from './dto/create-ship-confirm-internal.dto';
 
 @ApiTags('Outbound DO')
 @Controller('outbound-do')
@@ -402,14 +403,16 @@ export class OutboundDoController {
   }
 
   // ship confirm internal
-  @Patch(':id/ship-confirm-internal')
+  @Post('ship-confirm-internal/:id')
   @ApiOperation({ summary: 'Ship confirm internal' })
   @ApiParam({ name: 'id', description: 'ID outbound DO' })
   @ApiResponse({
     status: 200,
     description: 'Ship confirm internal',
   })
-  async shipConfirmInternal(@Param('id') id: string) {
-    // return this.outboundDoService.shipConfirmInternal(id);
+  async shipConfirmInternal(
+    @Param('id') id: string,
+  ) {
+    return this.outboundDoService.shipConfirmInternal(id);
   }
 }
