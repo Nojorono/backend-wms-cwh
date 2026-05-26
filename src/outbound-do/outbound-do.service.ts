@@ -579,6 +579,12 @@ export class OutboundDoService {
     return Number.isFinite(n) ? n : undefined;
   }
 
+  async shipConfirmSubdist(
+    deliveryDtos: CreateOutboundIntegrationDeliveriesDto[],
+  ): Promise<any> {
+    return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
+  }
+
 
   async shipConfirmInternal(
     id: string,

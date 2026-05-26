@@ -78,19 +78,22 @@ export class CreateOutboundDoDto {
   @ApiProperty({ example: 'Truck Utilitas' })
   @IsOptional()
   @IsString()
-  truck_utilitas: string;
+  truck_utilitas?: string;
 
   @ApiProperty({ example: 'Ekspedisi Eksternal' })
+  @IsOptional()
   @IsString()
-  delivery_category: OutboundDoDeliveryCategory;
+  delivery_category?: OutboundDoDeliveryCategory;
 
   @ApiProperty({ example: 'MULTIDROP' })
+  @IsOptional()
   @IsString()
-  type_calculation: OutboundDoTypeCalculation;
+  type_calculation?: OutboundDoTypeCalculation;
 
   @ApiProperty({ example: 100 })
+  @IsOptional()
   @IsNumber()
-  qty_utilitas: number;
+  qty_utilitas?: number;
 
   @ApiPropertyOptional({ enum: OutboundDoStatus, example: OutboundDoStatus.PENDING })
   @IsOptional()
