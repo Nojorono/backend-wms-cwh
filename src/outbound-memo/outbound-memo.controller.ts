@@ -68,7 +68,8 @@ export class OutboundMemoController {
     },
     {
       name: 'has_do',
-      description: 'Filter outbound memo berdasarkan apakah sudah memiliki outbound DO',
+      description:
+        'Filter apakah sudah memiliki outbound DO (true/false). Gunakan false untuk memo APPROVED yang siap dibuatkan DO.',
       example: false,
       type: Boolean,
     },
@@ -94,24 +95,20 @@ export class OutboundMemoController {
     @Query() paginationQuery: OutboundMemoPaginationDto,
     @OrganizationId() organizationId: string,
   ) {
-    const hasPaginationParams =
-      paginationQuery.page ||
-      paginationQuery.limit ||
-      paginationQuery.search ||
-      paginationQuery.sortBy ||
-      paginationQuery.sortOrder ||
-      paginationQuery.status ||
+    const hasQueryParams =
+      paginationQuery.page !== undefined ||
+      paginationQuery.limit !== undefined ||
+      paginationQuery.search !== undefined ||
+      paginationQuery.sortBy !== undefined ||
+      paginationQuery.sortOrder !== undefined ||
+      paginationQuery.status !== undefined ||
       paginationQuery.has_do !== undefined ||
       paginationQuery.type !== undefined ||
       paginationQuery.has_transaction_picking !== undefined ||
       paginationQuery.item_id !== undefined;
 
-    if (hasPaginationParams) {
+    if (hasQueryParams) {
       return this.outboundMemoService.findAllPaginated(paginationQuery, organizationId);
-    }
-
-    if (paginationQuery.status) {
-      return this.outboundMemoService.findByStatus(paginationQuery.status, organizationId);
     }
 
     return this.outboundMemoService.findAll(organizationId);

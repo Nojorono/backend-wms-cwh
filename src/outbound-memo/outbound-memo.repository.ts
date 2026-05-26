@@ -94,12 +94,10 @@ export class OutboundMemoRepository {
   }
 
   async findByStatus(status: string, organizationId: string): Promise<OutboundMemo[]> {
-    const where: Partial<OutboundMemo> = { status: status as OutboundMemoStatus };
-    where.organization_id = organizationId;
-
-    if (status === OutboundMemoStatus.APPROVED) {
-      where.has_do = false;
-    }
+    const where: Partial<OutboundMemo> = {
+      status: status as OutboundMemoStatus,
+      organization_id: organizationId,
+    };
 
     return await this.outboundMemoRepository.find({
       where,
@@ -147,13 +145,14 @@ export class OutboundMemoRepository {
 
     if (status) {
       qb.andWhere('memo.status = :status', { status });
-      if (status === OutboundMemoStatus.APPROVED) {
-        qb.andWhere('memo.has_do = false');
-      }
     }
 
     if (has_do !== undefined) {
-      qb.andWhere('memo.has_do = :has_do', { has_do });
+      if (has_do === false) {
+        qb.andWhere('(memo.has_do = :has_do OR memo.has_do IS NULL)', { has_do: false });
+      } else {
+        qb.andWhere('memo.has_do = :has_do', { has_do: true });
+      }
     }
 
     if (type) {

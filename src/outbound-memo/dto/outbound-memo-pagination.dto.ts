@@ -6,7 +6,8 @@ import { OutboundMemoStatus, OutboundMemoType } from '../../core/domain/entities
 
 export class OutboundMemoPaginationDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({
-    description: 'Filter outbound memo berdasarkan status',
+    description:
+      'Filter outbound memo berdasarkan status. Untuk APPROVED yang belum punya outbound DO, tambahkan has_do=false.',
     enum: OutboundMemoStatus,
     example: OutboundMemoStatus.PENDING,
   })
