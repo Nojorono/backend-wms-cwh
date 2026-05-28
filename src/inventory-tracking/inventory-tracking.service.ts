@@ -301,15 +301,13 @@ export class InventoryTrackingService {
     warehouse_sub_id: string,
     warehouse_id: string,
     inventory_status: string,
-    progression_status: ProgressionStatus,
+    progression_status?: ProgressionStatus,
     inbound_id?: string,
   ): Promise<any> {
     // Validasi status
     this.validateInventoryStatus(inventory_status);
 
     const existing = await this.validatePalletIdUniqueness(pallet_id);
-
-    console.log("existing", existing);
 
     if (existing) {
       // Jika sudah ada di lokasi yang sama, update saja
