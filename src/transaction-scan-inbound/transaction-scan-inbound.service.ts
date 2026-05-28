@@ -117,7 +117,7 @@ export class TransactionScanInboundService {
         existing.m_warehouse_sub_id,
         warehouseSub.warehouse_id,
         'INSPECTION_COMPLETED',
-        ProgressionStatus.IN_PROGRESS,
+        ProgressionStatus.NOT_STARTED,
         existing.inbound_id,
       );
 
