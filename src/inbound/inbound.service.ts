@@ -461,10 +461,10 @@ export class InboundService {
         throw new NotFoundException('Inbound not found');
       }
 
-      // Validate status transition
-      if (inbound.status === InboundStatus.UNLOADING) {
-        throw new BadRequestException('Cannot update inbound that is already unloading');
-      }
+      // // Validate status transition
+      // if (inbound.status === InboundStatus.UNLOADING) {
+      //   throw new BadRequestException('Cannot update inbound that is already unloading');
+      // }
 
       if (inbound.status === InboundStatus.INTEGRATED) {
         throw new BadRequestException('Cannot update inbound that is already integrated');
