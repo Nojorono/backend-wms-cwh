@@ -301,6 +301,7 @@ export class InventoryTrackingService {
     warehouse_sub_id: string,
     warehouse_id: string,
     inventory_status: string,
+    progression_status: ProgressionStatus,
     inbound_id?: string,
   ): Promise<any> {
     // Validasi status
@@ -319,6 +320,7 @@ export class InventoryTrackingService {
         inventory_note: 'Inventory tracking updated',
         inventory_date: new Date(),
         inbound_id: inbound_id,
+        progression_status: progression_status,
       });
     }
 
@@ -418,6 +420,7 @@ export class InventoryTrackingService {
       warehouse_sub_id,
       warehouse_id,
       inventory_status,
+      ProgressionStatus.IN_PROGRESS,
       inbound_id,
     );
   }

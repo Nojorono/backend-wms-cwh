@@ -16,6 +16,7 @@ import { QuantityOperationType } from 'src/core/domain/entities/transaction-pall
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
 import { NotificationService } from 'src/notification/notification.service';
 import { UpdateResult } from 'typeorm';
+import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
 
 @Injectable()
 export class TransactionScanInboundService {
@@ -116,6 +117,7 @@ export class TransactionScanInboundService {
         existing.m_warehouse_sub_id,
         warehouseSub.warehouse_id,
         'INSPECTION_COMPLETED',
+        ProgressionStatus.IN_PROGRESS,
         existing.inbound_id,
       );
 
@@ -390,6 +392,7 @@ export class TransactionScanInboundService {
           existing.m_warehouse_sub_id,
           warehouseSub.warehouse_id,
           'INSPECTION_COMPLETED',
+          ProgressionStatus.IN_PROGRESS,
           existing.inbound_id,
         );
       }
