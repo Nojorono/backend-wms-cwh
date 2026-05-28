@@ -229,11 +229,11 @@ export class PoInternalReqStatusCheckerService {
       total_lines: this.asNumber(poHeader.TOTAL_LINES) ?? undefined,
       batch_number: this.asString(poHeader.BATCH_NUMBER),
       iface_status_ir: this.asString(poHeader.IFACE_STATUS_IR),
-      iface_message_ir: this.asString(poHeader.IFACE_MESSAGE_IR),
+      iface_message_ir: this.asNullableString(poHeader.IFACE_MESSAGE_IR) as any,
       iface_status_io: this.asString(poHeader.IFACE_STATUS_IO),
-      iface_message_io: this.asString(poHeader.IFACE_MESSAGE_IO),
+      iface_message_io: this.asNullableString(poHeader.IFACE_MESSAGE_IO) as any,
       iface_status_oi: this.asString(poHeader.IFACE_STATUS_OI),
-      iface_message_oi: this.asString(poHeader.IFACE_MESSAGE_OI),
+      iface_message_oi: this.asNullableString(poHeader.IFACE_MESSAGE_OI) as any,
       request_id_ir: this.asNumber(poHeader.REQUEST_ID_IR) ?? undefined,
       request_id_io: this.asNumber(poHeader.REQUEST_ID_IO) ?? undefined,
       request_id_oi: this.asNumber(poHeader.REQUEST_ID_OI) ?? undefined,
@@ -249,19 +249,18 @@ export class PoInternalReqStatusCheckerService {
         .filter((line) => line.source_line_id)
         .map((line) => [line.source_line_id, line]),
     );
+    const localLinesByIfaceLineId = new Map(
+      (header.lines ?? [])
+        .filter((line) => line.iface_line_id != null)
+        .map((line) => [String(line.iface_line_id), line]),
+    );
 
     for (const poLine of linesRaw) {
       const sourceLineId = this.asString(poLine.SOURCE_LINE_ID);
-      if (!sourceLineId) {
-        continue;
-      }
-      const localLine = localLinesBySourceLineId.get(sourceLineId);
-      if (!localLine) {
-        continue;
-      }
-      await this.outboundIntegrationIrReqService.updateLine(localLine.id, {
+      const ifaceLineId = this.asNumber(poLine.IFACE_LINE_ID);
+      const linePayload = {
         iface_header_id: this.asNumber(poLine.IFACE_HEADER_ID) ?? undefined,
-        iface_line_id: this.asNumber(poLine.IFACE_LINE_ID) ?? undefined,
+        iface_line_id: ifaceLineId ?? undefined,
         source_header_id: this.asString(poLine.SOURCE_HEADER_ID),
         source_line_id: sourceLineId,
         inventory_item_id: this.asNumber(poLine.INVENTORY_ITEM_ID) ?? undefined,
@@ -273,11 +272,25 @@ export class PoInternalReqStatusCheckerService {
         so_line_id: this.asNumber(poLine.SO_LINE_ID) ?? undefined,
         so_line_number: this.asNumber(poLine.SO_LINE_NUMBER) ?? undefined,
         iface_line_status_ir: this.asString(poLine.IFACE_LINE_STATUS_IR),
-        iface_line_message_ir: this.asString(poLine.IFACE_LINE_MESSAGE_IR),
+        iface_line_message_ir: this.asNullableString(poLine.IFACE_LINE_MESSAGE_IR) as any,
         creation_date: this.asDate(poLine.CREATION_DATE),
         last_updated_date: this.asDate(poLine.LAST_UPDATED_DATE),
         created_by: this.asNumber(poLine.CREATED_BY) ?? undefined,
         last_updated_by: this.asNumber(poLine.LAST_UPDATED_BY) ?? undefined,
+      };
+
+      const localLine =
+        (sourceLineId ? localLinesBySourceLineId.get(sourceLineId) : undefined) ??
+        (ifaceLineId != null ? localLinesByIfaceLineId.get(String(ifaceLineId)) : undefined);
+
+      if (localLine) {
+        await this.outboundIntegrationIrReqService.updateLine(localLine.id, linePayload);
+        continue;
+      }
+
+      await this.outboundIntegrationIrReqService.createLine({
+        outbound_integration_ir_req_id: header.id,
+        ...linePayload,
       });
     }
   }
@@ -323,6 +336,17 @@ export class PoInternalReqStatusCheckerService {
     }
     const s = String(value).trim();
     return s === '' ? undefined : s;
+  }
+
+  private asNullableString(value: unknown): string | null | undefined {
+    if (value === null) {
+      return null;
+    }
+    if (value === undefined) {
+      return undefined;
+    }
+    const s = String(value).trim();
+    return s === '' ? null : s;
   }
 
   private asDate(value: unknown): Date | undefined {

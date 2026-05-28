@@ -31,6 +31,8 @@ import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-paginati
 import { OrganizationId } from '../core/decorators/organization-id.decorator';
 import { CreateShipConfirmInternalDto } from './dto/create-ship-confirm-internal.dto';
 import { CreateOutboundIntegrationDeliveriesDto } from 'src/outbound-integration-deliveries/dto/create-outbound-integration-deliveries.dto';
+import { CreatePickReleaseSubdistDto } from './dto/create-pick-release-subdist.dto';
+import { CreateShipConfirmSubdistDto } from './dto/create-ship-confirm-subdist.dto';
 
 @ApiTags('Outbound DO')
 @Controller('outbound-do')
@@ -418,29 +420,29 @@ export class OutboundDoController {
   }
 
   // pick release subdist
-  @Post('pick-release-subdist/:id')
+  @Post('pick-release-subdist')
   @ApiOperation({ summary: 'Pick release subdist' })
-  @ApiBody({ type: [CreateOutboundIntegrationDeliveriesDto] })
+  @ApiBody({ type: [CreatePickReleaseSubdistDto] })
   @ApiResponse({
     status: 200,
     description: 'Pick release subdist',
   })
   async pickReleaseSubdist(
-    @Body() deliveryDtos: CreateOutboundIntegrationDeliveriesDto[],
+    @Body() deliveryDtos: CreatePickReleaseSubdistDto[],
   ) {
-    return this.outboundDoService.shipConfirmSubdist(deliveryDtos);
+    return this.outboundDoService.pickReleaseSubdist(deliveryDtos);
   }
 
   // ship confirm subdist
   @Post('ship-confirm-subdist')
   @ApiOperation({ summary: 'Ship confirm subdist' })
-  @ApiBody({ type: [CreateOutboundIntegrationDeliveriesDto] })
+  @ApiBody({ type: [CreateShipConfirmSubdistDto] })
   @ApiResponse({
     status: 200,
     description: 'Ship confirm subdist',
   })
   async shipConfirmSubdist(
-    @Body() deliveryDtos: CreateOutboundIntegrationDeliveriesDto[],
+    @Body() deliveryDtos: CreateShipConfirmSubdistDto[],
   ) {
     return this.outboundDoService.shipConfirmSubdist(deliveryDtos);
   }

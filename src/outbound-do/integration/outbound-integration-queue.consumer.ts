@@ -17,11 +17,6 @@ import { OutboundMemoStatus } from 'src/core/domain/entities/outbound-memo.entit
 export class OutboundIntegrationQueueConsumer {
   private readonly logger = new Logger(OutboundIntegrationQueueConsumer.name);
   private readonly terminalStatuses = new Set(['S', 'E', 'SUCCESS', 'COMPLETED', 'ERROR', 'FAILED']);
-  private readonly terminalMemoStatuses = new Set<OutboundMemoStatus>([
-    OutboundMemoStatus.INTEGRATED,
-    OutboundMemoStatus.FAILED,
-    OutboundMemoStatus.TIMEOUT,
-  ]);
 
   constructor(
     private readonly outboundIntegrationIrReqService: OutboundIntegrationIrReqService,
@@ -49,21 +44,6 @@ export class OutboundIntegrationQueueConsumer {
         (await this.outboundIntegrationIrReqService.findAllByOutboundDoId(outboundDoId)) ?? [];
       if (headers.length === 0) {
         this.logger.warn(`No integration IR req headers for outboundDoId=${outboundDoId}`);
-        return;
-      }
-
-      if (this.isAllHeadersTerminal(headers)) {
-        const memoResults = headers
-          .filter((header) => Boolean(header.outbound_memo_id))
-          .map((header) => ({
-            outboundMemoId: header.outbound_memo_id as string,
-            status: this.statusChecker.deriveProcessStatusFromHeader(header),
-            reason: 'Synced integration header already terminal',
-          }));
-        await this.applyMemoStatusUpdates(memoResults);
-        this.logger.log(
-          `Outbound integration already terminal outboundDoId=${outboundDoId} retryCount=${retryCount}`,
-        );
         return;
       }
 
@@ -139,7 +119,7 @@ export class OutboundIntegrationQueueConsumer {
         continue;
       }
 
-      if (memo.status && this.terminalMemoStatuses.has(memo.status)) {
+      if (!this.shouldUpdateMemoStatus(memo.status, memoStatus)) {
         continue;
       }
 
@@ -159,7 +139,7 @@ export class OutboundIntegrationQueueConsumer {
       }
 
       const memo = await this.outboundDoRepository.findMemoById(header.outbound_memo_id);
-      if (!memo || (memo.status && this.terminalMemoStatuses.has(memo.status))) {
+      if (!memo) {
         continue;
       }
 
@@ -170,6 +150,10 @@ export class OutboundIntegrationQueueConsumer {
           : processStatus === 'ERROR'
             ? OutboundMemoStatus.FAILED
             : OutboundMemoStatus.TIMEOUT;
+
+      if (!this.shouldUpdateMemoStatus(memo.status, memoStatus)) {
+        continue;
+      }
 
       await this.outboundDoRepository.updateMemoStatus(header.outbound_memo_id, memoStatus);
       this.logger.warn(
@@ -188,6 +172,26 @@ export class OutboundIntegrationQueueConsumer {
       return OutboundMemoStatus.FAILED;
     }
     return null;
+  }
+
+  /**
+   * Allow retries to recover FAILED/TIMEOUT -> INTEGRATED,
+   * but never downgrade INTEGRATED back to non-integrated statuses.
+   */
+  private shouldUpdateMemoStatus(
+    currentStatus: OutboundMemoStatus | null | undefined,
+    nextStatus: OutboundMemoStatus,
+  ): boolean {
+    if (!currentStatus) {
+      return true;
+    }
+    if (currentStatus === nextStatus) {
+      return false;
+    }
+    if (currentStatus === OutboundMemoStatus.INTEGRATED) {
+      return false;
+    }
+    return true;
   }
 
   private isAllHeadersTerminal(headers: OutboundIntegrationIrReqHeaderWithLines[]): boolean {

@@ -37,6 +37,8 @@ import {
   ShipConfirmInternalTransactionType,
 } from '../core/domain/entities/outbound-integration-deliveries.entity';
 import { CreateOutboundIntegrationDeliveriesDto } from '../outbound-integration-deliveries/dto/create-outbound-integration-deliveries.dto';
+import { CreatePickReleaseSubdistDto } from './dto/create-pick-release-subdist.dto';
+import { CreateShipConfirmSubdistDto } from './dto/create-ship-confirm-subdist.dto';
 
 export type ShipConfirmInternalResult = ShipConfirmInternalQueryResult & {
   outbound_integration_deliveries: OutboundIntegrationDeliveries[];
@@ -580,9 +582,15 @@ export class OutboundDoService {
   }
 
   async shipConfirmSubdist(
-    deliveryDtos: CreateOutboundIntegrationDeliveriesDto[],
+    deliveryDtos: CreateShipConfirmSubdistDto[],
   ): Promise<any> {
-    return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
+    // return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
+  }
+
+  async pickReleaseSubdist(
+    deliveryDtos: CreatePickReleaseSubdistDto[],
+  ): Promise<any> {
+    // return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
   }
 
 
@@ -637,12 +645,70 @@ export class OutboundDoService {
       throw new BadRequestException('No delivery rows to create for ship confirm');
     }
 
-    await this.outboundIntegrationDeliveriesRepository.softDeleteByOutboundDoIdAndTransactionType(
-      shipConfirmData.id,
-      ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL,
+    return await this.upsertIntegrationDeliveriesByType(shipConfirmData.id, deliveryDtos);
+  }
+
+  private async upsertIntegrationDeliveriesByType(
+    outboundDoId: string,
+    deliveryDtos: CreateOutboundIntegrationDeliveriesDto[],
+  ): Promise<OutboundIntegrationDeliveries[]> {
+    const existingRows = await this.outboundIntegrationDeliveriesRepository.findByOutboundDoId(
+      outboundDoId,
+    );
+    const existingByKey = new Map(
+      existingRows.map((row) => [this.buildIntegrationDeliveryKey(row), row]),
     );
 
-    return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
+    for (const dto of deliveryDtos) {
+      const key = this.buildIntegrationDeliveryKey(dto);
+      const existing = existingByKey.get(key);
+
+      if (existing) {
+        await this.outboundIntegrationDeliveriesRepository.update(existing.id, dto);
+        continue;
+      }
+
+      const created = await this.outboundIntegrationDeliveriesRepository.create(dto);
+      existingByKey.set(key, created);
+    }
+
+    const targetTypes = new Set(
+      deliveryDtos
+        .map((dto) => dto.transaction_type)
+        .filter((type): type is ShipConfirmInternalTransactionType => type != null),
+    );
+
+    const latestRows = await this.outboundIntegrationDeliveriesRepository.findByOutboundDoId(
+      outboundDoId,
+    );
+    return latestRows.filter(
+      (row) => targetTypes.size === 0 || targetTypes.has(row.transaction_type),
+    );
+  }
+
+  private buildIntegrationDeliveryKey(
+    row: Pick<
+      CreateOutboundIntegrationDeliveriesDto,
+      | 'transaction_type'
+      | 'outbound_memo_item_id'
+      | 'source_header_id'
+      | 'iso_header_id'
+      | 'iso_inventory_item_id'
+      | 'iso_organization_id'
+      | 'delivery_id'
+      | 'delivery_name'
+    >,
+  ): string {
+    return [
+      row.transaction_type ?? 'null',
+      row.outbound_memo_item_id ?? 'null',
+      row.source_header_id ?? 'null',
+      row.iso_header_id ?? 'null',
+      row.iso_inventory_item_id ?? 'null',
+      row.iso_organization_id ?? 'null',
+      row.delivery_id ?? 'null',
+      row.delivery_name ?? 'null',
+    ].join('|');
   }
 
   private mapMutasiSoInternalLineToDelivery(
