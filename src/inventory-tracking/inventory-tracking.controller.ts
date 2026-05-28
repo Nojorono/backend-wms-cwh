@@ -149,10 +149,11 @@ export class InventoryTrackingController {
   @ApiQuery({ name: 'warehouse_bin_id', required: false, type: String })
   @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
   findAllByWarehouse(
+    @OrganizationId() organizationId: string,
     @Query('warehouse_sub_id') warehouse_sub_id?: string,
     @Query('warehouse_bin_id') warehouse_bin_id?: string,
   ) {
-    return this.service.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+    return this.service.findAllByWarehouse(organizationId, warehouse_sub_id, warehouse_bin_id);
   }
 
   @Get('history/:pallet_id')
@@ -239,8 +240,11 @@ export class InventoryTrackingController {
       },
     },
   })
-  async findByItemId(@Param('item_id') item_id: string) {
-    return this.service.findByItemId(item_id);
+  async findByItemId(
+    @Param('item_id') item_id: string,
+    @OrganizationId() organizationId: string,
+  ) {
+    return this.service.findByItemId(item_id, organizationId);
   }
 
   @Get('visibility/warehouse')

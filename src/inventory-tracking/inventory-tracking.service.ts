@@ -180,8 +180,16 @@ export class InventoryTrackingService {
     return inventoryTrackings;
   }
 
-  async findAllByWarehouse(warehouse_sub_id, warehouse_bin_id): Promise<InventoryTracking[]> {
-    const inventoryTrackings = await this.repository.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+  async findAllByWarehouse(
+    organizationId: string,
+    warehouse_sub_id?: string,
+    warehouse_bin_id?: string,
+  ): Promise<InventoryTracking[]> {
+    const inventoryTrackings = await this.repository.findAllByWarehouse(
+      organizationId,
+      warehouse_sub_id,
+      warehouse_bin_id,
+    );
     return await this.enrichPalletsWithCurrentItems(inventoryTrackings);
   }
 
@@ -322,9 +330,6 @@ export class InventoryTrackingService {
       });
     }
 
-    // Validasi duplikasi pallet_id sebelum create
-    // await this.validatePalletIdUniqueness(pallet_id);
-
     // Create new tracking record
     return this.create({
       pallet_id,
@@ -337,8 +342,8 @@ export class InventoryTrackingService {
     });
   }
 
-  async findByItemId(item_id: string): Promise<any[]> {
-    return this.repository.findByItemId(item_id);
+  async findByItemId(item_id: string, organizationId: string): Promise<any[]> {
+    return this.repository.findByItemId(item_id, organizationId);
   }
 
   // Method untuk mengecek apakah sudah ada history dengan inbound_id yang sama

@@ -197,6 +197,7 @@ export class InventoryTrackingRepository {
   }
 
   async findAllByWarehouse(
+    organizationId: string,
     warehouse_sub_id?: string,
     warehouse_bin_id?: string,
   ): Promise<InventoryTracking[]> {
@@ -206,6 +207,8 @@ export class InventoryTrackingRepository {
       .leftJoinAndSelect('inventory.warehouse', 'warehouse')
       .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
       .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin');
+
+    qb.andWhere('inventory.organization_id = :organizationId::uuid', { organizationId });
 
     if (warehouse_sub_id) {
       qb.andWhere('warehouseSub.id = :warehouse_sub_id', { warehouse_sub_id });
@@ -418,7 +421,7 @@ export class InventoryTrackingRepository {
     });
   }
 
-  async findByItemId(item_id: string): Promise<any[]> {
+  async findByItemId(item_id: string, organizationId: string): Promise<any[]> {
     const query = `
       SELECT 
         it.id as inventory_tracking_id,
@@ -447,12 +450,13 @@ export class InventoryTrackingRepository {
       LEFT JOIN m_warehouse_sub ws ON it.warehouse_sub_id = ws.id
       LEFT JOIN m_warehouse_bin wb ON it.warehouse_bin_id = wb.id
       WHERE pth.item_id = $1
+        AND it.organization_id = $2::uuid
         
         AND pth.new_quantity > 0
       ORDER BY it.inventory_date ASC, pth.production_date ASC
     `;
 
-    const results = (await this.repository.query(query, [item_id])) as any[];
+    const results = (await this.repository.query(query, [item_id, organizationId])) as any[];
     return results;
   }
 
