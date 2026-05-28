@@ -6,6 +6,7 @@ import {
   OutboundMemoCheckResult,
 } from './outbound-integration-queue.types';
 import { PoInternalReqStatusCheckerService } from './po-internal-req-status-checker.service';
+import { ShipConfirmStatusCheckerService } from './ship-confirm-status-checker.service';
 import {
   OutboundIntegrationIrReqService,
   OutboundIntegrationIrReqHeaderWithLines,
@@ -22,6 +23,7 @@ export class OutboundIntegrationQueueConsumer {
     private readonly outboundIntegrationIrReqService: OutboundIntegrationIrReqService,
     private readonly producer: OutboundIntegrationQueueProducer,
     private readonly statusChecker: PoInternalReqStatusCheckerService,
+    private readonly shipConfirmStatusChecker: ShipConfirmStatusCheckerService,
     private readonly outboundDoRepository: OutboundDoRepository,
   ) { }
 
@@ -30,14 +32,20 @@ export class OutboundIntegrationQueueConsumer {
       const outboundDoId = data?.outboundDoId;
       const retryCount = data?.retryCount ?? 0;
       const maxRetry = data?.maxRetry ?? 20;
+      const jobType = data?.jobType ?? 'PO_INTERNAL_REQ';
 
       if (!outboundDoId) {
         this.logger.error('Outbound queue payload is invalid: missing outboundDoId');
         return;
       }
 
+      if (jobType === 'SHIP_CONFIRM') {
+        await this.handleShipConfirmProcess(data);
+        return;
+      }
+
       this.logger.log(
-        `Outbound queue processing outboundDoId=${outboundDoId} retryCount=${retryCount}/${maxRetry}`,
+        `Outbound queue processing outboundDoId=${outboundDoId} retryCount=${retryCount}/${maxRetry} jobType=${jobType}`,
       );
 
       const headers =
@@ -81,6 +89,7 @@ export class OutboundIntegrationQueueConsumer {
         outboundDoId,
         retryCount,
         maxRetry,
+        jobType: 'PO_INTERNAL_REQ',
       });
       this.logger.log(
         `Outbound queue status=PENDING outboundDoId=${outboundDoId} retryCount=${retryCount} delayMs=${delay}`,
@@ -96,12 +105,61 @@ export class OutboundIntegrationQueueConsumer {
           outboundDoId: data.outboundDoId,
           retryCount: data.retryCount ?? 0,
           maxRetry: data.maxRetry ?? 20,
+          jobType: data.jobType ?? 'PO_INTERNAL_REQ',
         });
         this.logger.warn(
           `Outbound queue rescheduled after failure outboundDoId=${data.outboundDoId} retryCount=${data.retryCount ?? 0} delayMs=${delay}`,
         );
       }
     }
+  }
+
+  private async handleShipConfirmProcess(data: OutboundJobPayload): Promise<void> {
+    const outboundDoId = data.outboundDoId;
+    const retryCount = data.retryCount ?? 0;
+    const maxRetry = data.maxRetry ?? 20;
+
+    this.logger.log(
+      `Ship confirm queue processing outboundDoId=${outboundDoId} retryCount=${retryCount}/${maxRetry}`,
+    );
+
+    if (retryCount >= maxRetry) {
+      this.logger.error(
+        `Ship confirm queue timeout outboundDoId=${outboundDoId} retryCount=${retryCount}`,
+      );
+      return;
+    }
+
+    const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus({
+      outboundDoId,
+      retryCount,
+      maxRetry,
+      jobType: 'SHIP_CONFIRM',
+    });
+
+    if (result.status === 'SUCCESS') {
+      this.logger.log(
+        `Ship confirm queue status=SUCCESS outboundDoId=${outboundDoId} retryCount=${retryCount}`,
+      );
+      return;
+    }
+
+    if (result.status === 'ERROR') {
+      this.logger.error(
+        `Ship confirm queue status=ERROR outboundDoId=${outboundDoId} retryCount=${retryCount} reason=${result.reason}`,
+      );
+      return;
+    }
+
+    const delay = this.producer.scheduleRetry({
+      outboundDoId,
+      retryCount,
+      maxRetry,
+      jobType: 'SHIP_CONFIRM',
+    });
+    this.logger.log(
+      `Ship confirm queue status=PENDING outboundDoId=${outboundDoId} retryCount=${retryCount} delayMs=${delay} reason=${result.reason}`,
+    );
   }
 
   private async applyMemoStatusUpdates(memoResults: OutboundMemoCheckResult[]): Promise<void> {

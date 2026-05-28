@@ -1,16 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
 import {
   DeliveryAttributeCategory,
   ShipConfirmInternalTransactionType,
 } from 'src/core/domain/entities/outbound-integration-deliveries.entity';
+import { CreateShipConfirmPickReleaseLineDto } from './create-ship-confirm-pick-release-line.dto';
 
 export class CreateShipConfirmInternalDto {
   @ApiProperty({
@@ -105,4 +109,14 @@ export class CreateShipConfirmInternalDto {
   @IsString()
   @MaxLength(150)
   DELIVERY_ATTRIBUTE15?: string;
+
+  @ApiPropertyOptional({
+    type: [CreateShipConfirmPickReleaseLineDto],
+    description: 'Type 2/3: Outbound GS SO Subdist Pick Release / Ship Confirm lines',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateShipConfirmPickReleaseLineDto)
+  LINES?: CreateShipConfirmPickReleaseLineDto[];
 }

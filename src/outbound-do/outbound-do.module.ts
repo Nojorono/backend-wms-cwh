@@ -12,10 +12,12 @@ import { TransactionPickingModule } from '../transaction-picking/transaction-pic
 import { OutboundIntegrationIrReqModule } from '../outbound-integration-ir-req/outbound-integration-ir-req.module';
 import { OutboundIntegrationDeliveriesModule } from '../outbound-integration-deliveries/outbound-integration-deliveries.module';
 import { IrRequestIntegrationService } from './integration/ir-request.integration';
+import { ShipConfirmIntegrationService } from './integration/ship-confirm.integration';
 import { OutboundIntegrationQueueProducer } from './integration/outbound-integration-queue.producer';
 import { OutboundIntegrationQueueConsumer } from './integration/outbound-integration-queue.consumer';
 import { OutboundIntegrationQueueWorker } from './integration/outbound-integration-queue.worker';
 import { PoInternalReqStatusCheckerService } from './integration/po-internal-req-status-checker.service';
+import { ShipConfirmStatusCheckerService } from './integration/ship-confirm-status-checker.service';
 import { getOutboundIntegrationRmqOptions } from './integration/outbound-integration-rmq.config';
 import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-integration-ir-req.entity';
 
@@ -42,6 +44,20 @@ import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-inte
         inject: [ConfigService],
       },
       {
+        name: 'SHIP_CONFIRM_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.shipConfirm') || 'ship_confirm_queue',
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
         name: 'OUTBOUND_INTEGRATION_QUEUE_CLIENT',
         useFactory: (configService: ConfigService) => ({
           transport: Transport.RMQ,
@@ -56,11 +72,18 @@ import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-inte
     OutboundDoService,
     OutboundDoRepository,
     IrRequestIntegrationService,
+    ShipConfirmIntegrationService,
     OutboundIntegrationQueueProducer,
     OutboundIntegrationQueueConsumer,
     OutboundIntegrationQueueWorker,
     PoInternalReqStatusCheckerService,
+    ShipConfirmStatusCheckerService,
   ],
-  exports: [OutboundDoService, OutboundDoRepository, IrRequestIntegrationService],
+  exports: [
+    OutboundDoService,
+    OutboundDoRepository,
+    IrRequestIntegrationService,
+    ShipConfirmIntegrationService,
+  ],
 })
 export class OutboundDoModule {}

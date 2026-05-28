@@ -9,8 +9,12 @@ import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 
+export type OutboundMemoWithIntegrationIrReq = OutboundMemo & {
+  outbound_integration_ir_req: OutboundIntegrationIrReq | null;
+};
+
 export type ShipConfirmInternalQueryResult = OutboundDo & {
-  outbound_integration_ir_req: OutboundIntegrationIrReq[];
+  outbound_memos: OutboundMemoWithIntegrationIrReq[];
 };
 
 @Injectable()
@@ -239,29 +243,49 @@ export class OutboundDoRepository {
   }
 
   async findOneForShipConfirmInternal(id: string): Promise<ShipConfirmInternalQueryResult> {
-    const integrationHeaders = await this.buildQueryWithAllRelationsForShipConfirmInternal()
-      .where('outbound_integration_ir_req.outbound_do_id = :id', { id })
+    const outboundDo = await this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoinAndMapMany(
+        'outbound_memos.outbound_integration_ir_req',
+        OutboundIntegrationIrReq,
+        'outbound_integration_ir_req',
+        'outbound_integration_ir_req.outbound_memo_id = outbound_memos.id',
+      )
+      .leftJoinAndSelect('outbound_integration_ir_req.lines', 'lines')
+      .where('outbound_do.id = :id', { id })
       .orderBy('outbound_integration_ir_req.createdAt', 'ASC')
-      .getMany();
+      .getOne();
 
-    if (!integrationHeaders.length) {
-      throw new NotFoundException(
-        'No outbound integration IR req found for this outbound DO',
-      );
-    }
-
-    const outboundDo = integrationHeaders[0].outbound_do;
     if (!outboundDo) {
       throw new NotFoundException('Outbound DO not found');
     }
 
-    for (const header of integrationHeaders) {
-      header.outbound_do = undefined as unknown as OutboundDo;
-    }
+    const outbound_memos: OutboundMemoWithIntegrationIrReq[] = (
+      outboundDo.outbound_memos ?? []
+    ).map((memo) => {
+      const memoWithIrReq = memo as OutboundMemo & {
+        outbound_integration_ir_req?: OutboundIntegrationIrReq[];
+      };
+      const irReqList = memoWithIrReq.outbound_integration_ir_req ?? [];
+      const irReq = irReqList.length > 0 ? irReqList[0] : null;
+
+      if (irReq) {
+        irReq.outbound_do = undefined as unknown as OutboundDo;
+        if (!irReq.outbound_memo_id) {
+          irReq.outbound_memo_id = memo.id;
+        }
+      }
+
+      return {
+        ...memo,
+        outbound_integration_ir_req: irReq,
+      };
+    });
 
     return {
       ...outboundDo,
-      outbound_integration_ir_req: integrationHeaders,
+      outbound_memos,
     };
   }
 

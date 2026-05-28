@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import {
   OutboundDoRepository,
+  OutboundMemoWithIntegrationIrReq,
   ShipConfirmInternalQueryResult,
 } from './outbound-do.repository';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
@@ -26,9 +27,12 @@ import {
   IrRequestIntegrationService,
   PoInternalReqCreateResponseDto,
 } from './integration/ir-request.integration';
+import { ShipConfirmIntegrationService } from './integration/ship-confirm.integration';
+import { ShipConfirmStatusCheckerService } from './integration/ship-confirm-status-checker.service';
+import { ShipConfirmInternalResponseDto } from './integration/dto/ship-confirm-internal-response.dto';
+import { CreateShipConfirmInternalDto } from './dto/create-ship-confirm-internal.dto';
 import { CreatePoInternalReqDto, CreatePoInternalReqLinesDto } from './integration/dto/create-po-internal-req.dto';
 import { OutboundIntegrationQueueProducer } from './integration/outbound-integration-queue.producer';
-import { CreateShipConfirmInternalDto } from './dto/create-ship-confirm-internal.dto';
 import { OutboundIntegrationDeliveriesRepository } from '../outbound-integration-deliveries/outbound-integration-deliveries.repository';
 import { OutboundIntegrationIrReq } from '../core/domain/entities/outbound-integration-ir-req.entity';
 import {
@@ -41,7 +45,9 @@ import { CreatePickReleaseSubdistDto } from './dto/create-pick-release-subdist.d
 import { CreateShipConfirmSubdistDto } from './dto/create-ship-confirm-subdist.dto';
 
 export type ShipConfirmInternalResult = ShipConfirmInternalQueryResult & {
+  integration_status: 'PROCESSING' | 'SUCCESS' | 'ERROR';
   outbound_integration_deliveries: OutboundIntegrationDeliveries[];
+  ship_confirm: ShipConfirmInternalResponseDto;
 };
 
 export type OutboundDoIntegrationResult = {
@@ -63,8 +69,10 @@ export class OutboundDoService {
     private readonly transactionPickingService: TransactionPickingService,
     private readonly outboundIntegrationIrReqService: OutboundIntegrationIrReqService,
     private readonly irRequestIntegrationService: IrRequestIntegrationService,
+    private readonly shipConfirmIntegrationService: ShipConfirmIntegrationService,
     private readonly outboundIntegrationQueueProducer: OutboundIntegrationQueueProducer,
     private readonly outboundIntegrationDeliveriesRepository: OutboundIntegrationDeliveriesRepository,
+    private readonly shipConfirmStatusChecker: ShipConfirmStatusCheckerService,
   ) { }
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
@@ -345,6 +353,7 @@ export class OutboundDoService {
       outboundDoId: id,
       retryCount: 0,
       maxRetry: 20,
+      jobType: 'PO_INTERNAL_REQ',
     });
 
     this.logger.log(
@@ -594,9 +603,7 @@ export class OutboundDoService {
   }
 
 
-  async shipConfirmInternal(
-    id: string,
-  ): Promise<any> {
+  async shipConfirmInternal(id: string): Promise<ShipConfirmInternalResult> {
     const shipConfirmData = await this.repository.findOneForShipConfirmInternal(id);
 
     // validate outbound_do.outbound_type == AMO
@@ -606,37 +613,116 @@ export class OutboundDoService {
       );
     }
 
-    // const outbound_integration_deliveries = await this.createMutasiSoInternalDeliveries(shipConfirmData, shipConfirmData.outbound_integration_ir_req);
+    const outbound_integration_deliveries = await this.createMutasiSoInternalDeliveries(
+      shipConfirmData,
+      shipConfirmData.outbound_memos ?? [],
+    );
+
+    const shipConfirmPayloads =
+      this.buildMutasiSoInternalShipConfirmPayloadsFromDeliveries(outbound_integration_deliveries);
+    const ship_confirm = await this.shipConfirmIntegrationService.create(shipConfirmPayloads);
+
+    await this.shipConfirmStatusChecker.syncDeliveriesFromCreateResponse(
+      outbound_integration_deliveries,
+      ship_confirm,
+    );
+
+    const refreshedDeliveries =
+      await this.outboundIntegrationDeliveriesRepository.findByOutboundDoId(id);
+    const statusCheck = this.shipConfirmStatusChecker.evaluateDeliveries(refreshedDeliveries);
+
+    await this.outboundIntegrationQueueProducer.publish({
+      outboundDoId: id,
+      retryCount: 0,
+      maxRetry: 20,
+      jobType: 'SHIP_CONFIRM',
+    });
+
+    this.logger.log(
+      `Queued ship confirm status job outboundDoId=${id} integrationStatus=${statusCheck.status}`,
+    );
 
     return {
       ...shipConfirmData,
-      // outbound_integration_deliveries,
+      integration_status:
+        statusCheck.status === 'PENDING' ? 'PROCESSING' : statusCheck.status,
+      outbound_integration_deliveries: refreshedDeliveries,
+      ship_confirm,
     };
+  }
+
+  /**
+   * One Oracle ship-confirm payload per source_header_id, derived from WMS staging rows
+   * (same attributes already mapped in mapMutasiSoInternalLineToDelivery).
+   */
+  private buildMutasiSoInternalShipConfirmPayloadsFromDeliveries(
+    deliveries: OutboundIntegrationDeliveries[],
+  ): CreateShipConfirmInternalDto[] {
+    const bySourceHeader = new Map<string, OutboundIntegrationDeliveries>();
+
+    for (const delivery of deliveries) {
+      if (!delivery.source_header_id || delivery.iso_header_id == null) {
+        continue;
+      }
+      if (!bySourceHeader.has(delivery.source_header_id)) {
+        bySourceHeader.set(delivery.source_header_id, delivery);
+      }
+    }
+
+    return [...bySourceHeader.values()].map((delivery) => ({
+      TRANSACTION_TYPE: ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL,
+      SOURCE_SYSTEM: delivery.source_system ?? 'WMS',
+      SOURCE_HEADER_ID: delivery.source_header_id!,
+      ISO_HEADER_ID: Number(delivery.iso_header_id),
+      DELIVERY_ATTRIBUTE_CATEGORY: this.resolveDeliveryAttributeCategory(
+        delivery.delivery_attribute_category,
+      ),
+      DELIVERY_ATTRIBUTE6: delivery.delivery_attribute6,
+      DELIVERY_ATTRIBUTE7: delivery.delivery_attribute7,
+      DELIVERY_ATTRIBUTE8: delivery.delivery_attribute8,
+      DELIVERY_ATTRIBUTE9: delivery.delivery_attribute9,
+      DELIVERY_ATTRIBUTE10: delivery.delivery_attribute10,
+      DELIVERY_ATTRIBUTE11: delivery.delivery_attribute11,
+      DELIVERY_ATTRIBUTE12: delivery.delivery_attribute12,
+      DELIVERY_ATTRIBUTE13: delivery.delivery_attribute13,
+      DELIVERY_ATTRIBUTE14: delivery.delivery_attribute14,
+      DELIVERY_ATTRIBUTE15: delivery.delivery_attribute15,
+    }));
   }
 
   private async createMutasiSoInternalDeliveries(
     shipConfirmData: ShipConfirmInternalQueryResult,
-    integrationHeaders: OutboundIntegrationIrReq[],
+    outboundMemos: OutboundMemoWithIntegrationIrReq[],
   ): Promise<OutboundIntegrationDeliveries[]> {
     const deliveryDtos: CreateOutboundIntegrationDeliveriesDto[] = [];
 
-    for (const header of integrationHeaders) {
+    for (const memo of outboundMemos) {
+      const header = memo.outbound_integration_ir_req;
+      if (!header) {
+        continue;
+      }
+
       const lines = header.lines ?? [];
       if (!lines.length) {
         throw new BadRequestException(
-          `Outbound integration IR req ${header.id} has no lines for ship confirm`,
+          `Outbound integration IR req ${header.id} has no lines for ship confirm (memo ${memo.id})`,
         );
       }
 
       if (header.so_header_id == null) {
         throw new BadRequestException(
-          `SO header id is required for header memo ${header.outbound_memo_id} for ship confirm`,
+          `SO header id is required for memo ${memo.id} (${memo.outbound_memo_number ?? 'N/A'}) for ship confirm`,
         );
       }
 
+      const headerForMapping: OutboundIntegrationIrReq = {
+        ...header,
+        outbound_memo_id: header.outbound_memo_id ?? memo.id,
+      };
+
       for (const line of lines) {
         deliveryDtos.push(
-          this.mapMutasiSoInternalLineToDelivery(shipConfirmData, header, line),
+          this.mapMutasiSoInternalLineToDelivery(shipConfirmData, headerForMapping, line),
         );
       }
     }
@@ -716,6 +802,8 @@ export class OutboundDoService {
     header: OutboundIntegrationIrReq,
     line: OutboundIntegrationIrReqLines,
   ): CreateOutboundIntegrationDeliveriesDto {
+    const deliveryAttributes = this.buildMutasiSoInternalDeliveryAttributes(shipConfirmData);
+
     return {
       organization_id: header.organization_id ?? undefined,
       outbound_do_id: shipConfirmData.id,
@@ -724,8 +812,39 @@ export class OutboundDoService {
       transaction_type: ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL,
       source_system: 'WMS',
       source_header_id: header.source_header_id,
+      source_line_id: line.source_line_id ?? undefined,
       iso_header_id: header.so_header_id,
-      delivery_attribute_category: shipConfirmData.delivery_category as unknown as DeliveryAttributeCategory,
+      iso_line_id: line.so_line_id ?? undefined,
+      iso_inventory_item_id: line.inventory_item_id ?? undefined,
+      create_delivery_status: 'U',
+      update_delivery_status: 'U',
+      pick_release_status: 'U',
+      ship_confirm_status: 'U',
+      ...deliveryAttributes,
+    };
+  }
+
+  /** Shared DO-level delivery attributes (WMS snake_case + Oracle DELIVERY_ATTRIBUTE*). */
+  private buildMutasiSoInternalDeliveryAttributes(
+    shipConfirmData: ShipConfirmInternalQueryResult,
+  ): Pick<
+    CreateOutboundIntegrationDeliveriesDto,
+    | 'delivery_attribute_category'
+    | 'delivery_attribute6'
+    | 'delivery_attribute7'
+    | 'delivery_attribute8'
+    | 'delivery_attribute9'
+    | 'delivery_attribute10'
+    | 'delivery_attribute11'
+    | 'delivery_attribute12'
+    | 'delivery_attribute13'
+    | 'delivery_attribute14'
+    | 'delivery_attribute15'
+  > {
+    return {
+      delivery_attribute_category: this.resolveDeliveryAttributeCategory(
+        shipConfirmData.delivery_category,
+      ),
       delivery_attribute6: shipConfirmData.vendor_id,
       delivery_attribute7: shipConfirmData.driver_name,
       delivery_attribute8: shipConfirmData.license_plate,
@@ -733,9 +852,30 @@ export class OutboundDoService {
       delivery_attribute10: shipConfirmData.truck_utilitas,
       delivery_attribute11: shipConfirmData.container_number,
       delivery_attribute12: shipConfirmData.vendor_po_number,
-      delivery_attribute13: shipConfirmData.delivery_date.toISOString(),
-      delivery_attribute14: shipConfirmData.qty_utilitas.toString(),
+      delivery_attribute13: shipConfirmData.delivery_date
+        ? new Date(shipConfirmData.delivery_date).toISOString()
+        : undefined,
+      delivery_attribute14:
+        shipConfirmData.qty_utilitas != null
+          ? String(shipConfirmData.qty_utilitas)
+          : undefined,
       delivery_attribute15: shipConfirmData.type_calculation,
     };
+  }
+
+  private resolveDeliveryAttributeCategory(
+    deliveryCategory?: string | null,
+  ): DeliveryAttributeCategory {
+    const raw = deliveryCategory?.trim();
+    if (!raw) {
+      return DeliveryAttributeCategory.EKSPEDISI_VENDOR;
+    }
+
+    const allowed = Object.values(DeliveryAttributeCategory) as string[];
+    if (allowed.includes(raw)) {
+      return raw as DeliveryAttributeCategory;
+    }
+
+    return DeliveryAttributeCategory.EKSPEDISI_VENDOR;
   }
 }
