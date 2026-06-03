@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import {
   OutboundIntegrationIrReqService,
   OutboundIntegrationIrReqHeaderWithLines,
@@ -34,6 +34,7 @@ export class PoInternalReqStatusCheckerService {
   ]);
 
   constructor(
+    @Inject(forwardRef(() => OutboundIntegrationIrReqService))
     private readonly outboundIntegrationIrReqService: OutboundIntegrationIrReqService,
     private readonly irRequestIntegrationService: IrRequestIntegrationService,
   ) {}
@@ -124,6 +125,52 @@ export class PoInternalReqStatusCheckerService {
       return 'ERROR';
     }
     return 'SUCCESS';
+  }
+
+  /**
+   * Marks non-terminal Oracle iface fields as TIMEOUT when WMS polling gives up.
+   * Only updates fields that are not already S or E.
+   */
+  async applyTimeoutToIntegrationHeader(
+    header: OutboundIntegrationIrReqHeaderWithLines,
+    reason = 'WMS polling timeout: Oracle status did not reach terminal state within retry limit',
+  ): Promise<void> {
+    const headerPatch: Record<string, string> = {};
+
+    if (!this.isTerminalStatus(header.iface_status_ir)) {
+      headerPatch.iface_status_ir = 'TIMEOUT';
+      headerPatch.iface_message_ir = reason;
+    }
+    if (!this.isTerminalStatus(header.iface_status_io)) {
+      headerPatch.iface_status_io = 'TIMEOUT';
+      headerPatch.iface_message_io = reason;
+    }
+    if (!this.isTerminalStatus(header.iface_status_oi)) {
+      headerPatch.iface_status_oi = 'TIMEOUT';
+      headerPatch.iface_message_oi = reason;
+    }
+
+    if (Object.keys(headerPatch).length > 0) {
+      await this.outboundIntegrationIrReqService.updateHeader(header.id, headerPatch);
+    }
+
+    for (const line of header.lines ?? []) {
+      if (this.isTerminalStatus(line.iface_line_status_ir)) {
+        continue;
+      }
+      await this.outboundIntegrationIrReqService.updateLine(line.id, {
+        iface_line_status_ir: 'TIMEOUT',
+        iface_line_message_ir: reason,
+      });
+    }
+  }
+
+  private isTerminalStatus(value?: string | null): boolean {
+    const normalized = this.normalizeStatus(value);
+    if (!normalized) {
+      return false;
+    }
+    return this.terminalStatuses.has(normalized);
   }
 
   private async checkPerHeader(header: OutboundIntegrationIrReqHeaderWithLines): Promise<CheckResult> {

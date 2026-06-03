@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -26,7 +26,7 @@ import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-inte
     ConfigModule,
     TypeOrmModule.forFeature([OutboundDo, OutboundMemo, OutboundMemoItem, OutboundIntegrationIrReq  ]),
     TransactionPickingModule,
-    OutboundIntegrationIrReqModule,
+    forwardRef(() => OutboundIntegrationIrReqModule),
     OutboundIntegrationDeliveriesModule,
     ClientsModule.registerAsync([
       {
@@ -84,6 +84,7 @@ import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-inte
     OutboundDoRepository,
     IrRequestIntegrationService,
     ShipConfirmIntegrationService,
+    PoInternalReqStatusCheckerService,
   ],
 })
 export class OutboundDoModule {}

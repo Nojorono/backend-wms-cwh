@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { OutboundIntegrationIrReq } from '../core/domain/entities/outbound-integration-ir-req.entity';
 import { OutboundIntegrationIrReqLines } from '../core/domain/entities/outbound-integration-ir-req-lines.entity';
+import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
 import { CreateOutboundIntegrationIrReqDto } from './dto/create-outbound-integration-ir-req.dto';
 import { UpdateOutboundIntegrationIrReqDto } from './dto/update-outbound-integration-ir-req.dto';
 import { CreateOutboundIntegrationIrReqLineDto } from './dto/create-outbound-integration-ir-req-line.dto';
@@ -8,6 +9,13 @@ import { UpdateOutboundIntegrationIrReqLineDto } from './dto/update-outbound-int
 import { OutboundIntegrationIrReqRepository } from './outbound-integration-ir-req.repository';
 import { CreateOutboundIntegrationIrReqPayloadDto } from './dto/create-outbound-integration-ir-req-payload.dto';
 import { UpdateOutboundIntegrationIrReqPayloadDto } from './dto/update-outbound-integration-ir-req-payload.dto';
+import { PollIntegrationStatusResponseDto } from './dto/poll-integration-status-response.dto';
+import { PoInternalReqStatusCheckerService } from '../outbound-do/integration/po-internal-req-status-checker.service';
+import { OutboundDoRepository } from '../outbound-do/outbound-do.repository';
+import {
+  OutboundJobProcessStatus,
+  OutboundMemoCheckResult,
+} from '../outbound-do/integration/outbound-integration-queue.types';
 
 export type OutboundIntegrationIrReqAggregateResult = {
   header: OutboundIntegrationIrReq;
@@ -20,7 +28,12 @@ export type OutboundIntegrationIrReqHeaderWithLines = OutboundIntegrationIrReq &
 
 @Injectable()
 export class OutboundIntegrationIrReqService {
-  constructor(private readonly repository: OutboundIntegrationIrReqRepository) { }
+  constructor(
+    private readonly repository: OutboundIntegrationIrReqRepository,
+    @Inject(forwardRef(() => PoInternalReqStatusCheckerService))
+    private readonly statusChecker: PoInternalReqStatusCheckerService,
+    private readonly outboundDoRepository: OutboundDoRepository,
+  ) { }
 
   async createHeader(dto: CreateOutboundIntegrationIrReqDto): Promise<OutboundIntegrationIrReq> {
     return await this.repository.createHeader(dto);
@@ -168,5 +181,90 @@ export class OutboundIntegrationIrReqService {
   async removeLine(id: string): Promise<void> {
     await this.findLineById(id);
     await this.repository.removeLine(id);
+  }
+
+  /**
+   * Poll Oracle PO internal req status, sync to outbound_integration_ir_req (+ lines),
+   * and update outbound_memo status when terminal (INTEGRATED / FAILED).
+   */
+  async pollStatusByOutboundDoId(outboundDoId: string): Promise<PollIntegrationStatusResponseDto> {
+    const headers = await this.findAllByOutboundDoId(outboundDoId);
+    if (!headers?.length) {
+      throw new NotFoundException(
+        `No outbound integration IR req found for outbound DO ${outboundDoId}`,
+      );
+    }
+
+    const result = await this.statusChecker.checkOutboundDoStatus({
+      outboundDoId,
+      retryCount: 0,
+      maxRetry: 20,
+    });
+
+    await this.applyMemoStatusFromCheckResult(result.memos);
+
+    const refreshed = (await this.findAllByOutboundDoId(outboundDoId)) ?? [];
+
+    return {
+      status: result.status,
+      reason: result.reason,
+      outbound_do_id: outboundDoId,
+      memos: result.memos.map((memo) => ({
+        outbound_memo_id: memo.outboundMemoId,
+        status: memo.status,
+        reason: memo.reason,
+      })),
+      outbound_integration_ir_req: refreshed,
+    };
+  }
+
+  private async applyMemoStatusFromCheckResult(
+    memoResults: OutboundMemoCheckResult[],
+  ): Promise<void> {
+    for (const memoResult of memoResults) {
+      const memoStatus = this.mapProcessStatusToMemoStatus(memoResult.status);
+      if (!memoStatus) {
+        continue;
+      }
+
+      const memo = await this.outboundDoRepository.findMemoById(memoResult.outboundMemoId);
+      if (!memo) {
+        continue;
+      }
+
+      if (!this.shouldUpdateMemoStatus(memo.status, memoStatus)) {
+        continue;
+      }
+
+      await this.outboundDoRepository.updateMemoStatus(memoResult.outboundMemoId, memoStatus);
+    }
+  }
+
+  private mapProcessStatusToMemoStatus(
+    status: OutboundJobProcessStatus,
+  ): OutboundMemoStatus | null {
+    if (status === 'SUCCESS') {
+      return OutboundMemoStatus.INTEGRATED;
+    }
+    if (status === 'ERROR') {
+      return OutboundMemoStatus.FAILED;
+    }
+    return null;
+  }
+
+  private shouldUpdateMemoStatus(
+    currentStatus: OutboundMemoStatus | null | undefined,
+    nextStatus: OutboundMemoStatus,
+  ): boolean {
+    if (!currentStatus) {
+      return true;
+    }
+    if (currentStatus === nextStatus) {
+      return false;
+    }
+    if (currentStatus === OutboundMemoStatus.INTEGRATED) {
+      return false;
+    }
+    return true;
   }
 }

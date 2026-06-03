@@ -7,6 +7,7 @@ import { UpdateOutboundIntegrationIrReqLineDto } from './dto/update-outbound-int
 import { OutboundIntegrationIrReqService } from './outbound-integration-ir-req.service';
 import { CreateOutboundIntegrationIrReqPayloadDto } from './dto/create-outbound-integration-ir-req-payload.dto';
 import { UpdateOutboundIntegrationIrReqPayloadDto } from './dto/update-outbound-integration-ir-req-payload.dto';
+import { PollIntegrationStatusResponseDto } from './dto/poll-integration-status-response.dto';
 import { OutboundIntegrationIrReqHeaderWithLines } from './outbound-integration-ir-req.service';
 
 @ApiTags('Outbound Integration IR Req')
@@ -27,6 +28,21 @@ export class OutboundIntegrationIrReqController {
   @ApiResponse({ status: 200 })
   findAllHeaders(): Promise<OutboundIntegrationIrReqHeaderWithLines[]> {
     return this.service.findAllHeaders();
+  }
+
+  @Get('poll-status/outbound-do/:outboundDoId')
+  @ApiOperation({
+    summary: 'Poll Oracle PO internal req status and sync to WMS',
+    description:
+      'Fetches latest Oracle iface status (IR/IO/OI + lines), updates outbound_integration_ir_req, ' +
+      'and sets outbound_memo to INTEGRATED or FAILED when terminal.',
+  })
+  @ApiResponse({ status: 200, type: PollIntegrationStatusResponseDto })
+  @ApiResponse({ status: 404, description: 'No integration IR req for this outbound DO' })
+  pollStatusByOutboundDoId(
+    @Param('outboundDoId') outboundDoId: string,
+  ): Promise<PollIntegrationStatusResponseDto> {
+    return this.service.pollStatusByOutboundDoId(outboundDoId);
   }
 
   @Post('lines')

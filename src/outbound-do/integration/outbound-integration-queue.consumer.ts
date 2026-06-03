@@ -56,7 +56,16 @@ export class OutboundIntegrationQueueConsumer {
       }
 
       if (retryCount >= maxRetry) {
-        await this.applyMemoTimeoutForPendingMemos(headers);
+        const result = await this.statusChecker.checkOutboundDoStatus({
+          outboundDoId,
+          retryCount,
+          maxRetry,
+        });
+        await this.applyMemoStatusUpdates(result.memos);
+
+        const refreshedHeaders =
+          (await this.outboundIntegrationIrReqService.findAllByOutboundDoId(outboundDoId)) ?? [];
+        await this.applyMemoTimeoutForPendingMemos(refreshedHeaders);
         this.logger.error(
           `Outbound queue timeout outboundDoId=${outboundDoId} retryCount=${retryCount}`,
         );
@@ -211,6 +220,10 @@ export class OutboundIntegrationQueueConsumer {
 
       if (!this.shouldUpdateMemoStatus(memo.status, memoStatus)) {
         continue;
+      }
+
+      if (memoStatus === OutboundMemoStatus.TIMEOUT) {
+        await this.statusChecker.applyTimeoutToIntegrationHeader(header);
       }
 
       await this.outboundDoRepository.updateMemoStatus(header.outbound_memo_id, memoStatus);

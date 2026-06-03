@@ -68,10 +68,12 @@ export class CreateOutboundMemoDto {
   ship_to: string;
 
   @ApiProperty({ example: 'Surabaya' })
+  @IsOptional()
   @IsString()
   destination: string;
 
   @ApiProperty({ example: 'uuid-destination-io-123' })
+  @IsOptional()
   @IsString()
   @IsUUID(4, { message: 'destination_io_id must be a valid UUID' })
   destination_io_id?: string;
