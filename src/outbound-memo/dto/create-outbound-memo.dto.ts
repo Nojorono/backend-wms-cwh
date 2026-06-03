@@ -35,6 +35,21 @@ export class CreateOutboundMemoDto {
   @IsUUID(4, { message: 'organization_id must be a valid UUID' })
   organization_id?: string;
 
+  @ApiPropertyOptional({ example: 'string' })
+  @IsOptional()
+  @IsString()
+  so_organization_id?: string;
+
+  @ApiPropertyOptional({ example: 'SO-2025-001' })
+  @IsOptional()
+  @IsString()
+  so_number?: string;
+
+  @ApiPropertyOptional({ example: 123 })
+  @IsOptional()
+  @IsNumber()
+  header_id?: number;
+
   @ApiProperty({ example: 'OM-2025-001' })
   @IsOptional()
   @IsString()
