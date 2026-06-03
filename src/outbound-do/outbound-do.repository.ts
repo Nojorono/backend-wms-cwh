@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
+import { OutboundDo, OutboundDoType } from '../core/domain/entities/outbound-do.entity';
 import { OutboundMemo, OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundIntegrationIrReq } from '../core/domain/entities/outbound-integration-ir-req.entity';
 import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
@@ -296,6 +296,14 @@ export class OutboundDoRepository {
     if (!entity) throw new NotFoundException('Outbound DO not found');
     const processed = this.addSequenceToMemos(entity);
     return await this.nestAssignedGateLoad(processed);
+  }
+
+  async findOutboundTypeById(id: string): Promise<OutboundDoType | null> {
+    const row = await this.outboundDoRepository.findOne({
+      where: { id },
+      select: ['id', 'outbound_type'],
+    });
+    return row?.outbound_type ?? null;
   }
 
   async findByOutboundDoNumber(outbound_do_number: string): Promise<OutboundDo | null> {

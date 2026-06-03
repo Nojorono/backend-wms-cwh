@@ -4,6 +4,7 @@ import {
   OutboundJobPayload,
   OutboundJobProcessStatus,
   OutboundMemoCheckResult,
+  OutboundIntegrationJobType,
 } from './outbound-integration-queue.types';
 import { PoInternalReqStatusCheckerService } from './po-internal-req-status-checker.service';
 import { ShipConfirmStatusCheckerService } from './ship-confirm-status-checker.service';
@@ -13,6 +14,7 @@ import {
 } from 'src/outbound-integration-ir-req/outbound-integration-ir-req.service';
 import { OutboundDoRepository } from '../outbound-do.repository';
 import { OutboundMemoStatus } from 'src/core/domain/entities/outbound-memo.entity';
+import { OutboundDoType } from 'src/core/domain/entities/outbound-do.entity';
 
 @Injectable()
 export class OutboundIntegrationQueueConsumer {
@@ -32,15 +34,16 @@ export class OutboundIntegrationQueueConsumer {
       const outboundDoId = data?.outboundDoId;
       const retryCount = data?.retryCount ?? 0;
       const maxRetry = data?.maxRetry ?? 20;
-      const jobType = data?.jobType ?? 'PO_INTERNAL_REQ';
 
       if (!outboundDoId) {
         this.logger.error('Outbound queue payload is invalid: missing outboundDoId');
         return;
       }
 
+      const jobType = await this.resolveJobType(outboundDoId, data?.jobType);
+
       if (jobType === 'SHIP_CONFIRM') {
-        await this.handleShipConfirmProcess(data);
+        await this.handleShipConfirmProcess({ ...data, outboundDoId, jobType: 'SHIP_CONFIRM' });
         return;
       }
 
@@ -110,11 +113,12 @@ export class OutboundIntegrationQueueConsumer {
       );
 
       if (data?.outboundDoId && (data?.retryCount ?? 0) < (data?.maxRetry ?? 20)) {
+        const retryJobType = await this.resolveJobType(data.outboundDoId, data.jobType);
         const delay = this.producer.scheduleRetry({
           outboundDoId: data.outboundDoId,
           retryCount: data.retryCount ?? 0,
           maxRetry: data.maxRetry ?? 20,
-          jobType: data.jobType ?? 'PO_INTERNAL_REQ',
+          jobType: retryJobType,
         });
         this.logger.warn(
           `Outbound queue rescheduled after failure outboundDoId=${data.outboundDoId} retryCount=${data.retryCount ?? 0} delayMs=${delay}`,
@@ -169,6 +173,25 @@ export class OutboundIntegrationQueueConsumer {
     this.logger.log(
       `Ship confirm queue status=PENDING outboundDoId=${outboundDoId} retryCount=${retryCount} delayMs=${delay} reason=${result.reason}`,
     );
+  }
+
+  /**
+   * SUBDIST uses outbound_integration_deliveries (pick release / ship confirm), not IR req.
+   */
+  private async resolveJobType(
+    outboundDoId: string,
+    jobType?: OutboundIntegrationJobType,
+  ): Promise<OutboundIntegrationJobType> {
+    if (jobType === 'SHIP_CONFIRM') {
+      return 'SHIP_CONFIRM';
+    }
+
+    const outboundType = await this.outboundDoRepository.findOutboundTypeById(outboundDoId);
+    if (outboundType === OutboundDoType.SUBDIST) {
+      return 'SHIP_CONFIRM';
+    }
+
+    return jobType ?? 'PO_INTERNAL_REQ';
   }
 
   private async applyMemoStatusUpdates(memoResults: OutboundMemoCheckResult[]): Promise<void> {

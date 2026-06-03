@@ -31,6 +31,7 @@ import { ShipConfirmIntegrationService } from './integration/ship-confirm.integr
 import { ShipConfirmStatusCheckerService } from './integration/ship-confirm-status-checker.service';
 import { ShipConfirmInternalResponseDto } from './integration/dto/ship-confirm-internal-response.dto';
 import { CreateShipConfirmInternalDto } from './dto/create-ship-confirm-internal.dto';
+import { CreateShipConfirmPickReleaseLineDto } from './dto/create-ship-confirm-pick-release-line.dto';
 import { CreatePoInternalReqDto, CreatePoInternalReqLinesDto } from './integration/dto/create-po-internal-req.dto';
 import { OutboundIntegrationQueueProducer } from './integration/outbound-integration-queue.producer';
 import { OutboundIntegrationDeliveriesRepository } from '../outbound-integration-deliveries/outbound-integration-deliveries.repository';
@@ -41,13 +42,18 @@ import {
   ShipConfirmInternalTransactionType,
 } from '../core/domain/entities/outbound-integration-deliveries.entity';
 import { CreateOutboundIntegrationDeliveriesDto } from '../outbound-integration-deliveries/dto/create-outbound-integration-deliveries.dto';
-import { CreatePickReleaseSubdistDto } from './dto/create-pick-release-subdist.dto';
 import { CreateShipConfirmSubdistDto } from './dto/create-ship-confirm-subdist.dto';
 
 export type ShipConfirmInternalResult = ShipConfirmInternalQueryResult & {
   integration_status: 'PROCESSING' | 'SUCCESS' | 'ERROR';
   outbound_integration_deliveries: OutboundIntegrationDeliveries[];
   ship_confirm: ShipConfirmInternalResponseDto;
+};
+
+export type PickReleaseSubdistResult = OutboundDo & {
+  integration_status: 'PROCESSING' | 'SUCCESS' | 'ERROR';
+  outbound_integration_deliveries: OutboundIntegrationDeliveries[];
+  pick_release: ShipConfirmInternalResponseDto;
 };
 
 export type OutboundDoIntegrationResult = {
@@ -596,12 +602,194 @@ export class OutboundDoService {
     // return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
   }
 
-  async pickReleaseSubdist(
-    deliveryDtos: CreatePickReleaseSubdistDto[],
-  ): Promise<any> {
-    // return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
+  async pickReleaseSubdist(id: string): Promise<PickReleaseSubdistResult> {
+    const outboundDo = await this.repository.findOne(id);
+    if (!outboundDo) {
+      throw new BadRequestException('Outbound DO not found');
+    }
+
+    if (outboundDo.outbound_type !== OutboundDoType.SUBDIST) {
+      throw new BadRequestException('Outbound type is not SUBDIST');
+    }
+
+    const outbound_integration_deliveries = await this.createPickReleaseSubdistDeliveries(
+      outboundDo,
+    );
+
+    const pickReleasePayloads = this.buildPickReleaseSubdistPayloadsFromDeliveries(
+      outbound_integration_deliveries,
+    );
+    const pick_release = await this.shipConfirmIntegrationService.create(pickReleasePayloads);
+
+    await this.shipConfirmStatusChecker.syncDeliveriesFromCreateResponse(
+      outbound_integration_deliveries,
+      pick_release,
+    );
+
+    const refreshedDeliveries =
+      await this.outboundIntegrationDeliveriesRepository.findByOutboundDoId(id);
+    const statusCheck = this.shipConfirmStatusChecker.evaluateDeliveries(refreshedDeliveries);
+
+    await this.outboundIntegrationQueueProducer.publish({
+      outboundDoId: id,
+      retryCount: 0,
+      maxRetry: 20,
+      jobType: 'SHIP_CONFIRM',
+    });
+
+    this.logger.log(
+      `Queued pick release subdist status job outboundDoId=${id} integrationStatus=${statusCheck.status}`,
+    );
+
+    return {
+      ...outboundDo,
+      integration_status:
+        statusCheck.status === 'PENDING' ? 'PROCESSING' : statusCheck.status,
+      outbound_integration_deliveries: refreshedDeliveries,
+      pick_release,
+    };
   }
 
+  private async createPickReleaseSubdistDeliveries(
+    outboundDo: OutboundDo,
+  ): Promise<OutboundIntegrationDeliveries[]> {
+    const deliveryDtos: CreateOutboundIntegrationDeliveriesDto[] = [];
+
+    for (const memo of outboundDo.outbound_memos ?? []) {
+      const items = memo.outbound_memo_items ?? [];
+      if (!items.length) {
+        throw new BadRequestException(
+          `Outbound memo ${memo.id} (${memo.outbound_memo_number ?? 'N/A'}) has no items for pick release`,
+        );
+      }
+
+      if (memo.header_id == null) {
+        throw new BadRequestException(
+          `header_id is required on memo ${memo.id} (${memo.outbound_memo_number ?? 'N/A'}) for pick release`,
+        );
+      }
+
+      if (!memo.so_organization_id?.trim()) {
+        throw new BadRequestException(
+          `so_organization_id is required on memo ${memo.id} (${memo.outbound_memo_number ?? 'N/A'}) for pick release`,
+        );
+      }
+
+      for (const item of items) {
+        deliveryDtos.push(this.mapPickReleaseSubdistMemoItemToDelivery(outboundDo, memo, item));
+      }
+    }
+
+    if (!deliveryDtos.length) {
+      throw new BadRequestException('No delivery rows to create for pick release subdist');
+    }
+
+    return await this.upsertIntegrationDeliveriesByType(outboundDo.id, deliveryDtos);
+  }
+
+  private mapPickReleaseSubdistMemoItemToDelivery(
+    outboundDo: OutboundDo,
+    memo: OutboundMemo,
+    item: OutboundMemoItem,
+  ): CreateOutboundIntegrationDeliveriesDto {
+    const master = item.item as MasterItem | undefined;
+    const isoInventoryItemId = this.parseNumericInventoryItemId(master?.inventory_item_id);
+    if (isoInventoryItemId == null) {
+      throw new BadRequestException(
+        `inventory_item_id is required on memo item ${item.id} for pick release subdist`,
+      );
+    }
+
+    const isoOrganizationId = this.parseNumericInventoryItemId(memo.so_organization_id);
+    if (isoOrganizationId == null) {
+      throw new BadRequestException(
+        `so_organization_id must be numeric on memo ${memo.id} for pick release subdist`,
+      );
+    }
+
+    const deliveryAttributes = this.buildMutasiSoInternalDeliveryAttributes(outboundDo);
+
+    return {
+      organization_id: memo.organization_id ?? outboundDo.organization_id ?? undefined,
+      outbound_do_id: outboundDo.id,
+      outbound_memo_id: memo.id,
+      outbound_memo_item_id: item.id,
+      transaction_type: ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE,
+      source_system: 'WMS',
+      source_header_id: memo.id,
+      source_line_id: item.id,
+      iso_header_id: memo.header_id,
+      iso_inventory_item_id: isoInventoryItemId,
+      iso_organization_id: isoOrganizationId,
+      create_delivery_status: 'U',
+      update_delivery_status: 'U',
+      pick_release_status: 'U',
+      ship_confirm_status: 'U',
+      ...deliveryAttributes,
+    };
+  }
+
+  private buildPickReleaseSubdistPayloadsFromDeliveries(
+    deliveries: OutboundIntegrationDeliveries[],
+  ): CreateShipConfirmInternalDto[] {
+    const bySourceHeader = new Map<string, OutboundIntegrationDeliveries[]>();
+
+    for (const delivery of deliveries) {
+      if (!delivery.source_header_id || delivery.iso_header_id == null) {
+        continue;
+      }
+      const list = bySourceHeader.get(delivery.source_header_id) ?? [];
+      list.push(delivery);
+      bySourceHeader.set(delivery.source_header_id, list);
+    }
+
+    if (bySourceHeader.size === 0) {
+      throw new BadRequestException('No pick release subdist payloads could be built from deliveries');
+    }
+
+    return [...bySourceHeader.values()].map((rows) => {
+      const headerRow = rows[0];
+      const lines: CreateShipConfirmPickReleaseLineDto[] = rows
+        .filter(
+          (row) =>
+            row.iso_inventory_item_id != null && row.iso_organization_id != null && row.iso_header_id != null,
+        )
+        .map((row) => ({
+          SOURCE_LINE_ID: row.source_line_id ?? row.outbound_memo_item_id ?? '',
+          ISO_HEADER_ID: Number(row.iso_header_id),
+          ISO_LINE_ID: row.iso_line_id != null ? Number(row.iso_line_id) : 0,
+          ISO_INVENTORY_ITEM_ID: Number(row.iso_inventory_item_id),
+          ISO_ORGANIZATION_ID: Number(row.iso_organization_id),
+        }));
+
+      if (!lines.length) {
+        throw new BadRequestException(
+          `Pick release lines missing for source_header_id ${headerRow.source_header_id}`,
+        );
+      }
+
+      return {
+        TRANSACTION_TYPE: ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE,
+        SOURCE_SYSTEM: headerRow.source_system ?? 'WMS',
+        SOURCE_HEADER_ID: headerRow.source_header_id!,
+        ISO_HEADER_ID: Number(headerRow.iso_header_id),
+        DELIVERY_ATTRIBUTE_CATEGORY: this.resolveDeliveryAttributeCategory(
+          headerRow.delivery_attribute_category,
+        ),
+        DELIVERY_ATTRIBUTE6: headerRow.delivery_attribute6,
+        DELIVERY_ATTRIBUTE7: headerRow.delivery_attribute7,
+        DELIVERY_ATTRIBUTE8: headerRow.delivery_attribute8,
+        DELIVERY_ATTRIBUTE9: headerRow.delivery_attribute9,
+        DELIVERY_ATTRIBUTE10: headerRow.delivery_attribute10,
+        DELIVERY_ATTRIBUTE11: headerRow.delivery_attribute11,
+        DELIVERY_ATTRIBUTE12: headerRow.delivery_attribute12,
+        DELIVERY_ATTRIBUTE13: headerRow.delivery_attribute13,
+        DELIVERY_ATTRIBUTE14: headerRow.delivery_attribute14,
+        DELIVERY_ATTRIBUTE15: headerRow.delivery_attribute15,
+        LINES: lines,
+      };
+    });
+  }
 
   async shipConfirmInternal(id: string): Promise<ShipConfirmInternalResult> {
     const shipConfirmData = await this.repository.findOneForShipConfirmInternal(id);
@@ -826,7 +1014,20 @@ export class OutboundDoService {
 
   /** Shared DO-level delivery attributes (WMS snake_case + Oracle DELIVERY_ATTRIBUTE*). */
   private buildMutasiSoInternalDeliveryAttributes(
-    shipConfirmData: ShipConfirmInternalQueryResult,
+    outboundDo: Pick<
+      OutboundDo,
+      | 'delivery_category'
+      | 'vendor_id'
+      | 'driver_name'
+      | 'license_plate'
+      | 'seal_number'
+      | 'truck_utilitas'
+      | 'container_number'
+      | 'vendor_po_number'
+      | 'delivery_date'
+      | 'qty_utilitas'
+      | 'type_calculation'
+    >,
   ): Pick<
     CreateOutboundIntegrationDeliveriesDto,
     | 'delivery_attribute_category'
@@ -843,23 +1044,21 @@ export class OutboundDoService {
   > {
     return {
       delivery_attribute_category: this.resolveDeliveryAttributeCategory(
-        shipConfirmData.delivery_category,
+        outboundDo.delivery_category,
       ),
-      delivery_attribute6: shipConfirmData.vendor_id,
-      delivery_attribute7: shipConfirmData.driver_name,
-      delivery_attribute8: shipConfirmData.license_plate,
-      delivery_attribute9: shipConfirmData.seal_number,
-      delivery_attribute10: shipConfirmData.truck_utilitas,
-      delivery_attribute11: shipConfirmData.container_number,
-      delivery_attribute12: shipConfirmData.vendor_po_number,
-      delivery_attribute13: shipConfirmData.delivery_date
-        ? new Date(shipConfirmData.delivery_date).toISOString()
+      delivery_attribute6: outboundDo.vendor_id,
+      delivery_attribute7: outboundDo.driver_name,
+      delivery_attribute8: outboundDo.license_plate,
+      delivery_attribute9: outboundDo.seal_number,
+      delivery_attribute10: outboundDo.truck_utilitas,
+      delivery_attribute11: outboundDo.container_number,
+      delivery_attribute12: outboundDo.vendor_po_number,
+      delivery_attribute13: outboundDo.delivery_date
+        ? new Date(outboundDo.delivery_date).toISOString()
         : undefined,
       delivery_attribute14:
-        shipConfirmData.qty_utilitas != null
-          ? String(shipConfirmData.qty_utilitas)
-          : undefined,
-      delivery_attribute15: shipConfirmData.type_calculation,
+        outboundDo.qty_utilitas != null ? String(outboundDo.qty_utilitas) : undefined,
+      delivery_attribute15: outboundDo.type_calculation,
     };
   }
 

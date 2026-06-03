@@ -420,17 +420,17 @@ export class OutboundDoController {
   }
 
   // pick release subdist
-  @Post('pick-release-subdist')
+  @Post('pick-release-subdist/:id')
   @ApiOperation({ summary: 'Pick release subdist' })
-  @ApiBody({ type: [CreatePickReleaseSubdistDto] })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
   @ApiResponse({
     status: 200,
     description: 'Pick release subdist',
   })
   async pickReleaseSubdist(
-    @Body() deliveryDtos: CreatePickReleaseSubdistDto[],
+    @Param('id') id: string,
   ) {
-    return this.outboundDoService.pickReleaseSubdist(deliveryDtos);
+    return this.outboundDoService.pickReleaseSubdist(id);
   }
 
   // ship confirm subdist

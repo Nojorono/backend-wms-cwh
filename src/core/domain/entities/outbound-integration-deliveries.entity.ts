@@ -11,6 +11,10 @@ export enum ShipConfirmInternalTransactionType {
 }
 
 /** Oracle delivery attribute category (expedition type). */
+/** PG truncates identifiers to 63 chars; must match the enum type name stored in the database. */
+export const OUTBOUND_DELIVERY_ATTRIBUTE_CATEGORY_ENUM_NAME =
+  'outbound_integration_deliveries_delivery_attribute_category_enu';
+
 export enum DeliveryAttributeCategory {
   EKSPEDISI_EKSTERNAL = 'Ekspedisi Eksternal',
   EKSPEDISI_INTERNAL = 'Ekspedisi Internal',
@@ -91,6 +95,7 @@ export class OutboundIntegrationDeliveries extends BaseEntity {
     name: 'delivery_attribute_category',
     type: 'enum',
     enum: DeliveryAttributeCategory,
+    enumName: OUTBOUND_DELIVERY_ATTRIBUTE_CATEGORY_ENUM_NAME,
     nullable: true,
   })
   delivery_attribute_category: DeliveryAttributeCategory;

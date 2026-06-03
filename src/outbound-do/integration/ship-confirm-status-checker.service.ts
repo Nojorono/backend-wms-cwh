@@ -127,8 +127,24 @@ export class ShipConfirmStatusCheckerService {
     deliveries: OutboundIntegrationDeliveries[],
     response: ShipConfirmInternalResponseDto,
   ): Promise<number> {
-    const rows = this.extractOracleRows(response);
+    let rows = this.extractOracleRows(response);
+    if (!rows.length && deliveries.length > 0) {
+      const sourceHeaderIds = [
+        ...new Set(
+          deliveries
+            .map((d) => d.source_header_id)
+            .filter((id): id is string => typeof id === 'string' && id.trim() !== ''),
+        ),
+      ];
+      for (const sourceHeaderId of sourceHeaderIds) {
+        rows.push(...this.findOracleRowsForSourceHeader(response, sourceHeaderId));
+      }
+    }
+
     if (!rows.length) {
+      this.logger.warn(
+        `No Oracle delivery rows extracted from ship confirm response: ${this.safeJson(response)}`,
+      );
       return 0;
     }
 
@@ -139,31 +155,130 @@ export class ShipConfirmStatusCheckerService {
     return updated;
   }
 
+  private findOracleRowsForSourceHeader(
+    response: ShipConfirmInternalResponseDto,
+    sourceHeaderId: string,
+  ): Record<string, unknown>[] {
+    const rows: Record<string, unknown>[] = [];
+    this.collectOracleRowsForHeader(response, sourceHeaderId, rows, 0, undefined);
+    return rows;
+  }
+
+  private collectOracleRowsForHeader(
+    value: unknown,
+    sourceHeaderId: string,
+    rows: Record<string, unknown>[],
+    depth: number,
+    parent?: Record<string, unknown>,
+  ): void {
+    if (depth > 12 || value == null) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        this.collectOracleRowsForHeader(entry, sourceHeaderId, rows, depth + 1, parent);
+      }
+      return;
+    }
+
+    if (typeof value !== 'object') {
+      return;
+    }
+
+    const normalized = this.normalizeOracleRowKeys(value as Record<string, unknown>);
+    const headerContext =
+      parent && normalized.SOURCE_HEADER_ID == null
+        ? { ...this.normalizeOracleRowKeys(parent), ...normalized }
+        : normalized;
+
+    const rowHeaderId = this.asSourceHeaderId(headerContext.SOURCE_HEADER_ID);
+    const lines = headerContext.LINES;
+
+    if (Array.isArray(lines)) {
+      const parentForLines = { ...headerContext };
+      delete parentForLines.LINES;
+      for (const line of lines) {
+        if (line == null || typeof line !== 'object') {
+          continue;
+        }
+        const merged = {
+          ...parentForLines,
+          ...this.normalizeOracleRowKeys(line as Record<string, unknown>),
+        };
+        if (merged.SOURCE_HEADER_ID == null) {
+          merged.SOURCE_HEADER_ID = parentForLines.SOURCE_HEADER_ID;
+        }
+        const mergedHeaderId = this.asSourceHeaderId(merged.SOURCE_HEADER_ID);
+        if (mergedHeaderId === sourceHeaderId && this.isOracleDeliveryRow(merged)) {
+          rows.push(merged);
+        }
+      }
+    }
+
+    if (rowHeaderId === sourceHeaderId && this.isOracleDeliveryRow(headerContext)) {
+      const headerRow = { ...headerContext };
+      delete headerRow.LINES;
+      rows.push(headerRow);
+    }
+
+    const obj = value as Record<string, unknown>;
+    for (const key of ['data', 'result', 'rows', 'LINES']) {
+      if (key in obj) {
+        this.collectOracleRowsForHeader(obj[key], sourceHeaderId, rows, depth + 1, headerContext);
+      }
+    }
+
+    for (const nested of Object.values(obj)) {
+      if (nested != null && typeof nested === 'object' && !Array.isArray(nested)) {
+        this.collectOracleRowsForHeader(nested, sourceHeaderId, rows, depth + 1, headerContext);
+      }
+    }
+  }
+
   private async applyOracleRowToDeliveries(
     deliveries: OutboundIntegrationDeliveries[],
     oracleRow: Record<string, unknown>,
   ): Promise<number> {
-    const patch = this.mapOracleRowToStatusPatch(oracleRow);
+    const normalized = this.normalizeOracleRowKeys(oracleRow);
+    const patch = this.mapOracleRowToStatusPatch(normalized);
     if (Object.keys(patch).length === 0) {
       return 0;
     }
 
-    const sourceHeaderId = this.asString(oracleRow.SOURCE_HEADER_ID);
-    const sourceLineId = this.asString(oracleRow.SOURCE_LINE_ID);
-
+    const sourceHeaderId = this.asSourceHeaderId(normalized.SOURCE_HEADER_ID);
     if (!sourceHeaderId) {
       return 0;
     }
 
+    const sourceLineId = this.asString(normalized.SOURCE_LINE_ID);
+    const isoInventoryItemId = this.asNumber(normalized.ISO_INVENTORY_ITEM_ID);
+
     const targets = deliveries.filter((delivery) => {
-      if (delivery.source_header_id !== sourceHeaderId) {
+      if (this.asSourceHeaderId(delivery.source_header_id) !== sourceHeaderId) {
         return false;
       }
-      if (sourceLineId && delivery.source_line_id !== sourceLineId) {
-        return false;
+
+      if (sourceLineId) {
+        return (
+          delivery.source_line_id === sourceLineId ||
+          delivery.outbound_memo_item_id === sourceLineId
+        );
       }
+
+      if (isoInventoryItemId != null && delivery.iso_inventory_item_id != null) {
+        return Number(delivery.iso_inventory_item_id) === isoInventoryItemId;
+      }
+
       return true;
     });
+
+    if (!targets.length) {
+      this.logger.warn(
+        `No delivery rows matched Oracle row sourceHeaderId=${sourceHeaderId} sourceLineId=${sourceLineId ?? 'N/A'} isoInventoryItemId=${isoInventoryItemId ?? 'N/A'}`,
+      );
+      return 0;
+    }
 
     for (const delivery of targets) {
       await this.deliveriesRepository.update(delivery.id, patch);
@@ -238,10 +353,54 @@ export class ShipConfirmStatusCheckerService {
       }
       return;
     }
-    const str = this.asString(value);
-    if (str !== undefined) {
-      (patch as Record<string, unknown>)[key] = str;
+
+    const isStatusField =
+      key === 'create_delivery_status' ||
+      key === 'update_delivery_status' ||
+      key === 'pick_release_status' ||
+      key === 'ship_confirm_status';
+
+    const normalizedValue = isStatusField
+      ? this.normalizeOracleDeliveryStatus(value)
+      : this.asString(value);
+
+    if (normalizedValue !== undefined) {
+      (patch as Record<string, unknown>)[key] = normalizedValue;
     }
+  }
+
+  private normalizeOracleDeliveryStatus(value: unknown): string | undefined {
+    const raw = this.asString(value);
+    if (!raw) {
+      return undefined;
+    }
+    const upper = raw.toUpperCase();
+    if (upper === 'E' || upper === 'ERROR' || upper === 'FAILED') {
+      return 'E';
+    }
+    if (upper === 'S' || upper === 'SUCCESS' || upper === 'COMPLETED' || upper === 'DONE') {
+      return 'S';
+    }
+    if (upper === 'U' || upper === 'UNPROCESSED' || upper === 'PENDING' || upper === 'PROCESSING') {
+      return 'U';
+    }
+    return upper.length === 1 ? upper : raw;
+  }
+
+  private normalizeOracleRowKeys(row: Record<string, unknown>): Record<string, unknown> {
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      normalized[key.toUpperCase()] = value;
+    }
+    return normalized;
+  }
+
+  private asSourceHeaderId(value: unknown): string | undefined {
+    if (value == null) {
+      return undefined;
+    }
+    const s = String(value).trim();
+    return s === '' ? undefined : s;
   }
 
   private groupDeliveriesBySourceHeader(
@@ -261,18 +420,50 @@ export class ShipConfirmStatusCheckerService {
 
   private extractOracleRows(response: ShipConfirmInternalResponseDto): Record<string, unknown>[] {
     const rows: Record<string, unknown>[] = [];
-    this.collectOracleRows(response, rows, 0);
-    return rows;
+    const responseObj = response as Record<string, unknown>;
+    if (responseObj.data != null) {
+      this.collectOracleRows(responseObj.data, rows, 0, undefined);
+    }
+    this.collectOracleRows(response, rows, 0, undefined);
+    return this.dedupeOracleRows(rows);
   }
 
-  private collectOracleRows(value: unknown, rows: Record<string, unknown>[], depth: number): void {
-    if (depth > 10 || value == null) {
+  private dedupeOracleRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+    const seen = new Set<string>();
+    const unique: Record<string, unknown>[] = [];
+    for (const row of rows) {
+      const normalized = this.normalizeOracleRowKeys(row);
+      const key = [
+        this.asSourceHeaderId(normalized.SOURCE_HEADER_ID) ?? '',
+        this.asString(normalized.SOURCE_LINE_ID) ?? '',
+        this.asNumber(normalized.ISO_INVENTORY_ITEM_ID) ?? '',
+        this.normalizeOracleDeliveryStatus(normalized.PICK_RELEASE_STATUS) ?? '',
+        this.normalizeOracleDeliveryStatus(normalized.CREATE_DELIVERY_STATUS) ?? '',
+        this.normalizeOracleDeliveryStatus(normalized.UPDATE_DELIVERY_STATUS) ?? '',
+        this.normalizeOracleDeliveryStatus(normalized.SHIP_CONFIRM_STATUS) ?? '',
+      ].join('|');
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      unique.push(normalized);
+    }
+    return unique;
+  }
+
+  private collectOracleRows(
+    value: unknown,
+    rows: Record<string, unknown>[],
+    depth: number,
+    parent?: Record<string, unknown>,
+  ): void {
+    if (depth > 12 || value == null) {
       return;
     }
 
     if (Array.isArray(value)) {
       for (const entry of value) {
-        this.collectOracleRows(entry, rows, depth + 1);
+        this.collectOracleRows(entry, rows, depth + 1, parent);
       }
       return;
     }
@@ -281,34 +472,78 @@ export class ShipConfirmStatusCheckerService {
       return;
     }
 
-    const obj = value as Record<string, unknown>;
+    const normalized = this.normalizeOracleRowKeys(value as Record<string, unknown>);
+    const headerContext =
+      parent && normalized.SOURCE_HEADER_ID == null
+        ? { ...this.normalizeOracleRowKeys(parent), ...normalized }
+        : normalized;
 
-    if (this.isOracleDeliveryRow(obj)) {
-      rows.push(obj);
-      return;
+    const lines = headerContext.LINES;
+    if (Array.isArray(lines)) {
+      const parentForLines = { ...headerContext };
+      delete parentForLines.LINES;
+      for (const line of lines) {
+        if (line == null || typeof line !== 'object') {
+          continue;
+        }
+        const merged = {
+          ...parentForLines,
+          ...this.normalizeOracleRowKeys(line as Record<string, unknown>),
+        };
+        if (merged.SOURCE_HEADER_ID == null) {
+          merged.SOURCE_HEADER_ID = parentForLines.SOURCE_HEADER_ID;
+        }
+        if (this.isOracleDeliveryRow(merged)) {
+          rows.push(merged);
+        }
+      }
     }
 
-    for (const key of ['data', 'result', 'rows', 'LINES']) {
+    if (this.isOracleDeliveryRow(headerContext)) {
+      const headerRow = { ...headerContext };
+      delete headerRow.LINES;
+      rows.push(headerRow);
+    }
+
+    const obj = value as Record<string, unknown>;
+    for (const key of ['data', 'result', 'rows']) {
       if (key in obj) {
-        this.collectOracleRows(obj[key], rows, depth + 1);
+        this.collectOracleRows(obj[key], rows, depth + 1, headerContext);
       }
     }
 
     for (const nested of Object.values(obj)) {
-      if (typeof nested === 'object') {
-        this.collectOracleRows(nested, rows, depth + 1);
+      if (nested != null && typeof nested === 'object') {
+        this.collectOracleRows(nested, rows, depth + 1, headerContext);
       }
     }
   }
 
   private isOracleDeliveryRow(obj: Record<string, unknown>): boolean {
+    const normalized = this.normalizeOracleRowKeys(obj);
+    if (!this.asSourceHeaderId(normalized.SOURCE_HEADER_ID)) {
+      return false;
+    }
+
     return (
-      typeof obj.SOURCE_HEADER_ID === 'string' &&
-      (obj.CREATE_DELIVERY_STATUS != null ||
-        obj.UPDATE_DELIVERY_STATUS != null ||
-        obj.PICK_RELEASE_STATUS != null ||
-        obj.SHIP_CONFIRM_STATUS != null)
+      normalized.CREATE_DELIVERY_STATUS != null ||
+      normalized.UPDATE_DELIVERY_STATUS != null ||
+      normalized.PICK_RELEASE_STATUS != null ||
+      normalized.SHIP_CONFIRM_STATUS != null ||
+      normalized.CREATE_DELIVERY_MESSAGE != null ||
+      normalized.UPDATE_DELIVERY_MESSAGE != null ||
+      normalized.PICK_RELEASE_MESSAGE != null ||
+      normalized.SHIP_CONFIRM_MESSAGE != null
     );
+  }
+
+  private safeJson(value: unknown): string {
+    try {
+      const raw = JSON.stringify(value);
+      return raw.length > 3000 ? `${raw.slice(0, 3000)}...<truncated>` : raw;
+    } catch {
+      return '[unserializable]';
+    }
   }
 
   private normalizeStatus(value?: string | null): string {

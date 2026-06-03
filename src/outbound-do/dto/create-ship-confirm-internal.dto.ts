@@ -22,7 +22,7 @@ export class CreateShipConfirmInternalDto {
     example: ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL,
   })
   @IsEnum(ShipConfirmInternalTransactionType)
-  TRANSACTION_TYPE: ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL;
+  TRANSACTION_TYPE: ShipConfirmInternalTransactionType;
 
   @ApiProperty({ example: 'WMS' })
   @IsString()

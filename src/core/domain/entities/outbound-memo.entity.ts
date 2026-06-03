@@ -23,6 +23,9 @@ export enum OutboundMemoType {
 @Entity('outbound_memo')
 export class OutboundMemo extends BaseEntity {
   @Column({ nullable: true })
+  delivery_attribute14: string;
+
+  @Column({ nullable: true })
   organization_id: string;
 
   @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
