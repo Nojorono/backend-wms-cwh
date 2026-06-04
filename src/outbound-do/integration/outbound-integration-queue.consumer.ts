@@ -137,8 +137,14 @@ export class OutboundIntegrationQueueConsumer {
     );
 
     if (retryCount >= maxRetry) {
+      const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus({
+        outboundDoId,
+        retryCount,
+        maxRetry,
+        jobType: 'SHIP_CONFIRM',
+      });
       this.logger.error(
-        `Ship confirm queue timeout outboundDoId=${outboundDoId} retryCount=${retryCount}`,
+        `Ship confirm queue timeout outboundDoId=${outboundDoId} retryCount=${retryCount} reason=${result.reason}`,
       );
       return;
     }

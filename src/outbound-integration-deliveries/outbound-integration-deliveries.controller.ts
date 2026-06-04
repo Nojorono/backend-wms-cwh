@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { OutboundIntegrationDeliveries } from '../core/domain/entities/outbound-integration-deliveries.entity';
 import { CreateOutboundIntegrationDeliveriesDto } from './dto/create-outbound-integration-deliveries.dto';
 import { UpdateOutboundIntegrationDeliveriesDto } from './dto/update-outbound-integration-deliveries.dto';
+import { PollShipConfirmStatusResponseDto } from './dto/poll-ship-confirm-status-response.dto';
 import { OutboundIntegrationDeliveriesService } from './outbound-integration-deliveries.service';
 
 @ApiTags('Outbound Integration Deliveries')
@@ -32,6 +33,21 @@ export class OutboundIntegrationDeliveriesController {
     @Param('outboundDoId') outboundDoId: string,
   ): Promise<OutboundIntegrationDeliveries[]> {
     return this.service.findByOutboundDoId(outboundDoId);
+  }
+
+  @Get('poll-status/outbound-do/:outboundDoId')
+  @ApiOperation({
+    summary: 'Poll Oracle ship confirm / pick release status and sync to WMS',
+    description:
+      'Calls shipconfirm.find per source_header_id (memo.id for subdist, IR header id for internal), ' +
+      'updates create/update/pick_release/ship_confirm status fields on outbound_integration_deliveries.',
+  })
+  @ApiResponse({ status: 200, type: PollShipConfirmStatusResponseDto })
+  @ApiResponse({ status: 404, description: 'No integration deliveries for this outbound DO' })
+  pollStatusByOutboundDoId(
+    @Param('outboundDoId') outboundDoId: string,
+  ): Promise<PollShipConfirmStatusResponseDto> {
+    return this.service.pollStatusByOutboundDoId(outboundDoId);
   }
 
   @Get('outbound-memo/:outboundMemoId')

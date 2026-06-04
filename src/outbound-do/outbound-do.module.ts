@@ -27,7 +27,7 @@ import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-inte
     TypeOrmModule.forFeature([OutboundDo, OutboundMemo, OutboundMemoItem, OutboundIntegrationIrReq  ]),
     TransactionPickingModule,
     forwardRef(() => OutboundIntegrationIrReqModule),
-    OutboundIntegrationDeliveriesModule,
+    forwardRef(() => OutboundIntegrationDeliveriesModule),
     ClientsModule.registerAsync([
       {
         name: 'PO_INTERNAL_REQ_SERVICE',
@@ -85,6 +85,7 @@ import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-inte
     IrRequestIntegrationService,
     ShipConfirmIntegrationService,
     PoInternalReqStatusCheckerService,
+    ShipConfirmStatusCheckerService,
   ],
 })
 export class OutboundDoModule {}

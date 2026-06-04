@@ -31,7 +31,6 @@ import { ShipConfirmIntegrationService } from './integration/ship-confirm.integr
 import { ShipConfirmStatusCheckerService } from './integration/ship-confirm-status-checker.service';
 import { ShipConfirmInternalResponseDto } from './integration/dto/ship-confirm-internal-response.dto';
 import { CreateShipConfirmInternalDto } from './dto/create-ship-confirm-internal.dto';
-import { CreateShipConfirmPickReleaseLineDto } from './dto/create-ship-confirm-pick-release-line.dto';
 import { CreatePoInternalReqDto, CreatePoInternalReqLinesDto } from './integration/dto/create-po-internal-req.dto';
 import { OutboundIntegrationQueueProducer } from './integration/outbound-integration-queue.producer';
 import { OutboundIntegrationDeliveriesRepository } from '../outbound-integration-deliveries/outbound-integration-deliveries.repository';
@@ -729,44 +728,42 @@ export class OutboundDoService {
     };
   }
 
+  /**
+   * One Oracle pick-release payload per memo (SOURCE_HEADER_ID = memo.id).
+   * LINES[] use outbound_memo_item.id as SOURCE_LINE_ID — same key used by shipconfirm.find polling.
+   */
   private buildPickReleaseSubdistPayloadsFromDeliveries(
     deliveries: OutboundIntegrationDeliveries[],
   ): CreateShipConfirmInternalDto[] {
-    const bySourceHeader = new Map<string, OutboundIntegrationDeliveries[]>();
+    const pickReleaseRows = deliveries.filter(
+      (row) =>
+        row.transaction_type === ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE &&
+        row.source_header_id &&
+        row.iso_header_id != null &&
+        row.iso_inventory_item_id != null &&
+        row.iso_organization_id != null,
+    );
 
-    for (const delivery of deliveries) {
-      if (!delivery.source_header_id || delivery.iso_header_id == null) {
-        continue;
-      }
-      const list = bySourceHeader.get(delivery.source_header_id) ?? [];
-      list.push(delivery);
-      bySourceHeader.set(delivery.source_header_id, list);
+    if (!pickReleaseRows.length) {
+      throw new BadRequestException('No pick release subdist payloads could be built from deliveries');
     }
 
-    if (bySourceHeader.size === 0) {
-      throw new BadRequestException('No pick release subdist payloads could be built from deliveries');
+    const bySourceHeader = new Map<string, OutboundIntegrationDeliveries[]>();
+    for (const row of pickReleaseRows) {
+      const list = bySourceHeader.get(row.source_header_id!) ?? [];
+      list.push(row);
+      bySourceHeader.set(row.source_header_id!, list);
     }
 
     return [...bySourceHeader.values()].map((rows) => {
       const headerRow = rows[0];
-      const lines: CreateShipConfirmPickReleaseLineDto[] = rows
-        .filter(
-          (row) =>
-            row.iso_inventory_item_id != null && row.iso_organization_id != null && row.iso_header_id != null,
-        )
-        .map((row) => ({
-          SOURCE_LINE_ID: row.source_line_id ?? row.outbound_memo_item_id ?? '',
-          ISO_HEADER_ID: Number(row.iso_header_id),
-          ISO_LINE_ID: row.iso_line_id != null ? Number(row.iso_line_id) : 0,
-          ISO_INVENTORY_ITEM_ID: Number(row.iso_inventory_item_id),
-          ISO_ORGANIZATION_ID: Number(row.iso_organization_id),
-        }));
-
-      if (!lines.length) {
-        throw new BadRequestException(
-          `Pick release lines missing for source_header_id ${headerRow.source_header_id}`,
-        );
-      }
+      const lines = rows.map((row) => ({
+        SOURCE_LINE_ID: row.source_line_id ?? row.outbound_memo_item_id ?? '',
+        ISO_HEADER_ID: Number(row.iso_header_id),
+        ISO_LINE_ID: row.iso_line_id != null ? Number(row.iso_line_id) : 0,
+        ISO_INVENTORY_ITEM_ID: Number(row.iso_inventory_item_id),
+        ISO_ORGANIZATION_ID: Number(row.iso_organization_id),
+      }));
 
       return {
         TRANSACTION_TYPE: ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE,

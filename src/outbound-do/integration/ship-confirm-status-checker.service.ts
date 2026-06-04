@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OutboundIntegrationDeliveriesRepository } from '../../outbound-integration-deliveries/outbound-integration-deliveries.repository';
-import { OutboundIntegrationDeliveries } from '../../core/domain/entities/outbound-integration-deliveries.entity';
+import {
+  OutboundIntegrationDeliveries,
+  ShipConfirmInternalTransactionType,
+} from '../../core/domain/entities/outbound-integration-deliveries.entity';
 import { UpdateOutboundIntegrationDeliveriesDto } from '../../outbound-integration-deliveries/dto/update-outbound-integration-deliveries.dto';
 import { ShipConfirmIntegrationService } from './ship-confirm.integration';
 import { ShipConfirmInternalResponseDto } from './dto/ship-confirm-internal-response.dto';
@@ -27,7 +30,7 @@ export class ShipConfirmStatusCheckerService {
   constructor(
     private readonly deliveriesRepository: OutboundIntegrationDeliveriesRepository,
     private readonly shipConfirmIntegrationService: ShipConfirmIntegrationService,
-  ) {}
+  ) { }
 
   /** U = Unprocessed; terminal only when S or E. */
   isOracleStatusTerminal(value?: string | null): boolean {
@@ -36,9 +39,23 @@ export class ShipConfirmStatusCheckerService {
   }
 
   areAllOracleStatusesTerminal(delivery: OutboundIntegrationDeliveries): boolean {
-    return ORACLE_DELIVERY_STATUS_FIELDS.every((field) =>
-      this.isOracleStatusTerminal(delivery[field]),
-    );
+    const requiredFields = this.getRequiredOracleStatusFields(delivery.transaction_type);
+    return requiredFields.every((field) => this.isOracleStatusTerminal(delivery[field]));
+  }
+
+  /** Which Oracle iface fields must reach S/E — depends on transaction type. */
+  getRequiredOracleStatusFields(
+    transactionType?: ShipConfirmInternalTransactionType | null,
+  ): OracleDeliveryStatusField[] {
+    switch (transactionType) {
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE:
+        return ['pick_release_status'];
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM:
+        return ['create_delivery_status', 'update_delivery_status', 'ship_confirm_status'];
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL:
+      default:
+        return [...ORACLE_DELIVERY_STATUS_FIELDS];
+    }
   }
 
   evaluateDeliveries(deliveries: OutboundIntegrationDeliveries[]): ShipConfirmDoCheckResult {
@@ -62,7 +79,9 @@ export class ShipConfirmStatusCheckerService {
     }
 
     const hasError = deliveries.some((d) =>
-      ORACLE_DELIVERY_STATUS_FIELDS.some((field) => this.normalizeStatus(d[field]) === 'E'),
+      this.getRequiredOracleStatusFields(d.transaction_type).some(
+        (field) => this.normalizeStatus(d[field]) === 'E',
+      ),
     );
 
     return {
@@ -75,6 +94,10 @@ export class ShipConfirmStatusCheckerService {
     };
   }
 
+  /**
+   * Poll Oracle by each delivery row's source_header_id (memo.id for internal & subdist pick release).
+   * outboundDoId is only used to load WMS staging rows for that DO — not sent to Oracle.
+   */
   async checkOutboundDoStatus(payload: OutboundJobPayload): Promise<ShipConfirmDoCheckResult> {
     const deliveries = await this.deliveriesRepository.findByOutboundDoId(payload.outboundDoId);
     if (!deliveries.length) {
@@ -89,13 +112,23 @@ export class ShipConfirmStatusCheckerService {
     let updatedCount = 0;
     const headers = this.groupDeliveriesBySourceHeader(deliveries);
 
+    this.logger.log(
+      `Ship confirm poll outboundDoId=${payload.outboundDoId} sourceHeaderCount=${headers.size} deliveryCount=${deliveries.length}`,
+    );
+
     for (const [sourceHeaderId, group] of headers) {
       const isoHeaderId = group[0]?.iso_header_id;
       if (isoHeaderId == null) {
+        this.logger.warn(
+          `Skip shipconfirm.find; missing iso_header_id sourceHeaderId=${sourceHeaderId} outboundDoId=${payload.outboundDoId}`,
+        );
         continue;
       }
 
       try {
+        this.logger.log(
+          `shipconfirm.find source_header_id=${sourceHeaderId} iso_header_id=${isoHeaderId} transactionType=${group[0]?.transaction_type ?? 'N/A'}`,
+        );
         const response = await this.shipConfirmIntegrationService.find({
           source_header_id: sourceHeaderId,
           iso_header_id: Number(isoHeaderId),
@@ -254,24 +287,12 @@ export class ShipConfirmStatusCheckerService {
     const sourceLineId = this.asString(normalized.SOURCE_LINE_ID);
     const isoInventoryItemId = this.asNumber(normalized.ISO_INVENTORY_ITEM_ID);
 
-    const targets = deliveries.filter((delivery) => {
-      if (this.asSourceHeaderId(delivery.source_header_id) !== sourceHeaderId) {
-        return false;
-      }
-
-      if (sourceLineId) {
-        return (
-          delivery.source_line_id === sourceLineId ||
-          delivery.outbound_memo_item_id === sourceLineId
-        );
-      }
-
-      if (isoInventoryItemId != null && delivery.iso_inventory_item_id != null) {
-        return Number(delivery.iso_inventory_item_id) === isoInventoryItemId;
-      }
-
-      return true;
-    });
+    const targets = this.resolveDeliveryMatchTargets(
+      deliveries,
+      sourceHeaderId,
+      sourceLineId,
+      isoInventoryItemId,
+    );
 
     if (!targets.length) {
       this.logger.warn(
@@ -285,6 +306,53 @@ export class ShipConfirmStatusCheckerService {
     }
 
     return targets.length;
+  }
+
+  /**
+   * Subdist pick release: source_header_id = memo.id (multiple delivery rows per memo).
+   * Match Oracle rows by SOURCE_LINE_ID / item id, or ISO_INVENTORY_ITEM_ID when present.
+   */
+  private resolveDeliveryMatchTargets(
+    deliveries: OutboundIntegrationDeliveries[],
+    sourceHeaderId: string,
+    sourceLineId?: string,
+    isoInventoryItemId?: number | null,
+  ): OutboundIntegrationDeliveries[] {
+    const headerMatches = deliveries.filter(
+      (delivery) => this.asSourceHeaderId(delivery.source_header_id) === sourceHeaderId,
+    );
+
+    if (!headerMatches.length) {
+      return [];
+    }
+
+    if (headerMatches.length === 1) {
+      return headerMatches;
+    }
+
+    if (sourceLineId) {
+      const lineMatches = headerMatches.filter(
+        (delivery) =>
+          delivery.source_line_id === sourceLineId ||
+          delivery.outbound_memo_item_id === sourceLineId,
+      );
+      if (lineMatches.length) {
+        return lineMatches;
+      }
+    }
+
+    if (isoInventoryItemId != null) {
+      const inventoryMatches = headerMatches.filter(
+        (delivery) =>
+          delivery.iso_inventory_item_id != null &&
+          Number(delivery.iso_inventory_item_id) === isoInventoryItemId,
+      );
+      if (inventoryMatches.length) {
+        return inventoryMatches;
+      }
+    }
+
+    return headerMatches;
   }
 
   private mapOracleRowToStatusPatch(
