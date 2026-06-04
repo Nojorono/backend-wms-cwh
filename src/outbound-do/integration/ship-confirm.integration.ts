@@ -3,6 +3,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { catchError, firstValueFrom, timeout } from 'rxjs';
 import { ensureRmqConnection } from 'src/core/helpers/rmq-connection.helper';
 import { CreateShipConfirmInternalDto } from '../dto/create-ship-confirm-internal.dto';
+import { CreateShipConfirmSubdistOracleDto } from '../dto/create-ship-confirm-subdist-oracle.dto';
 import { ShipConfirmInternalFindDto } from '../dto/ship-confirm-internal-find.dto';
 import { ShipConfirmInternalResponseDto } from './dto/ship-confirm-internal-response.dto';
 
@@ -47,7 +48,7 @@ export class ShipConfirmIntegrationService implements OnModuleInit {
    * RMQ `shipconfirm.create` — accepts single payload or array (microservice normalizes to array).
    */
   async create(
-    payloads: CreateShipConfirmInternalDto[],
+    payloads: CreateShipConfirmInternalDto[] | CreateShipConfirmSubdistOracleDto[],
   ): Promise<ShipConfirmInternalResponseDto> {
     try {
       await this.ensureConnection();

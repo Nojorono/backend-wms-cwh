@@ -1,54 +1,31 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsNotEmpty, IsNumber, IsUUID, Min, ValidateNested } from 'class-validator';
 
-export class CreateShipConfirmSubdistDto {
+/** Input line for subdist ship confirm — quantities only; delivery id/name come from pick release staging. */
+export class CreateShipConfirmSubdistLineDto {
   @ApiProperty({
-    description: 'Transaction type',
-    example: 'OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM',
-    maxLength: 200,
+    description: 'Outbound memo item ID (same as pick release source_line_id)',
+    format: 'uuid',
   })
-  @IsString()
-  @MaxLength(200)
-  transaction_type: string;
+  @IsUUID()
+  outbound_memo_item_id: string;
 
   @ApiProperty({
-    description: 'Source system',
-    example: 'WMS',
-    maxLength: 100,
-  })
-  @IsString()
-  @MaxLength(100)
-  source_system: string;
-
-  @ApiProperty({
-    description: 'Source header ID',
-    example: '100000231',
-    maxLength: 100,
-  })
-  @IsString()
-  @MaxLength(100)
-  source_header_id: string;
-
-  @ApiProperty({
-    description: 'Oracle delivery ID',
-    example: 981234,
-  })
-  @IsNumber()
-  delivery_id: number;
-
-  @ApiProperty({
-    description: 'Oracle delivery name',
-    example: 'DEL-0001',
-    maxLength: 30,
-  })
-  @IsString()
-  @MaxLength(30)
-  delivery_name: string;
-
-  @ApiProperty({
-    description: 'Shipped quantity',
+    description: 'Shipped quantity sent to Oracle',
     example: 120,
   })
+  @IsNotEmpty()
   @IsNumber()
+  @Min(1)
+  @Type(() => Number)
   shipped_quantity: number;
+}
+
+export class CreateShipConfirmSubdistPayloadDto {
+  @ApiProperty({ type: [CreateShipConfirmSubdistLineDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateShipConfirmSubdistLineDto)
+  lines: CreateShipConfirmSubdistLineDto[];
 }

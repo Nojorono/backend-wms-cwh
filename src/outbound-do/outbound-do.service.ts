@@ -41,7 +41,8 @@ import {
   ShipConfirmInternalTransactionType,
 } from '../core/domain/entities/outbound-integration-deliveries.entity';
 import { CreateOutboundIntegrationDeliveriesDto } from '../outbound-integration-deliveries/dto/create-outbound-integration-deliveries.dto';
-import { CreateShipConfirmSubdistDto } from './dto/create-ship-confirm-subdist.dto';
+import { CreateShipConfirmSubdistPayloadDto } from './dto/create-ship-confirm-subdist.dto';
+import { CreateShipConfirmSubdistOracleDto } from './dto/create-ship-confirm-subdist-oracle.dto';
 
 export type ShipConfirmInternalResult = ShipConfirmInternalQueryResult & {
   integration_status: 'PROCESSING' | 'SUCCESS' | 'ERROR';
@@ -53,6 +54,12 @@ export type PickReleaseSubdistResult = OutboundDo & {
   integration_status: 'PROCESSING' | 'SUCCESS' | 'ERROR';
   outbound_integration_deliveries: OutboundIntegrationDeliveries[];
   pick_release: ShipConfirmInternalResponseDto;
+};
+
+export type ShipConfirmSubdistResult = OutboundDo & {
+  integration_status: 'PROCESSING' | 'SUCCESS' | 'ERROR';
+  outbound_integration_deliveries: OutboundIntegrationDeliveries[];
+  ship_confirm: ShipConfirmInternalResponseDto;
 };
 
 export type OutboundDoIntegrationResult = {
@@ -596,9 +603,184 @@ export class OutboundDoService {
   }
 
   async shipConfirmSubdist(
-    deliveryDtos: CreateShipConfirmSubdistDto[],
-  ): Promise<any> {
-    // return await this.outboundIntegrationDeliveriesRepository.createMany(deliveryDtos);
+    id: string,
+    payload: CreateShipConfirmSubdistPayloadDto,
+  ): Promise<ShipConfirmSubdistResult> {
+    const outboundDo = await this.repository.findOne(id);
+    if (!outboundDo) {
+      throw new BadRequestException('Outbound DO not found');
+    }
+
+    if (outboundDo.outbound_type !== OutboundDoType.SUBDIST) {
+      throw new BadRequestException('Outbound type is not SUBDIST');
+    }
+
+    if (!payload.lines?.length) {
+      throw new BadRequestException('At least one ship confirm line is required');
+    }
+
+    const pickReleaseRows = await this.loadPickReleaseSubdistDeliveries(id);
+    const outbound_integration_deliveries = await this.createShipConfirmSubdistDeliveries(
+      outboundDo,
+      pickReleaseRows,
+      payload.lines,
+    );
+
+    const shipConfirmPayloads = this.buildShipConfirmSubdistPayloadsFromDeliveries(
+      outbound_integration_deliveries,
+    );
+    const ship_confirm = await this.shipConfirmIntegrationService.create(shipConfirmPayloads);
+
+    await this.shipConfirmStatusChecker.syncDeliveriesFromCreateResponse(
+      outbound_integration_deliveries,
+      ship_confirm,
+    );
+
+    const refreshedDeliveries =
+      await this.outboundIntegrationDeliveriesRepository.findByOutboundDoId(id);
+    const shipConfirmRows = refreshedDeliveries.filter(
+      (row) =>
+        row.transaction_type === ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM,
+    );
+    const statusCheck = this.shipConfirmStatusChecker.evaluateDeliveries(shipConfirmRows);
+
+    await this.outboundIntegrationQueueProducer.publish({
+      outboundDoId: id,
+      retryCount: 0,
+      maxRetry: 20,
+      jobType: 'SHIP_CONFIRM',
+    });
+
+    this.logger.log(
+      `Queued ship confirm subdist status job outboundDoId=${id} integrationStatus=${statusCheck.status}`,
+    );
+
+    return {
+      ...outboundDo,
+      integration_status:
+        statusCheck.status === 'PENDING' ? 'PROCESSING' : statusCheck.status,
+      outbound_integration_deliveries: refreshedDeliveries,
+      ship_confirm,
+    };
+  }
+
+  private async loadPickReleaseSubdistDeliveries(
+    outboundDoId: string,
+  ): Promise<OutboundIntegrationDeliveries[]> {
+    const rows = await this.outboundIntegrationDeliveriesRepository.findByOutboundDoId(outboundDoId);
+    const pickReleaseRows = rows.filter(
+      (row) =>
+        row.transaction_type === ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE,
+    );
+
+    if (!pickReleaseRows.length) {
+      throw new BadRequestException(
+        'No pick release integration deliveries found; run pick-release-subdist first',
+      );
+    }
+
+    return pickReleaseRows;
+  }
+
+  private async createShipConfirmSubdistDeliveries(
+    outboundDo: OutboundDo,
+    pickReleaseRows: OutboundIntegrationDeliveries[],
+    inputLines: CreateShipConfirmSubdistPayloadDto['lines'],
+  ): Promise<OutboundIntegrationDeliveries[]> {
+    const pickReleaseByItemId = new Map(
+      pickReleaseRows
+        .filter((row) => row.outbound_memo_item_id)
+        .map((row) => [row.outbound_memo_item_id!, row]),
+    );
+
+    const deliveryDtos: CreateOutboundIntegrationDeliveriesDto[] = [];
+
+    for (const line of inputLines) {
+      const pickReleaseRow = pickReleaseByItemId.get(line.outbound_memo_item_id);
+      if (!pickReleaseRow) {
+        throw new BadRequestException(
+          `No pick release delivery for outbound_memo_item_id ${line.outbound_memo_item_id}`,
+        );
+      }
+
+      deliveryDtos.push(
+        this.mapShipConfirmSubdistFromPickRelease(outboundDo, pickReleaseRow, line.shipped_quantity),
+      );
+    }
+
+    return await this.upsertIntegrationDeliveriesByType(outboundDo.id, deliveryDtos);
+  }
+
+  private mapShipConfirmSubdistFromPickRelease(
+    outboundDo: OutboundDo,
+    pickReleaseRow: OutboundIntegrationDeliveries,
+    shippedQuantity: number,
+  ): CreateOutboundIntegrationDeliveriesDto {
+    if (pickReleaseRow.delivery_id == null) {
+      throw new BadRequestException(
+        `delivery_id is required from pick release for memo item ${pickReleaseRow.outbound_memo_item_id ?? 'N/A'}`,
+      );
+    }
+    if (!pickReleaseRow.delivery_name?.trim()) {
+      throw new BadRequestException(
+        `delivery_name is required from pick release for memo item ${pickReleaseRow.outbound_memo_item_id ?? 'N/A'}`,
+      );
+    }
+    if (!pickReleaseRow.source_header_id) {
+      throw new BadRequestException(
+        `source_header_id is required from pick release for memo item ${pickReleaseRow.outbound_memo_item_id ?? 'N/A'}`,
+      );
+    }
+
+    const pickReleaseStatus = (pickReleaseRow.pick_release_status ?? '').trim().toUpperCase();
+    if (pickReleaseStatus !== 'S') {
+      throw new BadRequestException(
+        `Pick release must be successful (S) before ship confirm for memo item ${pickReleaseRow.outbound_memo_item_id ?? 'N/A'}; current status=${pickReleaseRow.pick_release_status ?? 'empty'}`,
+      );
+    }
+
+    return {
+      organization_id: pickReleaseRow.organization_id ?? outboundDo.organization_id ?? undefined,
+      outbound_do_id: outboundDo.id,
+      outbound_memo_id: pickReleaseRow.outbound_memo_id ?? undefined,
+      outbound_memo_item_id: pickReleaseRow.outbound_memo_item_id ?? undefined,
+      transaction_type: ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM,
+      source_system: 'WMS',
+      source_header_id: pickReleaseRow.source_header_id,
+      source_line_id: pickReleaseRow.source_line_id ?? pickReleaseRow.outbound_memo_item_id ?? undefined,
+      iso_header_id: pickReleaseRow.iso_header_id ?? undefined,
+      delivery_id: pickReleaseRow.delivery_id,
+      delivery_name: pickReleaseRow.delivery_name,
+      shipped_quantity: Math.round(Number(shippedQuantity)),
+      ship_confirm_status: 'U',
+    };
+  }
+
+  /** One Oracle `shipconfirm.create` record per staged line — six fields only. */
+  private buildShipConfirmSubdistPayloadsFromDeliveries(
+    deliveries: OutboundIntegrationDeliveries[],
+  ): CreateShipConfirmSubdistOracleDto[] {
+    const shipConfirmRows = deliveries.filter(
+      (row) =>
+        row.transaction_type === ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM &&
+        row.source_header_id &&
+        row.delivery_id != null &&
+        row.delivery_name &&
+        row.shipped_quantity != null,
+    );
+
+    if (!shipConfirmRows.length) {
+      throw new BadRequestException('No ship confirm subdist payloads could be built from deliveries');
+    }
+
+    return shipConfirmRows.map((row) => ({
+      TRANSACTION_TYPE: ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM,
+      SOURCE_SYSTEM: row.source_system ?? 'WMS',
+      SOURCE_HEADER_ID: row.source_header_id!,
+      DELIVERY_ID: Number(row.delivery_id),
+      DELIVERY_NAME: row.delivery_name!,
+      SHIPPED_QUANTITY: Number(row.shipped_quantity),
+    }));
   }
 
   async pickReleaseSubdist(id: string): Promise<PickReleaseSubdistResult> {
