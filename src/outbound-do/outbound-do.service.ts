@@ -626,8 +626,9 @@ export class OutboundDoService {
       payload.lines,
     );
 
-    const shipConfirmPayloads = this.buildShipConfirmSubdistPayloadsFromDeliveries(
+    const shipConfirmPayloads = this.buildShipConfirmCreatePayloadsFromDeliveries(
       outbound_integration_deliveries,
+      ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM,
     );
     const ship_confirm = await this.shipConfirmIntegrationService.create(shipConfirmPayloads);
 
@@ -756,8 +757,27 @@ export class OutboundDoService {
     };
   }
 
-  /** One Oracle `shipconfirm.create` record per staged line — six fields only. */
-  private buildShipConfirmSubdistPayloadsFromDeliveries(
+  /**
+   * Builds Oracle `shipconfirm.create` payloads for one of three transaction types.
+   */
+  private buildShipConfirmCreatePayloadsFromDeliveries(
+    deliveries: OutboundIntegrationDeliveries[],
+    transactionType: ShipConfirmInternalTransactionType,
+  ): CreateShipConfirmInternalDto[] | CreateShipConfirmSubdistOracleDto[] {
+    switch (transactionType) {
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM:
+        return this.buildSubdistShipConfirmCreatePayloads(deliveries);
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE:
+        return this.buildSubdistPickReleaseCreatePayloads(deliveries);
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL:
+        return this.buildMutasiSoInternalShipConfirmCreatePayloads(deliveries);
+      default:
+        throw new BadRequestException(`Unsupported ship confirm transaction type: ${transactionType}`);
+    }
+  }
+
+  /** Subdist ship confirm — six Oracle fields per staged line. */
+  private buildSubdistShipConfirmCreatePayloads(
     deliveries: OutboundIntegrationDeliveries[],
   ): CreateShipConfirmSubdistOracleDto[] {
     const shipConfirmRows = deliveries.filter(
@@ -797,8 +817,9 @@ export class OutboundDoService {
       outboundDo,
     );
 
-    const pickReleasePayloads = this.buildPickReleaseSubdistPayloadsFromDeliveries(
+    const pickReleasePayloads = this.buildShipConfirmCreatePayloadsFromDeliveries(
       outbound_integration_deliveries,
+      ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE,
     );
     const pick_release = await this.shipConfirmIntegrationService.create(pickReleasePayloads);
 
@@ -888,7 +909,7 @@ export class OutboundDoService {
       );
     }
 
-    const deliveryAttributes = this.buildMutasiSoInternalDeliveryAttributes(outboundDo);
+    const deliveryAttributes = this.buildOutboundIntegrationDeliveryAttributes(outboundDo, memo);
 
     return {
       organization_id: memo.organization_id ?? outboundDo.organization_id ?? undefined,
@@ -911,10 +932,10 @@ export class OutboundDoService {
   }
 
   /**
-   * One Oracle pick-release payload per memo (SOURCE_HEADER_ID = memo.id).
+   * Subdist pick release — one Oracle payload per memo (SOURCE_HEADER_ID = memo.id).
    * LINES[] use outbound_memo_item.id as SOURCE_LINE_ID — same key used by shipconfirm.find polling.
    */
-  private buildPickReleaseSubdistPayloadsFromDeliveries(
+  private buildSubdistPickReleaseCreatePayloads(
     deliveries: OutboundIntegrationDeliveries[],
   ): CreateShipConfirmInternalDto[] {
     const pickReleaseRows = deliveries.filter(
@@ -952,19 +973,7 @@ export class OutboundDoService {
         SOURCE_SYSTEM: headerRow.source_system ?? 'WMS',
         SOURCE_HEADER_ID: headerRow.source_header_id!,
         ISO_HEADER_ID: Number(headerRow.iso_header_id),
-        DELIVERY_ATTRIBUTE_CATEGORY: this.resolveDeliveryAttributeCategory(
-          headerRow.delivery_attribute_category,
-        ),
-        DELIVERY_ATTRIBUTE6: headerRow.delivery_attribute6,
-        DELIVERY_ATTRIBUTE7: headerRow.delivery_attribute7,
-        DELIVERY_ATTRIBUTE8: headerRow.delivery_attribute8,
-        DELIVERY_ATTRIBUTE9: headerRow.delivery_attribute9,
-        DELIVERY_ATTRIBUTE10: headerRow.delivery_attribute10,
-        DELIVERY_ATTRIBUTE11: headerRow.delivery_attribute11,
-        DELIVERY_ATTRIBUTE12: headerRow.delivery_attribute12,
-        DELIVERY_ATTRIBUTE13: headerRow.delivery_attribute13,
-        DELIVERY_ATTRIBUTE14: headerRow.delivery_attribute14,
-        DELIVERY_ATTRIBUTE15: headerRow.delivery_attribute15,
+        ...this.mapStagedDeliveryToOracleDeliveryAttributes(headerRow),
         LINES: lines,
       };
     });
@@ -985,8 +994,10 @@ export class OutboundDoService {
       shipConfirmData.outbound_memos ?? [],
     );
 
-    const shipConfirmPayloads =
-      this.buildMutasiSoInternalShipConfirmPayloadsFromDeliveries(outbound_integration_deliveries);
+    const shipConfirmPayloads = this.buildShipConfirmCreatePayloadsFromDeliveries(
+      outbound_integration_deliveries,
+      ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL,
+    );
     const ship_confirm = await this.shipConfirmIntegrationService.create(shipConfirmPayloads);
 
     await this.shipConfirmStatusChecker.syncDeliveriesFromCreateResponse(
@@ -1018,11 +1029,8 @@ export class OutboundDoService {
     };
   }
 
-  /**
-   * One Oracle ship-confirm payload per source_header_id, derived from WMS staging rows
-   * (same attributes already mapped in mapMutasiSoInternalLineToDelivery).
-   */
-  private buildMutasiSoInternalShipConfirmPayloadsFromDeliveries(
+  /** Mutasi SO internal ship confirm — one Oracle payload per source_header_id. */
+  private buildMutasiSoInternalShipConfirmCreatePayloads(
     deliveries: OutboundIntegrationDeliveries[],
   ): CreateShipConfirmInternalDto[] {
     const bySourceHeader = new Map<string, OutboundIntegrationDeliveries>();
@@ -1041,19 +1049,7 @@ export class OutboundDoService {
       SOURCE_SYSTEM: delivery.source_system ?? 'WMS',
       SOURCE_HEADER_ID: delivery.source_header_id!,
       ISO_HEADER_ID: Number(delivery.iso_header_id),
-      DELIVERY_ATTRIBUTE_CATEGORY: this.resolveDeliveryAttributeCategory(
-        delivery.delivery_attribute_category,
-      ),
-      DELIVERY_ATTRIBUTE6: delivery.delivery_attribute6,
-      DELIVERY_ATTRIBUTE7: delivery.delivery_attribute7,
-      DELIVERY_ATTRIBUTE8: delivery.delivery_attribute8,
-      DELIVERY_ATTRIBUTE9: delivery.delivery_attribute9,
-      DELIVERY_ATTRIBUTE10: delivery.delivery_attribute10,
-      DELIVERY_ATTRIBUTE11: delivery.delivery_attribute11,
-      DELIVERY_ATTRIBUTE12: delivery.delivery_attribute12,
-      DELIVERY_ATTRIBUTE13: delivery.delivery_attribute13,
-      DELIVERY_ATTRIBUTE14: delivery.delivery_attribute14,
-      DELIVERY_ATTRIBUTE15: delivery.delivery_attribute15,
+      ...this.mapStagedDeliveryToOracleDeliveryAttributes(delivery),
     }));
   }
 
@@ -1089,7 +1085,7 @@ export class OutboundDoService {
 
       for (const line of lines) {
         deliveryDtos.push(
-          this.mapMutasiSoInternalLineToDelivery(shipConfirmData, headerForMapping, line),
+          this.mapMutasiSoInternalLineToDelivery(shipConfirmData, headerForMapping, line, memo),
         );
       }
     }
@@ -1168,8 +1164,12 @@ export class OutboundDoService {
     shipConfirmData: ShipConfirmInternalQueryResult,
     header: OutboundIntegrationIrReq,
     line: OutboundIntegrationIrReqLines,
+    outboundMemo: OutboundMemo,
   ): CreateOutboundIntegrationDeliveriesDto {
-    const deliveryAttributes = this.buildMutasiSoInternalDeliveryAttributes(shipConfirmData);
+    const deliveryAttributes = this.buildOutboundIntegrationDeliveryAttributes(
+      shipConfirmData,
+      outboundMemo,
+    );
 
     return {
       organization_id: header.organization_id ?? undefined,
@@ -1191,8 +1191,55 @@ export class OutboundDoService {
     };
   }
 
-  /** Shared DO-level delivery attributes (WMS snake_case + Oracle DELIVERY_ATTRIBUTE*). */
-  private buildMutasiSoInternalDeliveryAttributes(
+  /** Staged row → Oracle DELIVERY_ATTRIBUTE* (shared by mutasi + subdist pick release payloads). */
+  private mapStagedDeliveryToOracleDeliveryAttributes(
+    delivery: Pick<
+      OutboundIntegrationDeliveries,
+      | 'delivery_attribute_category'
+      | 'delivery_attribute6'
+      | 'delivery_attribute7'
+      | 'delivery_attribute8'
+      | 'delivery_attribute9'
+      | 'delivery_attribute10'
+      | 'delivery_attribute11'
+      | 'delivery_attribute12'
+      | 'delivery_attribute13'
+      | 'delivery_attribute14'
+      | 'delivery_attribute15'
+    >,
+  ): Pick<
+    CreateShipConfirmInternalDto,
+    | 'DELIVERY_ATTRIBUTE_CATEGORY'
+    | 'DELIVERY_ATTRIBUTE6'
+    | 'DELIVERY_ATTRIBUTE7'
+    | 'DELIVERY_ATTRIBUTE8'
+    | 'DELIVERY_ATTRIBUTE9'
+    | 'DELIVERY_ATTRIBUTE10'
+    | 'DELIVERY_ATTRIBUTE11'
+    | 'DELIVERY_ATTRIBUTE12'
+    | 'DELIVERY_ATTRIBUTE13'
+    | 'DELIVERY_ATTRIBUTE14'
+    | 'DELIVERY_ATTRIBUTE15'
+  > {
+    return {
+      DELIVERY_ATTRIBUTE_CATEGORY: this.normalizeDeliveryAttributeCategory(
+        delivery.delivery_attribute_category,
+      ),
+      DELIVERY_ATTRIBUTE6: delivery.delivery_attribute6,
+      DELIVERY_ATTRIBUTE7: delivery.delivery_attribute7,
+      DELIVERY_ATTRIBUTE8: delivery.delivery_attribute8,
+      DELIVERY_ATTRIBUTE9: delivery.delivery_attribute9,
+      DELIVERY_ATTRIBUTE10: delivery.delivery_attribute10,
+      DELIVERY_ATTRIBUTE11: delivery.delivery_attribute11,
+      DELIVERY_ATTRIBUTE12: delivery.delivery_attribute12,
+      DELIVERY_ATTRIBUTE13: delivery.delivery_attribute13,
+      DELIVERY_ATTRIBUTE14: delivery.delivery_attribute14,
+      DELIVERY_ATTRIBUTE15: delivery.delivery_attribute15,
+    };
+  }
+
+  /** Shared DO + memo delivery attributes for WMS staging (mutasi + subdist pick release). */
+  private buildOutboundIntegrationDeliveryAttributes(
     outboundDo: Pick<
       OutboundDo,
       | 'delivery_category'
@@ -1207,6 +1254,7 @@ export class OutboundDoService {
       | 'qty_utilitas'
       | 'type_calculation'
     >,
+    outboundMemo?: Pick<OutboundMemo, 'delivery_attribute14'>,
   ): Pick<
     CreateOutboundIntegrationDeliveriesDto,
     | 'delivery_attribute_category'
@@ -1221,10 +1269,12 @@ export class OutboundDoService {
     | 'delivery_attribute14'
     | 'delivery_attribute15'
   > {
+    const delivery_attribute_category = this.normalizeDeliveryAttributeCategory(
+      outboundDo.delivery_category,
+    );
+
     return {
-      delivery_attribute_category: this.resolveDeliveryAttributeCategory(
-        outboundDo.delivery_category,
-      ),
+      delivery_attribute_category,
       delivery_attribute6: outboundDo.vendor_id,
       delivery_attribute7: outboundDo.driver_name,
       delivery_attribute8: outboundDo.license_plate,
@@ -1235,13 +1285,34 @@ export class OutboundDoService {
       delivery_attribute13: outboundDo.delivery_date
         ? new Date(outboundDo.delivery_date).toISOString()
         : undefined,
-      delivery_attribute14:
-        outboundDo.qty_utilitas != null ? String(outboundDo.qty_utilitas) : undefined,
+      delivery_attribute14: this.resolveDeliveryAttribute14ByExpeditionCategory(
+        delivery_attribute_category,
+        outboundDo,
+        outboundMemo,
+      ),
       delivery_attribute15: outboundDo.type_calculation,
     };
   }
 
-  private resolveDeliveryAttributeCategory(
+  /**
+   * Ekspedisi Eksternal: Quantity Utilitas (%) from outbound_memo.delivery_attribute14.
+   * Other categories: qty_utilitas on outbound DO.
+   */
+  private resolveDeliveryAttribute14ByExpeditionCategory(
+    category: DeliveryAttributeCategory,
+    outboundDo: Pick<OutboundDo, 'qty_utilitas'>,
+    outboundMemo?: Pick<OutboundMemo, 'delivery_attribute14'>,
+  ): string | undefined {
+    if (category === DeliveryAttributeCategory.EKSPEDISI_EKSTERNAL) {
+      const fromMemo = outboundMemo?.delivery_attribute14?.trim();
+      return fromMemo || undefined;
+    }
+
+    return outboundDo.qty_utilitas != null ? String(outboundDo.qty_utilitas) : undefined;
+  }
+
+  /** Maps outbound_do.delivery_category to one of three expedition categories. */
+  private normalizeDeliveryAttributeCategory(
     deliveryCategory?: string | null,
   ): DeliveryAttributeCategory {
     const raw = deliveryCategory?.trim();
