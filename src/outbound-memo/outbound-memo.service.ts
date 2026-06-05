@@ -165,21 +165,21 @@ export class OutboundMemoService {
     currentStatus: OutboundMemoStatus,
     newStatus: OutboundMemoStatus,
   ): void {
-    const validTransitions: Record<OutboundMemoStatus, OutboundMemoStatus[]> = {
-      [OutboundMemoStatus.PENDING]: [
-        OutboundMemoStatus.APPROVED,
-        OutboundMemoStatus.CANCELLED,
-      ],
-      [OutboundMemoStatus.APPROVED]: [OutboundMemoStatus.CANCELLED, OutboundMemoStatus.COMPLETED],
-      [OutboundMemoStatus.CANCELLED]: [],
-      [OutboundMemoStatus.COMPLETED]: [],
-    };
+    // const validTransitions: Record<OutboundMemoStatus, OutboundMemoStatus[]> = {
+    //   [OutboundMemoStatus.PENDING]: [
+    //     OutboundMemoStatus.APPROVED,
+    //     OutboundMemoStatus.CANCELLED,
+    //   ],
+    //   [OutboundMemoStatus.APPROVED]: [OutboundMemoStatus.CANCELLED, OutboundMemoStatus.COMPLETED],
+    //   [OutboundMemoStatus.CANCELLED]: [],
+    //   [OutboundMemoStatus.COMPLETED]: [],
+    // };
 
-    if (!validTransitions[currentStatus]?.includes(newStatus)) {
-      throw new BadRequestException(
-        `Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`,
-      );
-    }
+    // if (!validTransitions[currentStatus]?.includes(newStatus)) {
+    //   throw new BadRequestException(
+    //     `Tidak dapat mengubah status dari ${currentStatus} ke ${newStatus}`,
+    //   );
+    // }
   }
 
   private async generateOutboundMemoNumber(): Promise<string> {

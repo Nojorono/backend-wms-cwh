@@ -850,8 +850,8 @@ export class PickingSuggestionService {
       .andWhere('tracking.progression_status = :progression_status', {
         progression_status: ProgressionStatus.NOT_STARTED,
       })
-      .andWhere('tracking.inventory_status = :inventory_status', {
-        inventory_status: 'INSPECTION_COMPLETED',
+      .andWhere('tracking.inventory_status IN (:...inventory_statuses)', {
+        inventory_statuses: ['INSPECTION_COMPLETED', 'IN_INVENTORY'],
       })
       .getMany();
 

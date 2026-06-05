@@ -30,10 +30,30 @@ export class CreateOutboundMemoItemDto {
 }
 
 export class CreateOutboundMemoDto {
+  @ApiPropertyOptional({ example: 'string' })
+  @IsOptional()
+  @IsString()
+  delivery_attribute14?: string;
+
   @ApiPropertyOptional({ example: 'uuid-organization-123' })
   @IsOptional()
   @IsUUID(4, { message: 'organization_id must be a valid UUID' })
   organization_id?: string;
+
+  @ApiPropertyOptional({ example: 'string' })
+  @IsOptional()
+  @IsString()
+  so_organization_id?: string;
+
+  @ApiPropertyOptional({ example: 'SO-2025-001' })
+  @IsOptional()
+  @IsString()
+  so_number?: string;
+
+  @ApiPropertyOptional({ example: 123 })
+  @IsOptional()
+  @IsNumber()
+  header_id?: number;
 
   @ApiProperty({ example: 'OM-2025-001' })
   @IsOptional()
@@ -53,8 +73,15 @@ export class CreateOutboundMemoDto {
   ship_to: string;
 
   @ApiProperty({ example: 'Surabaya' })
+  @IsOptional()
   @IsString()
   destination: string;
+
+  @ApiProperty({ example: 'uuid-destination-io-123' })
+  @IsOptional()
+  @IsString()
+  @IsUUID(4, { message: 'destination_io_id must be a valid UUID' })
+  destination_io_id?: string;
 
   @ApiProperty({ example: '2025-01-15T00:00:00.000Z' })
   @IsDate()

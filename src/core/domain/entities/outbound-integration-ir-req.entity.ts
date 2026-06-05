@@ -1,10 +1,20 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OutboundMemo } from './outbound-memo.entity';
+import { OutboundDo } from './outbound-do.entity';
+import { OutboundIntegrationIrReqLines } from './outbound-integration-ir-req-lines.entity';
+
 @Entity('outbound_integration_ir_req')
 export class OutboundIntegrationIrReq extends BaseEntity {
     @Column({ nullable: true })
     organization_id: string;
+
+    @Column({ nullable: true })
+    outbound_do_id: string;
+
+    @ManyToOne(() => OutboundDo, { onDelete: 'RESTRICT', nullable: true })
+    @JoinColumn({ name: 'outbound_do_id' })
+    outbound_do: OutboundDo;
 
     @Column({ nullable: true })
     outbound_memo_id: string;
@@ -120,4 +130,7 @@ export class OutboundIntegrationIrReq extends BaseEntity {
 
     @Column({ name: 'last_updated_by', type: 'bigint', nullable: true })
     last_updated_by: number;
+
+    @OneToMany(() => OutboundIntegrationIrReqLines, (line) => line.outbound_integration_ir_req)
+    lines: OutboundIntegrationIrReqLines[];
 }

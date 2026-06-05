@@ -1,4 +1,9 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InvOnHandMappingIntegrationService } from './integration/inv-on-hand-mapping.integration';
+import {
+  InvOnHandMappingDetailQueryDto,
+  InvOnHandMappingDetailResponseDto,
+} from './dto/inv-on-hand-mapping.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
@@ -23,6 +28,7 @@ export class InventoryTrackingService {
     private readonly repository: InventoryTrackingRepository,
     private readonly paginationService: PaginationService,
     private readonly masterPalletService: MasterPalletService,
+    private readonly invOnHandMappingIntegrationService: InvOnHandMappingIntegrationService,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletHistoryRepository: Repository<PalletTransactionHistory>,
   ) { }
@@ -174,8 +180,16 @@ export class InventoryTrackingService {
     return inventoryTrackings;
   }
 
-  async findAllByWarehouse(warehouse_sub_id, warehouse_bin_id): Promise<InventoryTracking[]> {
-    const inventoryTrackings = await this.repository.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+  async findAllByWarehouse(
+    organizationId: string,
+    warehouse_sub_id?: string,
+    warehouse_bin_id?: string,
+  ): Promise<InventoryTracking[]> {
+    const inventoryTrackings = await this.repository.findAllByWarehouse(
+      organizationId,
+      warehouse_sub_id,
+      warehouse_bin_id,
+    );
     return await this.enrichPalletsWithCurrentItems(inventoryTrackings);
   }
 
@@ -295,14 +309,13 @@ export class InventoryTrackingService {
     warehouse_sub_id: string,
     warehouse_id: string,
     inventory_status: string,
+    progression_status?: ProgressionStatus,
     inbound_id?: string,
   ): Promise<any> {
     // Validasi status
     this.validateInventoryStatus(inventory_status);
 
     const existing = await this.validatePalletIdUniqueness(pallet_id);
-
-    console.log("existing", existing);
 
     if (existing) {
       // Jika sudah ada di lokasi yang sama, update saja
@@ -313,11 +326,9 @@ export class InventoryTrackingService {
         inventory_note: 'Inventory tracking updated',
         inventory_date: new Date(),
         inbound_id: inbound_id,
+        progression_status: progression_status,
       });
     }
-
-    // Validasi duplikasi pallet_id sebelum create
-    // await this.validatePalletIdUniqueness(pallet_id);
 
     // Create new tracking record
     return this.create({
@@ -331,8 +342,8 @@ export class InventoryTrackingService {
     });
   }
 
-  async findByItemId(item_id: string): Promise<any[]> {
-    return this.repository.findByItemId(item_id);
+  async findByItemId(item_id: string, organizationId: string): Promise<any[]> {
+    return this.repository.findByItemId(item_id, organizationId);
   }
 
   // Method untuk mengecek apakah sudah ada history dengan inbound_id yang sama
@@ -412,6 +423,7 @@ export class InventoryTrackingService {
       warehouse_sub_id,
       warehouse_id,
       inventory_status,
+      ProgressionStatus.IN_PROGRESS,
       inbound_id,
     );
   }
@@ -578,5 +590,11 @@ export class InventoryTrackingService {
 
   async createInventoryTrackingBad(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
     return this.repository.createInventoryTrackingBad(dto);
+  }
+
+  async getOnHandMappingDetail(
+    query: InvOnHandMappingDetailQueryDto,
+  ): Promise<InvOnHandMappingDetailResponseDto> {
+    return this.invOnHandMappingIntegrationService.getOnHandMappingDetail(query);
   }
 }

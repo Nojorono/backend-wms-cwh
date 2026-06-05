@@ -9,7 +9,7 @@ import { MasterIO } from '../core/domain/entities/master-io.entity';
 @Controller('master-io')
 @ApiBearerAuth('JWT-auth')
 export class MasterIOController {
-  constructor(private readonly masterIOService: MasterIOService) {}
+  constructor(private readonly masterIOService: MasterIOService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new IO' })
@@ -24,6 +24,26 @@ export class MasterIOController {
   })
   create(@Body() createMasterIODto: CreateMasterIODto) {
     return this.masterIOService.create(createMasterIODto);
+  }
+
+  @Get('sync')
+  @ApiOperation({ summary: 'Sync IOs from integration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync IOs from integration.',
+  })
+  sync() {
+    return this.masterIOService.sync();
+  }
+
+  @Get('find-oracle')
+  @ApiOperation({ summary: 'Find IOs from integration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync IOs from integration.',
+  })
+  findOracle() {
+    return this.masterIOService.findOracle();
   }
 
   @Get()

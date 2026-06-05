@@ -228,6 +228,9 @@ export class MasterPalletService {
         }
       }
       if (updateQuantityDto.operation_type === QuantityOperationType.REMOVE) {
+        if (currentItemQuantity === 0) {
+          throw new BadRequestException('Cannot remove: pallet is empty');
+        }
         if (updateQuantityDto.quantity < 0) {
           throw new BadRequestException('Quantity to remove must be non-negative');
         }

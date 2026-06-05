@@ -1,24 +1,5 @@
-import { IsString, IsOptional, IsNumber } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { PartialType } from '@nestjs/swagger';
+import { CreateMasterIODto } from './create-master-io.dto';
 
-export class UpdateMasterIODto {
-  @ApiProperty({ example: 1, required: false })
-  @IsNumber()
-  @IsOptional()
-  organization_id?: number;
-
-  @ApiProperty({ example: 'Organization Name', required: false })
-  @IsString()
-  @IsOptional()
-  organization_name?: string;
-
-  @ApiProperty({ example: 'Operating Unit', required: false })
-  @IsString()
-  @IsOptional()
-  operating_unit?: string;
-
-  @ApiProperty({ example: 'Address', required: false })
-  @IsString()
-  @IsOptional()
-  address?: string;
+export class UpdateMasterIODto extends PartialType(CreateMasterIODto) {
 }

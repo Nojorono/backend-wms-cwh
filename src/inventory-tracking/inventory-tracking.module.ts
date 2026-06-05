@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingHistory } from '../core/domain/entities/inventory-tracking-history.entity';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
@@ -17,9 +19,11 @@ import { InventoryTrackingBadService } from './inventory-tracking-bad.service';
 import { PaginationService } from '../core/services/pagination.service';
 import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-tracking-bad.entity';
+import { InvOnHandMappingIntegrationService } from './integration/inv-on-hand-mapping.integration';
 
 @Module({
   imports: [
+    ConfigModule,
     TypeOrmModule.forFeature([
       InventoryTracking,
       InventoryTrackingBad,
@@ -33,6 +37,22 @@ import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-trackin
       PalletTransactionHistory,
     ]),
     MasterPalletModule,
+    ClientsModule.registerAsync([
+      {
+        name: 'INV_ON_HAND_QTY_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.invOnHandQty') || 'inv_on_hand_qty_queue',
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
   ],
   controllers: [InventoryTrackingController],
   providers: [
@@ -41,10 +61,11 @@ import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-trackin
     InventoryTrackingBadRepository,
     InventoryTrackingBadService,
     PaginationService,
+    InvOnHandMappingIntegrationService,
   ],
   exports: [
     InventoryTrackingService,
     InventoryTrackingBadService,
   ],
 })
-export class InventoryTrackingModule { }
+export class InventoryTrackingModule {}

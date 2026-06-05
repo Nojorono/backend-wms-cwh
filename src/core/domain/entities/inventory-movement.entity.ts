@@ -5,6 +5,7 @@ import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
 import { InventoryMovementPallet } from './inventory-movement-pallet.entity';
 import { InventoryMovementUser } from './inventory-movment-user.entity';
+import { MasterIO } from './master-io.entity';
 
 export enum MovementStatus {
   PENDING = 'PENDING',
@@ -20,6 +21,13 @@ export enum MovementType {
 
 @Entity('inventory_movement')
 export class InventoryMovement extends BaseEntity {
+  @Column({ nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
   @Column({ nullable: true })
   movement_number: string;
 

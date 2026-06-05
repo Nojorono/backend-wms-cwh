@@ -37,6 +37,22 @@ export class MasterIORepository {
     return io;
   }
 
+  async findByOrganizationCode(organization_code: string): Promise<MasterIO | null> {
+    const io = await this.repository.findOne({ where: { organization_code } });
+    if (!io) {
+      return null;
+    }
+    return io;
+  }
+
+  async findByOrganizationName(organization_name: string): Promise<MasterIO | null> {
+    const io = await this.repository.findOne({ where: { organization_name } });
+    if (!io) {
+      return null;
+    }
+    return io;
+  }
+
   async update(id: string, updateMasterIODto: UpdateMasterIODto): Promise<MasterIO | null> {
     const io = await this.findOne(id);
     if (!io) {

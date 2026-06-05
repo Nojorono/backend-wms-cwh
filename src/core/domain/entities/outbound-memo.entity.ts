@@ -10,6 +10,9 @@ export enum OutboundMemoStatus {
   APPROVED = 'APPROVED',
   CANCELLED = 'CANCELLED',
   COMPLETED = 'COMPLETED',
+  INTEGRATED = 'INTEGRATED',
+  FAILED = 'FAILED',
+  TIMEOUT = 'TIMEOUT',
 }
 
 export enum OutboundMemoType {
@@ -19,6 +22,9 @@ export enum OutboundMemoType {
 
 @Entity('outbound_memo')
 export class OutboundMemo extends BaseEntity {
+  @Column({ nullable: true })
+  delivery_attribute14: string;
+
   @Column({ nullable: true })
   organization_id: string;
 
@@ -42,6 +48,13 @@ export class OutboundMemo extends BaseEntity {
   destination: string;
 
   @Column({ nullable: true })
+  destination_io_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'destination_io_id' })
+  destination_io: MasterIO;
+
+  @Column({ nullable: true })
   delivery_date: Date;
 
   @Column({ nullable: true })
@@ -55,6 +68,15 @@ export class OutboundMemo extends BaseEntity {
 
   @Column({ nullable: true, default: false })
   has_do: boolean;
+
+  @Column({ nullable: true })
+  so_number: string;
+
+  @Column({ nullable: true })
+  so_organization_id: string;
+
+  @Column({ nullable: true })
+  header_id: number;
 
   @OneToMany(() => OutboundMemoItem, (outboundMemoItem) => outboundMemoItem.outbound_memo)
   outbound_memo_items: OutboundMemoItem[];

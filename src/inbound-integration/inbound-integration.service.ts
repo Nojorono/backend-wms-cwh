@@ -101,6 +101,29 @@ export class InboundIntegrationService {
     }));
   }
 
+  /** Like findAllByInbound, but includes all header statuses (CREATED/S/E/...) */
+  async findAllByInboundAnyStatus(inboundId: string): Promise<InboundIntegrationHeaderWithLines[]> {
+    const headers = await this.repository.findAllHeadersByInboundIdAnyStatus(inboundId);
+    if (!headers.length) {
+      return [];
+    }
+    const headerIds = headers.map((h) => h.id);
+    const lines = await this.repository.findLinesByHeaderIds(headerIds);
+    const linesByHeader = new Map<string, InboundIntegrationLines[]>();
+    for (const line of lines) {
+      if (!line.inbound_integration_id) {
+        continue;
+      }
+      const list = linesByHeader.get(line.inbound_integration_id) ?? [];
+      list.push(line);
+      linesByHeader.set(line.inbound_integration_id, list);
+    }
+    return headers.map((header) => ({
+      ...header,
+      lines: linesByHeader.get(header.id) ?? [],
+    }));
+  }
+
   async findHeaderById(id: string): Promise<InboundIntegration> {
     const header = await this.repository.findHeaderById(id);
     if (!header) {

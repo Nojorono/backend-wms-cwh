@@ -1,12 +1,21 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
-import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
+import { OutboundDo, OutboundDoType } from '../core/domain/entities/outbound-do.entity';
+import { OutboundMemo, OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
+import { OutboundIntegrationIrReq } from '../core/domain/entities/outbound-integration-ir-req.entity';
 import { AssignedGateLoad } from '../core/domain/entities/assigned-gate-load.entity';
 import { CreateOutboundDoDto } from './dto/create-outbound-do.dto';
 import { UpdateOutboundDoDto } from './dto/update-outbound-do.dto';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
+
+export type OutboundMemoWithIntegrationIrReq = OutboundMemo & {
+  outbound_integration_ir_req: OutboundIntegrationIrReq | null;
+};
+
+export type ShipConfirmInternalQueryResult = OutboundDo & {
+  outbound_memos: OutboundMemoWithIntegrationIrReq[];
+};
 
 @Injectable()
 export class OutboundDoRepository {
@@ -15,6 +24,8 @@ export class OutboundDoRepository {
     private readonly outboundDoRepository: Repository<OutboundDo>,
     @InjectRepository(OutboundMemo)
     private readonly outboundMemoRepository: Repository<OutboundMemo>,
+    @InjectRepository(OutboundIntegrationIrReq)
+    private readonly outboundIntegrationIrReqRepository: Repository<OutboundIntegrationIrReq>,
   ) { }
 
   async create(data: CreateOutboundDoDto): Promise<OutboundDo> {
@@ -84,6 +95,90 @@ export class OutboundDoRepository {
     return this.findOne(savedOutboundDo.id);
   }
 
+  private buildQueryWithAllRelationsForIntegration() {
+    return this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .leftJoin('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoin('outbound_memos.organization', 'organization_io')
+      .leftJoin('outbound_memos.destination_io', 'destination_io')
+      .leftJoin('outbound_memos.outbound_memo_items', 'outbound_memo_items')
+      .leftJoin('outbound_memo_items.item', 'memo_item')
+      .leftJoinAndMapMany(
+        'outbound_memo_items.assigned_gate_load',
+        AssignedGateLoad,
+        'assigned_gate_load',
+        'assigned_gate_load.outbound_memo_id = outbound_memo_items.outbound_memo_id AND assigned_gate_load.item_id = outbound_memo_items.item_id',
+      )
+      .leftJoin('assigned_gate_load.item', 'assigned_gate_load_item')
+      .leftJoin('assigned_gate_load.pallet', 'assigned_gate_load_pallet')
+      .leftJoin('assigned_gate_load.assigned_gate', 'assigned_gate')
+      .select(['outbound_do'])
+      .addSelect('outbound_memos')
+      .addSelect('organization_io')
+      .addSelect('destination_io')
+      .addSelect([
+        'outbound_memo_items.id',
+        'outbound_memo_items.item_id',
+        'outbound_memo_items.item',
+        'outbound_memo_items.quantity_plan',
+        'outbound_memo_items.quantity_delivered',
+        'outbound_memo_items.uom',
+      ])
+      .addSelect([
+        'memo_item.id',
+        'memo_item.sku',
+        'memo_item.item_number',
+        'memo_item.inventory_item_id',
+      ])
+      .addSelect([
+        'assigned_gate_load.id',
+        'assigned_gate_load.item_id',
+        'assigned_gate_load.quantity_picked',
+        'assigned_gate_load.quantity_loaded',
+        'assigned_gate_load.quantity_unloaded',
+        'assigned_gate_load.production_date',
+        'assigned_gate_load.week_number',
+        'assigned_gate_load.uom',
+        'assigned_gate_load.status',
+      ])
+      .addSelect([
+        'assigned_gate_load_item',
+      ])
+  }
+
+  private buildQueryWithAllRelationsForShipConfirmInternal() {
+    return this.outboundIntegrationIrReqRepository
+      .createQueryBuilder('outbound_integration_ir_req')
+      .leftJoin('outbound_integration_ir_req.outbound_do', 'outbound_do')
+      .leftJoinAndSelect('outbound_integration_ir_req.lines', 'lines')
+      .select(['outbound_integration_ir_req'])
+      .addSelect('lines')
+      .addSelect([
+        'outbound_do.id',
+        'outbound_do.createdAt',
+        'outbound_do.updatedAt',
+        'outbound_do.deletedAt',
+        'outbound_do.organization_id',
+        'outbound_do.outbound_do_number',
+        'outbound_do.expedition',
+        'outbound_do.origin',
+        'outbound_do.license_plate',
+        'outbound_do.container_number',
+        'outbound_do.seal_number',
+        'outbound_do.driver_name',
+        'outbound_do.driver_phone',
+        'outbound_do.vendor_id',
+        'outbound_do.vendor_po_number',
+        'outbound_do.status',
+        'outbound_do.outbound_type',
+        'outbound_do.delivery_date',
+        'outbound_do.qty_utilitas',
+        'outbound_do.truck_utilitas',
+        'outbound_do.delivery_category',
+        'outbound_do.type_calculation',
+      ]);
+  }
+
   private buildQueryWithAllRelations() {
     return this.outboundDoRepository
       .createQueryBuilder('outbound_do')
@@ -128,6 +223,72 @@ export class OutboundDoRepository {
     );
   }
 
+  async findOneForIntegration(id: string): Promise<OutboundDo> {
+    const entity = await this.buildQueryWithAllRelationsForIntegration()
+      .where('outbound_do.id = :id', { id })
+      .andWhere(
+        '(outbound_memos.id IS NULL OR outbound_memos.status IS NULL OR outbound_memos.status != :integratedStatus)',
+        { integratedStatus: OutboundMemoStatus.INTEGRATED },
+      )
+      .distinct(true)
+      .getOne();
+    if (!entity) throw new NotFoundException('Outbound DO not found');
+    const processed = this.addSequenceToMemos(entity);
+    if (processed.outbound_memos?.length) {
+      processed.outbound_memos = processed.outbound_memos.filter(
+        (memo) => memo.status !== OutboundMemoStatus.INTEGRATED,
+      );
+    }
+    return processed;
+  }
+
+  async findOneForShipConfirmInternal(id: string): Promise<ShipConfirmInternalQueryResult> {
+    const outboundDo = await this.outboundDoRepository
+      .createQueryBuilder('outbound_do')
+      .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoinAndMapMany(
+        'outbound_memos.outbound_integration_ir_req',
+        OutboundIntegrationIrReq,
+        'outbound_integration_ir_req',
+        'outbound_integration_ir_req.outbound_memo_id = outbound_memos.id',
+      )
+      .leftJoinAndSelect('outbound_integration_ir_req.lines', 'lines')
+      .where('outbound_do.id = :id', { id })
+      .orderBy('outbound_integration_ir_req.createdAt', 'ASC')
+      .getOne();
+
+    if (!outboundDo) {
+      throw new NotFoundException('Outbound DO not found');
+    }
+
+    const outbound_memos: OutboundMemoWithIntegrationIrReq[] = (
+      outboundDo.outbound_memos ?? []
+    ).map((memo) => {
+      const memoWithIrReq = memo as OutboundMemo & {
+        outbound_integration_ir_req?: OutboundIntegrationIrReq[];
+      };
+      const irReqList = memoWithIrReq.outbound_integration_ir_req ?? [];
+      const irReq = irReqList.length > 0 ? irReqList[0] : null;
+
+      if (irReq) {
+        irReq.outbound_do = undefined as unknown as OutboundDo;
+        if (!irReq.outbound_memo_id) {
+          irReq.outbound_memo_id = memo.id;
+        }
+      }
+
+      return {
+        ...memo,
+        outbound_integration_ir_req: irReq,
+      };
+    });
+
+    return {
+      ...outboundDo,
+      outbound_memos,
+    };
+  }
+
   async findOne(id: string): Promise<OutboundDo> {
     const entity = await this.buildQueryWithAllRelations()
       .where('outbound_do.id = :id', { id })
@@ -135,6 +296,14 @@ export class OutboundDoRepository {
     if (!entity) throw new NotFoundException('Outbound DO not found');
     const processed = this.addSequenceToMemos(entity);
     return await this.nestAssignedGateLoad(processed);
+  }
+
+  async findOutboundTypeById(id: string): Promise<OutboundDoType | null> {
+    const row = await this.outboundDoRepository.findOne({
+      where: { id },
+      select: ['id', 'outbound_type'],
+    });
+    return row?.outbound_type ?? null;
   }
 
   async findByOutboundDoNumber(outbound_do_number: string): Promise<OutboundDo | null> {
@@ -398,10 +567,9 @@ export class OutboundDoRepository {
       const memosWithSequence = outboundDo.outbound_memos.map((memo) => {
         const memoIndex = outboundDo.memo_id.indexOf(memo.id);
         const sequence = outboundDo.memo_sequence[memoIndex] || memoIndex + 1;
-
         return {
-          ...memo,
           sequence: sequence,
+          ...memo,
         } as any;
       });
 
@@ -643,5 +811,9 @@ export class OutboundDoRepository {
 
   async updateMemoHasDo(memoId: string, hasDo: boolean): Promise<void> {
     await this.outboundMemoRepository.update({ id: memoId }, { has_do: hasDo });
+  }
+
+  async updateMemoStatus(memoId: string, status: OutboundMemoStatus): Promise<void> {
+    await this.outboundMemoRepository.update({ id: memoId }, { status });
   }
 }

@@ -20,6 +20,7 @@ export class InventoryMovementRepository {
 
   async create(data: CreateInventoryMovementDto): Promise<InventoryMovement> {
     const entity = this.repository.create({
+      organization_id: data.organization_id,
       movement_number: data.movement_number,
       movement_type: data.movement_type,
       source_warehouse_id: data.source_warehouse_id,

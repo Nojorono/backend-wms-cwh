@@ -57,6 +57,13 @@ export class InboundIntegrationRepository {
     });
   }
 
+  async findAllHeadersByInboundIdAnyStatus(inboundId: string): Promise<InboundIntegration[]> {
+    return await this.inboundIntegrationRepo.find({
+      where: { inbound_id: inboundId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
   async findLinesByHeaderIds(headerIds: string[]): Promise<InboundIntegrationLines[]> {
     if (headerIds.length === 0) {
       return [];

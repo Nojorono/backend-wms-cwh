@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../core/domain/entities/inbound.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
+import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 
 @Injectable()
 export class InboundRepository {
@@ -26,6 +27,7 @@ export class InboundRepository {
     }
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -86,6 +88,7 @@ export class InboundRepository {
 
     const data = await queryBuilder
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -110,6 +113,7 @@ export class InboundRepository {
     qb.where('inbound.id = :id', { id });
     const entity = await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -124,6 +128,42 @@ export class InboundRepository {
       return null;
     }
     return entity;
+  }
+
+  /**
+   * Finds one inbound by id where at least one DO has integration_status READY or FAILED.
+   * Loads full inbound relations, then service can decide which DOs to process.
+   */
+  async findOneForIntegration(id: string): Promise<Inbound | null> {
+    const qb = this.repository.createQueryBuilder('inbound');
+    qb.where('inbound.id = :id', { id });
+    qb.andWhere((sub) => {
+      const sq = sub
+        .subQuery()
+        .select('1')
+        .from('inbound_do', 'd')
+        .where('d.inbound_id = inbound.id')
+        .andWhere('d.integration_status IN (:...statuses)')
+        .getQuery();
+      return `EXISTS ${sq}`;
+    })
+      .setParameter('statuses', [IntegrationStatus.READY, IntegrationStatus.FAILED]);
+
+    const entity = await qb
+      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndMapOne(
+        'inbound_items.item',
+        MasterItem,
+        'item',
+        'item.id::uuid = inbound_items.item_id',
+      )
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
+      .getOne();
+
+    return entity ?? null;
   }
 
   async update(id: string, data: Partial<Inbound>): Promise<Inbound | null> {
@@ -194,6 +234,7 @@ export class InboundRepository {
     qb.andWhere('assigned_helpers.helper_user_id = :id', { id });
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
@@ -209,6 +250,7 @@ export class InboundRepository {
     return await this.repository
       .createQueryBuilder('inbound')
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { Inbound } from '../core/domain/entities/inbound.entity';
@@ -16,14 +17,14 @@ import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem, InspectionStatus } from '../core/domain/entities/inbound-item.entity';
-import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
+import { InboundDo, IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 import { InboundStatus } from 'src/core/domain/entities/inbound.entity';
 import { PalletTransactionHistory, StatusInventory } from 'src/core/domain/entities/transaction-pallet-history.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
-  IntegrationToOracleService,
+  InboundMappingIntegrationService,
   InboundIntegrationToOracleResult,
-} from './integration/integration-to-oracle.service';
+} from './integration/inbound-mapping-integration.service';
 import {
   InboundIntegrationService,
   InboundIntegrationHeaderWithLines,
@@ -34,18 +35,28 @@ import {
   RcvReceiptIntegrationService,
   RcvReceiptResponseDto,
 } from './integration/rcv-receipt.integration';
+import { InboundIntegrationQueueProducer } from './integration/inbound-integration-queue.producer';
+import { TransactionScanInboundService } from 'src/transaction-scan-inbound/transaction-scan-inbound.service';
+import {
+  ScanInboundStatus,
+  TransactionScanInbound,
+} from 'src/core/domain/entities/transaction-scan-inbound.entity';
 
 @Injectable()
 export class InboundService {
+  private readonly logger = new Logger(InboundService.name);
+
   constructor(
     private readonly inboundRepo: InboundRepository,
     private readonly inboundDoRepo: InboundDoRepository,
     private readonly inboundItemRepo: InboundItemRepository,
     private readonly dataSource: DataSource,
     private readonly paginationService: PaginationService,
-    private readonly integrationToOracleService: IntegrationToOracleService,
+    private readonly inboundMappingIntegrationService: InboundMappingIntegrationService,
     private readonly inboundIntegrationService: InboundIntegrationService,
     private readonly rcvReceiptIntegrationService: RcvReceiptIntegrationService,
+    private readonly inboundIntegrationQueueProducer: InboundIntegrationQueueProducer,
+    private readonly transactionScanInboundService: TransactionScanInboundService,
     @InjectRepository(PalletTransactionHistory)
     private readonly palletTransactionHistoryRepository: Repository<PalletTransactionHistory>,
   ) { }
@@ -336,6 +347,7 @@ export class InboundService {
               inbound_po_date: doDto.inbound_po_date ? new Date(doDto.inbound_po_date) : undefined,
               flag_validated: doDto.flag_validated ?? false,
               validation_surat_jalan: doDto.validation_surat_jalan ?? false,
+              add_to_receipt_number: doDto.add_to_receipt_number,
             });
 
             if (doDto.inbound_items?.length) {
@@ -449,10 +461,10 @@ export class InboundService {
         throw new NotFoundException('Inbound not found');
       }
 
-      // Validate status transition
-      if (inbound.status === InboundStatus.UNLOADING) {
-        throw new BadRequestException('Cannot update inbound that is already unloading');
-      }
+      // // Validate status transition
+      // if (inbound.status === InboundStatus.UNLOADING) {
+      //   throw new BadRequestException('Cannot update inbound that is already unloading');
+      // }
 
       if (inbound.status === InboundStatus.INTEGRATED) {
         throw new BadRequestException('Cannot update inbound that is already integrated');
@@ -593,11 +605,8 @@ export class InboundService {
     return updateSaldo;
   }
 
-  /**
-   * Like `findOne`, but `transaction_scan_inbounds` are nested under each `inbound_item` (matched by
-   * `item_id`) and omitted from the inbound root. `quantity_inspection` is numeric in JSON.
-   */
-  async integrationToOracle(
+
+  async updateStatusInventoryReadyByInboundId(
     id: string,
   ): Promise<any> {
     const inbound = await this.findOne(id);
@@ -622,21 +631,79 @@ export class InboundService {
       });
     }
 
-    // update inbound status to READY_INTEGRATION
-    await this.inboundRepo.update(id, {
-      status: InboundStatus.INTEGRATED,
-    });
-
-    // const dataIntegration = await this.integrationToOracleService.build(inbound);
-    // await this.createInboundIntegrationRecords(dataIntegration);
-    // const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
-    // const rcv_receipt_results = await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
-    // await this.inboundIntegrationService.updateStatusByInboundId(id, 'INTEGRATION');
-
-    // return rcv_receipt_results;
-    // return { ...dataIntegration, rcv_receipt_results };
-    return inbound;
   }
+
+  async integrationToOracle(
+    id: string,
+  ): Promise<any> {
+    try {
+      const inbound = await this.findOneForIntegration(id);
+      if (!inbound) {
+        throw new NotFoundException(
+          'Inbound not found or no inbound_do with integration_status READY/FAILED',
+        );
+      }
+
+      const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
+      await this.createInboundIntegrationRecords(dataIntegration);
+      const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
+
+      let rcv_receipt_results: RcvReceiptResponseDto[];
+      try {
+        rcv_receipt_results =
+          await this.createRcvReceiptsFromInboundIntegrations(inbound_integrations);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Failed to create RCV receipt for inboundId=${id}: ${errorMessage}`);
+        throw new BadRequestException(`Failed to create RCV receipt: ${errorMessage}`);
+      }
+
+      const requestId = this.extractRequestIdFromRcvResults(rcv_receipt_results);
+
+      await this.inboundRepo.update(id, {
+        status: InboundStatus.PROCESSING,
+      });
+
+      await this.inboundIntegrationQueueProducer.publish({
+        inboundId: id,
+        requestId: requestId ?? undefined,
+        retryCount: 0,
+        maxRetry: 20,
+      });
+
+      this.logger.log(
+        `Queued inbound integration job inboundId=${id} requestId=${requestId ?? 'N/A'} retryCount=0`,
+      );
+
+      return {
+        status: 'PROCESSING',
+        inboundId: id,
+        requestId: requestId ?? null,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to integrate inbound to oracle for inboundId=${id}: ${errorMessage}`);
+      throw new BadRequestException(`Failed to integrate inbound to oracle: ${errorMessage}`);
+    }
+  }
+
+  async findOneForIntegration(
+    id: string,
+  ): Promise<Inbound & { inbound_reference_number?: string | null }> {
+    const found = await this.inboundRepo.findOneForIntegration(id);
+    if (!found) {
+      throw new NotFoundException(
+        'Inbound not found or no inbound_do with integration_status READY/FAILED',
+      );
+    }
+    const [enriched] = await this.enrichWithReferenceNumber([found]);
+    return enriched;
+  }
+
+
 
   private async createInboundIntegrationRecords(
     inbound: InboundIntegrationToOracleResult,
@@ -668,12 +735,20 @@ export class InboundService {
       (inbound.inbound_type ?? '').toUpperCase(),
     );
 
+    const isPo = ['PO'].includes(
+      (inbound.inbound_type ?? '').toUpperCase(),
+    );
+
     for (const inboundDo of inbound.inbound_dos ?? []) {
+      const hasAddToReceiptNumber =
+        typeof inboundDo.add_to_receipt_number === 'string' &&
+        inboundDo.add_to_receipt_number.trim() !== '';
+
       const inboundItems = (inboundDo.inbound_items ?? []) as InboundItemWithWarehouse[];
       const lines = inboundItems.map((item) => ({
         source_line_id: item.id,
         source_header_id: inboundDo.id,
-        po_number: inboundDo.inbound_po_number ?? undefined,
+        po_number: isPo ? inboundDo.inbound_po_number : undefined,
         po_line_number: toOptionalNumber(item.line_number),
         iso_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
         iso_line_number: isSoInternalOrSubdist ? toOptionalNumber(item.line_number) : undefined,
@@ -690,16 +765,24 @@ export class InboundService {
         locator_id_selisih: toOptionalNumber(item.warehouse_diff?.locator_id),
       }));
 
+
       await this.inboundIntegrationService.createOrReplaceByInboundDo({
         organization_id: inbound.organization_id,
         inbound_id: inbound.id,
         inbound_do_id: inboundDo.id,
         source_system: 'WMS',
-        transaction_type: isSoInternalOrSubdist ? RcvReceiptTransactionType.INBOUND_GS_MUTASI_SO_INTERNAL : RcvReceiptTransactionType.INBOUND_GS_PRINCIPAL,
+        transaction_type: hasAddToReceiptNumber
+          ? RcvReceiptTransactionType.ADD_TO_RECEIPT
+          : isSoInternalOrSubdist
+            ? RcvReceiptTransactionType.INBOUND_GS_MUTASI_SO_INTERNAL
+            : RcvReceiptTransactionType.INBOUND_GS_PRINCIPAL,
         receipt_source_code: isSoInternalOrSubdist ? 'INTERNAL ORDER' : 'VENDOR',
         source_header_id: inboundDo.id,
-        do_number: isSoInternalOrSubdist ? inboundDo.inbound_do_number : undefined,
+        do_number: inboundDo.inbound_do_number ?? undefined,
         vendor_id: toOptionalNumber(inboundDo.vendor_id),
+        receipt_number: hasAddToReceiptNumber
+          ? inboundDo.add_to_receipt_number!.trim()
+          : undefined,
         vendor_site_id: toOptionalNumber(inboundDo.vendor_site_id),
         total_lines: toOptionalNumber(inboundDo.total_line_items) ?? lines.length,
         rsh_attribute1: inbound.license_plate ?? undefined,
@@ -799,15 +882,161 @@ export class InboundService {
       return [];
     }
 
-    console.log('payloads', payloads);
-
     const response = await this.rcvReceiptIntegrationService.createRcvReceipt(
-      payloads.length === 1 ? payloads[0] : payloads,
+      payloads,
     );
     if (Array.isArray(response)) {
       return response as RcvReceiptResponseDto[];
     }
+    const responseData = (response as Record<string, unknown>).data;
+    if (Array.isArray(responseData)) {
+      return responseData as RcvReceiptResponseDto[];
+    }
     return [response];
-    return [];
+  }
+
+  private extractRequestIdFromRcvResults(
+    responses: RcvReceiptResponseDto[],
+  ): number | null {
+    for (const row of responses) {
+      const result = this.extractRequestIdFromUnknown(row);
+      if (result != null) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  private extractRequestIdFromUnknown(value: unknown): number | null {
+    if (value == null) {
+      return null;
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const nested = this.extractRequestIdFromUnknown(entry);
+        if (nested != null) {
+          return nested;
+        }
+      }
+      return null;
+    }
+    if (typeof value !== 'object') {
+      return null;
+    }
+    const obj = value as Record<string, unknown>;
+    const candidates = [
+      obj.request_id,
+      obj.requestId,
+      obj.REQUEST_ID,
+      obj.REQUEST_ID_IR,
+      obj.REQUEST_ID_IO,
+      obj.REQUEST_ID_OI,
+      obj.data,
+    ];
+    for (const candidate of candidates) {
+      if (candidate == null) {
+        continue;
+      }
+      if (typeof candidate === 'number') {
+        return Number.isNaN(candidate) ? null : candidate;
+      }
+      if (typeof candidate === 'string') {
+        const n = Number(candidate);
+        if (!Number.isNaN(n)) {
+          return n;
+        }
+      } else {
+        const nested = this.extractRequestIdFromUnknown(candidate);
+        if (nested != null) {
+          return nested;
+        }
+      }
+    }
+    return null;
+  }
+
+  async cancelInboundDo(id: string): Promise<InboundDo> {
+    const inboundDo = await this.inboundDoRepo.findOne(id);
+    if (!inboundDo) {
+      throw new NotFoundException('Inbound DO not found');
+    }
+
+    if (inboundDo.integration_status === IntegrationStatus.CANCELLED) {
+      const unchanged = await this.inboundDoRepo.findOne(id);
+      if (!unchanged) {
+        throw new NotFoundException('Inbound DO not found');
+      }
+      return unchanged;
+    }
+
+    if (inboundDo.integration_status === IntegrationStatus.SUCCESS) {
+      throw new BadRequestException(
+        'Cannot cancel inbound DO that has already been integrated successfully',
+      );
+    }
+
+    if (!inboundDo.inbound_id) {
+      throw new BadRequestException('Inbound DO is not linked to an inbound');
+    }
+
+    const inbound = await this.inboundRepo.findOne(inboundDo.inbound_id);
+    if (!inbound) {
+      throw new NotFoundException('Inbound not found');
+    }
+
+    const targetDo = inbound.inbound_dos?.find((d) => d.id === id);
+    if (!targetDo) {
+      throw new NotFoundException('Inbound DO not found on parent inbound');
+    }
+
+    const inboundForDoScans: Inbound = {
+      ...inbound,
+      inbound_dos: [targetDo],
+    };
+    this.inboundMappingIntegrationService.nestTransactionScansUnderInboundItems(inboundForDoScans);
+
+    const scansToRemove: TransactionScanInbound[] = [];
+    const seenScanIds = new Set<string>();
+    for (const item of targetDo.inbound_items ?? []) {
+      const withScans = item as InboundItem & {
+        transaction_scan_inbounds?: TransactionScanInbound[];
+      };
+      for (const scan of withScans.transaction_scan_inbounds ?? []) {
+        if (scan?.id && !seenScanIds.has(scan.id)) {
+          seenScanIds.add(scan.id);
+          scansToRemove.push(scan);
+        }
+      }
+    }
+
+    if (scansToRemove.length > 0) {
+      // for (const item of targetDo.inbound_items ?? []) {
+      //   if (item.inspection_status === InspectionStatus.APPROVED) {
+      //     throw new BadRequestException(
+      //       'Cannot cancel: at least one inbound line has inspection approved',
+      //     );
+      //   }
+      // }
+
+      // for (const scan of scansToRemove) {
+      //   if (scan.status === ScanInboundStatus.COMPLETED) {
+      //     throw new BadRequestException(
+      //       'Cannot cancel: at least one transaction scan inbound is already completed (inspection)',
+      //     );
+      //   }
+      // }
+
+      for (const scan of scansToRemove) {
+        await this.transactionScanInboundService.remove(scan.id);
+      }
+    }
+
+    const updated = await this.inboundDoRepo.update(id, {
+      integration_status: IntegrationStatus.CANCELLED,
+    });
+    if (!updated) {
+      throw new NotFoundException('Inbound DO not found');
+    }
+    return updated;
   }
 }
