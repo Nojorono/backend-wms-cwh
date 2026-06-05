@@ -50,6 +50,7 @@ import { InboundIntegrationModule } from './inbound-integration/inbound-integrat
 import { OutboundIntegrationIrReqModule } from './outbound-integration-ir-req/outbound-integration-ir-req.module';
 import { OutboundIntegrationDeliveriesModule } from './outbound-integration-deliveries/outbound-integration-deliveries.module';
 import { OpeningBalanceStockModule } from './opening-balance-stock/opening-balance-stock.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { OpeningBalanceStockModule } from './opening-balance-stock/opening-balan
     OutboundIntegrationIrReqModule,
     OutboundIntegrationDeliveriesModule,
     OpeningBalanceStockModule,
+    EmailModule,
   ],
   providers: [
     {
