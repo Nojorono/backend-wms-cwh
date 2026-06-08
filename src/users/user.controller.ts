@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Put, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -31,13 +31,23 @@ export class UserController {
 
   @Get()
   @ApiOperation({ summary: 'Get all Users' })
+  @ApiQuery({
+    name: 'departement_id',
+    required: false,
+    description: 'Optional filter by department UUID',
+  })
   @ApiResponse({ status: 200, description: 'Return all Users.', type: [User] })
-  findAll(@OrganizationId() organizationId: string | number | null) {
+  findAll(
+    @OrganizationId() organizationId: string | number | null,
+    @Query('departement_id') departementId?: string,
+  ) {
     if (organizationId === undefined || organizationId === null || organizationId === '') {
       return this.userService.findAll();
     }
 
-    return this.userService.findAllByOrganizationId(String(organizationId));
+    const normalizedDepartementId = departementId?.trim() || undefined;
+
+    return this.userService.findAllByOrganizationId(String(organizationId), normalizedDepartementId);
   }
 
   @Get('deleted')

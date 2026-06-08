@@ -78,8 +78,11 @@ export class UserService {
     return await this.repository.findAll();
   }
 
-  async findAllByOrganizationId(organizationId: string): Promise<User[]> {
-    return await this.repository.findAllByOrganizationId(organizationId);
+  async findAllByOrganizationId(
+    organizationId: string,
+    departementId?: string,
+  ): Promise<User[]> {
+    return await this.repository.findAllByOrganizationId(organizationId, departementId);
   }
 
   async findAllWithDeleted(): Promise<User[]> {

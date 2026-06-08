@@ -21,8 +21,23 @@ export class UserRepository {
     return await this.repository.find({ relations: ['userDetail'] });
   }
 
-  async findAllByOrganizationId(organizationId: string): Promise<User[]> {
-    return await this.repository.find({ where: { userDetail: { organizationId } }, relations: ['userDetail'] });
+  async findAllByOrganizationId(
+    organizationId: string,
+    departementId?: string,
+  ): Promise<User[]> {
+    const userDetailWhere: {
+      organizationId: string;
+      departementId?: string;
+    } = { organizationId };
+
+    if (departementId) {
+      userDetailWhere.departementId = departementId;
+    }
+
+    return await this.repository.find({
+      where: { userDetail: userDetailWhere },
+      relations: ['userDetail'],
+    });
   }
 
   async findAllWithDeleted(): Promise<User[]> {
