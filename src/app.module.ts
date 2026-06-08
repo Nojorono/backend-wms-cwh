@@ -51,6 +51,7 @@ import { OutboundIntegrationIrReqModule } from './outbound-integration-ir-req/ou
 import { OutboundIntegrationDeliveriesModule } from './outbound-integration-deliveries/outbound-integration-deliveries.module';
 import { OpeningBalanceStockModule } from './opening-balance-stock/opening-balance-stock.module';
 import { EmailModule } from './email/email.module';
+import { MasterDepartementModule } from './master-departement/master-departement.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { EmailModule } from './email/email.module';
     OutboundIntegrationDeliveriesModule,
     OpeningBalanceStockModule,
     EmailModule,
+    MasterDepartementModule,
   ],
   providers: [
     {

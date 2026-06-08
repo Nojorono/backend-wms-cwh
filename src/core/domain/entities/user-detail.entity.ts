@@ -3,6 +3,7 @@ import { BaseEntity } from './base.entity';
 import { MasterIO } from './master-io.entity';
 import { User } from './user.entity';
 import { MasterWarehouseSub } from './master-warehouse-sub.entity';
+import { MasterDepartement } from './matser-departement.entity';
 
 @Entity('user_details')
 @Index(['userId'], { unique: true })
@@ -13,6 +14,13 @@ export class UserDetail extends BaseEntity {
   @OneToOne(() => User, (user) => user.userDetail)
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
   user: User;
+
+  @ManyToOne(() => MasterDepartement, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'departement_id' })
+  departement: MasterDepartement;
+
+  @Column({ name: 'departement_id', nullable: true })
+  departementId: string;
 
   @Column({ nullable: true })
   employee_id: string;

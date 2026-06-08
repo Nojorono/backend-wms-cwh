@@ -35,7 +35,8 @@ export class UserService {
         createUserDto.phone ||
         createUserDto.organizationId ||
         createUserDto.firstName ||
-        createUserDto.lastName
+        createUserDto.lastName ||
+        createUserDto.departementId
       ) {
         const normalizedWarehouseSubId =
           createUserDto.warehouseSubId === null ? undefined : createUserDto.warehouseSubId;
@@ -49,6 +50,7 @@ export class UserService {
           firstName: createUserDto.firstName,
           lastName: createUserDto.lastName,
           warehouse_sub_id: normalizedWarehouseSubId,
+          departementId: createUserDto.departementId,
         });
 
         await this.userDetailRepository.save(userDetail);
@@ -136,7 +138,8 @@ export class UserService {
       updateUserDto.organizationId !== undefined ||
       updateUserDto.firstName !== undefined ||
       updateUserDto.lastName !== undefined ||
-      updateUserDto.warehouseSubId !== undefined
+      updateUserDto.warehouseSubId !== undefined ||
+      updateUserDto.departementId !== undefined
     ) {
       const userDetailUpdateData: Partial<UserDetail> = {};
       if (updateUserDto.employeeId !== undefined) userDetailUpdateData.employee_id = updateUserDto.employeeId;
@@ -164,6 +167,7 @@ export class UserService {
           firstName: updateUserDto.firstName,
           lastName: updateUserDto.lastName,
           warehouse_sub_id: normalizedWarehouseSubId,
+          departementId: updateUserDto.departementId,
         });
         await this.userDetailRepository.save(userDetail);
       } else {
