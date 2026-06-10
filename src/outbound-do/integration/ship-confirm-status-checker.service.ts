@@ -22,6 +22,18 @@ export const ORACLE_DELIVERY_STATUS_FIELDS = [
 
 export type OracleDeliveryStatusField = (typeof ORACLE_DELIVERY_STATUS_FIELDS)[number];
 
+/** PICK_RELEASE: steps 1–3 must reach S or E. */
+export const ORACLE_PICK_RELEASE_STATUS_FIELDS: readonly OracleDeliveryStatusField[] = [
+  'create_delivery_status',
+  'update_delivery_status',
+  'pick_release_status',
+];
+
+/** SHIP_CONFIRM_SUBDIST: only ship_confirm_status must reach S or E. */
+export const ORACLE_SHIP_CONFIRM_SUBDIST_STATUS_FIELDS: readonly OracleDeliveryStatusField[] = [
+  'ship_confirm_status',
+];
+
 @Injectable()
 export class ShipConfirmStatusCheckerService {
   private readonly logger = new Logger(ShipConfirmStatusCheckerService.name);
@@ -43,15 +55,15 @@ export class ShipConfirmStatusCheckerService {
     return requiredFields.every((field) => this.isOracleStatusTerminal(delivery[field]));
   }
 
-  /** Which Oracle iface fields must reach S/E — depends on transaction type. */
+  /** Which Oracle iface fields must reach S or E — depends on transaction type. */
   getRequiredOracleStatusFields(
     transactionType?: ShipConfirmInternalTransactionType | null,
   ): OracleDeliveryStatusField[] {
     switch (transactionType) {
       case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE:
-        return ['pick_release_status'];
+        return [...ORACLE_PICK_RELEASE_STATUS_FIELDS];
       case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM:
-        return ['create_delivery_status', 'update_delivery_status', 'ship_confirm_status'];
+        return [...ORACLE_SHIP_CONFIRM_SUBDIST_STATUS_FIELDS];
       case ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL:
       default:
         return [...ORACLE_DELIVERY_STATUS_FIELDS];

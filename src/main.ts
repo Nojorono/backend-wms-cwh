@@ -1,13 +1,79 @@
 import { resolve } from 'path';
+import type { Server } from 'node:http';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from './core/interceptors/response.interceptor';
 import { AppLoggerService } from './infrastructure/services/logger.service';
 import { LoggingInterceptor } from './core/interceptors/logging.interceptor';
 
-async function bootstrap() {
+const LISTEN_RETRY_ATTEMPTS = 10;
+const LISTEN_RETRY_DELAY_MS = 1000;
+const LISTEN_HOST = '0.0.0.0';
+
+function configureHttpServer(app: INestApplication): void {
+  const server = app.getHttpServer() as Server;
+  server.keepAliveTimeout = 5_000;
+  server.headersTimeout = 10_000;
+}
+
+function registerGracefulShutdown(app: INestApplication, logger: AppLoggerService): void {
+  let isShuttingDown = false;
+
+  const shutdown = async (signal: string): Promise<void> => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    isShuttingDown = true;
+    logger.warn(`Shutting down on ${signal}...`, 'Bootstrap');
+
+    const server = app.getHttpServer() as Server;
+    if (typeof server.closeAllConnections === 'function') {
+      server.closeAllConnections();
+    }
+
+    await app.close();
+    process.exit(0);
+  };
+
+  process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+  });
+  process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
+  });
+}
+
+async function listenWithRetry(
+  app: INestApplication,
+  port: number,
+  logger: AppLoggerService,
+): Promise<void> {
+  for (let attempt = 1; attempt <= LISTEN_RETRY_ATTEMPTS; attempt++) {
+    try {
+      await app.listen(port, LISTEN_HOST);
+      configureHttpServer(app);
+      return;
+    } catch (error) {
+      const errno = error as NodeJS.ErrnoException;
+      const isPortInUse = errno.code === 'EADDRINUSE';
+
+      if (!isPortInUse || attempt === LISTEN_RETRY_ATTEMPTS) {
+        throw error;
+      }
+
+      logger.warn(
+        `Port ${port} is still in use (attempt ${attempt}/${LISTEN_RETRY_ATTEMPTS}). Waiting for previous process to release it...`,
+        'Bootstrap',
+      );
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, LISTEN_RETRY_DELAY_MS * attempt));
+    }
+  }
+}
+
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
@@ -70,10 +136,12 @@ async function bootstrap() {
     },
   });
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
+  registerGracefulShutdown(app, logger);
 
-  const baseUrl = `http://localhost:${port}`;
+  const port = Number(process.env.PORT) || 3000;
+  await listenWithRetry(app, port, logger);
+
+  const baseUrl = `http://127.0.0.1:${port}`;
   const logDir = resolve(process.cwd(), process.env.LOG_DIR || 'logs');
   const env = process.env.NODE_ENV || 'development';
 
@@ -82,4 +150,8 @@ async function bootstrap() {
     'Bootstrap',
   );
 }
-bootstrap();
+
+bootstrap().catch((error: unknown) => {
+  console.error('Application failed to start', error);
+  process.exit(1);
+});
