@@ -78,7 +78,7 @@ export class ShipConfirmIntegrationService implements OnModuleInit {
     }
   }
 
-  /** RMQ `shipconfirm.find` — lookup by source_header_id and/or iso_header_id. */
+  /** RMQ `shipconfirm.find` — lookup by source_header_id, iso_header_id, and/or transaction_type. */
   async find(payload: ShipConfirmInternalFindDto): Promise<ShipConfirmInternalResponseDto> {
     try {
       await this.ensureConnection();

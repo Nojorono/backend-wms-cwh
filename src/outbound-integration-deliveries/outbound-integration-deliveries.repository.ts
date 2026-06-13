@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   OutboundIntegrationDeliveries,
   ShipConfirmInternalTransactionType,
@@ -15,7 +15,7 @@ export class OutboundIntegrationDeliveriesRepository {
   constructor(
     @InjectRepository(OutboundIntegrationDeliveries)
     private readonly repo: Repository<OutboundIntegrationDeliveries>,
-  ) {}
+  ) { }
 
   async create(dto: CreateOutboundIntegrationDeliveriesDto): Promise<OutboundIntegrationDeliveries> {
     const entity = this.repo.create(dto);
@@ -57,9 +57,45 @@ export class OutboundIntegrationDeliveriesRepository {
     });
   }
 
+  async findByOutboundDoIdAndTransactionTypes(
+    outboundDoId: string,
+    transactionTypes: ShipConfirmInternalTransactionType[],
+  ): Promise<OutboundIntegrationDeliveries[]> {
+    if (!transactionTypes.length) {
+      return await this.findByOutboundDoId(outboundDoId);
+    }
+
+    return await this.repo.find({
+      where: {
+        outbound_do_id: outboundDoId,
+        transaction_type: In(transactionTypes),
+      },
+      relations: [...DELIVERY_RELATIONS],
+      order: { createdAt: 'ASC' },
+    });
+  }
+
   async findByOutboundMemoId(outboundMemoId: string): Promise<OutboundIntegrationDeliveries[]> {
     return await this.repo.find({
       where: { outbound_memo_id: outboundMemoId },
+      relations: [...DELIVERY_RELATIONS],
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async findByMemoIdAndTransactionTypes(
+    memoId: string,
+    transactionTypes: ShipConfirmInternalTransactionType[],
+  ): Promise<OutboundIntegrationDeliveries[]> {
+    if (!transactionTypes.length) {
+      return await this.findByOutboundMemoId(memoId);
+    }
+
+    return await this.repo.find({
+      where: [
+        { outbound_memo_id: memoId, transaction_type: In(transactionTypes) },
+        { source_header_id: memoId, transaction_type: In(transactionTypes) },
+      ],
       relations: [...DELIVERY_RELATIONS],
       order: { createdAt: 'ASC' },
     });

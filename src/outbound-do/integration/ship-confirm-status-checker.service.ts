@@ -6,6 +6,7 @@ import {
 } from '../../core/domain/entities/outbound-integration-deliveries.entity';
 import { UpdateOutboundIntegrationDeliveriesDto } from '../../outbound-integration-deliveries/dto/update-outbound-integration-deliveries.dto';
 import { ShipConfirmIntegrationService } from './ship-confirm.integration';
+import { ShipConfirmInternalFindDto } from '../dto/ship-confirm-internal-find.dto';
 import { ShipConfirmInternalResponseDto } from './dto/ship-confirm-internal-response.dto';
 import {
   OutboundJobPayload,
@@ -107,53 +108,65 @@ export class ShipConfirmStatusCheckerService {
   }
 
   /**
-   * Poll Oracle by each delivery row's source_header_id (memo.id for internal & subdist pick release).
+   * Poll Oracle by memo id (`source_header_id` = `outbound_memo_id` for all ship confirm types).
    * outboundDoId is only used to load WMS staging rows for that DO — not sent to Oracle.
    */
-  async checkOutboundDoStatus(payload: OutboundJobPayload): Promise<ShipConfirmDoCheckResult> {
-    const deliveries = await this.deliveriesRepository.findByOutboundDoId(payload.outboundDoId);
+  async checkOutboundDoStatus(
+    payload: OutboundJobPayload,
+    transactionType?: ShipConfirmInternalTransactionType,
+  ): Promise<ShipConfirmDoCheckResult> {
+    const allDeliveries = await this.deliveriesRepository.findByOutboundDoId(payload.outboundDoId);
+    const deliveries = transactionType
+      ? allDeliveries.filter((row) => row.transaction_type === transactionType)
+      : allDeliveries;
+
     if (!deliveries.length) {
       return {
         status: 'PENDING',
-        reason: 'No outbound integration deliveries for this outbound DO',
+        reason: transactionType
+          ? `No outbound integration deliveries for transaction_type ${transactionType}`
+          : 'No outbound integration deliveries for this outbound DO',
         deliveriesUpdated: 0,
         hasError: false,
       };
     }
 
     let updatedCount = 0;
-    const headers = this.groupDeliveriesBySourceHeader(deliveries);
+    const findGroups = this.groupDeliveriesForFind(deliveries);
 
     this.logger.log(
-      `Ship confirm poll outboundDoId=${payload.outboundDoId} sourceHeaderCount=${headers.size} deliveryCount=${deliveries.length}`,
+      `Ship confirm poll outboundDoId=${payload.outboundDoId} transactionType=${transactionType ?? 'ALL'} findGroupCount=${findGroups.size} deliveryCount=${deliveries.length}`,
     );
 
-    for (const [sourceHeaderId, group] of headers) {
-      const isoHeaderId = group[0]?.iso_header_id;
-      if (isoHeaderId == null) {
+    for (const [, group] of findGroups) {
+      const sourceHeaderId = this.resolveMemoSourceHeaderId(group[0]);
+      const groupTransactionType = group[0]?.transaction_type;
+
+      if (!sourceHeaderId || !groupTransactionType) {
         this.logger.warn(
-          `Skip shipconfirm.find; missing iso_header_id sourceHeaderId=${sourceHeaderId} outboundDoId=${payload.outboundDoId}`,
+          `Skip shipconfirm.find; missing source_header_id or transaction_type outboundDoId=${payload.outboundDoId}`,
         );
         continue;
       }
 
       try {
-        this.logger.log(
-          `shipconfirm.find source_header_id=${sourceHeaderId} iso_header_id=${isoHeaderId} transactionType=${group[0]?.transaction_type ?? 'N/A'}`,
-        );
-        const response = await this.shipConfirmIntegrationService.find({
-          source_header_id: sourceHeaderId,
-          iso_header_id: Number(isoHeaderId),
+        updatedCount += await this.findAndSyncBySourceHeader({
+          sourceHeaderId,
+          transactionType: groupTransactionType,
+          scopeDeliveries: group,
+          matchPool: allDeliveries,
         });
-        updatedCount += await this.syncDeliveriesFromOracleResponse(group, response);
       } catch (error) {
         this.logger.warn(
-          `shipconfirm.find failed sourceHeaderId=${sourceHeaderId}: ${error instanceof Error ? error.message : String(error)}`,
+          `shipconfirm.find failed sourceHeaderId=${sourceHeaderId} transactionType=${groupTransactionType}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
 
-    const refreshed = await this.deliveriesRepository.findByOutboundDoId(payload.outboundDoId);
+    const refreshedAll = await this.deliveriesRepository.findByOutboundDoId(payload.outboundDoId);
+    const refreshed = transactionType
+      ? refreshedAll.filter((row) => row.transaction_type === transactionType)
+      : refreshedAll;
     const result = this.evaluateDeliveries(refreshed);
     return {
       ...result,
@@ -161,29 +174,116 @@ export class ShipConfirmStatusCheckerService {
     };
   }
 
+  /**
+   * Poll Oracle with required source_header_id (memo id) + transaction_type, then sync staging rows.
+   */
+  async findAndSyncBySourceHeader(input: {
+    sourceHeaderId: string;
+    transactionType: ShipConfirmInternalTransactionType;
+    scopeDeliveries: OutboundIntegrationDeliveries[];
+    matchPool?: OutboundIntegrationDeliveries[];
+  }): Promise<number> {
+    const matchPool = input.matchPool ?? input.scopeDeliveries;
+    const isoHeaderId = this.resolveIsoHeaderIdForFind(
+      matchPool,
+      input.sourceHeaderId,
+      input.scopeDeliveries[0],
+    );
+
+    const requiresIsoHeaderId =
+      input.transactionType !== ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM;
+
+    if (requiresIsoHeaderId && isoHeaderId == null) {
+      this.logger.warn(
+        `Skip shipconfirm.find; missing iso_header_id sourceHeaderId=${input.sourceHeaderId} transactionType=${input.transactionType}`,
+      );
+      return 0;
+    }
+
+    const findPayload = this.buildShipConfirmFindPayload(
+      input.sourceHeaderId,
+      input.transactionType,
+      isoHeaderId,
+    );
+
+    this.logger.log(
+      `shipconfirm.find source_header_id=${findPayload.source_header_id} transaction_type=${findPayload.transaction_type} iso_header_id=${findPayload.iso_header_id ?? 'N/A'}`,
+    );
+
+    const response = await this.shipConfirmIntegrationService.find(findPayload);
+
+    return await this.syncDeliveriesFromOracleResponse(
+      input.scopeDeliveries,
+      response,
+      matchPool,
+      input.transactionType,
+    );
+  }
+
+  async checkStatusBySourceHeader(input: {
+    sourceHeaderId: string;
+    transactionType: ShipConfirmInternalTransactionType;
+    scopeDeliveries: OutboundIntegrationDeliveries[];
+    matchPool?: OutboundIntegrationDeliveries[];
+  }): Promise<ShipConfirmDoCheckResult> {
+    const deliveriesUpdated = await this.findAndSyncBySourceHeader(input);
+    const result = this.evaluateDeliveries(input.scopeDeliveries);
+
+    return {
+      ...result,
+      deliveriesUpdated,
+    };
+  }
+
+  private buildShipConfirmFindPayload(
+    sourceHeaderId: string,
+    transactionType: ShipConfirmInternalTransactionType,
+    isoHeaderId: number | null,
+  ): ShipConfirmInternalFindDto {
+    return {
+      source_header_id: sourceHeaderId,
+      transaction_type: transactionType,
+      ...(isoHeaderId != null ? { iso_header_id: isoHeaderId } : {}),
+    };
+  }
+
   async syncDeliveriesFromCreateResponse(
     deliveries: OutboundIntegrationDeliveries[],
     response: ShipConfirmInternalResponseDto,
   ): Promise<number> {
-    return this.syncDeliveriesFromOracleResponse(deliveries, response);
+    return this.syncDeliveriesFromOracleResponse(deliveries, response, deliveries);
   }
 
   async syncDeliveriesFromOracleResponse(
     deliveries: OutboundIntegrationDeliveries[],
     response: ShipConfirmInternalResponseDto,
+    matchPool?: OutboundIntegrationDeliveries[],
+    transactionType?: ShipConfirmInternalTransactionType,
   ): Promise<number> {
+    const pool = matchPool ?? deliveries;
     let rows = this.extractOracleRows(response);
-    if (!rows.length && deliveries.length > 0) {
-      const sourceHeaderIds = [
-        ...new Set(
-          deliveries
-            .map((d) => d.source_header_id)
-            .filter((id): id is string => typeof id === 'string' && id.trim() !== ''),
-        ),
-      ];
-      for (const sourceHeaderId of sourceHeaderIds) {
-        rows.push(...this.findOracleRowsForSourceHeader(response, sourceHeaderId));
+    if (!rows.length && pool.length > 0) {
+      const findGroups = this.groupDeliveriesForFind(pool);
+      for (const [, group] of findGroups) {
+        const sourceHeaderId = this.resolveMemoSourceHeaderId(group[0]);
+        const groupTransactionType = transactionType ?? group[0]?.transaction_type;
+        if (!sourceHeaderId) {
+          continue;
+        }
+        rows.push(
+          ...this.findOracleRowsForSourceHeader(
+            response,
+            sourceHeaderId,
+            groupTransactionType,
+          ),
+        );
       }
+    }
+
+    if (transactionType) {
+      rows = rows.filter((row) =>
+        this.matchesOracleTransactionType(this.normalizeOracleRowKeys(row), transactionType),
+      );
     }
 
     if (!rows.length) {
@@ -195,17 +295,100 @@ export class ShipConfirmStatusCheckerService {
 
     let updated = 0;
     for (const row of rows) {
-      updated += await this.applyOracleRowToDeliveries(deliveries, row);
+      updated += await this.applyOracleRowToDeliveries(pool, row, deliveries);
     }
+
+    updated += await this.syncUnmatchedScopeDeliveries(deliveries, rows, pool);
     return updated;
+  }
+
+  /**
+   * Second pass: pair remaining scope rows with Oracle rows by delivery_id / delivery_name
+   * when header-level grouping prevented a unique first-pass match.
+   */
+  private async syncUnmatchedScopeDeliveries(
+    updateScope: OutboundIntegrationDeliveries[],
+    oracleRows: Record<string, unknown>[],
+    matchPool: OutboundIntegrationDeliveries[],
+  ): Promise<number> {
+    if (!updateScope.length || !oracleRows.length) {
+      return 0;
+    }
+
+    const refreshedScope = await Promise.all(
+      updateScope.map((delivery) => this.deliveriesRepository.findById(delivery.id)),
+    );
+    const pendingScope = refreshedScope.filter(
+      (delivery): delivery is OutboundIntegrationDeliveries =>
+        delivery != null && !this.areAllOracleStatusesTerminal(delivery),
+    );
+
+    if (!pendingScope.length) {
+      return 0;
+    }
+
+    let updated = 0;
+    const usedOracleKeys = new Set<string>();
+
+    for (const delivery of pendingScope) {
+      const oracleRow = oracleRows.find((row) => {
+        const key = this.buildOracleRowDedupeKey(row);
+        if (usedOracleKeys.has(key)) {
+          return false;
+        }
+
+        const normalized = this.normalizeOracleRowKeys(row);
+        const deliveryId = this.asNumber(normalized.DELIVERY_ID);
+        const deliveryName = this.asString(normalized.DELIVERY_NAME);
+
+        if (deliveryId != null && delivery.delivery_id != null) {
+          return Number(delivery.delivery_id) === deliveryId;
+        }
+
+        if (deliveryName && delivery.delivery_name?.trim()) {
+          return delivery.delivery_name.trim() === deliveryName;
+        }
+
+        return false;
+      });
+
+      if (!oracleRow) {
+        continue;
+      }
+
+      usedOracleKeys.add(this.buildOracleRowDedupeKey(oracleRow));
+      updated += await this.applyOracleRowToDeliveries(matchPool, oracleRow, [delivery]);
+    }
+
+    return updated;
+  }
+
+  private resolveScopeTransactionType(
+    updateScope: OutboundIntegrationDeliveries[],
+  ): ShipConfirmInternalTransactionType | undefined {
+    const types = new Set(
+      updateScope
+        .map((delivery) => delivery.transaction_type)
+        .filter((type): type is ShipConfirmInternalTransactionType => type != null),
+    );
+
+    return types.size === 1 ? [...types][0] : undefined;
   }
 
   private findOracleRowsForSourceHeader(
     response: ShipConfirmInternalResponseDto,
     sourceHeaderId: string,
+    transactionType?: ShipConfirmInternalTransactionType,
   ): Record<string, unknown>[] {
     const rows: Record<string, unknown>[] = [];
-    this.collectOracleRowsForHeader(response, sourceHeaderId, rows, 0, undefined);
+    this.collectOracleRowsForHeader(
+      response,
+      sourceHeaderId,
+      rows,
+      0,
+      undefined,
+      transactionType,
+    );
     return rows;
   }
 
@@ -215,6 +398,7 @@ export class ShipConfirmStatusCheckerService {
     rows: Record<string, unknown>[],
     depth: number,
     parent?: Record<string, unknown>,
+    transactionType?: ShipConfirmInternalTransactionType,
   ): void {
     if (depth > 12 || value == null) {
       return;
@@ -222,7 +406,14 @@ export class ShipConfirmStatusCheckerService {
 
     if (Array.isArray(value)) {
       for (const entry of value) {
-        this.collectOracleRowsForHeader(entry, sourceHeaderId, rows, depth + 1, parent);
+        this.collectOracleRowsForHeader(
+          entry,
+          sourceHeaderId,
+          rows,
+          depth + 1,
+          parent,
+          transactionType,
+        );
       }
       return;
     }
@@ -255,13 +446,21 @@ export class ShipConfirmStatusCheckerService {
           merged.SOURCE_HEADER_ID = parentForLines.SOURCE_HEADER_ID;
         }
         const mergedHeaderId = this.asSourceHeaderId(merged.SOURCE_HEADER_ID);
-        if (mergedHeaderId === sourceHeaderId && this.isOracleDeliveryRow(merged)) {
+        if (
+          mergedHeaderId === sourceHeaderId &&
+          this.isOracleDeliveryRow(merged) &&
+          this.matchesOracleTransactionType(merged, transactionType)
+        ) {
           rows.push(merged);
         }
       }
     }
 
-    if (rowHeaderId === sourceHeaderId && this.isOracleDeliveryRow(headerContext)) {
+    if (
+      rowHeaderId === sourceHeaderId &&
+      this.isOracleDeliveryRow(headerContext) &&
+      this.matchesOracleTransactionType(headerContext, transactionType)
+    ) {
       const headerRow = { ...headerContext };
       delete headerRow.LINES;
       rows.push(headerRow);
@@ -270,20 +469,51 @@ export class ShipConfirmStatusCheckerService {
     const obj = value as Record<string, unknown>;
     for (const key of ['data', 'result', 'rows', 'LINES']) {
       if (key in obj) {
-        this.collectOracleRowsForHeader(obj[key], sourceHeaderId, rows, depth + 1, headerContext);
+        this.collectOracleRowsForHeader(
+          obj[key],
+          sourceHeaderId,
+          rows,
+          depth + 1,
+          headerContext,
+          transactionType,
+        );
       }
     }
 
     for (const nested of Object.values(obj)) {
       if (nested != null && typeof nested === 'object' && !Array.isArray(nested)) {
-        this.collectOracleRowsForHeader(nested, sourceHeaderId, rows, depth + 1, headerContext);
+        this.collectOracleRowsForHeader(
+          nested,
+          sourceHeaderId,
+          rows,
+          depth + 1,
+          headerContext,
+          transactionType,
+        );
       }
     }
   }
 
+  private matchesOracleTransactionType(
+    row: Record<string, unknown>,
+    transactionType?: ShipConfirmInternalTransactionType,
+  ): boolean {
+    if (!transactionType) {
+      return true;
+    }
+
+    const rowTransactionType = this.asString(row.TRANSACTION_TYPE);
+    if (!rowTransactionType) {
+      return true;
+    }
+
+    return rowTransactionType === transactionType;
+  }
+
   private async applyOracleRowToDeliveries(
-    deliveries: OutboundIntegrationDeliveries[],
+    matchPool: OutboundIntegrationDeliveries[],
     oracleRow: Record<string, unknown>,
+    updateScope: OutboundIntegrationDeliveries[] = matchPool,
   ): Promise<number> {
     const normalized = this.normalizeOracleRowKeys(oracleRow);
     const patch = this.mapOracleRowToStatusPatch(normalized);
@@ -292,58 +522,222 @@ export class ShipConfirmStatusCheckerService {
     }
 
     const sourceHeaderId = this.asSourceHeaderId(normalized.SOURCE_HEADER_ID);
-    if (!sourceHeaderId) {
-      return 0;
-    }
+    const deliveryId = this.asNumber(normalized.DELIVERY_ID);
+    const deliveryName = this.asString(normalized.DELIVERY_NAME);
 
-    const sourceLineId = this.asString(normalized.SOURCE_LINE_ID);
-    const isoInventoryItemId = this.asNumber(normalized.ISO_INVENTORY_ITEM_ID);
-
-    const targets = this.resolveDeliveryMatchTargets(
-      deliveries,
+    const matched = this.resolveDeliveryMatchTargets(
+      matchPool,
       sourceHeaderId,
-      sourceLineId,
-      isoInventoryItemId,
+      {
+        sourceLineId: this.asString(normalized.SOURCE_LINE_ID),
+        isoLineId: this.asNumber(normalized.ISO_LINE_ID),
+        isoInventoryItemId: this.asNumber(normalized.ISO_INVENTORY_ITEM_ID),
+        deliveryId,
+        deliveryName,
+        shipConfirmRequestId: this.asNumber(normalized.SHIP_CONFIRM_REQUEST_ID),
+        pickReleaseRequestId: this.asNumber(normalized.PICK_RELEASE_REQUEST_ID),
+      },
+      this.resolveScopeTransactionType(updateScope),
     );
+
+    const scopeIds = new Set(updateScope.map((delivery) => delivery.id));
+    const targets = matched.filter((delivery) => scopeIds.has(delivery.id));
 
     if (!targets.length) {
       this.logger.warn(
-        `No delivery rows matched Oracle row sourceHeaderId=${sourceHeaderId} sourceLineId=${sourceLineId ?? 'N/A'} isoInventoryItemId=${isoInventoryItemId ?? 'N/A'}`,
+        `No delivery rows matched Oracle row sourceHeaderId=${sourceHeaderId ?? 'N/A'} deliveryId=${deliveryId ?? 'N/A'} deliveryName=${deliveryName ?? 'N/A'} sourceLineId=${this.asString(normalized.SOURCE_LINE_ID) ?? 'N/A'}`,
       );
       return 0;
     }
 
+    let updated = 0;
     for (const delivery of targets) {
-      await this.deliveriesRepository.update(delivery.id, patch);
+      const scopedPatch = this.filterOraclePatchForTransactionType(
+        delivery.transaction_type,
+        patch,
+      );
+      if (Object.keys(scopedPatch).length === 0) {
+        continue;
+      }
+      await this.deliveriesRepository.update(delivery.id, scopedPatch);
+      updated += 1;
     }
 
-    return targets.length;
+    return updated;
+  }
+
+  private filterOraclePatchForTransactionType(
+    transactionType: ShipConfirmInternalTransactionType | null | undefined,
+    patch: UpdateOutboundIntegrationDeliveriesDto,
+  ): UpdateOutboundIntegrationDeliveriesDto {
+    const sharedKeys = new Set([
+      'iface_id',
+      'delivery_id',
+      'delivery_name',
+      'creation_date',
+      'last_updated_date',
+    ]);
+
+    const allowedKeys = new Set<string>([...sharedKeys]);
+
+    switch (transactionType) {
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE:
+        allowedKeys.add('pick_release_request_id');
+        allowedKeys.add('create_delivery_status');
+        allowedKeys.add('create_delivery_message');
+        allowedKeys.add('update_delivery_status');
+        allowedKeys.add('update_delivery_message');
+        allowedKeys.add('pick_release_status');
+        allowedKeys.add('pick_release_message');
+        break;
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM:
+        allowedKeys.add('ship_confirm_request_id');
+        allowedKeys.add('ship_confirm_status');
+        allowedKeys.add('ship_confirm_message');
+        break;
+      case ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL:
+      default:
+        return patch;
+    }
+
+    const scoped: UpdateOutboundIntegrationDeliveriesDto = {};
+    for (const [key, value] of Object.entries(patch)) {
+      if (allowedKeys.has(key)) {
+        (scoped as Record<string, unknown>)[key] = value;
+      }
+    }
+    return scoped;
   }
 
   /**
-   * Subdist pick release: source_header_id = memo.id (multiple delivery rows per memo).
-   * Match Oracle rows by SOURCE_LINE_ID / item id, or ISO_INVENTORY_ITEM_ID when present.
+   * All ship confirm types use memo id as Oracle SOURCE_HEADER_ID.
+   * Prefer outbound_memo_id; fall back to stored source_header_id for legacy rows.
+   */
+  private resolveMemoSourceHeaderId(
+    delivery?: OutboundIntegrationDeliveries | null,
+  ): string | undefined {
+    if (!delivery) {
+      return undefined;
+    }
+
+    const memoId = delivery.outbound_memo_id?.trim();
+    if (memoId) {
+      return memoId;
+    }
+
+    return this.asSourceHeaderId(delivery.source_header_id);
+  }
+
+  /**
+   * Match Oracle rows to WMS staging by memo id, delivery id/name, line, or inventory item.
+   * Subdist ship confirm Oracle rows often omit SOURCE_HEADER_ID and use DELIVERY_ID instead.
    */
   private resolveDeliveryMatchTargets(
     deliveries: OutboundIntegrationDeliveries[],
-    sourceHeaderId: string,
-    sourceLineId?: string,
-    isoInventoryItemId?: number | null,
+    sourceHeaderId: string | undefined,
+    criteria: {
+      sourceLineId?: string;
+      isoLineId?: number | null;
+      isoInventoryItemId?: number | null;
+      deliveryId?: number | null;
+      deliveryName?: string;
+      shipConfirmRequestId?: number | null;
+      pickReleaseRequestId?: number | null;
+    } = {},
+    transactionType?: ShipConfirmInternalTransactionType,
   ): OutboundIntegrationDeliveries[] {
-    const headerMatches = deliveries.filter(
-      (delivery) => this.asSourceHeaderId(delivery.source_header_id) === sourceHeaderId,
-    );
+    const {
+      sourceLineId,
+      isoLineId,
+      isoInventoryItemId,
+      deliveryId,
+      deliveryName,
+      shipConfirmRequestId,
+      pickReleaseRequestId,
+    } = criteria;
 
-    if (!headerMatches.length) {
-      return [];
+    let candidates = deliveries;
+
+    if (transactionType) {
+      const typed = candidates.filter((delivery) => delivery.transaction_type === transactionType);
+      if (typed.length) {
+        candidates = typed;
+      }
     }
 
-    if (headerMatches.length === 1) {
-      return headerMatches;
+    if (sourceHeaderId) {
+      const headerMatches = candidates.filter(
+        (delivery) => this.resolveMemoSourceHeaderId(delivery) === sourceHeaderId,
+      );
+      if (headerMatches.length) {
+        candidates = headerMatches;
+      }
+    }
+
+    if (deliveryId != null) {
+      const deliveryMatches = candidates.filter(
+        (delivery) => delivery.delivery_id != null && Number(delivery.delivery_id) === deliveryId,
+      );
+      if (deliveryMatches.length === 1) {
+        return deliveryMatches;
+      }
+      if (deliveryMatches.length > 1 && transactionType) {
+        const typedMatches = deliveryMatches.filter(
+          (delivery) => delivery.transaction_type === transactionType,
+        );
+        if (typedMatches.length === 1) {
+          return typedMatches;
+        }
+      }
+      if (deliveryMatches.length) {
+        return deliveryMatches;
+      }
+    }
+
+    if (deliveryName) {
+      const nameMatches = candidates.filter(
+        (delivery) => (delivery.delivery_name ?? '').trim() === deliveryName,
+      );
+      if (nameMatches.length === 1) {
+        return nameMatches;
+      }
+      if (nameMatches.length > 1 && transactionType) {
+        const typedMatches = nameMatches.filter(
+          (delivery) => delivery.transaction_type === transactionType,
+        );
+        if (typedMatches.length === 1) {
+          return typedMatches;
+        }
+      }
+      if (nameMatches.length) {
+        return nameMatches;
+      }
+    }
+
+    if (shipConfirmRequestId != null) {
+      const requestMatches = candidates.filter(
+        (delivery) =>
+          delivery.ship_confirm_request_id != null &&
+          Number(delivery.ship_confirm_request_id) === shipConfirmRequestId,
+      );
+      if (requestMatches.length) {
+        return requestMatches;
+      }
+    }
+
+    if (pickReleaseRequestId != null) {
+      const requestMatches = candidates.filter(
+        (delivery) =>
+          delivery.pick_release_request_id != null &&
+          Number(delivery.pick_release_request_id) === pickReleaseRequestId,
+      );
+      if (requestMatches.length) {
+        return requestMatches;
+      }
     }
 
     if (sourceLineId) {
-      const lineMatches = headerMatches.filter(
+      const lineMatches = candidates.filter(
         (delivery) =>
           delivery.source_line_id === sourceLineId ||
           delivery.outbound_memo_item_id === sourceLineId,
@@ -353,8 +747,17 @@ export class ShipConfirmStatusCheckerService {
       }
     }
 
+    if (isoLineId != null) {
+      const isoLineMatches = candidates.filter(
+        (delivery) => delivery.iso_line_id != null && Number(delivery.iso_line_id) === isoLineId,
+      );
+      if (isoLineMatches.length) {
+        return isoLineMatches;
+      }
+    }
+
     if (isoInventoryItemId != null) {
-      const inventoryMatches = headerMatches.filter(
+      const inventoryMatches = candidates.filter(
         (delivery) =>
           delivery.iso_inventory_item_id != null &&
           Number(delivery.iso_inventory_item_id) === isoInventoryItemId,
@@ -364,7 +767,11 @@ export class ShipConfirmStatusCheckerService {
       }
     }
 
-    return headerMatches;
+    if (candidates.length === 1) {
+      return candidates;
+    }
+
+    return [];
   }
 
   private mapOracleRowToStatusPatch(
@@ -483,19 +890,39 @@ export class ShipConfirmStatusCheckerService {
     return s === '' ? undefined : s;
   }
 
-  private groupDeliveriesBySourceHeader(
+  private groupDeliveriesForFind(
     deliveries: OutboundIntegrationDeliveries[],
   ): Map<string, OutboundIntegrationDeliveries[]> {
     const map = new Map<string, OutboundIntegrationDeliveries[]>();
     for (const delivery of deliveries) {
-      if (!delivery.source_header_id) {
+      const memoSourceHeaderId = this.resolveMemoSourceHeaderId(delivery);
+      if (!memoSourceHeaderId) {
         continue;
       }
-      const list = map.get(delivery.source_header_id) ?? [];
+
+      const key = `${memoSourceHeaderId}|${delivery.transaction_type ?? 'unknown'}`;
+      const list = map.get(key) ?? [];
       list.push(delivery);
-      map.set(delivery.source_header_id, list);
+      map.set(key, list);
     }
     return map;
+  }
+
+  private resolveIsoHeaderIdForFind(
+    deliveries: OutboundIntegrationDeliveries[],
+    sourceHeaderId: string,
+    delivery: OutboundIntegrationDeliveries | undefined,
+  ): number | null {
+    if (delivery?.iso_header_id != null) {
+      return Number(delivery.iso_header_id);
+    }
+
+    const siblingWithIso = deliveries.find(
+      (row) =>
+        this.resolveMemoSourceHeaderId(row) === sourceHeaderId && row.iso_header_id != null,
+    );
+
+    return siblingWithIso?.iso_header_id != null ? Number(siblingWithIso.iso_header_id) : null;
   }
 
   private extractOracleRows(response: ShipConfirmInternalResponseDto): Record<string, unknown>[] {
@@ -513,15 +940,7 @@ export class ShipConfirmStatusCheckerService {
     const unique: Record<string, unknown>[] = [];
     for (const row of rows) {
       const normalized = this.normalizeOracleRowKeys(row);
-      const key = [
-        this.asSourceHeaderId(normalized.SOURCE_HEADER_ID) ?? '',
-        this.asString(normalized.SOURCE_LINE_ID) ?? '',
-        this.asNumber(normalized.ISO_INVENTORY_ITEM_ID) ?? '',
-        this.normalizeOracleDeliveryStatus(normalized.PICK_RELEASE_STATUS) ?? '',
-        this.normalizeOracleDeliveryStatus(normalized.CREATE_DELIVERY_STATUS) ?? '',
-        this.normalizeOracleDeliveryStatus(normalized.UPDATE_DELIVERY_STATUS) ?? '',
-        this.normalizeOracleDeliveryStatus(normalized.SHIP_CONFIRM_STATUS) ?? '',
-      ].join('|');
+      const key = this.buildOracleRowDedupeKey(normalized);
       if (seen.has(key)) {
         continue;
       }
@@ -529,6 +948,32 @@ export class ShipConfirmStatusCheckerService {
       unique.push(normalized);
     }
     return unique;
+  }
+
+  private buildOracleRowDedupeKey(row: Record<string, unknown>): string {
+    const identityParts = [
+      this.asNumber(row.DELIVERY_ID),
+      this.asString(row.DELIVERY_NAME),
+      this.asSourceHeaderId(row.SOURCE_HEADER_ID),
+      this.asString(row.SOURCE_LINE_ID),
+      this.asNumber(row.ISO_LINE_ID),
+      this.asNumber(row.ISO_INVENTORY_ITEM_ID),
+      this.asNumber(row.SHIP_CONFIRM_REQUEST_ID),
+      this.asNumber(row.PICK_RELEASE_REQUEST_ID),
+      this.asNumber(row.IFACE_ID),
+    ].map((value) => (value == null ? '' : String(value)));
+
+    if (identityParts.some((part) => part !== '')) {
+      return identityParts.join('|');
+    }
+
+    return [
+      ...identityParts,
+      this.normalizeOracleDeliveryStatus(row.PICK_RELEASE_STATUS) ?? '',
+      this.normalizeOracleDeliveryStatus(row.CREATE_DELIVERY_STATUS) ?? '',
+      this.normalizeOracleDeliveryStatus(row.UPDATE_DELIVERY_STATUS) ?? '',
+      this.normalizeOracleDeliveryStatus(row.SHIP_CONFIRM_STATUS) ?? '',
+    ].join('|');
   }
 
   private collectOracleRows(
@@ -601,7 +1046,13 @@ export class ShipConfirmStatusCheckerService {
 
   private isOracleDeliveryRow(obj: Record<string, unknown>): boolean {
     const normalized = this.normalizeOracleRowKeys(obj);
-    if (!this.asSourceHeaderId(normalized.SOURCE_HEADER_ID)) {
+
+    const hasIdentifier =
+      this.asSourceHeaderId(normalized.SOURCE_HEADER_ID) != null ||
+      this.asNumber(normalized.DELIVERY_ID) != null ||
+      !!this.asString(normalized.DELIVERY_NAME);
+
+    if (!hasIdentifier) {
       return false;
     }
 
@@ -613,7 +1064,9 @@ export class ShipConfirmStatusCheckerService {
       normalized.CREATE_DELIVERY_MESSAGE != null ||
       normalized.UPDATE_DELIVERY_MESSAGE != null ||
       normalized.PICK_RELEASE_MESSAGE != null ||
-      normalized.SHIP_CONFIRM_MESSAGE != null
+      normalized.SHIP_CONFIRM_MESSAGE != null ||
+      normalized.SHIP_CONFIRM_REQUEST_ID != null ||
+      normalized.PICK_RELEASE_REQUEST_ID != null
     );
   }
 

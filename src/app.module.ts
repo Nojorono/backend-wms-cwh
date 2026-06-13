@@ -52,8 +52,6 @@ import { OutboundIntegrationDeliveriesModule } from './outbound-integration-deli
 import { OpeningBalanceStockModule } from './opening-balance-stock/opening-balance-stock.module';
 import { EmailModule } from './email/email.module';
 import { MasterDepartementModule } from './master-departement/master-departement.module';
-import { ScheduledTaskModule } from './scheduled-task/scheduled-task.module';
-
 @Module({
   imports: [
     LoggerModule, // Global logger module - must be imported first
@@ -112,7 +110,6 @@ import { ScheduledTaskModule } from './scheduled-task/scheduled-task.module';
     OpeningBalanceStockModule,
     EmailModule,
     MasterDepartementModule,
-    ScheduledTaskModule,
   ],
   providers: [
     {

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsNotEmpty, IsNumber, IsUUID, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator';
 
 /** Input line for subdist ship confirm — quantities only; delivery id/name come from pick release staging. */
 export class CreateShipConfirmSubdistLineDto {
@@ -20,6 +20,22 @@ export class CreateShipConfirmSubdistLineDto {
   @Min(1)
   @Type(() => Number)
   shipped_quantity: number;
+
+  // @ApiProperty({
+  //   description: 'Delivery ID',
+  //   example: 12345,
+  // })
+  // @IsNumber()
+  // @Type(() => Number)
+  // delivery_id: number;
+
+  // @ApiProperty({
+  //   description: 'Delivery name',
+  //   example: 'DEL-001',
+  // })
+  // @IsString()
+  // @MaxLength(150)
+  // delivery_name: string;
 }
 
 export class CreateShipConfirmSubdistPayloadDto {

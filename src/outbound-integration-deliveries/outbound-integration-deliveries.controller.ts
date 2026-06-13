@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { OutboundIntegrationDeliveries } from '../core/domain/entities/outbound-integration-deliveries.entity';
 import { CreateOutboundIntegrationDeliveriesDto } from './dto/create-outbound-integration-deliveries.dto';
 import { UpdateOutboundIntegrationDeliveriesDto } from './dto/update-outbound-integration-deliveries.dto';
 import { PollShipConfirmStatusResponseDto } from './dto/poll-ship-confirm-status-response.dto';
+import { PollShipConfirmByMemoQueryDto } from './dto/poll-ship-confirm-by-memo-query.dto';
 import { OutboundIntegrationDeliveriesService } from './outbound-integration-deliveries.service';
 
 @ApiTags('Outbound Integration Deliveries')
@@ -37,17 +38,21 @@ export class OutboundIntegrationDeliveriesController {
 
   @Get('poll-status/outbound-do/:outboundDoId')
   @ApiOperation({
-    summary: 'Poll Oracle ship confirm / pick release status and sync to WMS',
+    summary: 'Poll Oracle ship confirm / pick release status by outbound DO',
     description:
-      'Calls shipconfirm.find per source_header_id (memo.id for subdist, IR header id for internal), ' +
-      'updates create/update/pick_release/ship_confirm status fields on outbound_integration_deliveries.',
+      'Loads outbound_integration_deliveries for the outbound DO and transaction_type, ' +
+      'then calls shipconfirm.find per memo with source_header_id (= memo id) + transaction_type.',
   })
   @ApiResponse({ status: 200, type: PollShipConfirmStatusResponseDto })
-  @ApiResponse({ status: 404, description: 'No integration deliveries for this outbound DO' })
+  @ApiResponse({
+    status: 404,
+    description: 'No integration deliveries for this outbound DO and transaction_type',
+  })
   pollStatusByOutboundDoId(
     @Param('outboundDoId') outboundDoId: string,
+    @Query() query: PollShipConfirmByMemoQueryDto,
   ): Promise<PollShipConfirmStatusResponseDto> {
-    return this.service.pollStatusByOutboundDoId(outboundDoId);
+    return this.service.pollStatusByOutboundDoId(outboundDoId, query);
   }
 
   @Get('outbound-memo/:outboundMemoId')

@@ -6,6 +6,7 @@ import {
 import { CreateOutboundIntegrationDeliveriesDto } from './dto/create-outbound-integration-deliveries.dto';
 import { UpdateOutboundIntegrationDeliveriesDto } from './dto/update-outbound-integration-deliveries.dto';
 import { PollShipConfirmStatusResponseDto } from './dto/poll-ship-confirm-status-response.dto';
+import { PollShipConfirmByMemoQueryDto } from './dto/poll-ship-confirm-by-memo-query.dto';
 import { OutboundIntegrationDeliveriesRepository } from './outbound-integration-deliveries.repository';
 import { ShipConfirmStatusCheckerService } from '../outbound-do/integration/ship-confirm-status-checker.service';
 import { OutboundJobProcessStatus } from '../outbound-do/integration/outbound-integration-queue.types';
@@ -57,56 +58,81 @@ export class OutboundIntegrationDeliveriesService {
   }
 
   /**
-   * Poll Oracle ship confirm / pick release status via shipconfirm.find,
-   * sync to outbound_integration_deliveries (per source_header_id = memo.id for subdist).
+   * Poll Oracle for an outbound DO, filtered by transaction_type.
+   * shipconfirm.find uses source_header_id (= memo id) + transaction_type per memo group.
    */
-  async pollStatusByOutboundDoId(outboundDoId: string): Promise<PollShipConfirmStatusResponseDto> {
-    const existing = await this.repository.findByOutboundDoId(outboundDoId);
-    if (!existing.length) {
+  async pollStatusByOutboundDoId(
+    outboundDoId: string,
+    query: PollShipConfirmByMemoQueryDto,
+  ): Promise<PollShipConfirmStatusResponseDto> {
+    const scoped = await this.repository.findByOutboundDoIdAndTransactionTypes(outboundDoId, [
+      query.transaction_type,
+    ]);
+
+    if (!scoped.length) {
       throw new NotFoundException(
-        `No outbound integration deliveries found for outbound DO ${outboundDoId}`,
+        `No outbound integration deliveries for outbound DO ${outboundDoId} and transaction_type ${query.transaction_type}`,
       );
     }
 
-    const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus({
-      outboundDoId,
-      retryCount: 0,
-      maxRetry: 20,
-      jobType: 'SHIP_CONFIRM',
-    });
+    const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus(
+      {
+        outboundDoId,
+        retryCount: 0,
+        maxRetry: 20,
+        jobType: 'SHIP_CONFIRM',
+      },
+      query.transaction_type,
+    );
 
-    const refreshed = await this.repository.findByOutboundDoId(outboundDoId);
+    const refreshed = await this.repository.findByOutboundDoIdAndTransactionTypes(outboundDoId, [
+      query.transaction_type,
+    ]);
 
+    return this.buildPollStatusResponse(outboundDoId, result, refreshed);
+  }
+
+  private buildPollStatusResponse(
+    outboundDoId: string,
+    result: {
+      status: OutboundJobProcessStatus;
+      reason: string;
+      deliveriesUpdated: number;
+      hasError: boolean;
+    },
+    deliveries: OutboundIntegrationDeliveries[],
+  ): PollShipConfirmStatusResponseDto {
     return {
       status: result.status,
       reason: result.reason,
       outbound_do_id: outboundDoId,
       deliveries_updated: result.deliveriesUpdated,
       has_error: result.hasError,
-      source_headers: this.buildSourceHeaderSummaries(refreshed),
-      outbound_integration_deliveries: refreshed,
+      source_headers: this.buildSourceHeaderSummaries(deliveries),
+      outbound_integration_deliveries: deliveries,
     };
   }
 
   private buildSourceHeaderSummaries(
     deliveries: OutboundIntegrationDeliveries[],
   ): PollShipConfirmStatusResponseDto['source_headers'] {
-    const bySourceHeader = new Map<string, OutboundIntegrationDeliveries[]>();
+    const byMemoId = new Map<string, OutboundIntegrationDeliveries[]>();
 
     for (const delivery of deliveries) {
-      if (!delivery.source_header_id) {
+      const memoId = delivery.outbound_memo_id?.trim() || delivery.source_header_id?.trim();
+      if (!memoId) {
         continue;
       }
-      const list = bySourceHeader.get(delivery.source_header_id) ?? [];
+      const list = byMemoId.get(memoId) ?? [];
       list.push(delivery);
-      bySourceHeader.set(delivery.source_header_id, list);
+      byMemoId.set(memoId, list);
     }
 
-    return [...bySourceHeader.entries()].map(([sourceHeaderId, rows]) => {
+    return [...byMemoId.entries()].map(([memoId, rows]) => {
       const processStatus = this.deriveProcessStatusForDeliveries(rows);
       return {
-        source_header_id: sourceHeaderId,
-        outbound_memo_id: rows[0]?.outbound_memo_id ?? undefined,
+        source_header_id: memoId,
+        outbound_memo_id: memoId,
         status: processStatus,
         reason: this.buildSourceHeaderReason(rows, processStatus),
         delivery_count: rows.length,
