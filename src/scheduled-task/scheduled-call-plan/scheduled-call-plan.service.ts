@@ -6,7 +6,7 @@ import { ScheduledCallPlanFetchPayload } from './types/scheduled-call-plan-fetch
 
 @Injectable()
 export class ScheduledCallPlanService {
-  constructor(private readonly snowflakeService: ScheduledCallPlanSnowflakeService) {}
+  constructor(private readonly snowflakeService: ScheduledCallPlanSnowflakeService) { }
 
   async runFetchNow(
     payload?: ScheduledCallPlanFetchPayload,
@@ -15,13 +15,17 @@ export class ScheduledCallPlanService {
   }
 
   async runFetchNowFromJob(job: ScheduledTask): Promise<ScheduledCallPlanFetchResult> {
-    return await this.fetchCallPlan(this.parsePayload(job.payload));
+    const dataCallPlan = await this.fetchCallPlan(this.parsePayload(job.payload));
+    return dataCallPlan;
   }
 
   private async fetchCallPlan(
     payload: ScheduledCallPlanFetchPayload,
   ): Promise<ScheduledCallPlanFetchResult> {
-    return await this.snowflakeService.fetchCallPlan(payload.callPlanStartDate);
+    const dataCallPlan = await this.snowflakeService.fetchCallPlan(payload.callPlanStartDate);
+
+    // to do: find CALL_PLAN_NUMBER null and send email to sales supervisor and ahom
+    return dataCallPlan;
   }
 
   private parsePayload(payload: ScheduledTask['payload']): ScheduledCallPlanFetchPayload {

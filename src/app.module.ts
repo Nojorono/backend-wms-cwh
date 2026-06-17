@@ -53,6 +53,7 @@ import { OpeningBalanceStockModule } from './opening-balance-stock/opening-balan
 import { EmailModule } from './email/email.module';
 import { MasterDepartementModule } from './master-departement/master-departement.module';
 import { ScheduledCallPlanModule } from './scheduled-task/scheduled-call-plan/scheduled-call-plan.module';
+import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
 @Module({
   imports: [
     LoggerModule, // Global logger module - must be imported first
@@ -112,6 +113,7 @@ import { ScheduledCallPlanModule } from './scheduled-task/scheduled-call-plan/sc
     EmailModule,
     MasterDepartementModule,
     ScheduledCallPlanModule,
+    DoSuggestionModule,
   ],
   providers: [
     {
