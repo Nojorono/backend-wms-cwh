@@ -7,6 +7,7 @@ import {
 import { MasterIORepository } from './master-io.repository';
 import { CreateMasterIODto } from './dto/create-master-io.dto';
 import { UpdateMasterIODto } from './dto/update-master-io.dto';
+import { MasterIOFilterQueryDto, MasterIOFilter } from './dto/master-io-filter-query.dto';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
 import { IOIntegrationService } from './integration/io-integration.service';
 
@@ -28,8 +29,82 @@ export class MasterIOService {
     return await this.repository.create(createMasterIODto);
   }
 
-  async findAll(): Promise<MasterIO[]> {
-    return await this.repository.findAll();
+  async findAll(query?: MasterIOFilterQueryDto): Promise<MasterIO[]> {
+    return await this.repository.findAll(this.mapFilterQuery(query));
+  }
+
+  private mapFilterQuery(query?: MasterIOFilterQueryDto): MasterIOFilter | undefined {
+    if (!query) {
+      return undefined;
+    }
+
+    const organizationTypes = this.parseCommaSeparated(query.organization_type);
+    const regionCode = this.parseNullableStringFilter(query.region_code);
+    const endDateActive = this.parseNullableDateFilter(query.end_date_active);
+
+    const hasOrganizationTypes = organizationTypes.length > 0;
+    const hasRegionCode = regionCode !== undefined;
+    const hasEndDateActive = endDateActive !== undefined;
+
+    if (!hasOrganizationTypes && !hasRegionCode && !hasEndDateActive) {
+      return undefined;
+    }
+
+    return {
+      ...(hasOrganizationTypes ? { organization_types: organizationTypes } : {}),
+      ...(hasRegionCode ? { region_code: regionCode } : {}),
+      ...(hasEndDateActive ? { end_date_active: endDateActive } : {}),
+    };
+  }
+
+  private parseCommaSeparated(value?: string): string[] {
+    if (!value?.trim()) {
+      return [];
+    }
+
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+
+  private parseNullableStringFilter(value?: string): string | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    if (trimmed.toLowerCase() === 'null') {
+      return null;
+    }
+
+    return trimmed;
+  }
+
+  private parseNullableDateFilter(value?: string): Date | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    if (trimmed.toLowerCase() === 'null') {
+      return null;
+    }
+
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Invalid end_date_active: ${value}`);
+    }
+
+    return parsed;
   }
 
   async findOne(id: string): Promise<MasterIO> {

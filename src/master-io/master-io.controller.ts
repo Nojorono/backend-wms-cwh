@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterIOService } from './master-io.service';
 import { CreateMasterIODto } from './dto/create-master-io.dto';
 import { UpdateMasterIODto } from './dto/update-master-io.dto';
+import { MasterIOFilterQueryDto } from './dto/master-io-filter-query.dto';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
 
 @ApiTags('Master IO')
@@ -47,14 +48,14 @@ export class MasterIOController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all UOMs' })
+  @ApiOperation({ summary: 'Get all IOs with optional filters' })
   @ApiResponse({
     status: 200,
     description: 'Return all IOs.',
     type: [MasterIO],
   })
-  findAll() {
-    return this.masterIOService.findAll();
+  findAll(@Query() query: MasterIOFilterQueryDto) {
+    return this.masterIOService.findAll(query);
   }
 
   @Get(':id')

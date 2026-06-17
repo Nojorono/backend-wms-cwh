@@ -4,10 +4,10 @@ import { DoSuggestionDetail } from './do-suggestion-detail.entity';
 import { MasterIO } from './master-io.entity';
 
 export enum DoSuggestionStatus {
-    PENDING = 'PENDING',
+    PENDING = 'DRAFT',
     REVISED = 'REVISED',
+    SUBMITTED = 'SUBMITTED',
     FINAL = 'FINAL',
-    CANCELLED = 'CANCELLED',
 }
 
 @Entity('do_suggestion')

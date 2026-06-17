@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
 import { CreateMasterIODto } from './dto/create-master-io.dto';
 import { UpdateMasterIODto } from './dto/update-master-io.dto';
+import { MasterIOFilter } from './dto/master-io-filter-query.dto';
 
 @Injectable()
 export class MasterIORepository {
@@ -17,8 +18,31 @@ export class MasterIORepository {
     return await this.repository.save(io);
   }
 
-  async findAll(): Promise<MasterIO[]> {
-    return await this.repository.find();
+  async findAll(filters?: MasterIOFilter): Promise<MasterIO[]> {
+    const qb = this.repository.createQueryBuilder('io');
+
+    if (filters?.organization_types?.length) {
+      qb.andWhere('io.organization_type IN (:...organization_types)', {
+        organization_types: filters.organization_types,
+      });
+    }
+
+    if (filters?.region_code === null) {
+      qb.andWhere('io.region_code IS NULL');
+    } else if (filters?.region_code !== undefined) {
+      qb.andWhere('io.region_code = :region_code', { region_code: filters.region_code });
+    }
+
+    if (filters?.end_date_active === null) {
+      qb.andWhere('io.end_date_active IS NULL');
+    } else if (filters?.end_date_active !== undefined) {
+      qb.andWhere('io.end_date_active = :end_date_active', {
+        end_date_active: filters.end_date_active,
+      });
+    }
+
+    qb.orderBy('io.createdAt', 'DESC');
+    return await qb.getMany();
   }
 
   async findOne(id: string): Promise<MasterIO | null> {
