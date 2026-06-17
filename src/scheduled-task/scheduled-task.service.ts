@@ -1,26 +1,28 @@
 import {
   BadRequestException,
   ConflictException,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
   OnApplicationBootstrap,
   OnApplicationShutdown,
-  forwardRef,
 } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { ScheduledTask, ScheduledTaskType } from '../core/domain/entities/scheduled-task.entity';
 import { ScheduledTaskPayload } from '../core/domain/types/scheduled-task-payload.interface';
-import { ScheduledCallPlanService } from './scheduled-call-plan/scheduled-call-plan.service';
-import {
-  SCHEDULED_CALL_PLAN_CALLBACK_TYPE,
-  SCHEDULED_EMAIL_CALLBACK_TYPE,
-  SCHEDULED_TASK_CALLBACK_TYPES,
-  ScheduledTaskCallbackType,
-} from './scheduled-task.constants';
+import { ScheduledTaskCallbackRegistry } from './scheduled-task-callback.registry';
 import { ScheduledTaskRepository } from './scheduled-task.repository';
+
+export interface RegisterCronJobInput {
+  name: string;
+  cronTime: string;
+  callbackType: string;
+  timezone?: string;
+  payload?: ScheduledTaskPayload;
+  /** When false, cron runs in SchedulerRegistry only (not persisted). Default true. */
+  persist?: boolean;
+}
 
 export interface ScheduledTaskActionResult {
   success: boolean;
@@ -30,12 +32,15 @@ export interface ScheduledTaskActionResult {
 @Injectable()
 export class ScheduledTaskService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(ScheduledTaskService.name);
+  private readonly memoryJobs = new Map<
+    string,
+    Pick<RegisterCronJobInput, 'callbackType' | 'payload' | 'timezone'>
+  >();
 
   constructor(
     private readonly repository: ScheduledTaskRepository,
     private readonly schedulerRegistry: SchedulerRegistry,
-    @Inject(forwardRef(() => ScheduledCallPlanService))
-    private readonly callPlanService: ScheduledCallPlanService,
+    private readonly callbackRegistry: ScheduledTaskCallbackRegistry,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -60,7 +65,7 @@ export class ScheduledTaskService implements OnApplicationBootstrap, OnApplicati
   }
 
   getCallbackTypes(): string[] {
-    return [...SCHEDULED_TASK_CALLBACK_TYPES];
+    return this.callbackRegistry.getCallbackTypes();
   }
 
   findAll(): Promise<ScheduledTask[]> {
@@ -71,13 +76,77 @@ export class ScheduledTaskService implements OnApplicationBootstrap, OnApplicati
     return this.repository.findByName(name, withDeleted);
   }
 
-  async ensureCronJob(input: {
-    name: string;
-    cronTime: string;
-    callbackType: string;
-    timezone?: string;
-    payload?: ScheduledTaskPayload;
-  }): Promise<void> {
+  /**
+   * Register a cron job. Use `persist: false` for env-driven in-memory schedules.
+   */
+  async registerCronJob(input: RegisterCronJobInput): Promise<ScheduledTaskActionResult> {
+    this.validateCallbackType(input.callbackType);
+
+    const persist = input.persist !== false;
+
+    if (persist) {
+      const existing = await this.findByName(input.name, true);
+      if (existing && !existing.deletedAt) {
+        throw new ConflictException(`Job "${input.name}" already exists`);
+      }
+      if (existing?.deletedAt) {
+        await this.repository.restoreByName(input.name);
+        const restored = await this.findByName(input.name);
+        if (restored) {
+          this.registerCron(restored);
+        }
+        return { success: true, message: `Cron job "${input.name}" restored` };
+      }
+    } else {
+      this.safeRemoveCron(input.name);
+      this.memoryJobs.delete(input.name);
+    }
+
+    const payload = this.mergePayload(input.payload, input.timezone);
+
+    try {
+      if (persist) {
+        this.mountCronJob(input.name, input.cronTime, input.timezone);
+        await this.repository.create({
+          name: input.name,
+          type: ScheduledTaskType.CRON,
+          schedule: input.cronTime,
+          callbackType: input.callbackType,
+          isActive: true,
+          payload,
+        });
+      } else {
+        this.memoryJobs.set(input.name, {
+          callbackType: input.callbackType,
+          payload: payload ?? undefined,
+          timezone: input.timezone,
+        });
+        this.mountCronJob(input.name, input.cronTime, input.timezone);
+      }
+
+      this.logger.log(
+        `Registered cron job "${input.name}" persist=${persist} callback=${input.callbackType}`,
+      );
+      return { success: true, message: `Cron job "${input.name}" registered` };
+    } catch (error) {
+      this.safeRemoveCron(input.name);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new BadRequestException(message);
+    }
+  }
+
+  /** Idempotent ensure — skips when an active job already exists (persisted only). */
+  async ensureCronJob(input: RegisterCronJobInput): Promise<void> {
+    const persist = input.persist !== false;
+
+    if (!persist) {
+      if (this.schedulerRegistry.doesExist('cron', input.name)) {
+        return;
+      }
+      await this.registerCronJob({ ...input, persist: false });
+      return;
+    }
+
     const existing = await this.findByName(input.name, true);
     if (existing && !existing.deletedAt) {
       return;
@@ -91,55 +160,7 @@ export class ScheduledTaskService implements OnApplicationBootstrap, OnApplicati
       return;
     }
 
-    await this.createCronJob(input);
-  }
-
-  async createCronJob(input: {
-    name: string;
-    cronTime: string;
-    callbackType: string;
-    timezone?: string;
-    payload?: ScheduledTaskPayload;
-  }): Promise<ScheduledTaskActionResult> {
-    this.validateCallbackType(input.callbackType);
-    if (input.callbackType === SCHEDULED_EMAIL_CALLBACK_TYPE && !input.payload) {
-      throw new BadRequestException('payload is required for sendEmail callback');
-    }
-
-    const existing = await this.findByName(input.name, true);
-    if (existing) {
-      throw new ConflictException(`Job "${input.name}" already exists`);
-    }
-
-    const payload = this.mergePayload(input.payload, input.timezone);
-
-    try {
-      const cronJob = new CronJob(
-        input.cronTime,
-        () => void this.runJob(input.name),
-        null,
-        false,
-        input.timezone,
-      );
-      this.schedulerRegistry.addCronJob(input.name, cronJob);
-      cronJob.start();
-
-      await this.repository.create({
-        name: input.name,
-        type: ScheduledTaskType.CRON,
-        schedule: input.cronTime,
-        callbackType: input.callbackType,
-        isActive: true,
-        payload,
-      });
-
-      this.logger.log(`Created cron job "${input.name}"`);
-      return { success: true, message: `Cron job "${input.name}" created` };
-    } catch (error) {
-      this.safeRemoveCron(input.name);
-      const message = error instanceof Error ? error.message : String(error);
-      throw new BadRequestException(message);
-    }
+    await this.registerCronJob(input);
   }
 
   async deleteJob(name: string): Promise<ScheduledTaskActionResult> {
@@ -164,44 +185,107 @@ export class ScheduledTaskService implements OnApplicationBootstrap, OnApplicati
     return { success: true, message: 'Permanently deleted' };
   }
 
+  /** Run a job immediately by name (persisted) or by callback type (in-memory / manual). */
+  async runNow(input: {
+    name?: string;
+    callbackType?: string;
+    payload?: ScheduledTaskPayload;
+  }): Promise<void> {
+    if (input.name) {
+      await this.runJobByName(input.name);
+      return;
+    }
+
+    if (!input.callbackType) {
+      throw new BadRequestException('name or callbackType is required');
+    }
+
+    this.validateCallbackType(input.callbackType);
+    await this.dispatchJob(this.buildSyntheticJob(`manual:${input.callbackType}`, input.callbackType, input.payload ?? null));
+  }
+
+  private buildSyntheticJob(
+    name: string,
+    callbackType: string,
+    payload: ScheduledTaskPayload | null,
+  ): ScheduledTask {
+    return {
+      id: 'manual',
+      name,
+      type: ScheduledTaskType.CRON,
+      schedule: '',
+      callbackType,
+      isActive: true,
+      payload,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: undefined,
+    };
+  }
+
   private registerCron(task: ScheduledTask): void {
     if (!task.isActive || this.schedulerRegistry.doesExist('cron', task.name)) {
       return;
     }
 
     const timezone = this.resolveTimezone(task.payload);
-    const cronJob = new CronJob(
-      task.schedule,
-      () => void this.runJob(task.name),
-      null,
-      false,
-      timezone,
-    );
-    this.schedulerRegistry.addCronJob(task.name, cronJob);
-    cronJob.start();
+    this.mountCronJob(task.name, task.schedule, timezone);
   }
 
-  private async runJob(name: string): Promise<void> {
+  private mountCronJob(name: string, cronTime: string, timezone?: string): void {
+    this.safeRemoveCron(name);
+
+    const cronJob = new CronJob(
+      cronTime,
+      () => void this.runJobByName(name),
+      null,
+      true,
+      timezone,
+    );
+    this.schedulerRegistry.addCronJob(name, cronJob);
+  }
+
+  private async runJobByName(name: string): Promise<void> {
+    const memoryJob = this.memoryJobs.get(name);
+    if (memoryJob) {
+      await this.dispatchJob(
+        this.buildSyntheticJob(name, memoryJob.callbackType, memoryJob.payload ?? null),
+      );
+      return;
+    }
+
+    await this.runPersistedJob(name);
+  }
+
+  private async runPersistedJob(name: string): Promise<void> {
     const job = await this.findByName(name);
     if (!job?.isActive) {
       return;
     }
 
+    await this.dispatchJob(job);
+  }
+
+  private async dispatchJob(job: ScheduledTask): Promise<void> {
+    const handler = this.callbackRegistry.get(job.callbackType);
+    if (!handler) {
+      this.logger.warn(`No handler for callback "${job.callbackType}" (job "${job.name}")`);
+      return;
+    }
+
     try {
-      if (job.callbackType === SCHEDULED_CALL_PLAN_CALLBACK_TYPE) {
-        await this.callPlanService.execute(job);
-        return;
-      }
-      this.logger.warn(`Unknown callback "${job.callbackType}" for job "${name}"`);
+      await handler.execute(job);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Job "${name}" failed: ${message}`);
+      this.logger.error(`Job "${job.name}" failed: ${message}`);
     }
   }
 
   private validateCallbackType(callbackType: string): void {
-    if (!SCHEDULED_TASK_CALLBACK_TYPES.includes(callbackType as ScheduledTaskCallbackType)) {
-      throw new BadRequestException(`Invalid callbackType: ${callbackType}`);
+    if (!this.callbackRegistry.has(callbackType)) {
+      throw new BadRequestException(
+        `Invalid callbackType: ${callbackType}. Registered: ${this.callbackRegistry.getCallbackTypes().join(', ') || 'none'}`,
+      );
     }
   }
 
@@ -221,6 +305,7 @@ export class ScheduledTaskService implements OnApplicationBootstrap, OnApplicati
   }
 
   private safeRemoveCron(name: string): void {
+    this.memoryJobs.delete(name);
     try {
       if (this.schedulerRegistry.doesExist('cron', name)) {
         this.schedulerRegistry.deleteCronJob(name);

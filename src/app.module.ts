@@ -52,6 +52,7 @@ import { OutboundIntegrationDeliveriesModule } from './outbound-integration-deli
 import { OpeningBalanceStockModule } from './opening-balance-stock/opening-balance-stock.module';
 import { EmailModule } from './email/email.module';
 import { MasterDepartementModule } from './master-departement/master-departement.module';
+import { ScheduledCallPlanModule } from './scheduled-task/scheduled-call-plan/scheduled-call-plan.module';
 @Module({
   imports: [
     LoggerModule, // Global logger module - must be imported first
@@ -110,6 +111,7 @@ import { MasterDepartementModule } from './master-departement/master-departement
     OpeningBalanceStockModule,
     EmailModule,
     MasterDepartementModule,
+    ScheduledCallPlanModule,
   ],
   providers: [
     {

@@ -1,6 +1,7 @@
-import { Controller, Delete, Get, Param } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ScheduledTask } from '../core/domain/entities/scheduled-task.entity';
+import { CreateCronTaskDto } from './dto/create-cron-task.dto';
 import { ScheduledTaskService } from './scheduled-task.service';
 
 @ApiTags('Scheduled Task')
@@ -17,9 +18,26 @@ export class ScheduledTaskController {
   }
 
   @Get('callbacks')
-  @ApiOperation({ summary: 'List available callback types' })
+  @ApiOperation({ summary: 'List registered callback handler types' })
   getCallbackTypes() {
     return this.scheduledTaskService.getCallbackTypes();
+  }
+
+  @Post('cron')
+  @ApiOperation({
+    summary: 'Create a persisted cron job',
+    description:
+      'Registers a cron job in NestJS SchedulerRegistry and persists it to scheduled_tasks.',
+  })
+  createCronJob(@Body() dto: CreateCronTaskDto) {
+    return this.scheduledTaskService.registerCronJob({
+      name: dto.name,
+      cronTime: dto.cronTime,
+      callbackType: dto.callbackType,
+      timezone: dto.timezone,
+      payload: dto.payload,
+      persist: true,
+    });
   }
 
   @Delete(':name/hard')
