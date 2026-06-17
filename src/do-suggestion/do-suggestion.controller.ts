@@ -51,4 +51,12 @@ export class DoSuggestionController {
   remove(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
     return this.doSuggestionService.remove(id);
   }
+
+  // find by callplan_number
+  @Get('callplan/:callplanNumber')
+  @ApiOperation({ summary: 'Get DO suggestion by callplan number' })
+  @ApiResponse({ status: 200, type: [DoSuggestion] })
+  findByCallplanNumber(@Param('callplanNumber') callplanNumber: string): Promise<DoSuggestion[]> {
+    return this.doSuggestionService.findByCallplanNumber(callplanNumber);
+  }
 }

@@ -138,6 +138,14 @@ export class DoSuggestionRepository {
     });
   }
 
+  async findByCallplanNumber(callplanNumber: string): Promise<DoSuggestion[]> {
+    return await this.headerRepository.find({
+      where: { callplan_number: callplanNumber },
+      relations: [...DO_SUGGESTION_RELATIONS],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async remove(id: string): Promise<void> {
     const existing = await this.findById(id);
     if (!existing) {

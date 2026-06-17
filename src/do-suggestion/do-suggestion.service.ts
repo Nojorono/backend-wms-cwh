@@ -41,6 +41,13 @@ export class DoSuggestionService {
     return { success: true, message: 'DO suggestion deleted' };
   }
 
+  async findByCallplanNumber(callplanNumber: string): Promise<DoSuggestion[]> {
+    if (!callplanNumber?.trim()) {
+      throw new BadRequestException('callplanNumber is required');
+    }
+    return await this.repository.findByCallplanNumber(callplanNumber.trim());
+  }
+
   private mapDtoToPersistData(dto: CreateOrUpdateDoSuggestionDto): DoSuggestionPersistData {
     if (!dto.lines?.length) {
       throw new BadRequestException('At least one line is required');
