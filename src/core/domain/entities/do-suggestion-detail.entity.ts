@@ -31,4 +31,7 @@ export class DoSuggestionDetail extends BaseEntity {
 
   @Column({ name: 'item_uom', type: 'varchar', length: 50, nullable: true })
   item_uom: string;
+
+  @Column({ name: 'line_number', type: 'int', nullable: true })
+  line_number: number;
 }

@@ -90,6 +90,22 @@ export class CreateOrUpdateDoSuggestionDto {
   @IsNumber()
   updated_by?: number;
 
+  @ApiPropertyOptional({ example: '2026-06-08' })
+  @IsOptional()
+  @IsDateString()
+  spb_date?: string;
+
+  @ApiPropertyOptional({
+    example: 'SPB/CP-2026-0001/5001',
+    description:
+      'Optional on create — auto-generated as SPB/{callplan_number}/5{NNN} when omitted. ' +
+      'Sequence increments per callplan_number + callplan_date_start.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  spb_number?: string;
+
   @ApiProperty({ type: [DoSuggestionDetailDto] })
   @IsArray()
   @ArrayMinSize(1)

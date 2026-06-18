@@ -43,4 +43,10 @@ export class DoSuggestionDetailDto {
   @IsString()
   @MaxLength(50)
   item_uom?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  line_number?: number;
 }

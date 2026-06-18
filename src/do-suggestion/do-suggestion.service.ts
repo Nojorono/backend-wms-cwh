@@ -15,7 +15,7 @@ export class DoSuggestionService {
   constructor(private readonly repository: DoSuggestionRepository) {}
 
   async createOrUpdate(dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
-    const payload = this.mapDtoToPersistData(dto);
+    const payload = await this.mapDtoToPersistData(dto);
 
     if (dto.id) {
       return await this.repository.update(dto.id, payload);
@@ -48,17 +48,40 @@ export class DoSuggestionService {
     return await this.repository.findByCallplanNumber(callplanNumber.trim());
   }
 
-  private mapDtoToPersistData(dto: CreateOrUpdateDoSuggestionDto): DoSuggestionPersistData {
+  private async mapDtoToPersistData(
+    dto: CreateOrUpdateDoSuggestionDto,
+  ): Promise<DoSuggestionPersistData> {
     if (!dto.lines?.length) {
       throw new BadRequestException('At least one line is required');
+    }
+
+    const callplanDateStart = dto.callplan_date_start
+      ? new Date(dto.callplan_date_start)
+      : undefined;
+
+    let spbNumber = dto.spb_number?.trim() || undefined;
+
+    if (!dto.id) {
+      if (!spbNumber) {
+        if (!callplanDateStart) {
+          throw new BadRequestException(
+            'callplan_date_start is required to auto-generate spb_number',
+          );
+        }
+        spbNumber = await this.repository.generateNextSpbNumber(
+          dto.callplan_number,
+          callplanDateStart,
+        );
+      }
+    } else if (!spbNumber) {
+      const existing = await this.repository.findById(dto.id);
+      spbNumber = existing?.spb_number ?? undefined;
     }
 
     const header: DoSuggestionHeaderData = {
       organization_id: dto.organization_id,
       callplan_number: dto.callplan_number,
-      callplan_date_start: dto.callplan_date_start
-        ? new Date(dto.callplan_date_start)
-        : undefined,
+      callplan_date_start: callplanDateStart,
       callplan_date_end: dto.callplan_date_end ? new Date(dto.callplan_date_end) : undefined,
       route_number: dto.route_number,
       trip_type: dto.trip_type,
@@ -68,6 +91,8 @@ export class DoSuggestionService {
       status: dto.status ?? DoSuggestionStatus.PENDING,
       created_by: dto.created_by,
       updated_by: dto.updated_by,
+      spb_date: dto.spb_date ? new Date(dto.spb_date) : undefined,
+      spb_number: spbNumber,
     };
 
     if (!dto.id) {

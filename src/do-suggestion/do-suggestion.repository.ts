@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
+import { formatSpbNumber, parseSpbSequence } from './do-suggestion-spb.util';
 
 const DO_SUGGESTION_RELATIONS = ['details', 'organization'] as const;
 
@@ -21,6 +22,8 @@ export type DoSuggestionHeaderData = Partial<
     | 'status'
     | 'created_by'
     | 'updated_by'
+    | 'spb_date'
+    | 'spb_number'
   >
 >;
 
@@ -49,7 +52,7 @@ export class DoSuggestionRepository {
     @InjectRepository(DoSuggestionDetail)
     private readonly detailRepository: Repository<DoSuggestionDetail>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async create(data: DoSuggestionPersistData): Promise<DoSuggestion> {
     const { lines, ...header } = data;
@@ -153,5 +156,29 @@ export class DoSuggestionRepository {
     }
 
     await this.headerRepository.softDelete(id);
+  }
+
+  // SPB/{callplan_number}/5{NNN} — sequence increments per callplan_date_start + callplan_number
+  async generateNextSpbNumber(
+    callplanNumber: string,
+    callplanDateStart: Date,
+  ): Promise<string> {
+    const rows = await this.headerRepository
+      .createQueryBuilder('ds')
+      .select('ds.spb_number', 'spb_number')
+      .where('ds.callplan_number = :callplanNumber', { callplanNumber })
+      .andWhere('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
+      .andWhere('ds.spb_number IS NOT NULL')
+      .getRawMany<{ spb_number: string }>();
+
+    let maxSequence = 0;
+    for (const row of rows) {
+      const sequence = parseSpbSequence(row.spb_number);
+      if (sequence != null && sequence > maxSequence) {
+        maxSequence = sequence;
+      }
+    }
+
+    return formatSpbNumber(callplanNumber, maxSequence + 1);
   }
 }

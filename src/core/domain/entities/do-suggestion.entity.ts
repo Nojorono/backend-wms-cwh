@@ -58,6 +58,12 @@ export class DoSuggestion extends BaseEntity {
     @Column({ name: 'updated_by', type: 'bigint', nullable: true })
     updated_by: number;
 
+    @Column({ name: 'spb_date', type: 'date', nullable: true })
+    spb_date: Date;
+
+    @Column({ name: 'spb_number', type: 'varchar', length: 100, nullable: true })
+    spb_number: string;
+
     @OneToMany(() => DoSuggestionDetail, (detail) => detail.do_suggestion)
     details: DoSuggestionDetail[];
 }
