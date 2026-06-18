@@ -4,7 +4,7 @@ import { DoSuggestionDetail } from './do-suggestion-detail.entity';
 import { MasterIO } from './master-io.entity';
 
 export enum DoSuggestionStatus {
-    PENDING = 'DRAFT',
+    DRAFT = 'DRAFT',
     REVISED = 'REVISED',
     SUBMITTED = 'SUBMITTED',
     FINAL = 'FINAL',
@@ -43,11 +43,14 @@ export class DoSuggestion extends BaseEntity {
     @Column({ name: 'sales_spv', type: 'varchar', length: 255, nullable: true })
     sales_spv: string;
 
+    @Column({ name: 'sales_spv_nik', type: 'varchar', length: 50, nullable: true })
+    sales_spv_nik: string;
+
     @Column({
         name: 'status',
         type: 'enum',
         enum: DoSuggestionStatus,
-        default: DoSuggestionStatus.PENDING,
+        default: DoSuggestionStatus.DRAFT,
         nullable: true,
     })
     status: DoSuggestionStatus;

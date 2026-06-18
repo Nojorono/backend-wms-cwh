@@ -19,6 +19,7 @@ export type DoSuggestionHeaderData = Partial<
     | 'sales_nik'
     | 'sales_name'
     | 'sales_spv'
+    | 'sales_spv_nik'
     | 'status'
     | 'created_by'
     | 'updated_by'
@@ -144,6 +145,22 @@ export class DoSuggestionRepository {
   async findByCallplanNumber(callplanNumber: string): Promise<DoSuggestion[]> {
     return await this.headerRepository.find({
       where: { callplan_number: callplanNumber },
+      relations: [...DO_SUGGESTION_RELATIONS],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findByCallplanDateStartOrganizationAndSalesSpvNik(
+    callplanDateStart: Date,
+    organizationId: string,
+    salesSpvNik: string,
+  ): Promise<DoSuggestion[]> {
+    return await this.headerRepository.find({
+      where: {
+        callplan_date_start: callplanDateStart,
+        organization_id: organizationId,
+        sales_spv_nik: salesSpvNik,
+      },
       relations: [...DO_SUGGESTION_RELATIONS],
       order: { createdAt: 'DESC' },
     });

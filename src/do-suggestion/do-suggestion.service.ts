@@ -12,7 +12,7 @@ import {
 
 @Injectable()
 export class DoSuggestionService {
-  constructor(private readonly repository: DoSuggestionRepository) {}
+  constructor(private readonly repository: DoSuggestionRepository) { }
 
   async createOrUpdate(dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
     const payload = await this.mapDtoToPersistData(dto);
@@ -46,6 +46,33 @@ export class DoSuggestionService {
       throw new BadRequestException('callplanNumber is required');
     }
     return await this.repository.findByCallplanNumber(callplanNumber.trim());
+  }
+
+  async findByCallplanDateStart(
+    callplanDateStart: string,
+    organizationId: string,
+    salesSpvNik: string,
+  ): Promise<DoSuggestion[]> {
+    if (!callplanDateStart?.trim()) {
+      throw new BadRequestException('callplanDateStart is required');
+    }
+    if (!organizationId?.trim()) {
+      throw new BadRequestException('organizationId is required');
+    }
+    if (!salesSpvNik?.trim()) {
+      throw new BadRequestException('salesSpvNik is required');
+    }
+
+    const parsedDate = new Date(callplanDateStart.trim());
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException(`Invalid callplanDateStart: ${callplanDateStart}`);
+    }
+
+    return await this.repository.findByCallplanDateStartOrganizationAndSalesSpvNik(
+      parsedDate,
+      organizationId.trim(),
+      salesSpvNik.trim(),
+    );
   }
 
   private async mapDtoToPersistData(
@@ -88,10 +115,11 @@ export class DoSuggestionService {
       sales_nik: dto.sales_nik,
       sales_name: dto.sales_name,
       sales_spv: dto.sales_spv,
-      status: dto.status ?? DoSuggestionStatus.PENDING,
+      sales_spv_nik: dto.sales_spv_nik,
+      status: dto.status ?? DoSuggestionStatus.DRAFT,
       created_by: dto.created_by,
       updated_by: dto.updated_by,
-      spb_date: dto.spb_date ? new Date(dto.spb_date) : undefined,
+      spb_date: dto.spb_date ? new Date(dto.spb_date) : callplanDateStart,
       spb_number: spbNumber,
     };
 

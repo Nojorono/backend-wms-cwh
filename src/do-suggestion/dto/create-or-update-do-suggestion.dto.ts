@@ -73,7 +73,13 @@ export class CreateOrUpdateDoSuggestionDto {
   @MaxLength(255)
   sales_spv?: string;
 
-  @ApiPropertyOptional({ enum: DoSuggestionStatus, default: DoSuggestionStatus.PENDING })
+  @ApiPropertyOptional({ example: '12345678' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  sales_spv_nik?: string;
+
+  @ApiPropertyOptional({ enum: DoSuggestionStatus, default: DoSuggestionStatus.DRAFT })
   @IsOptional()
   @IsEnum(DoSuggestionStatus)
   status?: DoSuggestionStatus;
