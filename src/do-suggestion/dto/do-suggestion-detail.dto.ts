@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class DoSuggestionDetailDto {
   @ApiPropertyOptional({ description: 'Detail ID (for update line)' })
@@ -17,19 +17,19 @@ export class DoSuggestionDetailDto {
   @ApiPropertyOptional({ example: 100 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   item_qty_suggestion?: number;
 
   @ApiPropertyOptional({ example: 90 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   item_qty_revision?: number;
 
   @ApiPropertyOptional({ example: 90 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   item_qty_final?: number;
 
   @ApiPropertyOptional({ example: 12.5 })

@@ -17,13 +17,13 @@ export class DoSuggestionDetail extends BaseEntity {
   @Column({ name: 'item_code', type: 'varchar', length: 100, nullable: true })
   item_code: string;
 
-  @Column({ name: 'item_qty_suggestion', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  @Column({ name: 'item_qty_suggestion', type: 'bigint', nullable: true })
   item_qty_suggestion: number;
 
-  @Column({ name: 'item_qty_revision', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  @Column({ name: 'item_qty_revision', type: 'bigint', nullable: true })
   item_qty_revision: number;
 
-  @Column({ name: 'item_qty_final', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  @Column({ name: 'item_qty_final', type: 'bigint', nullable: true })
   item_qty_final: number;
 
   @Column({ name: 'contribution_percentage', type: 'numeric', precision: 18, scale: 4, nullable: true })
