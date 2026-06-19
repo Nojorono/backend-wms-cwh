@@ -54,6 +54,7 @@ import { EmailModule } from './email/email.module';
 import { MasterDepartementModule } from './master-departement/master-departement.module';
 import { ScheduledCallPlanModule } from './scheduled-task/scheduled-call-plan/scheduled-call-plan.module';
 import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
+import { OutboundSalesModule } from './outbound-sales/outbound-sales.module';
 @Module({
   imports: [
     LoggerModule, // Global logger module - must be imported first
@@ -114,6 +115,7 @@ import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
     MasterDepartementModule,
     ScheduledCallPlanModule,
     DoSuggestionModule,
+    OutboundSalesModule,
   ],
   providers: [
     {
