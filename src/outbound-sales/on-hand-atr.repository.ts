@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
+import { Repository } from 'typeorm'; import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
 import { CreateOnHandAtrDto } from './dto/create-on-hand-atr.dto';
 import { UpdateOnHandAtrDto } from './dto/update-on-hand-atr.dto';
 
@@ -76,4 +76,16 @@ export class OnHandAtrRepository {
             .andWhere('DATE(onHandAtr.created_at) = :date', { date })
             .orderBy('onHandAtr.created_at', 'DESC')
             .getMany();
-    }}
+    }
+
+    async findByOrganizationIdAndItemCodeAndDate(organizationId: string, itemCode: string, date: string): Promise<OnHandAtr[]> {
+        return await this.repo
+            .createQueryBuilder('onHandAtr')
+            .leftJoinAndSelect('onHandAtr.organization', 'organization')
+            .where('onHandAtr.organization_id = :organizationId', { organizationId })
+            .andWhere('onHandAtr.item_code = :itemCode', { itemCode })
+            .andWhere('DATE(onHandAtr.created_at) = :date', { date })
+            .orderBy('onHandAtr.created_at', 'DESC')
+            .getMany();
+    }
+}

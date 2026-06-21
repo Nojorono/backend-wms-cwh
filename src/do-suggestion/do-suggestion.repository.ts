@@ -43,6 +43,12 @@ export interface DoSuggestionPersistData extends DoSuggestionHeaderData {
   lines: DoSuggestionDetailData[];
 }
 
+export interface DoSuggestionItemCallplanSumRow {
+  organization_id: string;
+  item_code: string;
+  total_qty_submitted: number;
+}
+
 @Injectable()
 export class DoSuggestionRepository {
   constructor(
@@ -210,6 +216,54 @@ export class DoSuggestionRepository {
     }
 
     return formatSpbNumber(callplanNumber, maxSequence + 1);
+  }
+
+  async findByOrganizationIdAndItemCodeAndDate(
+    organizationId: string,
+    itemCode?: string,
+    date?: string,
+    status?: DoSuggestionStatus,
+  ): Promise<DoSuggestionItemCallplanSumRow[]> {
+    const qb = this.headerRepository
+      .createQueryBuilder('ds')
+      .innerJoin('ds.details', 'details', 'details.deleted_at IS NULL')
+      .select('ds.organization_id', 'organization_id')
+      .addSelect('details.item_code', 'item_code')
+      .addSelect(
+        'COALESCE(SUM(COALESCE(details.item_qty_submitted, 0)), 0)',
+        'total_qty_submitted',
+      )
+      .where('ds.organization_id = :organizationId', { organizationId })
+      .andWhere('ds.deleted_at IS NULL')
+      .groupBy('ds.organization_id')
+      .addGroupBy('details.item_code');
+
+    if (itemCode?.trim()) {
+      qb.andWhere('details.item_code = :itemCode', { itemCode: itemCode.trim() });
+    }
+
+    if (date?.trim()) {
+      const callplanDateStart = new Date(date.trim().split('T')[0]);
+      qb.andWhere('ds.callplan_date_start = :callplanDateStart', { callplanDateStart });
+    }
+
+    if (status) {
+      qb.andWhere('ds.status = :status', { status });
+    }
+
+    const rows = await qb
+      .orderBy('details.item_code', 'ASC')
+      .getRawMany<{
+        organization_id: string;
+        item_code: string;
+        total_qty_submitted: string;
+      }>();
+
+    return rows.map((row) => ({
+      organization_id: row.organization_id,
+      item_code: row.item_code,
+      total_qty_submitted: Number(row.total_qty_submitted) || 0,
+    }));
   }
 
   private async updateDetailLine(

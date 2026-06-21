@@ -51,6 +51,9 @@ export class OnHandAtr extends BaseEntity {
   @Column({ name: 'avail_to_reserve', type: 'int', nullable: true })
   avail_to_reserve: number;
 
+  @Column({ name: 'total_submitted', type: 'int', nullable: true })
+  total_submitted: number;
+
   @Column({ name: 'created_by', type: 'varchar', nullable: true })
   created_by: string;
 

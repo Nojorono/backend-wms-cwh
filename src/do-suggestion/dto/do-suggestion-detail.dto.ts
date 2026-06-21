@@ -30,6 +30,12 @@ export class DoSuggestionDetailDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  item_qty_submitted?: number;
+
+  @ApiPropertyOptional({ example: 90 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   item_qty_final?: number;
 
   @ApiPropertyOptional({ example: 12.5 })

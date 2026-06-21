@@ -1,12 +1,15 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common'; import { DataSource } from 'typeorm';
-import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
-import { IntegrationOnHandAtrService } from './integration/integration-on-hand-atr.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';
+import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';import { IntegrationOnHandAtrService } from './integration/integration-on-hand-atr.service';
 import { CreateOnHandAtrDto } from './dto/create-on-hand-atr.dto';
 import {
   InvOnHandQtyWithAtrItemDto,
   InvOnHandQtyWithAtrParamsDto,
 } from './dto/inv-on-hand-qty-with-atr.dto';
+import { TotalSubmittedResponseDto } from './dto/total-submitted-response.dto';
 import { OnHandAtrRepository } from './on-hand-atr.repository';
+import { DoSuggestionRepository } from '../do-suggestion/do-suggestion.repository';
 
 @Injectable()
 export class OutboundSalesService {
@@ -14,6 +17,7 @@ export class OutboundSalesService {
     private readonly integrationOnHandAtrService: IntegrationOnHandAtrService,
     private readonly dataSource: DataSource,
     private readonly onHandAtrRepository: OnHandAtrRepository,
+    private readonly doSuggestionRepository: DoSuggestionRepository,
   ) { }
 
   async findOnHand(
@@ -105,6 +109,37 @@ export class OutboundSalesService {
       locator_name: row.LOCATOR_NAME ?? undefined,
       quantity: row.QUANTITY,
       avail_to_reserve: row.AVAIL_TO_RESERVE,
+    };
+  }
+
+  async getTotalSubmitted(
+    organizationId: string | number | null,
+    date: string,
+  ): Promise<TotalSubmittedResponseDto> {
+    const resolvedOrganizationId = this.resolveOrganizationId(organizationId);
+    const snapshotDate = this.resolveSnapshotDate(date);
+
+    const doSuggestionRows =
+      await this.doSuggestionRepository.findByOrganizationIdAndItemCodeAndDate(
+        resolvedOrganizationId,
+        undefined,
+        snapshotDate,
+        DoSuggestionStatus.SUBMITTED,
+      );
+
+    const items = doSuggestionRows.map((row) => ({
+      item_code: row.item_code,
+      total_submitted: row.total_qty_submitted,
+    }));
+
+    const grandTotal = items.reduce((acc, row) => acc + row.total_submitted, 0);
+
+    return {
+      organization_id: resolvedOrganizationId,
+      date: snapshotDate,
+      status: DoSuggestionStatus.SUBMITTED,
+      items,
+      grand_total: grandTotal,
     };
   }
 }

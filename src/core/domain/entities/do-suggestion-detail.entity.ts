@@ -23,6 +23,9 @@ export class DoSuggestionDetail extends BaseEntity {
   @Column({ name: 'item_qty_revision', type: 'bigint', nullable: true })
   item_qty_revision: number;
 
+  @Column({ name: 'item_qty_submitted', type: 'bigint', nullable: true })
+  item_qty_submitted: number;
+
   @Column({ name: 'item_qty_final', type: 'bigint', nullable: true })
   item_qty_final: number;
 
