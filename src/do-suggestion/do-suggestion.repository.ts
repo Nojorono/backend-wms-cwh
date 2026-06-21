@@ -1,7 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
 import { formatSpbNumber, parseSpbSequence } from './do-suggestion-spb.util';
 
@@ -103,21 +101,25 @@ export class DoSuggestionRepository {
         await queryRunner.manager.update(DoSuggestion, id, header);
       }
 
-      await queryRunner.manager.softDelete(DoSuggestionDetail, {
-        do_suggestion_uuid: id,
-      });
+      for (const line of lines) {
+        if (line.id) {
+          await this.updateDetailLine(queryRunner.manager, id, line);
+          continue;
+        }
 
-      if (lines.length) {
-        const detailEntities = lines.map((line) => {
-          const { id: _lineId, ...lineData } = line;
-          return this.detailRepository.create({
-            ...lineData,
+        const { id: _lineId, ...lineData } = line;
+        const patch = Object.fromEntries(
+          Object.entries(lineData).filter(([, value]) => value !== undefined),
+        );
+
+        await queryRunner.manager.save(
+          DoSuggestionDetail,
+          this.detailRepository.create({
+            ...patch,
             do_suggestion_uuid: id,
-          });
-        });
-        await queryRunner.manager.save(DoSuggestionDetail, detailEntities);
+          }),
+        );
       }
-
       await queryRunner.commitTransaction();
       return (await this.findById(id)) as DoSuggestion;
     } catch (error) {
@@ -127,7 +129,6 @@ export class DoSuggestionRepository {
       await queryRunner.release();
     }
   }
-
   async findAll(): Promise<DoSuggestion[]> {
     return await this.headerRepository.find({
       relations: [...DO_SUGGESTION_RELATIONS],
@@ -197,5 +198,40 @@ export class DoSuggestionRepository {
     }
 
     return formatSpbNumber(callplanNumber, maxSequence + 1);
+  }
+
+  private async updateDetailLine(
+    manager: EntityManager,
+    suggestionId: string,
+    line: DoSuggestionDetailData,
+  ): Promise<void> {
+    const lineId = line.id as string;
+    const existingLine = await manager.findOne(DoSuggestionDetail, {
+      where: { id: lineId },
+      withDeleted: true,
+    });
+
+    if (!existingLine) {
+      throw new NotFoundException(`DO suggestion detail with ID ${lineId} not found`);
+    }
+
+    if (existingLine.do_suggestion_uuid !== suggestionId) {
+      throw new BadRequestException(
+        `DO suggestion detail with ID ${lineId} does not belong to DO suggestion ${suggestionId}`,
+      );
+    }
+
+    if (existingLine.deletedAt) {
+      await manager.restore(DoSuggestionDetail, lineId);
+    }
+
+    const { id: _lineId, ...linePatch } = line;
+    const patch = Object.fromEntries(
+      Object.entries(linePatch).filter(([, value]) => value !== undefined),
+    );
+
+    if (Object.keys(patch).length > 0) {
+      await manager.update(DoSuggestionDetail, lineId, patch);
+    }
   }
 }

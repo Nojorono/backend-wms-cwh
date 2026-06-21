@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
-import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';
+import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
 import { DoSuggestionDetailDto } from './dto/do-suggestion-detail.dto';
 import {
@@ -15,17 +14,16 @@ export class DoSuggestionService {
   constructor(private readonly repository: DoSuggestionRepository) { }
 
   async createOrUpdate(dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
-    const payload = await this.mapDtoToPersistData(dto);
-
     if (dto.id) {
+      const payload = await this.mapDtoToUpdateData(dto);
       return await this.repository.update(dto.id, payload);
     }
 
+    const payload = await this.mapDtoToCreateData(dto);
     return await this.repository.create(payload);
   }
 
-  async findAll(): Promise<DoSuggestion[]> {
-    return await this.repository.findAll();
+  async findAll(): Promise<DoSuggestion[]> {    return await this.repository.findAll();
   }
 
   async findOne(id: string): Promise<DoSuggestion> {
@@ -75,11 +73,10 @@ export class DoSuggestionService {
     );
   }
 
-  private async mapDtoToPersistData(
+  private async mapDtoToCreateData(
     dto: CreateOrUpdateDoSuggestionDto,
   ): Promise<DoSuggestionPersistData> {
-    if (!dto.lines?.length) {
-      throw new BadRequestException('At least one line is required');
+    if (!dto.lines?.length) {      throw new BadRequestException('At least one line is required');
     }
 
     const callplanDateStart = dto.callplan_date_start
@@ -88,25 +85,19 @@ export class DoSuggestionService {
 
     let spbNumber = dto.spb_number?.trim() || undefined;
 
-    if (!dto.id) {
-      if (!spbNumber) {
-        if (!callplanDateStart) {
-          throw new BadRequestException(
-            'callplan_date_start is required to auto-generate spb_number',
-          );
-        }
-        spbNumber = await this.repository.generateNextSpbNumber(
-          dto.callplan_number,
-          callplanDateStart,
+    if (!spbNumber) {
+      if (!callplanDateStart) {
+        throw new BadRequestException(
+          'callplan_date_start is required to auto-generate spb_number',
         );
       }
-    } else if (!spbNumber) {
-      const existing = await this.repository.findById(dto.id);
-      spbNumber = existing?.spb_number ?? undefined;
+      spbNumber = await this.repository.generateNextSpbNumber(
+        dto.callplan_number,
+        callplanDateStart,
+      );
     }
 
-    const header: DoSuggestionHeaderData = {
-      organization_id: dto.organization_id,
+    const header: DoSuggestionHeaderData = {      organization_id: dto.organization_id,
       callplan_number: dto.callplan_number,
       callplan_date_start: callplanDateStart,
       callplan_date_end: dto.callplan_date_end ? new Date(dto.callplan_date_end) : undefined,
@@ -123,21 +114,47 @@ export class DoSuggestionService {
       spb_number: spbNumber,
     };
 
-    if (!dto.id) {
-      delete header.updated_by;
-    } else {
-      delete header.created_by;
-    }
+    delete header.updated_by;
 
-    return {
-      ...header,
-      lines: dto.lines.map((line) => this.mapLineDto(line)),
+    return {      ...header,
+      lines: dto.lines.map((line) => this.mapLineDtoForCreate(line)),
     };
   }
 
-  private mapLineDto(line: DoSuggestionDetailDto): DoSuggestionDetailData {
+  private async mapDtoToUpdateData(
+    dto: CreateOrUpdateDoSuggestionDto,
+  ): Promise<DoSuggestionPersistData> {
+    if (!dto.lines?.length) {
+      throw new BadRequestException('At least one line is required');
+    }
+
+    const header = this.pickDefined<DoSuggestionHeaderData>({
+      organization_id: dto.organization_id,
+      callplan_number: dto.callplan_number,
+      callplan_date_start: dto.callplan_date_start
+        ? new Date(dto.callplan_date_start)
+        : undefined,
+      callplan_date_end: dto.callplan_date_end ? new Date(dto.callplan_date_end) : undefined,
+      route_number: dto.route_number,
+      trip_type: dto.trip_type,
+      sales_nik: dto.sales_nik,
+      sales_name: dto.sales_name,
+      sales_spv: dto.sales_spv,
+      sales_spv_nik: dto.sales_spv_nik,
+      status: dto.status,
+      updated_by: dto.updated_by,
+      spb_date: dto.spb_date ? new Date(dto.spb_date) : undefined,
+      spb_number: dto.spb_number !== undefined ? dto.spb_number.trim() : undefined,
+    });
+
     return {
-      id: line.id,
+      ...header,
+      lines: dto.lines.map((line) => this.mapLineDtoForUpdate(line)),
+    };
+  }
+
+  private mapLineDtoForCreate(line: DoSuggestionDetailDto): DoSuggestionDetailData {
+    return {      id: line.id,
       item_code: line.item_code,
       item_qty_suggestion: line.item_qty_suggestion,
       item_qty_revision: line.item_qty_revision,
@@ -145,5 +162,23 @@ export class DoSuggestionService {
       contribution_percentage: line.contribution_percentage,
       item_uom: line.item_uom,
     };
+  }
+
+  private mapLineDtoForUpdate(line: DoSuggestionDetailDto): DoSuggestionDetailData {
+    return this.pickDefined<DoSuggestionDetailData>({
+      id: line.id,
+      item_code: line.item_code,
+      item_qty_suggestion: line.item_qty_suggestion,
+      item_qty_revision: line.item_qty_revision,
+      item_qty_final: line.item_qty_final,
+      contribution_percentage: line.contribution_percentage,
+      item_uom: line.item_uom,
+    });
+  }
+
+  private pickDefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+    return Object.fromEntries(
+      Object.entries(obj).filter(([, value]) => value !== undefined),
+    ) as Partial<T>;
   }
 }
