@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
-import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
+import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
 import { formatSpbNumber, parseSpbSequence } from './do-suggestion-spb.util';
 
 const DO_SUGGESTION_RELATIONS = ['details', 'organization'] as const;
@@ -129,13 +129,18 @@ export class DoSuggestionRepository {
       await queryRunner.release();
     }
   }
-  async findAll(): Promise<DoSuggestion[]> {
-    return await this.headerRepository.find({
-      relations: [...DO_SUGGESTION_RELATIONS],
-      order: { createdAt: 'DESC' },
-    });
-  }
+  async findAll(status?: DoSuggestionStatus): Promise<DoSuggestion[]> {
+    const qb = this.headerRepository
+      .createQueryBuilder('ds')
+      .leftJoinAndSelect('ds.details', 'details')
+      .leftJoinAndSelect('ds.organization', 'organization');
 
+    if (status) {
+      qb.andWhere('ds.status = :status', { status });
+    }
+
+    return await qb.orderBy('ds.createdAt', 'DESC').getMany();
+  }
   async findById(id: string): Promise<DoSuggestion | null> {
     return await this.headerRepository.findOne({
       where: { id },
@@ -154,19 +159,26 @@ export class DoSuggestionRepository {
   async findByCallplanDateStartOrganizationAndSalesSpvNik(
     callplanDateStart: Date,
     organizationId: string,
-    salesSpvNik: string,
+    salesSpvNik?: string,
+    status?: DoSuggestionStatus,
   ): Promise<DoSuggestion[]> {
-    return await this.headerRepository.find({
-      where: {
-        callplan_date_start: callplanDateStart,
-        organization_id: organizationId,
-        sales_spv_nik: salesSpvNik,
-      },
-      relations: [...DO_SUGGESTION_RELATIONS],
-      order: { createdAt: 'DESC' },
-    });
-  }
+    const qb = this.headerRepository
+      .createQueryBuilder('ds')
+      .leftJoinAndSelect('ds.details', 'details')
+      .leftJoinAndSelect('ds.organization', 'organization')
+      .where('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
+      .andWhere('ds.organization_id = :organizationId', { organizationId });
 
+    if (salesSpvNik) {
+      qb.andWhere('ds.sales_spv_nik = :salesSpvNik', { salesSpvNik });
+    }
+
+    if (status) {
+      qb.andWhere('ds.status = :status', { status });
+    }
+
+    return await qb.orderBy('ds.createdAt', 'DESC').getMany();
+  }
   async remove(id: string): Promise<void> {
     const existing = await this.findById(id);
     if (!existing) {

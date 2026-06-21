@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';
-import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
+import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
 import { DoSuggestionDetailDto } from './dto/do-suggestion-detail.dto';
 import {
   DoSuggestionDetailData,
@@ -23,9 +22,9 @@ export class DoSuggestionService {
     return await this.repository.create(payload);
   }
 
-  async findAll(): Promise<DoSuggestion[]> {    return await this.repository.findAll();
+  async findAll(status?: DoSuggestionStatus): Promise<DoSuggestion[]> {
+    return await this.repository.findAll(status);
   }
-
   async findOne(id: string): Promise<DoSuggestion> {
     const row = await this.repository.findById(id);
     if (!row) {
@@ -49,16 +48,14 @@ export class DoSuggestionService {
   async findByCallplanDateStart(
     callplanDateStart: string,
     organizationId: string,
-    salesSpvNik: string,
+    salesSpvNik?: string,
+    status?: DoSuggestionStatus,
   ): Promise<DoSuggestion[]> {
     if (!callplanDateStart?.trim()) {
       throw new BadRequestException('callplanDateStart is required');
     }
     if (!organizationId?.trim()) {
       throw new BadRequestException('organizationId is required');
-    }
-    if (!salesSpvNik?.trim()) {
-      throw new BadRequestException('salesSpvNik is required');
     }
 
     const parsedDate = new Date(callplanDateStart.trim());
@@ -69,10 +66,10 @@ export class DoSuggestionService {
     return await this.repository.findByCallplanDateStartOrganizationAndSalesSpvNik(
       parsedDate,
       organizationId.trim(),
-      salesSpvNik.trim(),
+      salesSpvNik?.trim() || undefined,
+      status,
     );
   }
-
   private async mapDtoToCreateData(
     dto: CreateOrUpdateDoSuggestionDto,
   ): Promise<DoSuggestionPersistData> {

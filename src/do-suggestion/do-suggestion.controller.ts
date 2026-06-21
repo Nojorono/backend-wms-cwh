@@ -7,11 +7,16 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionService } from './do-suggestion.service';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
+import {
+  DoSuggestionCallplanFilterQueryDto,
+  DoSuggestionFilterQueryDto,
+} from './dto/do-suggestion-filter-query.dto';
 
 @ApiTags('DO Suggestion')
 @Controller('do-suggestion')
@@ -34,24 +39,27 @@ export class DoSuggestionController {
   @Get()
   @ApiOperation({ summary: 'List all DO suggestions with details' })
   @ApiResponse({ status: 200, type: [DoSuggestion] })
-  findAll(): Promise<DoSuggestion[]> {
-    return this.doSuggestionService.findAll();
+  findAll(@Query() query: DoSuggestionFilterQueryDto): Promise<DoSuggestion[]> {
+    return this.doSuggestionService.findAll(query.status);
   }
 
-  @Get('callplan/date-start/:callplanDateStart/organization/:organizationId/sales-spv-nik/:salesSpvNik')
+  @Get('callplan/date-start/:callplanDateStart/organization/:organizationId')
   @ApiOperation({
-    summary: 'Get DO suggestions by callplan date start, organization ID, and sales SPV NIK',
+    summary: 'Get DO suggestions by callplan date start and organization ID',
+    description:
+      'Optional query: sales_spv_nik, status (DRAFT | REVISED | SUBMITTED | FINAL).',
   })
   @ApiResponse({ status: 200, type: [DoSuggestion] })
   findByCallplanDateStart(
     @Param('callplanDateStart') callplanDateStart: string,
     @Param('organizationId') organizationId: string,
-    @Param('salesSpvNik') salesSpvNik: string,
+    @Query() query: DoSuggestionCallplanFilterQueryDto,
   ): Promise<DoSuggestion[]> {
     return this.doSuggestionService.findByCallplanDateStart(
       callplanDateStart,
       organizationId,
-      salesSpvNik,
+      query.sales_spv_nik,
+      query.status,
     );
   }
 
