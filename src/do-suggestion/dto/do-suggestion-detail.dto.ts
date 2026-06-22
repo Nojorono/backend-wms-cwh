@@ -18,6 +18,12 @@ export class DoSuggestionDetailDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  inventory_item_id?: number;
+
+  @ApiPropertyOptional({ example: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   item_qty_suggestion?: number;
 
   @ApiPropertyOptional({ example: 90 })

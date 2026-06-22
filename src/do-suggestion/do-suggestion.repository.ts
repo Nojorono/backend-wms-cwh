@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
-import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'; import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm'; import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
+import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
 import { formatSpbNumber, parseSpbSequence } from './do-suggestion-spb.util';
 
 const DO_SUGGESTION_RELATIONS = ['details', 'organization'] as const;
@@ -31,6 +31,7 @@ export type DoSuggestionDetailData = Partial<
     DoSuggestionDetail,
     | 'id'
     | 'item_code'
+    | 'inventory_item_id'
     | 'item_qty_suggestion'
     | 'item_qty_revision'
     | 'item_qty_submitted'

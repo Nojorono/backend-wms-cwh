@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsDateString, IsNotEmpty, IsString } from 'class-validator';
+import { IsDateString, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 /** YYYY-MM-DD for Swagger / examples (today). */
 export const onHandAtrDateNowExample = (): string =>
@@ -43,6 +43,11 @@ export class InvOnHandQtyWithAtrParamsDto {
   @IsDateString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().split('T')[0] : value))
   date: string;
+
+  @ApiPropertyOptional({ example: 'John Doe' })
+  @IsOptional()
+  @IsString()
+  created_by: string;
 }
 
 /** Oracle on-hand row with attributes (`get_inv_on_hand_qty_with_atr`). */

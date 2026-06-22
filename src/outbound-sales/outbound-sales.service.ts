@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';
-import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';import { IntegrationOnHandAtrService } from './integration/integration-on-hand-atr.service';
+import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity'; import { IntegrationOnHandAtrService } from './integration/integration-on-hand-atr.service';
 import { CreateOnHandAtrDto } from './dto/create-on-hand-atr.dto';
 import {
   InvOnHandQtyWithAtrItemDto,
@@ -38,9 +38,9 @@ export class OutboundSalesService {
     const response =
       await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
     const rows = response.data ?? [];
-
+    const createdBy = query.created_by ?? 'SYSTEM';
     if (rows.length > 0) {
-      const dtos = await this.mapOracleRowsToCreateDtos(rows, resolvedOrganizationId);
+      const dtos = await this.mapOracleRowsToCreateDtos(rows, resolvedOrganizationId, createdBy);
       const createdData = await this.createManyOnHandAtr(dtos);
       return createdData;
     }
@@ -86,13 +86,15 @@ export class OutboundSalesService {
 
   private async mapOracleRowsToCreateDtos(rows: InvOnHandQtyWithAtrItemDto[],
     organizationId: string,
+    createdBy: string,
   ): Promise<CreateOnHandAtrDto[]> {
-    return rows.map((row) => this.mapOracleRowToCreateDto(row, organizationId));
+    return rows.map((row) => this.mapOracleRowToCreateDto(row, organizationId, createdBy));
   }
 
   private mapOracleRowToCreateDto(
     row: InvOnHandQtyWithAtrItemDto,
     organizationId: string,
+    createdBy: string,
   ): CreateOnHandAtrDto {
     return {
       organization_id: organizationId,
@@ -109,6 +111,8 @@ export class OutboundSalesService {
       locator_name: row.LOCATOR_NAME ?? undefined,
       quantity: row.QUANTITY,
       avail_to_reserve: row.AVAIL_TO_RESERVE,
+      created_by: createdBy,
+      updated_by: createdBy,
     };
   }
 

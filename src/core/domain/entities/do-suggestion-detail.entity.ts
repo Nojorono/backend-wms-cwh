@@ -17,6 +17,9 @@ export class DoSuggestionDetail extends BaseEntity {
   @Column({ name: 'item_code', type: 'varchar', length: 100, nullable: true })
   item_code: string;
 
+  @Column({ name: 'inventory_item_id', type: 'bigint', nullable: true })
+  inventory_item_id: number;
+
   @Column({ name: 'item_qty_suggestion', type: 'bigint', nullable: true })
   item_qty_suggestion: number;
 
