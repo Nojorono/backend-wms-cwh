@@ -33,6 +33,7 @@ export type DoSuggestionDetailData = Partial<
     | 'item_code'
     | 'item_qty_suggestion'
     | 'item_qty_revision'
+    | 'item_qty_submitted'
     | 'item_qty_final'
     | 'contribution_percentage'
     | 'item_uom'

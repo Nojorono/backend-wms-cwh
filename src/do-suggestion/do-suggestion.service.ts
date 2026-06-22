@@ -151,10 +151,12 @@ export class DoSuggestionService {
   }
 
   private mapLineDtoForCreate(line: DoSuggestionDetailDto): DoSuggestionDetailData {
-    return {      id: line.id,
+    return {
+      id: line.id,
       item_code: line.item_code,
       item_qty_suggestion: line.item_qty_suggestion,
       item_qty_revision: line.item_qty_revision,
+      item_qty_submitted: line.item_qty_submitted,
       item_qty_final: line.item_qty_final,
       contribution_percentage: line.contribution_percentage,
       item_uom: line.item_uom,
@@ -167,6 +169,7 @@ export class DoSuggestionService {
       item_code: line.item_code,
       item_qty_suggestion: line.item_qty_suggestion,
       item_qty_revision: line.item_qty_revision,
+      item_qty_submitted: line.item_qty_submitted,
       item_qty_final: line.item_qty_final,
       contribution_percentage: line.contribution_percentage,
       item_uom: line.item_uom,

@@ -1,11 +1,21 @@
 import { BaseEntity } from './base.entity';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { MoveOrderIntegration } from './move-order-integration.entity';
 
 @Entity('move_order_line_integration')
 export class MoveOrderLineIntegration extends BaseEntity {
+  @Column({ name: 'move_order_integration_id', type: 'uuid', nullable: true })
+  move_order_integration_id: string;
+
+  @ManyToOne(() => MoveOrderIntegration, (header) => header.lines, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'move_order_integration_id' })
+  move_order_integration: MoveOrderIntegration;
+
   @Column({ name: 'line_iface_id', type: 'bigint', nullable: true })
   line_iface_id: number;
-
   @Column({ name: 'header_iface_id', type: 'bigint', nullable: true })
   header_iface_id: number;
 

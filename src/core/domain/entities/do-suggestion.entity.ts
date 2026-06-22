@@ -55,12 +55,11 @@ export class DoSuggestion extends BaseEntity {
     })
     status: DoSuggestionStatus;
 
-    @Column({ name: 'created_by', type: 'bigint', nullable: true })
-    created_by: number;
+    @Column({ name: 'created_by', type: 'varchar', length: 100, nullable: true })
+    created_by: string;
 
-    @Column({ name: 'updated_by', type: 'bigint', nullable: true })
-    updated_by: number;
-
+    @Column({ name: 'updated_by', type: 'varchar', length: 100, nullable: true })
+    updated_by: string;
     @Column({ name: 'spb_date', type: 'date', nullable: true })
     spb_date: Date;
 

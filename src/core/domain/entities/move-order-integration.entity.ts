@@ -1,13 +1,22 @@
 import { BaseEntity } from './base.entity';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { MoveOrderLineIntegration } from './move-order-integration-lines.entity';
+import { MasterIO } from './master-io.entity';
 
 @Entity('move_order_integration')
 export class MoveOrderIntegration extends BaseEntity {
+  @Column({ name: 'master_io_id', type: 'uuid', nullable: true })
+  master_io_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'master_io_id' })
+  master_io: MasterIO;
+
   @Column({ name: 'header_iface_id', type: 'bigint', nullable: true })
   header_iface_id: number;
 
-  @Column({ name: 'request_number', type: 'bigint', nullable: true })
-  request_number: number;
+  @Column({ name: 'request_number', type: 'varchar', length: 100, nullable: true })
+  request_number: string;
 
   @Column({ name: 'transaction_type_id', type: 'bigint', nullable: true })
   transaction_type_id: number;
@@ -124,6 +133,9 @@ export class MoveOrderIntegration extends BaseEntity {
   @Column({ name: 'iface_mode', type: 'varchar', length: 30, nullable: true })
   iface_mode: string;
 
+  @Column({ name: 'total_lines', type: 'int', nullable: true })
+  total_lines: number;
+
   @Column({ name: 'creation_date', type: 'timestamp', nullable: true })
   creation_date: Date;
 
@@ -138,4 +150,7 @@ export class MoveOrderIntegration extends BaseEntity {
 
   @Column({ name: 'last_updated_by', type: 'bigint', nullable: true })
   last_updated_by: number;
+
+  @OneToMany(() => MoveOrderLineIntegration, (line) => line.move_order_integration)
+  lines: MoveOrderLineIntegration[];
 }

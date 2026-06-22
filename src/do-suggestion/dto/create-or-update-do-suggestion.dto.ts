@@ -6,7 +6,6 @@ import {
   IsDateString,
   IsEnum,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -84,17 +83,17 @@ export class CreateOrUpdateDoSuggestionDto {
   @IsEnum(DoSuggestionStatus)
   status?: DoSuggestionStatus;
 
-  @ApiPropertyOptional({ example: 1001 })
+  @ApiPropertyOptional({ example: '020000149' })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  created_by?: number;
+  @IsString()
+  @MaxLength(100)
+  created_by?: string;
 
-  @ApiPropertyOptional({ example: 1001 })
+  @ApiPropertyOptional({ example: '020000149' })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  updated_by?: number;
+  @IsString()
+  @MaxLength(100)
+  updated_by?: string;
 
   @ApiPropertyOptional({ example: '2026-06-08' })
   @IsOptional()
