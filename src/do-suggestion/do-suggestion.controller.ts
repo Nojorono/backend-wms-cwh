@@ -29,7 +29,8 @@ export class DoSuggestionController {
   @ApiOperation({
     summary: 'Create or update DO suggestion with lines',
     description:
-      'Omit `id` to create. Include `id` to update header and replace all detail lines.',
+      'Omit `id` to create. Include `id` to partially update header and provided detail lines only. ' +
+      '`created_by` / `updated_by` accept employee NIK (varchar).',
   })
   @ApiResponse({ status: 200, type: DoSuggestion })
   createOrUpdate(@Body() dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
