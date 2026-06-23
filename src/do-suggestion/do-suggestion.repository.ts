@@ -38,6 +38,7 @@ export type DoSuggestionDetailData = Partial<
     | 'item_qty_final'
     | 'contribution_percentage'
     | 'item_uom'
+    | 'line_number'
   >
 >;
 
@@ -49,6 +50,10 @@ export interface DoSuggestionItemCallplanSumRow {
   organization_id: string;
   item_code: string;
   total_qty_submitted: number;
+}
+
+export interface DoSuggestionPendingSubmissionFilters {
+  callplanDateStart?: Date;
 }
 
 @Injectable()
@@ -162,6 +167,30 @@ export class DoSuggestionRepository {
       relations: [...DO_SUGGESTION_RELATIONS],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findPendingForSubmission(
+    filters: DoSuggestionPendingSubmissionFilters = {},
+  ): Promise<DoSuggestion[]> {
+    const qb = this.headerRepository
+      .createQueryBuilder('ds')
+      .leftJoinAndSelect('ds.details', 'details', 'details.deleted_at IS NULL')
+      .leftJoinAndSelect('ds.organization', 'organization')
+      .where('ds.deleted_at IS NULL')
+      .andWhere('ds.status IS DISTINCT FROM :submitted', {
+        submitted: DoSuggestionStatus.SUBMITTED,
+      })
+      .andWhere('ds.status IS DISTINCT FROM :final', {
+        final: DoSuggestionStatus.FINAL,
+      });
+
+    if (filters.callplanDateStart) {
+      qb.andWhere('ds.callplan_date_start = :callplanDateStart', {
+        callplanDateStart: filters.callplanDateStart,
+      });
+    }
+
+    return await qb.orderBy('ds.createdAt', 'ASC').getMany();
   }
 
   async findByCallplanDateStartOrganizationAndSalesSpvNik(

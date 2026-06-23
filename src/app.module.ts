@@ -54,6 +54,7 @@ import { EmailModule } from './email/email.module';
 import { MasterDepartementModule } from './master-departement/master-departement.module';
 import { ScheduledCallPlanModule } from './scheduled-task/scheduled-call-plan/scheduled-call-plan.module';
 import { ScheduledOnHandAtrModule } from './scheduled-task/scheduled-on-hand-atr/scheduled-on-hand-atr.module';
+import { ScheduledSpbSubmittedModule } from './scheduled-task/scheduled-spb-submitted/scheduled-spb-submitted.module';
 import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
 import { OutboundSalesModule } from './outbound-sales/outbound-sales.module';
 import { MoveOrderIntegrationModule } from './move-order-integration/move-order-integration.module';
@@ -117,6 +118,7 @@ import { MoveOrderIntegrationModule } from './move-order-integration/move-order-
     MasterDepartementModule,
     ScheduledCallPlanModule,
     ScheduledOnHandAtrModule,
+    ScheduledSpbSubmittedModule,
     DoSuggestionModule,
     OutboundSalesModule,
     MoveOrderIntegrationModule,

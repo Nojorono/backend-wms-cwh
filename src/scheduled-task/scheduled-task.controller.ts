@@ -8,6 +8,9 @@ import { ScheduledCallPlanService } from './scheduled-call-plan/scheduled-call-p
 import { ScheduledOnHandAtrFetchPayloadDto } from './scheduled-on-hand-atr/dto/scheduled-on-hand-atr-fetch-payload.dto';
 import { ScheduledOnHandAtrScheduler } from './scheduled-on-hand-atr/scheduled-on-hand-atr.scheduler';
 import { ScheduledOnHandAtrService } from './scheduled-on-hand-atr/scheduled-on-hand-atr.service';
+import { ScheduledSpbSubmittedSubmitPayloadDto } from './scheduled-spb-submitted/dto/scheduled-spb-submitted-submit-payload.dto';
+import { ScheduledSpbSubmittedScheduler } from './scheduled-spb-submitted/scheduled-spb-submitted.scheduler';
+import { ScheduledSpbSubmittedService } from './scheduled-spb-submitted/scheduled-spb-submitted.service';
 import { ScheduledTaskService } from './scheduled-task.service';
 
 @ApiTags('Scheduled Task')
@@ -20,6 +23,8 @@ export class ScheduledTaskController {
     private readonly scheduledCallPlanScheduler: ScheduledCallPlanScheduler,
     private readonly scheduledOnHandAtrService: ScheduledOnHandAtrService,
     private readonly scheduledOnHandAtrScheduler: ScheduledOnHandAtrScheduler,
+    private readonly scheduledSpbSubmittedService: ScheduledSpbSubmittedService,
+    private readonly scheduledSpbSubmittedScheduler: ScheduledSpbSubmittedScheduler,
   ) {}
 
   @Get()
@@ -82,6 +87,33 @@ export class ScheduledTaskController {
     return {
       success: true,
       message: 'On-hand ATR schedule bootstrap completed',
+    };
+  }
+
+  @Post('spb-submitted/submit-now')
+  @ApiOperation({
+    summary: 'Submit all pending DO suggestions to SUBMITTED',
+    description:
+      'Finds DO suggestions where status is not SUBMITTED (excluding FINAL), sets status to SUBMITTED, ' +
+      'and sets item_qty_submitted to item_qty_revision when present, otherwise item_qty_suggestion.',
+  })
+  @ApiResponse({ status: 200, description: 'SPB submit batch completed.' })
+  submitSpbPendingNow(@Body() payload?: ScheduledSpbSubmittedSubmitPayloadDto) {
+    return this.scheduledSpbSubmittedService.runSubmitNow(payload ?? {});
+  }
+
+  @Post('spb-submitted/bootstrap')
+  @ApiOperation({
+    summary: 'Re-run SPB submitted schedule bootstrap',
+    description:
+      'Applies SPB_SUBMITTED_SCHEDULE_MODE from env (database | memory | off).',
+  })
+  @ApiResponse({ status: 201, description: 'SPB submitted schedule bootstrap completed.' })
+  async bootstrapSpbSubmittedSchedule() {
+    await this.scheduledSpbSubmittedScheduler.bootstrap();
+    return {
+      success: true,
+      message: 'SPB submitted schedule bootstrap completed',
     };
   }
 

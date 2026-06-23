@@ -154,12 +154,14 @@ export class DoSuggestionService {
     return {
       id: line.id,
       item_code: line.item_code,
+      inventory_item_id: line.inventory_item_id,
       item_qty_suggestion: line.item_qty_suggestion,
       item_qty_revision: line.item_qty_revision,
       item_qty_submitted: line.item_qty_submitted,
       item_qty_final: line.item_qty_final,
       contribution_percentage: line.contribution_percentage,
       item_uom: line.item_uom,
+      line_number: line.line_number,
     };
   }
 
@@ -167,12 +169,14 @@ export class DoSuggestionService {
     return this.pickDefined<DoSuggestionDetailData>({
       id: line.id,
       item_code: line.item_code,
+      inventory_item_id: line.inventory_item_id,
       item_qty_suggestion: line.item_qty_suggestion,
       item_qty_revision: line.item_qty_revision,
       item_qty_submitted: line.item_qty_submitted,
       item_qty_final: line.item_qty_final,
       contribution_percentage: line.contribution_percentage,
       item_uom: line.item_uom,
+      line_number: line.line_number,
     });
   }
 
