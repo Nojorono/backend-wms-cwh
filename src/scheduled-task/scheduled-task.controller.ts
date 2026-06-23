@@ -5,6 +5,9 @@ import { CreateCronTaskDto } from './dto/create-cron-task.dto';
 import { ScheduledCallPlanFetchPayloadDto } from './scheduled-call-plan/dto/scheduled-call-plan-fetch-payload.dto';
 import { ScheduledCallPlanScheduler } from './scheduled-call-plan/scheduled-call-plan.scheduler';
 import { ScheduledCallPlanService } from './scheduled-call-plan/scheduled-call-plan.service';
+import { ScheduledOnHandAtrFetchPayloadDto } from './scheduled-on-hand-atr/dto/scheduled-on-hand-atr-fetch-payload.dto';
+import { ScheduledOnHandAtrScheduler } from './scheduled-on-hand-atr/scheduled-on-hand-atr.scheduler';
+import { ScheduledOnHandAtrService } from './scheduled-on-hand-atr/scheduled-on-hand-atr.service';
 import { ScheduledTaskService } from './scheduled-task.service';
 
 @ApiTags('Scheduled Task')
@@ -15,6 +18,8 @@ export class ScheduledTaskController {
     private readonly scheduledTaskService: ScheduledTaskService,
     private readonly scheduledCallPlanService: ScheduledCallPlanService,
     private readonly scheduledCallPlanScheduler: ScheduledCallPlanScheduler,
+    private readonly scheduledOnHandAtrService: ScheduledOnHandAtrService,
+    private readonly scheduledOnHandAtrScheduler: ScheduledOnHandAtrScheduler,
   ) {}
 
   @Get()
@@ -52,6 +57,32 @@ export class ScheduledTaskController {
   @ApiResponse({ status: 200, description: 'Return call plan data from Snowflake.' })
   fetchCallPlanNow(@Body() payload?: ScheduledCallPlanFetchPayloadDto) {
     return this.scheduledCallPlanService.runFetchNow(payload ?? {});
+  }
+
+  @Post('on-hand-atr/fetch-now')
+  @ApiOperation({
+    summary: 'Fetch on-hand ATR for all cabang (BRANCH/SUBBRANCH)',
+    description:
+      'Resolves cabang from m_io (organization_type BRANCH,SUBBRANCH), then calls findOnHand per branch.',
+  })
+  @ApiResponse({ status: 201, description: 'On-hand ATR fetch completed for all branches.' })
+  fetchOnHandAtrNow(@Body() payload?: ScheduledOnHandAtrFetchPayloadDto) {
+    return this.scheduledOnHandAtrService.runFetchNow(payload ?? {});
+  }
+
+  @Post('on-hand-atr/bootstrap')
+  @ApiOperation({
+    summary: 'Re-run on-hand ATR schedule bootstrap',
+    description:
+      'Applies ON_HAND_ATR_SCHEDULE_MODE from env (database | memory | off).',
+  })
+  @ApiResponse({ status: 201, description: 'On-hand ATR schedule bootstrap completed.' })
+  async bootstrapOnHandAtrSchedule() {
+    await this.scheduledOnHandAtrScheduler.bootstrap();
+    return {
+      success: true,
+      message: 'On-hand ATR schedule bootstrap completed',
+    };
   }
 
   @Post('call-plan/bootstrap')

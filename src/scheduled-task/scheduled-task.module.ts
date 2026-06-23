@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduledTask } from '../core/domain/entities/scheduled-task.entity';
 import { ScheduledCallPlanModule } from './scheduled-call-plan/scheduled-call-plan.module';
+import { ScheduledOnHandAtrModule } from './scheduled-on-hand-atr/scheduled-on-hand-atr.module';
 import { ScheduledTaskCallbackRegistry } from './scheduled-task-callback.registry';
 import { ScheduledTaskController } from './scheduled-task.controller';
 import { ScheduledTaskRepository } from './scheduled-task.repository';
@@ -13,6 +14,7 @@ import { ScheduledTaskService } from './scheduled-task.service';
     ScheduleModule.forRoot(),
     TypeOrmModule.forFeature([ScheduledTask]),
     forwardRef(() => ScheduledCallPlanModule),
+    forwardRef(() => ScheduledOnHandAtrModule),
   ],
   controllers: [ScheduledTaskController],
   providers: [ScheduledTaskCallbackRegistry, ScheduledTaskService, ScheduledTaskRepository],
