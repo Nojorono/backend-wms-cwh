@@ -35,13 +35,14 @@ export class ScheduledCallPlanService {
     const snowflakeResult = await this.snowflakeService.fetchCallPlan(payload);
     const data = this.groupCallPlanByAhom(snowflakeResult.data);
 
-    const emailSummary = await this.callPlanEmailService.sendRemindersForGroupedData(
+    const emailSummary = await this.callPlanEmailService.sendNullCallPlanRemindersForGroupedData(
       data,
       snowflakeResult.callPlanStartDate,
     );
 
     this.logger.log(
-      `Call plan reminders: attempted=${emailSummary.attempted} sent=${emailSummary.sent} skipped=${emailSummary.skippedMissingEmail}`,
+      `Call plan null reminders: attempted=${emailSummary.attempted} sent=${emailSummary.sent} ` +
+        `skippedMissingAhom=${emailSummary.skippedMissingAhomEmail}`,
     );
 
     return {

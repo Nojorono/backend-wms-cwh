@@ -8,15 +8,18 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Public } from '../core/decorators/public.decorator';
+import { CallPlanNullAhomTemplateDto } from './dto/call-plan-null-ahom-template.dto';
 import { CallPlanReminderPreviewQueryDto } from './dto/call-plan-reminder-preview-query.dto';
 import { CallPlanReminderTemplateDto } from './dto/call-plan-reminder-template.dto';
 import { PreviewCallPlanReminderEmailDto } from './dto/preview-call-plan-reminder-email.dto';
+import { SendCallPlanNullAhomEmailDto } from './dto/send-call-plan-null-ahom-email.dto';
 import { SendCallPlanReminderEmailDto } from './dto/send-call-plan-reminder-email.dto';
 import { SendEmailDto } from './dto/send-email.dto';
 import { SendEmailResponseDto } from './dto/send-email-response.dto';
 import { SmtpConfigDto } from './dto/smtp-config.dto';
 import { EmailService } from './email.service';
 import { mergeCallPlanReminderPreviewBody } from './template-email/call-plan-reminder-preview.sample';
+import { CALL_PLAN_NULL_AHOM_PREVIEW_SAMPLE } from './template-email/call-plan-null-ahom-preview.sample';
 
 @ApiTags('Email')
 @Controller('email')
@@ -34,6 +37,41 @@ export class EmailController {
   @ApiResponse({ status: 400, description: 'Invalid payload or SMTP failure.' })
   sendEmail(@Body() dto: SendEmailDto): Promise<SendEmailResponseDto> {
     return this.emailService.sendEmail(dto);
+  }
+
+  @Public()
+  @Get('call-plan-null-ahom/preview/html')
+  @ApiOperation({
+    summary: 'Open null call plan AHOM preview in browser',
+    description:
+      'Public GET endpoint. Renders the AHOM reminder template (sales tanpa Call Plan) using sample data.',
+  })
+  @ApiProduces('text/html')
+  @ApiResponse({ status: 200, description: 'Rendered HTML email page.' })
+  openCallPlanNullAhomPreviewHtml(@Res() res: Response): void {
+    const rendered = this.emailService.renderCallPlanNullAhomPreview(
+      CALL_PLAN_NULL_AHOM_PREVIEW_SAMPLE,
+    );
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(rendered.html);
+  }
+
+  @Post('call-plan-null-ahom/preview')
+  @ApiOperation({ summary: 'Preview null call plan AHOM email template (JSON)' })
+  previewCallPlanNullAhom(@Body() body: CallPlanNullAhomTemplateDto) {
+    return this.emailService.renderCallPlanNullAhomPreview(body);
+  }
+
+  @Post('call-plan-null-ahom/send')
+  @ApiOperation({
+    summary: 'Send null call plan AHOM email',
+    description: 'Send reminder to AHOM (TO) with all supervisors in CC.',
+  })
+  @ApiResponse({ status: 201, description: 'Reminder email sent.', type: SendEmailResponseDto })
+  sendCallPlanNullAhom(
+    @Body() dto: SendCallPlanNullAhomEmailDto,
+  ): Promise<SendEmailResponseDto> {
+    return this.emailService.sendCallPlanNullAhomEmail(dto);
   }
 
   @Public()

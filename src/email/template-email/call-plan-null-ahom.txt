@@ -1,0 +1,18 @@
+REMINDER CALL PLAN — SALES TANPA CALL PLAN
+==========================================
+
+Cabang     : {{cabang}}
+Tanggal    : {{callPlanStartDate}}
+
+Kepada AHOM:
+{{ahomName}} ({{ahomNik}})
+
+CC Supervisor ({{supervisorCount}})
+
+{{intro}}
+
+Daftar supervisor dan sales yang belum memiliki Call Plan:
+{{supervisorSalesSections}}
+
+---
+Email otomatis dikirim pada {{generatedAt}}.

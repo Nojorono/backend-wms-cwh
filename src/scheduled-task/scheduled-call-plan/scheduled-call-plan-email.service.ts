@@ -2,13 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SendEmailResponseDto } from '../../email/dto/send-email-response.dto';
 import { EmailService } from '../../email/email.service';
 import { UserDetailRepository } from '../../users/user-detail.repository';
-import { buildCallPlanReminderContexts } from './call-plan-reminder.mapper';
+import {
+  buildCallPlanNullAhomContexts,
+} from './call-plan-reminder.mapper';
 import { CallPlanAhomGroupedData } from './types/scheduled-call-plan-data.interface';
 
-export interface CallPlanReminderSendSummary {
+export interface CallPlanNullAhomSendSummary {
   attempted: number;
   sent: number;
-  skippedMissingEmail: number;
+  skippedMissingAhomEmail: number;
+  skippedNoData: number;
   results: SendEmailResponseDto[];
 }
 
@@ -21,66 +24,82 @@ export class ScheduledCallPlanEmailService {
     private readonly userDetailRepository: UserDetailRepository,
   ) {}
 
-  buildReminderContexts(groupedData: CallPlanAhomGroupedData[], callPlanStartDate: string) {
-    return buildCallPlanReminderContexts(groupedData, callPlanStartDate);
-  }
-
-  async sendRemindersForGroupedData(
+  async sendNullCallPlanRemindersForGroupedData(
     groupedData: CallPlanAhomGroupedData[],
     callPlanStartDate: string,
-  ): Promise<CallPlanReminderSendSummary> {
-    const contexts = this.buildReminderContexts(groupedData, callPlanStartDate);
-    const niks = contexts.flatMap((context) => [context.supervisorNik, context.ahomNik]);
+  ): Promise<CallPlanNullAhomSendSummary> {
+    const contexts = buildCallPlanNullAhomContexts(groupedData, callPlanStartDate);
+    if (!contexts.length) {
+      this.logger.log('No AHOM groups with missing call plan data to email');
+      return {
+        attempted: 0,
+        sent: 0,
+        skippedMissingAhomEmail: 0,
+        skippedNoData: groupedData.length,
+        results: [],
+      };
+    }
+
+    const niks = contexts.flatMap((context) => [
+      context.ahomNik,
+      ...context.supervisors.map((supervisor) => supervisor.supervisorNik),
+    ]);
     const emailMap = await this.userDetailRepository.findEmailMapByNik(niks);
 
     const results: SendEmailResponseDto[] = [];
-    let skippedMissingEmail = 0;
+    let skippedMissingAhomEmail = 0;
 
     for (const context of contexts) {
-      const supervisorNik = context.supervisorNik.trim().toUpperCase();
       const ahomNik = context.ahomNik.trim().toUpperCase();
-      const supervisorEmail = emailMap.get(supervisorNik);
       const ahomEmail = emailMap.get(ahomNik);
 
-      if (!supervisorEmail) {
-        skippedMissingEmail += 1;
+      if (!ahomEmail) {
+        skippedMissingAhomEmail += 1;
         this.logger.warn(
-          `Skip call plan reminder for supervisor NIK=${context.supervisorNik}: supervisorEmail=NOT_FOUND`,
+          `Skip null call plan reminder for AHOM NIK=${context.ahomNik} cabang=${context.cabang}: ahomEmail=NOT_FOUND`,
         );
         continue;
       }
 
-      if (!ahomEmail) {
+      const supervisorEmails = Array.from(
+        new Set(
+          context.supervisors
+            .map((supervisor) => emailMap.get(supervisor.supervisorNik.trim().toUpperCase()))
+            .filter((email): email is string => Boolean(email?.trim())),
+        ),
+      );
+
+      if (!supervisorEmails.length) {
         this.logger.warn(
-          `AHOM email not found for NIK=${context.ahomNik}; sending reminder to supervisor only`,
+          `No supervisor emails found for AHOM NIK=${context.ahomNik}; sending to AHOM only`,
         );
       }
 
-      const result = await this.emailService.sendCallPlanReminderEmail({
-        supervisorEmail: [supervisorEmail],
-        ahomEmail: ahomEmail ? [ahomEmail] : undefined,
+      const result = await this.emailService.sendCallPlanNullAhomEmail({
+        ahomEmail: [ahomEmail],
+        supervisorEmail: supervisorEmails.length ? supervisorEmails : undefined,
         body: {
           callPlanStartDate: context.callPlanStartDate,
           cabang: context.cabang,
-          supervisorName: context.supervisorName,
-          supervisorNik: context.supervisorNik,
           ahomName: context.ahomName,
           ahomNik: context.ahomNik,
-          sales: context.sales,
+          supervisors: context.supervisors,
         },
       });
       results.push(result);
 
       this.logger.log(
-        `Sent call plan reminder to supervisor=${supervisorEmail}` +
-          `${ahomEmail ? ` cc ahom=${ahomEmail}` : ''} cabang=${context.cabang}`,
+        `Sent null call plan reminder to ahom=${ahomEmail}` +
+          `${supervisorEmails.length ? ` cc supervisors=${supervisorEmails.join(',')}` : ''} ` +
+          `cabang=${context.cabang}`,
       );
     }
 
     return {
       attempted: contexts.length,
       sent: results.length,
-      skippedMissingEmail,
+      skippedMissingAhomEmail,
+      skippedNoData: 0,
       results,
     };
   }

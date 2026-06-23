@@ -3,6 +3,7 @@ import {
   CallPlanSalesData,
   CallPlanSalesSpvData,
 } from './types/scheduled-call-plan-data.interface';
+import { CallPlanNullAhomTemplateContext } from '../../email/template-email/types/call-plan-null-ahom-template.interface';
 import { CallPlanReminderTemplateContext } from '../../email/template-email/types/call-plan-reminder-template.interface';
 
 function isMissingCallPlanNumber(value: string | null | undefined): boolean {
@@ -61,6 +62,53 @@ export function buildCallPlanReminderContexts(
         contexts.push(context);
       }
     }
+  }
+
+  return contexts;
+}
+
+export function buildCallPlanNullAhomContexts(
+  groupedData: CallPlanAhomGroupedData[],
+  callPlanStartDate: string,
+): CallPlanNullAhomTemplateContext[] {
+  const contexts: CallPlanNullAhomTemplateContext[] = [];
+
+  for (const ahom of groupedData) {
+    if (!ahom.AHOM_NIK?.trim()) {
+      continue;
+    }
+
+    const supervisors = ahom.SALES_SPV.flatMap((supervisor) => {
+      if (!supervisor.SALES_SUPERVISOR_NIK?.trim()) {
+        return [];
+      }
+
+      const sales = toSalesRows(supervisor.SALES);
+      if (!sales.length) {
+        return [];
+      }
+
+      return [
+        {
+          supervisorName: supervisor.SALES_SUPERVISOR_NAME,
+          supervisorNik: supervisor.SALES_SUPERVISOR_NIK,
+          sales,
+        },
+      ];
+    });
+
+    if (!supervisors.length) {
+      continue;
+    }
+
+    contexts.push({
+      callPlanStartDate,
+      cabang: ahom.CABANG,
+      ahomName: ahom.AHOM_NAME,
+      ahomNik: ahom.AHOM_NIK,
+      supervisors,
+      generatedAt: '',
+    });
   }
 
   return contexts;

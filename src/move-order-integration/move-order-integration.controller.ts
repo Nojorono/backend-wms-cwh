@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { MoveOrderIntegration } from '../core/domain/entities/move-order-integration.entity';
 import { MoveOrderLineIntegration } from '../core/domain/entities/move-order-integration-lines.entity';
 import { CreateMoveOrderIntegrationLineDto } from './dto/create-move-order-integration-line.dto';
@@ -42,6 +42,73 @@ export class MoveOrderIntegrationController {
   @ApiOperation({
     summary: 'Submit move order directly to Oracle via RabbitMQ',
     description: 'Calls RMQ pattern move_order.create_with_lines on MOVE_ORDER_SERVICE.',
+  })
+  @ApiBody({
+    type: SubmitMoveOrderOraclePayloadDto,
+    description: 'Full payload example including optional header and locator fields.',
+    examples: {
+      fullPayload: {
+        summary: 'Complete move order payload',
+        value: {
+          REQUEST_NUMBER: 'JAT/SPB/2024/01/000002',
+          TRANSACTION_TYPE_ID: 121,
+          MOVE_ORDER_TYPE: 1,
+          ORGANIZATION_ID: 241,
+          DATE_REQUIRED: '2024-01-01',
+          FROM_SUBINVENTORY_CODE: 'KECIL',
+          TO_SUBINVENTORY_CODE: 'CANVAS',
+          HEADER_STATUS: 7,
+          STATUS_DATE: '2024-01-01',
+          ATTRIBUTE_CATEGORY: 'FPPR Tambahan',
+          ATTRIBUTE7: 'string',
+          ATTRIBUTE8: 'string',
+          ATTRIBUTE9: 'string',
+          ATTRIBUTE10: 'string',
+          ATTRIBUTE11: 'string',
+          ATTRIBUTE12: 'string',
+          ATTRIBUTE13: 'JAT/CP/2024/01/000001',
+          ATTRIBUTE14: 'JAT/SPB/2024/01/000002',
+          OPERATION: 'CREATE',
+          DB_FLAG: 'T',
+          SOURCE_SYSTEM: 'WMS',
+          SOURCE_HEADER_ID: '1234567890',
+          SOURCE_LINE_ID: '1234567890',
+          SOURCE_BATCH_ID: '1234567890',
+          IFACE_STATUS: 'READY',
+          IFACE_MODE: 'MOVE_ORDER',
+          TOTAL_LINES: 1,
+          CREATION_DATE: '2024-01-01',
+          CREATED_BY: 1234,
+          LAST_UPDATE_DATE: '2024-01-01',
+          LAST_UPDATED_BY: 1234,
+          lines: [
+            {
+              LINE_NUMBER: 1,
+              ORGANIZATION_ID: 241,
+              INVENTORY_ITEM_ID: 21001,
+              FROM_SUBINVENTORY_CODE: 'KECIL',
+              TO_SUBINVENTORY_CODE: 'CANVAS',
+              FROM_LOCATOR_ID: 1001,
+              TO_LOCATOR_ID: 2001,
+              UOM_CODE: 'BKS',
+              QUANTITY: 1000,
+              DATE_REQUIRED: '2024-01-01',
+              TRANSACTION_TYPE_ID: 121,
+              TRANSACTION_SOURCE_TYPE_ID: 4,
+              LINE_STATUS: 7,
+              STATUS_DATE: '2024-01-01',
+              LOT_NUMBER: 'LOT-001',
+              SOURCE_LINE_ID: '1234567890',
+              IFACE_STATUS: 'READY',
+              OPERATION: 'CREATE',
+              DB_FLAG: 'T',
+            },
+          ],
+          userId: 1234,
+          userName: 'John Doe',
+        },
+      },
+    },
   })
   @ApiResponse({ status: 200, type: MoveOrderWithLinesResponseDto })
   submitToOracle(

@@ -2,12 +2,15 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { CallPlanNullAhomTemplateDto } from './dto/call-plan-null-ahom-template.dto';
 import { CallPlanReminderTemplateDto } from './dto/call-plan-reminder-template.dto';
+import { SendCallPlanNullAhomEmailDto } from './dto/send-call-plan-null-ahom-email.dto';
 import { SendCallPlanReminderEmailDto } from './dto/send-call-plan-reminder-email.dto';
 import { SmtpConfigDto } from './dto/smtp-config.dto';
 import { SendEmailDto } from './dto/send-email.dto';
 import { SendEmailResponseDto } from './dto/send-email-response.dto';
 import { EmailTemplateService } from './email-template.service';
+import { CallPlanNullAhomTemplateContext } from './template-email/types/call-plan-null-ahom-template.interface';
 import { CallPlanReminderTemplateContext } from './template-email/types/call-plan-reminder-template.interface';
 
 export interface ResolvedSmtpConfig {
@@ -78,6 +81,33 @@ export class EmailService {
     );
   }
 
+  renderCallPlanNullAhomPreview(body: CallPlanNullAhomTemplateDto) {
+    return this.emailTemplateService.renderCallPlanNullAhom(
+      this.toCallPlanNullAhomContext(body),
+    );
+  }
+
+  async sendCallPlanNullAhomEmail(
+    dto: SendCallPlanNullAhomEmailDto,
+  ): Promise<SendEmailResponseDto> {
+    if (!dto.body.supervisors.length) {
+      throw new BadRequestException('At least one supervisor block is required in body.supervisors');
+    }
+
+    const rendered = this.emailTemplateService.renderCallPlanNullAhom(
+      this.toCallPlanNullAhomContext(dto.body),
+    );
+
+    return this.sendEmail({
+      smtp: dto.smtp,
+      to: dto.ahomEmail,
+      cc: dto.supervisorEmail?.length ? dto.supervisorEmail : undefined,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    });
+  }
+
   async sendCallPlanReminderEmail(
     dto: SendCallPlanReminderEmailDto,
   ): Promise<SendEmailResponseDto> {
@@ -97,6 +127,30 @@ export class EmailService {
       html: rendered.html,
       text: rendered.text,
     });
+  }
+
+  private toCallPlanNullAhomContext(
+    body: CallPlanNullAhomTemplateDto,
+  ): CallPlanNullAhomTemplateContext {
+    return {
+      callPlanStartDate: body.callPlanStartDate,
+      cabang: body.cabang,
+      ahomName: body.ahomName,
+      ahomNik: body.ahomNik,
+      generatedAt: body.generatedAt ?? '',
+      supervisors: body.supervisors.map((supervisor) => ({
+        supervisorName: supervisor.supervisorName,
+        supervisorNik: supervisor.supervisorNik,
+        sales: supervisor.sales.map((row) => ({
+          salesName: row.salesName,
+          salesNik: row.salesNik,
+          routeNumber: row.routeNumber ?? '',
+          callPlanStartDate: row.callPlanStartDate ?? '',
+          callPlanEndDate: row.callPlanEndDate ?? '',
+          isLuarkota: row.isLuarkota === true,
+        })),
+      })),
+    };
   }
 
   private toCallPlanReminderContext(
