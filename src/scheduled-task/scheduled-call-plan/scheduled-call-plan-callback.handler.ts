@@ -26,7 +26,7 @@ export class ScheduledCallPlanCallbackHandler
     const result = await this.callPlanService.runFetchNowFromJob(job);
 
     this.logger.log(
-      `[${job.name}] Fetched ${result.data.length} call plan supervisor record(s) for ${result.callPlanStartDate}`,
+      `[${job.name}] Fetched ${result.totalRows} call plan row(s), grouped into ${result.data.length} AHOM group(s), reminders sent for CALL_PLAN_START_DATE=${result.callPlanStartDate}`,
     );
   }
 }

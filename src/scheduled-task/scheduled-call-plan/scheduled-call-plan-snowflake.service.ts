@@ -3,9 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { INDONESIA_TIMEZONE } from '../../core/utils/date-transformer.util';
 import { SNOWFLAKE_CALL_PLAN_STATEMENT } from './scheduled-call-plan-snowflake.constants';
 import {
-  CallPlanSupervisorData,
-  ScheduledCallPlanFetchResult,
+  CallPlanRowData,
+  ScheduledCallPlanSnowflakeFetchResult,
 } from './types/scheduled-call-plan-data.interface';
+import { ScheduledCallPlanFetchPayload } from './types/scheduled-call-plan-fetch-payload.interface';
 import { SnowflakeStatementsResponse } from './types/snowflake-statements-response.interface';
 
 interface SnowflakeStatementsRequest {
@@ -23,18 +24,23 @@ export class ScheduledCallPlanSnowflakeService {
 
   constructor(private readonly configService: ConfigService) { }
 
-  async fetchCallPlan(callPlanStartDate?: string): Promise<ScheduledCallPlanFetchResult> {
-    const resolvedDate = callPlanStartDate?.trim() || this.resolveDefaultCallPlanStartDate();
+  async fetchCallPlan(
+    payload: ScheduledCallPlanFetchPayload = {},
+  ): Promise<ScheduledCallPlanSnowflakeFetchResult> {
+    const resolvedDate = payload.callPlanStartDate?.trim() || this.resolveDefaultCallPlanStartDate();
     const response = await this.executeStatement(resolvedDate);
     const data = this.parseResponse(response);
+    const totalRows = response.resultSetMetaData?.numRows ?? data.length;
 
     this.logger.log(
-      `Fetched ${data.length} call plan supervisor record(s) for CALL_PLAN_START_DATE=${resolvedDate}`,
+      `Fetched ${data.length} call plan row(s) for CALL_PLAN_START_DATE=${resolvedDate}`,
     );
+
+    console.log(data);
 
     return {
       callPlanStartDate: resolvedDate,
-      totalRows: response.resultSetMetaData?.numRows ?? data.length,
+      totalRows,
       data,
     };
   }
@@ -70,10 +76,7 @@ export class ScheduledCallPlanSnowflakeService {
       warehouse: this.configService.get<string>('SNOWFLAKE_WAREHOUSE')?.trim() || 'TASK_SFA',
       role: this.configService.get<string>('SNOWFLAKE_ROLE')?.trim() || 'ROLE_API',
       bindings: {
-        '1': {
-          type: 'TEXT',
-          value: callPlanStartDate,
-        },
+        '1': { type: 'TEXT', value: callPlanStartDate },
       },
     };
 
@@ -103,12 +106,12 @@ export class ScheduledCallPlanSnowflakeService {
     return responseBody;
   }
 
-  private parseResponse(response: SnowflakeStatementsResponse): CallPlanSupervisorData[] {
+  private parseResponse(response: SnowflakeStatementsResponse): CallPlanRowData[] {
     if (!response.data?.length) {
       return [];
     }
 
-    const parsed: CallPlanSupervisorData[] = [];
+    const parsed: CallPlanRowData[] = [];
 
     for (const row of response.data) {
       const rawValue = row?.[0];
@@ -117,7 +120,7 @@ export class ScheduledCallPlanSnowflakeService {
       }
 
       try {
-        const item = JSON.parse(rawValue) as CallPlanSupervisorData;
+        const item = this.normalizeCallPlanRow(JSON.parse(rawValue) as Partial<CallPlanRowData>);
         parsed.push(item);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -126,6 +129,27 @@ export class ScheduledCallPlanSnowflakeService {
     }
 
     return parsed;
+  }
+
+  private normalizeCallPlanRow(item: Partial<CallPlanRowData>): CallPlanRowData {
+    return {
+      AHOM_NAME: this.toText(item.AHOM_NAME),
+      AHOM_NIK: this.toText(item.AHOM_NIK),
+      CABANG: this.toText(item.CABANG),
+      ISLUARKOTA: item.ISLUARKOTA === true,
+      CALL_PLAN_END_DATE: this.toText(item.CALL_PLAN_END_DATE),
+      CALL_PLAN_NUMBER: this.toText(item.CALL_PLAN_NUMBER),
+      CALL_PLAN_START_DATE: this.toText(item.CALL_PLAN_START_DATE),
+      ROUTE_NUMBER: this.toText(item.ROUTE_NUMBER),
+      SALES_NAME: this.toText(item.SALES_NAME),
+      SALES_NIK: this.toText(item.SALES_NIK),
+      SALES_SUPERVISOR_NAME: this.toText(item.SALES_SUPERVISOR_NAME),
+      SALES_SUPERVISOR_NIK: this.toText(item.SALES_SUPERVISOR_NIK),
+    };
+  }
+
+  private toText(value: string | null | undefined): string {
+    return value == null ? '' : String(value).trim();
   }
 
   private getJakartaDateParts(date: Date): { year: number; month: number; day: number } {

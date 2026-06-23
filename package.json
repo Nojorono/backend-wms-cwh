@@ -62,6 +62,7 @@
     "class-validator": "^0.14.2",
     "cron": "^4.4.0",
     "dotenv": "^16.5.0",
+    "ioredis": "^5.11.1",
     "nest-winston": "^1.10.2",
     "nodemailer": "^8.0.10",
     "passport": "^0.7.0",

@@ -2,9 +2,13 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { CallPlanReminderTemplateDto } from './dto/call-plan-reminder-template.dto';
+import { SendCallPlanReminderEmailDto } from './dto/send-call-plan-reminder-email.dto';
 import { SmtpConfigDto } from './dto/smtp-config.dto';
 import { SendEmailDto } from './dto/send-email.dto';
 import { SendEmailResponseDto } from './dto/send-email-response.dto';
+import { EmailTemplateService } from './email-template.service';
+import { CallPlanReminderTemplateContext } from './template-email/types/call-plan-reminder-template.interface';
 
 export interface ResolvedSmtpConfig {
   host: string;
@@ -20,7 +24,10 @@ export interface ResolvedSmtpConfig {
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly emailTemplateService: EmailTemplateService,
+  ) {}
 
   /**
    * Send email using dynamic SMTP from request body, or SMTP_* env defaults.
@@ -63,6 +70,55 @@ export class EmailService {
     } finally {
       transporter.close();
     }
+  }
+
+  renderCallPlanReminderPreview(body: CallPlanReminderTemplateDto) {
+    return this.emailTemplateService.renderCallPlanReminder(
+      this.toCallPlanReminderContext(body),
+    );
+  }
+
+  async sendCallPlanReminderEmail(
+    dto: SendCallPlanReminderEmailDto,
+  ): Promise<SendEmailResponseDto> {
+    if (!dto.body.sales.length) {
+      throw new BadRequestException('At least one sales row is required in body.sales');
+    }
+
+    const rendered = this.emailTemplateService.renderCallPlanReminder(
+      this.toCallPlanReminderContext(dto.body),
+    );
+
+    return this.sendEmail({
+      smtp: dto.smtp,
+      to: dto.supervisorEmail,
+      cc: dto.ahomEmail?.length ? dto.ahomEmail : undefined,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    });
+  }
+
+  private toCallPlanReminderContext(
+    body: CallPlanReminderTemplateDto,
+  ): CallPlanReminderTemplateContext {
+    return {
+      callPlanStartDate: body.callPlanStartDate,
+      cabang: body.cabang,
+      supervisorName: body.supervisorName,
+      supervisorNik: body.supervisorNik,
+      ahomName: body.ahomName,
+      ahomNik: body.ahomNik,
+      generatedAt: body.generatedAt ?? '',
+      sales: body.sales.map((row) => ({
+        salesName: row.salesName,
+        salesNik: row.salesNik,
+        routeNumber: row.routeNumber ?? '',
+        callPlanStartDate: row.callPlanStartDate ?? '',
+        callPlanEndDate: row.callPlanEndDate ?? '',
+        isLuarkota: row.isLuarkota === true,
+      })),
+    };
   }
 
   /** Verify SMTP connection (dynamic config or env defaults). */
