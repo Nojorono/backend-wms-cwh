@@ -58,6 +58,7 @@ import { ScheduledSpbSubmittedModule } from './scheduled-task/scheduled-spb-subm
 import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
 import { OutboundSalesModule } from './outbound-sales/outbound-sales.module';
 import { MoveOrderIntegrationModule } from './move-order-integration/move-order-integration.module';
+import { CommonModule } from './common/common.module';
 @Module({
   imports: [
     LoggerModule, // Global logger module - must be imported first
@@ -69,6 +70,7 @@ import { MoveOrderIntegrationModule } from './move-order-integration/move-order-
       useFactory: (configService: ConfigService) => getTypeOrmConfig(configService),
       inject: [ConfigService],
     }),
+    CommonModule,
     AuthModule,
     RolePermissionModule,
     MenuModule,
