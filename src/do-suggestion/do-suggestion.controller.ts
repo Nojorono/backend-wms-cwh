@@ -12,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionService } from './do-suggestion.service';
+import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
 import {
   DoSuggestionCallplanFilterQueryDto,
@@ -35,6 +36,29 @@ export class DoSuggestionController {
   @ApiResponse({ status: 200, type: DoSuggestion })
   createOrUpdate(@Body() dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
     return this.doSuggestionService.createOrUpdate(dto);
+  }
+
+  @Post('batch')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Batch create or update DO suggestions',
+    description:
+      'Processes up to 50 DO suggestions in a single request, sequentially, to avoid concurrent DB load. ' +
+      'Use this instead of many parallel POST /do-suggestion calls from the client.',
+  })
+  @ApiResponse({
+    status: 200,
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: '50 DO suggestion(s) processed successfully' },
+        data: { type: 'array', items: { $ref: '#/components/schemas/DoSuggestion' } },
+      },
+    },
+  })
+  createOrUpdateBatch(@Body() dto: BatchCreateOrUpdateDoSuggestionDto) {
+    return this.doSuggestionService.createOrUpdateBatch(dto);
   }
 
   @Get()

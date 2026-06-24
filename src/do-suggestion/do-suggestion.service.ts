@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
+import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
+import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
 import { DoSuggestionDetailDto } from './dto/do-suggestion-detail.dto';
 import {
   DoSuggestionDetailData,
@@ -20,6 +21,25 @@ export class DoSuggestionService {
 
     const payload = await this.mapDtoToCreateData(dto);
     return await this.repository.create(payload);
+  }
+
+  async createOrUpdateBatch(
+    dto: BatchCreateOrUpdateDoSuggestionDto,
+  ): Promise<{ success: boolean; message: string; data: DoSuggestion[] }> {
+    if (!dto.data?.length) {
+      throw new BadRequestException('At least one DO suggestion is required');
+    }
+
+    const results: DoSuggestion[] = [];
+    for (const item of dto.data) {
+      results.push(await this.createOrUpdate(item));
+    }
+
+    return {
+      success: true,
+      message: `${results.length} DO suggestion(s) processed successfully`,
+      data: results,
+    };
   }
 
   async findAll(status?: DoSuggestionStatus): Promise<DoSuggestion[]> {
