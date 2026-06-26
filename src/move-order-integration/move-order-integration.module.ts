@@ -10,7 +10,7 @@ import { MoveOrderIntegrationRepository } from './move-order-integration.reposit
 import { IntegrationMoveOrderService } from './integration/integration-move-order.service';
 import {
   getMoveOrderIntegrationRmqOptions,
-  getMoveOrderOracleRmqOptions,
+  getMoveOrderWmsRmqOptions,
 } from './integration/move-order-integration-rmq.config';
 import { MoveOrderIntegrationQueueProducer } from './integration/move-order-integration-queue.producer';
 import { MoveOrderIntegrationQueueConsumer } from './integration/move-order-integration-queue.consumer';
@@ -26,10 +26,10 @@ import { MoveOrderIntegrationSyncService } from './integration/move-order-integr
     TypeOrmModule.forFeature([MoveOrderIntegration, MoveOrderLineIntegration]),
     ClientsModule.registerAsync([
       {
-        name: 'MOVE_ORDER_SERVICE',
+        name: 'MOVE_ORDER_WMS_SERVICE',
         useFactory: (configService: ConfigService) => ({
           transport: Transport.RMQ,
-          options: getMoveOrderOracleRmqOptions(configService),
+          options: getMoveOrderWmsRmqOptions(configService),
         }),
         inject: [ConfigService],
       },

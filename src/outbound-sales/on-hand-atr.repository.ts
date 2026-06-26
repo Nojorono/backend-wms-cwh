@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm'; import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
 import { CreateOnHandAtrDto } from './dto/create-on-hand-atr.dto';
 import { UpdateOnHandAtrDto } from './dto/update-on-hand-atr.dto';
+import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-organization.dto';
 
 const ON_HAND_ATR_RELATIONS = ['organization'] as const;
 
@@ -87,5 +88,42 @@ export class OnHandAtrRepository {
             .andWhere('DATE(onHandAtr.created_at) = :date', { date })
             .orderBy('onHandAtr.created_at', 'DESC')
             .getMany();
+    }
+
+    async findDistinctLocatorsByOrganizationId(
+        organizationId: string,
+    ): Promise<DistinctLocatorByOrganizationDto[]> {
+        const rows = await this.repo
+            .createQueryBuilder('onHandAtr')
+            .select('onHandAtr.organization_code', 'organization_code')
+            .addSelect('onHandAtr.organization_name', 'organization_name')
+            .addSelect('onHandAtr.subinventory_code', 'subinventory_code')
+            .addSelect('onHandAtr.locator_id', 'locator_id')
+            .addSelect('onHandAtr.locator', 'locator')
+            .addSelect('onHandAtr.locator_name', 'locator_name')
+            .where('onHandAtr.organization_id = :organizationId', { organizationId })
+            .andWhere('onHandAtr.deleted_at IS NULL')
+            .distinct(true)
+            .orderBy('onHandAtr.organization_code', 'ASC')
+            .addOrderBy('onHandAtr.subinventory_code', 'ASC')
+            .addOrderBy('onHandAtr.locator_name', 'ASC')
+            .getRawMany<{
+                organization_code: string | null;
+                organization_name: string | null;
+                subinventory_code: string | null;
+                locator_id: number | string | null;
+                locator: string | null;
+                locator_name: string | null;
+            }>();
+
+        return rows.map((row) => ({
+            organization_code: row.organization_code ?? undefined,
+            organization_name: row.organization_name ?? undefined,
+            subinventory_code: row.subinventory_code ?? undefined,
+            locator_id:
+                row.locator_id == null ? undefined : Number(row.locator_id),
+            locator: row.locator ?? undefined,
+            locator_name: row.locator_name ?? undefined,
+        }));
     }
 }

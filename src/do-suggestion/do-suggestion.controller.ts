@@ -23,7 +23,7 @@ import {
 @Controller('do-suggestion')
 @ApiBearerAuth('JWT-auth')
 export class DoSuggestionController {
-  constructor(private readonly doSuggestionService: DoSuggestionService) {}
+  constructor(private readonly doSuggestionService: DoSuggestionService) { }
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -107,5 +107,12 @@ export class DoSuggestionController {
   @ApiResponse({ status: 200 })
   remove(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
     return this.doSuggestionService.remove(id);
+  }
+
+  @Post(':id/integrate')
+  @ApiOperation({ summary: 'Integrate move order by DO suggestion ID' })
+  @ApiResponse({ status: 200 })
+  integrateMoveOrder(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
+    return this.doSuggestionService.integrateMoveOrder(id);
   }
 }

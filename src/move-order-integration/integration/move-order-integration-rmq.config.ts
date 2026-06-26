@@ -1,20 +1,20 @@
 import { ConfigService } from '@nestjs/config';
 
-/** Oracle move order microservice queue (create_with_lines, find_by_request_number). */
-export const MOVE_ORDER_ORACLE_RMQ = {
-  queue: 'move_order_queue',
+/** Move order WMS microservice queue (move-order-wms.create, move-order-wms.findBySourceHeaderId). */
+export const MOVE_ORDER_WMS_RMQ = {
+  queue: 'move_order_wms_queue',
 } as const;
 
-export const getMoveOrderOracleRmqOptions = (configService?: ConfigService) => ({
+export const getMoveOrderWmsRmqOptions = (configService?: ConfigService) => ({
   urls: [
     configService?.get<string>('RABBITMQ_URL') ??
       process.env.RABBITMQ_URL ??
       'amqp://localhost:5672',
   ],
   queue:
-    configService?.get<string>('RMQ_MOVE_ORDER_QUEUE') ??
-    process.env.RMQ_MOVE_ORDER_QUEUE ??
-    MOVE_ORDER_ORACLE_RMQ.queue,
+    configService?.get<string>('RMQ_MOVE_ORDER_WMS_QUEUE') ??
+    process.env.RMQ_MOVE_ORDER_WMS_QUEUE ??
+    MOVE_ORDER_WMS_RMQ.queue,
   queueOptions: {
     durable: false,
   },

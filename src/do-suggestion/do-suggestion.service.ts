@@ -1,7 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
+import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
 import { DoSuggestionDetailDto } from './dto/do-suggestion-detail.dto';
+import { MoveOrderIntegrationService } from '../move-order-integration/move-order-integration.service';
+import { CreateMoveOrderIntegrationPayloadDto } from '../move-order-integration/dto/create-move-order-integration-payload.dto';
+import { IntegrationOnHandAtrService } from '../outbound-sales/integration/integration-on-hand-atr.service';
 import {
   DoSuggestionDetailData,
   DoSuggestionHeaderData,
@@ -11,7 +17,13 @@ import {
 
 @Injectable()
 export class DoSuggestionService {
-  constructor(private readonly repository: DoSuggestionRepository) { }
+  constructor(
+    private readonly repository: DoSuggestionRepository,
+    private readonly moveOrderIntegrationService: MoveOrderIntegrationService,
+    private readonly integrationOnHandAtrService: IntegrationOnHandAtrService,
+    @InjectRepository(OnHandAtr)
+    private readonly onHandAtrRepository: Repository<OnHandAtr>,
+  ) { }
 
   async createOrUpdate(dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
     if (dto.id) {
@@ -58,6 +70,19 @@ export class DoSuggestionService {
     return { success: true, message: 'DO suggestion deleted' };
   }
 
+  async integrateMoveOrder(id: string): Promise<{ success: boolean; message: string }> {
+    const suggestion = await this.findOne(id);
+    const payload = await this.mapDoSuggestionToMoveOrderIntegrationPayload(suggestion);
+    const queued = await this.moveOrderIntegrationService.createAndIntegrate(payload);
+
+    return {
+      success: true,
+      message:
+        queued.message ||
+        `Move order integration queued successfully (id=${queued.move_order_integration_id})`,
+    };
+  }
+
   async findByCallplanNumber(callplanNumber: string): Promise<DoSuggestion[]> {
     if (!callplanNumber?.trim()) {
       throw new BadRequestException('callplanNumber is required');
@@ -93,7 +118,8 @@ export class DoSuggestionService {
   private async mapDtoToCreateData(
     dto: CreateOrUpdateDoSuggestionDto,
   ): Promise<DoSuggestionPersistData> {
-    if (!dto.lines?.length) {      throw new BadRequestException('At least one line is required');
+    if (!dto.lines?.length) {
+      throw new BadRequestException('At least one line is required');
     }
 
     const callplanDateStart = dto.callplan_date_start
@@ -114,7 +140,8 @@ export class DoSuggestionService {
       );
     }
 
-    const header: DoSuggestionHeaderData = {      organization_id: dto.organization_id,
+    const header: DoSuggestionHeaderData = {
+      organization_id: dto.organization_id,
       callplan_number: dto.callplan_number,
       callplan_date_start: callplanDateStart,
       callplan_date_end: dto.callplan_date_end ? new Date(dto.callplan_date_end) : undefined,
@@ -133,7 +160,8 @@ export class DoSuggestionService {
 
     delete header.updated_by;
 
-    return {      ...header,
+    return {
+      ...header,
       lines: dto.lines.map((line) => this.mapLineDtoForCreate(line)),
     };
   }
@@ -204,5 +232,249 @@ export class DoSuggestionService {
     return Object.fromEntries(
       Object.entries(obj).filter(([, value]) => value !== undefined),
     ) as Partial<T>;
+  }
+
+  private async mapDoSuggestionToMoveOrderIntegrationPayload(
+    suggestion: DoSuggestion,
+  ): Promise<CreateMoveOrderIntegrationPayloadDto> {
+    const organizationId = suggestion.organization?.organization_id;
+    if (organizationId == null) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no mapped organization_id in m_io`,
+      );
+    }
+
+    const dateRequired = this.resolveDateForOracle(
+      suggestion.spb_date ?? suggestion.callplan_date_start,
+    );
+    const locatorIds = await this.resolveLocatorIds(suggestion);
+
+    const lines = (suggestion.details ?? []).map((line, index) => {
+      const quantity =
+        line.item_qty_final
+      return {
+        line_number: line.line_number,
+        organization_id: Number(organizationId),
+        inventory_item_id: Number(line.inventory_item_id),
+        from_subinventory_code: 'KECIL',
+        from_locator_id: locatorIds.from_locator_id,
+        to_subinventory_code: 'CANVAS',
+        to_locator_id: locatorIds.to_locator_id,
+        uom_code: 'BKS',
+        quantity: Number(quantity),
+        date_required: new Date(dateRequired),
+        transaction_type_id: 105,
+        transaction_source_type_id: 4,
+        line_status: 7,
+        status_date: new Date(dateRequired),
+        source_system: 'WMS',
+        source_header_id: suggestion.id,
+        source_line_id: line.id,
+        iface_status: 'READY',
+        operation: 'CREATE',
+        db_flag: 'T',
+      };
+    });
+
+    const validLines = lines.filter(
+      (line) => Number.isFinite(line.inventory_item_id) && line.quantity > 0,
+    );
+    if (!validLines.length) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no valid detail lines to integrate`,
+      );
+    }
+
+    return {
+      master_io_id: suggestion.organization_id ?? undefined,
+      request_number: suggestion.spb_number?.trim(),
+      // request_number: 'SPB/JAT/2026/6/500021.1/5001',
+      transaction_type_id: 105,
+      move_order_type: 1,
+      organization_id: Number(organizationId),
+      date_required: new Date(dateRequired),
+      from_subinventory_code: 'KECIL',
+      to_subinventory_code: 'CANVAS',
+      header_status: 7,
+      attribute_category: 'FPPR Awal',
+      status_date: new Date(Date.now()),
+      attribute7: this.toDateOnly(suggestion.callplan_date_start), // Call Plan Start Date
+      attribute8: this.toDateOnly(suggestion.callplan_date_end), // Call Plan End Date
+      attribute9: suggestion.sales_nik?.trim(), // Sales_Nik
+      // attribute9: '100507.01939B0', // Sales_Nik
+      attribute10: suggestion.sales_spv_nik?.trim(), // Sales_Spv_Nik
+      attribute11: suggestion.trip_type?.trim(), // trip_type
+      attribute12: 'CVS', // CANVASING HARDCODE
+      attribute13: suggestion.callplan_number?.trim() || undefined, // Call Plan Number
+      attribute14: suggestion.spb_number?.trim() || undefined, // SPB Number
+      operation: 'CREATE',
+      db_flag: 'T',
+      source_system: 'WMS',
+      source_header_id: suggestion.id,
+      iface_status: 'READY',
+      iface_mode: 'CREATE_TRANSACT_MO',
+      total_lines: validLines.length,
+      lines: validLines,
+    };
+  }
+
+  private static readonly ORACLE_MONTH_NAMES = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ] as const;
+
+  private toDateOnly(value?: Date | string | null): string | undefined {
+    if (value == null) {
+      return undefined;
+    }
+
+    let year: number;
+    let month: number;
+    let day: number;
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+
+      const datePart = trimmed.split('T')[0];
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
+      if (match) {
+        year = Number(match[1]);
+        month = Number(match[2]) - 1;
+        day = Number(match[3]);
+      } else {
+        const parsed = new Date(trimmed);
+        if (Number.isNaN(parsed.getTime())) {
+          return undefined;
+        }
+        year = parsed.getUTCFullYear();
+        month = parsed.getUTCMonth();
+        day = parsed.getUTCDate();
+      }
+    } else {
+      if (Number.isNaN(value.getTime())) {
+        return undefined;
+      }
+      year = value.getUTCFullYear();
+      month = value.getUTCMonth();
+      day = value.getUTCDate();
+    }
+
+    const monthName = DoSuggestionService.ORACLE_MONTH_NAMES[month];
+    return `${String(day).padStart(2, '0')}-${monthName}-${String(year).slice(-2)}`;
+  }
+
+  private resolveDateForOracle(source?: Date | string): string {
+    const date = source ? new Date(source) : new Date();
+    if (Number.isNaN(date.getTime())) {
+      return new Date().toISOString().split('T')[0];
+    }
+    return date.toISOString().split('T')[0];
+  }
+
+  private async resolveLocatorIds(
+    suggestion: DoSuggestion,
+  ): Promise<{ from_locator_id?: number; to_locator_id?: number }> {
+    const organizationId = String(suggestion.organization_id);
+    const rows = await this.onHandAtrRepository
+      .createQueryBuilder('onHandAtr')
+      .select('onHandAtr.subinventory_code', 'subinventory_code')
+      .addSelect('onHandAtr.locator_id', 'locator_id')
+      .where('onHandAtr.organization_id = :organizationId', { organizationId })
+      .andWhere('onHandAtr.locator_id IS NOT NULL')
+      .andWhere('onHandAtr.deleted_at IS NULL')
+      .distinct(true)
+      .getRawMany<{ subinventory_code: string | null; locator_id: number | string | null }>();
+
+    const pickLocator = (subinventory: string): number | undefined => {
+      const found = rows.find(
+        (row) =>
+          (row.subinventory_code ?? '').trim().toUpperCase() === subinventory &&
+          row.locator_id != null,
+      );
+      return found?.locator_id != null ? Number(found.locator_id) : undefined;
+    };
+
+    const fromLocator = pickLocator('KECIL');
+    if (fromLocator == null) {
+      throw new BadRequestException(
+        `From locator not found for organization_id=${organizationId} and subinventory KECIL`,
+      );
+    }
+
+    const organizationCode =
+      suggestion.organization?.organization_name?.trim() ||
+      (await this.resolveOrganizationCodeFromOnHand(organizationId));
+    const salesrepNumber = suggestion.sales_nik?.trim();
+    // const salesrepNumber = '100507.01939B0';
+
+    if (!organizationCode) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no organization_code for locator sales lookup`,
+      );
+    }
+    if (!salesrepNumber) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no sales_nik for locator sales lookup`,
+      );
+    }
+
+    const response = await this.integrationOnHandAtrService.getLocatorSales({
+      organization_code: organizationCode,
+      salesrep_number: salesrepNumber,
+    });
+
+    if (!response.status) {
+      throw new BadRequestException(
+        response.message ||
+        `Failed to get locator sales for organization_code=${organizationCode}, salesrep_number=${salesrepNumber}`,
+      );
+    }
+
+    const locatorFromSales = response.data?.find(
+      (row) => row.LOCATOR_ID != null,
+    )?.LOCATOR_ID;
+
+    if (locatorFromSales == null) {
+      throw new BadRequestException(
+        `To locator not found for organization_code=${organizationCode}, salesrep_number=${salesrepNumber}`,
+      );
+    }
+
+    const toLocator = Number(locatorFromSales);
+
+    return {
+      from_locator_id: fromLocator,
+      to_locator_id: toLocator,
+    };
+  }
+
+  private async resolveOrganizationCodeFromOnHand(
+    organizationId: string,
+  ): Promise<string | undefined> {
+    const row = await this.onHandAtrRepository
+      .createQueryBuilder('onHandAtr')
+      .select('onHandAtr.organization_code', 'organization_code')
+      .where('onHandAtr.organization_id = :organizationId', { organizationId })
+      .andWhere('onHandAtr.organization_code IS NOT NULL')
+      .andWhere("TRIM(onHandAtr.organization_code) <> ''")
+      .andWhere('onHandAtr.deleted_at IS NULL')
+      .orderBy('onHandAtr.created_at', 'DESC')
+      .limit(1)
+      .getRawOne<{ organization_code?: string }>();
+
+    return row?.organization_code?.trim() || undefined;
   }
 }

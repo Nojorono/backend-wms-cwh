@@ -6,8 +6,17 @@ import {
   InvOnHandQtyWithAtrParamsDto,
   InvOnHandQtyWithAtrResponseDto,
 } from '../dto/inv-on-hand-qty-with-atr.dto';
+import {
+  LocatorSalesParamsDto,
+  LocatorSalesResponseDto,
+} from '../dto/locator-sales.dto';
 
-export { InvOnHandQtyWithAtrParamsDto, InvOnHandQtyWithAtrResponseDto };
+export {
+  InvOnHandQtyWithAtrParamsDto,
+  InvOnHandQtyWithAtrResponseDto,
+  LocatorSalesParamsDto,
+  LocatorSalesResponseDto,
+};
 
 @Injectable()
 export class IntegrationOnHandAtrService implements OnModuleInit {
@@ -86,6 +95,60 @@ export class IntegrationOnHandAtrService implements OnModuleInit {
       this.connectionEstablished = false;
       this.logger.error(
         `Error calling get_inv_on_hand_qty_with_atr: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      return {
+        data: [],
+        count: 0,
+        status: false,
+        message: `Error in microservice: ${error instanceof Error ? error.message : String(error)}`,
+        statusCode: 500,
+      };
+    }
+  }
+
+  /**
+   * RMQ `get_locator_sales` — locator sales lookup by organization and salesrep.
+   */
+  async getLocatorSales(
+    params: LocatorSalesParamsDto,
+  ): Promise<LocatorSalesResponseDto> {
+    try {
+      await this.ensureConnection();
+
+      this.logger.log('==== Sending request for locator sales with params ====');
+      this.logger.log(JSON.stringify(params || {}));
+
+      const timeoutMs = 30000;
+      const response = await firstValueFrom(
+        this.invOnHandQtyClient
+          .send<LocatorSalesResponseDto>('get_locator_sales', params ?? {})
+          .pipe(
+            timeout(timeoutMs),
+            catchError((error) => {
+              this.logger.error(
+                `INV_ON_HAND_QTY_SERVICE get_locator_sales failed: ${error.message || 'Unknown error'}`,
+              );
+              this.connectionEstablished = false;
+              throw error;
+            }),
+          ),
+      );
+
+      this.logger.log(
+        `get_locator_sales response: status=${response.status ?? response.statusCode}, count=${response.count ?? response.data?.length ?? 0}`,
+      );
+
+      return {
+        ...response,
+        status: response.status ?? response.statusCode === 200,
+        count: response.count ?? response.data?.length ?? 0,
+      };
+    } catch (error) {
+      this.connectionEstablished = false;
+      this.logger.error(
+        `Error calling get_locator_sales: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
 

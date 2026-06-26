@@ -7,6 +7,11 @@ import {
   InvOnHandQtyWithAtrItemDto,
   InvOnHandQtyWithAtrParamsDto,
 } from './dto/inv-on-hand-qty-with-atr.dto';
+import {
+  LocatorSalesParamsDto,
+  LocatorSalesResponseDto,
+} from './dto/locator-sales.dto';
+import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-organization.dto';
 import { TotalSubmittedResponseDto } from './dto/total-submitted-response.dto';
 import { OnHandAtrRepository } from './on-hand-atr.repository';
 import { DoSuggestionRepository } from '../do-suggestion/do-suggestion.repository';
@@ -145,5 +150,18 @@ export class OutboundSalesService {
       items,
       grand_total: grandTotal,
     };
+  }
+
+  async getLocatorSales(params: LocatorSalesParamsDto): Promise<LocatorSalesResponseDto> {
+    return await this.integrationOnHandAtrService.getLocatorSales(params);
+  }
+
+  async getDistinctLocatorsByOrganizationId(
+    organizationId: string | number | null,
+  ): Promise<DistinctLocatorByOrganizationDto[]> {
+    const resolvedOrganizationId = this.resolveOrganizationId(organizationId);
+    return await this.onHandAtrRepository.findDistinctLocatorsByOrganizationId(
+      resolvedOrganizationId,
+    );
   }
 }

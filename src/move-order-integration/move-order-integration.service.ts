@@ -38,13 +38,18 @@ export type MoveOrderIntegrationQueuedResult = {
   message: string;
 };
 
+export type MoveOrderIntegrationQueuedBatchResult = {
+  total: number;
+  results: MoveOrderIntegrationQueuedResult[];
+};
+
 @Injectable()
 export class MoveOrderIntegrationService {
   constructor(
     private readonly repository: MoveOrderIntegrationRepository,
     private readonly integrationMoveOrderService: IntegrationMoveOrderService,
     private readonly queueProducer: MoveOrderIntegrationQueueProducer,
-  ) {}
+  ) { }
 
   async createHeader(dto: CreateMoveOrderIntegrationDto): Promise<MoveOrderIntegration> {
     return await this.repository.createHeader(dto);
@@ -163,15 +168,16 @@ export class MoveOrderIntegrationService {
   }
 
   async submitToOracle(
-    createDto: CreateMoveOrderWithLinesDto,
+    createDto: CreateMoveOrderWithLinesDto | CreateMoveOrderWithLinesDto[],
     userId?: number,
     userName?: string,
   ): Promise<MoveOrderWithLinesResponseDto> {
-    if (!createDto.lines?.length) {
+    const dtoList = Array.isArray(createDto) ? createDto : [createDto];
+    if (!dtoList.every((item) => item.lines?.length)) {
       throw new BadRequestException('lines must contain at least one item');
     }
     return await this.integrationMoveOrderService.createMoveOrderWithLines(
-      createDto,
+      dtoList,
       userId,
       userName,
     );
@@ -203,6 +209,27 @@ export class MoveOrderIntegrationService {
     );
   }
 
+  async createAndIntegrateMany(
+    payloads: CreateMoveOrderIntegrationPayloadDto[],
+    userId?: number,
+    userName?: string,
+  ): Promise<MoveOrderIntegrationQueuedBatchResult> {
+    if (!payloads.length) {
+      throw new BadRequestException('Payload array must contain at least one item');
+    }
+
+    const results: MoveOrderIntegrationQueuedResult[] = [];
+    for (const payload of payloads) {
+      const queued = await this.createAndIntegrate(payload, userId, userName);
+      results.push(queued);
+    }
+
+    return {
+      total: results.length,
+      results,
+    };
+  }
+
   private async enqueueIntegrationJob(
     record: MoveOrderIntegrationHeaderWithLines,
     userId?: number,
@@ -217,7 +244,7 @@ export class MoveOrderIntegrationService {
     }
 
     await this.repository.updateHeader(record.id, {
-      iface_status: 'QUEUED',
+      iface_status: 'READY',
       iface_message: 'Queued for Oracle move order integration',
     });
 

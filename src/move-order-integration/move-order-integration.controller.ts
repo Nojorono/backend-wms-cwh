@@ -6,6 +6,7 @@ import { CreateMoveOrderIntegrationLineDto } from './dto/create-move-order-integ
 import { UpdateMoveOrderIntegrationLineDto } from './dto/update-move-order-integration-line.dto';
 import {
   MoveOrderIntegrationHeaderWithLines,
+  MoveOrderIntegrationQueuedBatchResult,
   MoveOrderIntegrationQueuedResult,
   MoveOrderIntegrationService,
 } from './move-order-integration.service';
@@ -41,10 +42,11 @@ export class MoveOrderIntegrationController {
   @Post('submit-oracle')
   @ApiOperation({
     summary: 'Submit move order directly to Oracle via RabbitMQ',
-    description: 'Calls RMQ pattern move_order.create_with_lines on MOVE_ORDER_SERVICE.',
+    description: 'Calls RMQ pattern move-order-wms.create on MOVE_ORDER_WMS_SERVICE.',
   })
   @ApiBody({
     type: SubmitMoveOrderOraclePayloadDto,
+    isArray: true,
     description: 'Full payload example including optional header and locator fields.',
     examples: {
       fullPayload: {
@@ -112,8 +114,18 @@ export class MoveOrderIntegrationController {
   })
   @ApiResponse({ status: 200, type: MoveOrderWithLinesResponseDto })
   submitToOracle(
-    @Body() payload: SubmitMoveOrderOraclePayloadDto,
+    @Body() payload: SubmitMoveOrderOraclePayloadDto | SubmitMoveOrderOraclePayloadDto[],
   ): Promise<MoveOrderWithLinesResponseDto> {
+    if (Array.isArray(payload)) {
+      const normalized = payload.map((row) => {
+        const { userId: _userId, userName: _userName, ...createDto } = row;
+        return createDto;
+      });
+      const userId = payload[0]?.userId;
+      const userName = payload[0]?.userName;
+      return this.service.submitToOracle(normalized, userId, userName);
+    }
+
     const { userId, userName, ...createDto } = payload;
     return this.service.submitToOracle(createDto, userId, userName);
   }
@@ -122,10 +134,27 @@ export class MoveOrderIntegrationController {
   @ApiOperation({
     summary: 'Persist move order integration then submit to Oracle',
   })
+  @ApiBody({
+    type: CreateAndIntegrateMoveOrderPayloadDto,
+    isArray: true,
+    description:
+      'Accepts single object or array of objects. Array will be processed sequentially and queued one by one.',
+  })
   @ApiResponse({ status: 202 })
   createAndIntegrate(
-    @Body() payload: CreateAndIntegrateMoveOrderPayloadDto,
-  ): Promise<MoveOrderIntegrationQueuedResult> {
+    @Body() payload: CreateAndIntegrateMoveOrderPayloadDto | CreateAndIntegrateMoveOrderPayloadDto[],
+  ): Promise<MoveOrderIntegrationQueuedResult | MoveOrderIntegrationQueuedBatchResult> {
+    if (Array.isArray(payload)) {
+      const normalized = payload.map((row) => {
+        const { userId: _userId, userName: _userName, ...createPayload } = row;
+        return createPayload;
+      });
+
+      const userId = payload[0]?.userId;
+      const userName = payload[0]?.userName;
+      return this.service.createAndIntegrateMany(normalized, userId, userName);
+    }
+
     const { userId, userName, ...createPayload } = payload;
     return this.service.createAndIntegrate(createPayload, userId, userName);
   }
@@ -168,7 +197,7 @@ export class MoveOrderIntegrationController {
   @Post(':id/integrate')
   @ApiOperation({
     summary: 'Submit persisted move order integration to Oracle',
-    description: 'Maps WMS record to Oracle DTO and calls move_order.create_with_lines.',
+    description: 'Maps WMS record to Oracle DTO and calls move-order-wms.create.',
   })
   @ApiResponse({ status: 202 })
   integrateById(

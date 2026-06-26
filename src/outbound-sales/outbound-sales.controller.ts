@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -15,6 +15,11 @@ import { OrganizationId } from 'src/core/decorators/organization-id.decorator';
 import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
 import { TotalSubmittedQueryDto } from './dto/total-submitted-query.dto';
 import { TotalSubmittedResponseDto } from './dto/total-submitted-response.dto';
+import {
+  LocatorSalesParamsDto,
+  LocatorSalesResponseDto,
+} from './dto/locator-sales.dto';
+import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-organization.dto';
 
 @ApiTags('Outbound Sales')
 @ApiBearerAuth('JWT-auth')
@@ -50,5 +55,29 @@ export class OutboundSalesController {
     @OrganizationId() organizationId: string | number | null,
   ): Promise<TotalSubmittedResponseDto> {
     return this.service.getTotalSubmitted(organizationId, query.date);
+  }
+
+  @Get('locator-sales')
+  @ApiOperation({
+    summary: 'Get locator sales data from RMQ microservice',
+    description:
+      'Calls INV_ON_HAND_QTY_SERVICE pattern get_locator_sales with organization_code and salesrep_number.',
+  })
+  @ApiResponse({ status: 200, description: 'OK', type: LocatorSalesResponseDto })
+  getLocatorSales(@Query() query: LocatorSalesParamsDto): Promise<LocatorSalesResponseDto> {
+    return this.service.getLocatorSales(query);
+  }
+
+  @Get('locators/distinct/:organizationId')
+  @ApiOperation({
+    summary: 'Get distinct locators by organization ID',
+    description:
+      'Returns distinct organization_code, organization_name, subinventory_code, locator_id, locator, and locator_name from on_hand_atr by organizationId param.',
+  })
+  @ApiResponse({ status: 200, description: 'OK', type: [DistinctLocatorByOrganizationDto] })
+  getDistinctLocatorsByOrganizationId(
+    @Param('organizationId') organizationId: string,
+  ): Promise<DistinctLocatorByOrganizationDto[]> {
+    return this.service.getDistinctLocatorsByOrganizationId(organizationId);
   }
 }
