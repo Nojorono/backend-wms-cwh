@@ -10,7 +10,8 @@ export interface MoveOrderIntegrationInsertJobPayload {
 /** RMQ integration queue payload — poll Oracle status and update WMS. */
 export interface MoveOrderIntegrationPollJobPayload {
   moveOrderIntegrationId: string;
-  request_number: string;
+  source_header_id?: string;
+  request_number?: string;
   source_system?: string;
   retryCount: number;
   maxRetry: number;

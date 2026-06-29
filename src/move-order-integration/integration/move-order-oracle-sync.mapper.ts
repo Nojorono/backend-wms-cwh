@@ -106,8 +106,146 @@ const LINE_ORACLE_TO_WMS: Record<string, keyof UpdateMoveOrderIntegrationLineDto
   LAST_UPDATED_BY: 'last_updated_by',
   LINE_ID: 'line_id',
   HEADER_ID: 'header_id',
+  TRANSACTION_TEMP_ID: 'transaction_temp_id',
   REQUEST_ID: 'request_id',
 };
+
+export function normalizeOracleRecord(
+  source?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!source) {
+    return {};
+  }
+
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    normalized[key.toUpperCase()] = value;
+  }
+  return normalized;
+}
+
+import { NormalizedMoveOrderFindData } from './move-order-find.types';
+
+function extractOracleLines(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (row): row is Record<string, unknown> => typeof row === 'object' && row != null,
+  );
+}
+
+/** Oracle find returns flat header row with LINES[], or { header, lines }. */
+export function normalizeMoveOrderFindData(
+  data?: Record<string, unknown> | null,
+): NormalizedMoveOrderFindData | null {
+  if (!data) {
+    return null;
+  }
+
+  const nestedHeader = data.header;
+  if (typeof nestedHeader === 'object' && nestedHeader != null) {
+    const header = normalizeOracleRecord(nestedHeader as Record<string, unknown>);
+    const lines = extractOracleLines(
+      data.lines ?? data.LINES ?? header.LINES,
+    );
+    const { LINES: _lines, ...headerWithoutLines } = header;
+    return { header: headerWithoutLines, lines };
+  }
+
+  const normalized = normalizeOracleRecord(data);
+  const { LINES, ...headerFields } = normalized;
+  return {
+    header: headerFields,
+    lines: extractOracleLines(LINES),
+  };
+}
+
+const DATE_WMS_FIELDS = new Set([
+  'date_required',
+  'status_date',
+  'program_update_date',
+  'creation_date',
+  'last_update_date',
+  'pick_slip_date',
+]);
+
+const NUMERIC_WMS_FIELDS = new Set([
+  'header_iface_id',
+  'transaction_type_id',
+  'move_order_type',
+  'organization_id',
+  'to_account_id',
+  'grouping_rule_id',
+  'ship_to_location_id',
+  'reference_id',
+  'header_status',
+  'program_application_id',
+  'program_id',
+  'header_id',
+  'request_id',
+  'total_lines',
+  'created_by',
+  'last_update_login',
+  'last_updated_by',
+  'line_iface_id',
+  'line_number',
+  'inventory_item_id',
+  'from_subinventory_id',
+  'from_locator_id',
+  'to_organization_id',
+  'to_subinventory_id',
+  'to_locator_id',
+  'to_account_id',
+  'quantity',
+  'quantity_delivered',
+  'quantity_detailed',
+  'reason_id',
+  'project_id',
+  'task_id',
+  'transaction_header_id',
+  'txn_source_id',
+  'txn_source_line_id',
+  'txn_source_line_detail_id',
+  'transaction_source_type_id',
+  'primary_quantity',
+  'line_status',
+  'line_id',
+  'transaction_temp_id',
+]);
+
+function coerceWmsValue(wmsKey: string, value: unknown): unknown {
+  if (value == null) {
+    return value;
+  }
+
+  if (DATE_WMS_FIELDS.has(wmsKey)) {
+    if (value instanceof Date) {
+      return value;
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? value : parsed;
+    }
+  }
+
+  if (NUMERIC_WMS_FIELDS.has(wmsKey)) {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? value : parsed;
+    }
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value;
+}
 
 function mapOracleRecord<T extends object>(
   source: Record<string, unknown> | undefined,
@@ -117,10 +255,12 @@ function mapOracleRecord<T extends object>(
     return {};
   }
 
+  const normalized = normalizeOracleRecord(source);
   const result: Partial<T> = {};
   for (const [oracleKey, wmsKey] of Object.entries(fieldMap)) {
-    if (source[oracleKey] !== undefined && source[oracleKey] !== null) {
-      result[wmsKey as keyof T] = source[oracleKey] as T[keyof T];
+    if (normalized[oracleKey] !== undefined && normalized[oracleKey] !== null) {
+      const coerced = coerceWmsValue(String(wmsKey), normalized[oracleKey]);
+      result[wmsKey as keyof T] = coerced as T[keyof T];
     }
   }
   return result;
@@ -153,7 +293,8 @@ const ERROR_IFACE_STATUSES = new Set(['ERROR', 'FAILED', 'E', 'REJECTED']);
 export function resolveOracleIfaceStatus(
   header?: Record<string, unknown>,
 ): 'PENDING' | 'SUCCESS' | 'ERROR' {
-  const raw = header?.IFACE_STATUS ?? header?.iface_status;
+  const normalized = normalizeOracleRecord(header);
+  const raw = normalized.IFACE_STATUS;
   const status = typeof raw === 'string' ? raw.toUpperCase() : '';
 
   if (!status || PENDING_IFACE_STATUSES.has(status)) {

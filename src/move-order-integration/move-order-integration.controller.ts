@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { MoveOrderIntegration } from '../core/domain/entities/move-order-integration.entity';
 import { MoveOrderLineIntegration } from '../core/domain/entities/move-order-integration-lines.entity';
@@ -14,6 +14,9 @@ import { CreateMoveOrderIntegrationPayloadDto } from './dto/create-move-order-in
 import { UpdateMoveOrderIntegrationPayloadDto } from './dto/update-move-order-integration-payload.dto';
 import { MoveOrderWithLinesResponseDto } from './integration/dto/move-order-with-lines-response.dto';
 import { MoveOrderIntegrationContextDto } from './dto/move-order-integration-context.dto';
+import { MoveOrderIntegrationPollResponseDto } from './dto/move-order-integration-poll-response.dto';
+import { MoveOrderIntegrationPaginationQueryDto } from './dto/move-order-integration-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import {
   CreateAndIntegrateMoveOrderPayloadDto,
   SubmitMoveOrderOraclePayloadDto,
@@ -23,20 +26,15 @@ import {
 @ApiBearerAuth('JWT-auth')
 @Controller('move-order-integration')
 export class MoveOrderIntegrationController {
-  constructor(private readonly service: MoveOrderIntegrationService) {}
-
-  @Post()
-  @ApiOperation({ summary: 'Create move order integration header with optional lines' })
-  @ApiResponse({ status: 201 })
-  create(@Body() dto: CreateMoveOrderIntegrationPayloadDto) {
-    return this.service.create(dto);
-  }
+  constructor(private readonly service: MoveOrderIntegrationService) { }
 
   @Get()
-  @ApiOperation({ summary: 'List move order integration headers with lines' })
+  @ApiOperation({ summary: 'List move order integration headers with lines (paginated)' })
   @ApiResponse({ status: 200 })
-  findAllHeaders(): Promise<MoveOrderIntegrationHeaderWithLines[]> {
-    return this.service.findAllHeaders();
+  findAllHeaders(
+    @Query() query: MoveOrderIntegrationPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<MoveOrderIntegrationHeaderWithLines>> {
+    return this.service.findAllHeadersPaginated(query);
   }
 
   @Post('submit-oracle')
@@ -159,52 +157,15 @@ export class MoveOrderIntegrationController {
     return this.service.createAndIntegrate(createPayload, userId, userName);
   }
 
-  @Post('lines')
-  @ApiOperation({ summary: 'Create move order integration line' })
-  @ApiResponse({ status: 201, type: MoveOrderLineIntegration })
-  createLine(@Body() dto: CreateMoveOrderIntegrationLineDto) {
-    return this.service.createLine(dto);
-  }
-
-  @Get('lines/all')
-  @ApiOperation({ summary: 'List all move order integration lines' })
-  @ApiResponse({ status: 200, type: [MoveOrderLineIntegration] })
-  findAllLines() {
-    return this.service.findAllLines();
-  }
-
-  @Get('lines/:id')
-  @ApiOperation({ summary: 'Get move order integration line by ID' })
-  @ApiResponse({ status: 200, type: MoveOrderLineIntegration })
-  findLineById(@Param('id') id: string) {
-    return this.service.findLineById(id);
-  }
-
-  @Patch('lines/:id')
-  @ApiOperation({ summary: 'Update move order integration line by ID' })
-  @ApiResponse({ status: 200, type: MoveOrderLineIntegration })
-  updateLine(@Param('id') id: string, @Body() dto: UpdateMoveOrderIntegrationLineDto) {
-    return this.service.updateLine(id, dto);
-  }
-
-  @Delete('lines/:id')
-  @ApiOperation({ summary: 'Soft-delete move order integration line by ID' })
-  @ApiResponse({ status: 200 })
-  removeLine(@Param('id') id: string) {
-    return this.service.removeLine(id);
-  }
-
-  @Post(':id/integrate')
+  @Get('polling/:id')
   @ApiOperation({
-    summary: 'Submit persisted move order integration to Oracle',
-    description: 'Maps WMS record to Oracle DTO and calls move-order-wms.create.',
+    summary: 'Poll Oracle and sync move order integration status',
+    description:
+      'Calls move-order-wms.findBySourceHeaderId using source_header_id, updates staging header/lines, and returns current status.',
   })
-  @ApiResponse({ status: 202 })
-  integrateById(
-    @Param('id') id: string,
-    @Body() context?: MoveOrderIntegrationContextDto,
-  ): Promise<MoveOrderIntegrationQueuedResult> {
-    return this.service.integrateById(id, context?.userId, context?.userName);
+  @ApiResponse({ status: 200, type: MoveOrderIntegrationPollResponseDto })
+  polling(@Param('id') id: string): Promise<MoveOrderIntegrationPollResponseDto> {
+    return this.service.polling(id);
   }
 
   @Get(':id')

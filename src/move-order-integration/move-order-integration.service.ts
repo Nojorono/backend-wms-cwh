@@ -12,6 +12,11 @@ import { IntegrationMoveOrderService } from './integration/integration-move-orde
 import { CreateMoveOrderWithLinesDto } from './integration/dto/create-move-order-with-lines.dto';
 import { MoveOrderWithLinesResponseDto } from './integration/dto/move-order-with-lines-response.dto';
 import { MoveOrderIntegrationQueueProducer } from './integration/move-order-integration-queue.producer';
+import { MoveOrderIntegrationPollService } from './integration/move-order-integration-poll.service';
+import { MoveOrderIntegrationPollResponseDto } from './dto/move-order-integration-poll-response.dto';
+import { MoveOrderIntegrationPaginationQueryDto } from './dto/move-order-integration-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 import {
   mapMoveOrderIntegrationEntityToOracle,
 } from './integration/move-order-integration.mapper';
@@ -49,6 +54,8 @@ export class MoveOrderIntegrationService {
     private readonly repository: MoveOrderIntegrationRepository,
     private readonly integrationMoveOrderService: IntegrationMoveOrderService,
     private readonly queueProducer: MoveOrderIntegrationQueueProducer,
+    private readonly pollService: MoveOrderIntegrationPollService,
+    private readonly paginationService: PaginationService,
   ) { }
 
   async createHeader(dto: CreateMoveOrderIntegrationDto): Promise<MoveOrderIntegration> {
@@ -64,6 +71,20 @@ export class MoveOrderIntegrationService {
 
   async findAllHeaders(): Promise<MoveOrderIntegrationHeaderWithLines[]> {
     const headers = await this.repository.findAllHeaders();
+    return this.attachLinesToHeaders(headers);
+  }
+
+  async findAllHeadersPaginated(
+    query: MoveOrderIntegrationPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<MoveOrderIntegrationHeaderWithLines>> {
+    const { data, total } = await this.repository.findAllHeadersPaginated(query);
+    const headersWithLines = await this.attachLinesToHeaders(data);
+    return this.paginationService.createPaginatedResponse(headersWithLines, query, total);
+  }
+
+  private async attachLinesToHeaders(
+    headers: MoveOrderIntegration[],
+  ): Promise<MoveOrderIntegrationHeaderWithLines[]> {
     if (!headers.length) {
       return [];
     }
@@ -71,6 +92,7 @@ export class MoveOrderIntegrationService {
     const headerIds = headers.map((h) => h.id);
     const lines = await this.repository.findLinesByHeaderIds(headerIds);
     const linesByHeader = new Map<string, MoveOrderLineIntegration[]>();
+
     for (const line of lines) {
       if (!line.move_order_integration_id) {
         continue;
@@ -228,6 +250,10 @@ export class MoveOrderIntegrationService {
       total: results.length,
       results,
     };
+  }
+
+  async polling(id: string): Promise<MoveOrderIntegrationPollResponseDto> {
+    return await this.pollService.pollByIntegrationId(id);
   }
 
   private async enqueueIntegrationJob(

@@ -1,19 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class FindMoveOrderByRequestNumberDto {
+export class FindMoveOrderBySourceHeaderIdDto {
   @ApiProperty({
-    description: 'Move order request number',
-    example: 'JAT/SPB/2024/01/000002',
+    description: 'WMS source header id used when creating the Oracle interface row',
+    example: 'b56da9b0-7822-4cab-bf88-a6bdca3af1fc',
   })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
-  request_number: string;
+  source_header_id: string;
 
   @ApiPropertyOptional({
     description: 'Source system filter',
-    example: 'DMS',
+    example: 'WMS',
     maxLength: 100,
   })
   @IsString()

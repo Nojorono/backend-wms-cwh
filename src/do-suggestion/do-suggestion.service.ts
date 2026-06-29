@@ -244,9 +244,7 @@ export class DoSuggestionService {
       );
     }
 
-    const dateRequired = this.resolveDateForOracle(
-      suggestion.spb_date ?? suggestion.callplan_date_start,
-    );
+    const dateRequired = this.resolveDateForOracle(suggestion.callplan_date_start);
     const locatorIds = await this.resolveLocatorIds(suggestion);
 
     const lines = (suggestion.details ?? []).map((line, index) => {
@@ -262,11 +260,13 @@ export class DoSuggestionService {
         to_locator_id: locatorIds.to_locator_id,
         uom_code: 'BKS',
         quantity: Number(quantity),
-        date_required: new Date(dateRequired),
+        date_required: new Date(dateRequired), // call_plan_date_start
+        // date_required: new Date('2026-06-26'),
         transaction_type_id: 105,
         transaction_source_type_id: 4,
         line_status: 7,
-        status_date: new Date(dateRequired),
+        status_date: new Date(dateRequired), // call_plan_date_start
+        // status_date: new Date('2026-06-26'),
         source_system: 'WMS',
         source_header_id: suggestion.id,
         source_line_id: line.id,
@@ -288,29 +288,36 @@ export class DoSuggestionService {
     return {
       master_io_id: suggestion.organization_id ?? undefined,
       request_number: suggestion.spb_number?.trim(),
-      // request_number: 'SPB/JAT/2026/6/500021.1/5001',
+      // request_number: 'SPB/JAT/2026/6/500021.1/5006',
       transaction_type_id: 105,
       move_order_type: 1,
       organization_id: Number(organizationId),
-      date_required: new Date(dateRequired),
+      date_required: new Date(dateRequired), // call_plan_date_start
+      // date_required: new Date('2026-06-26'),
       from_subinventory_code: 'KECIL',
       to_subinventory_code: 'CANVAS',
       header_status: 7,
+      description: suggestion.sales_name?.trim() || undefined,
       attribute_category: 'FPPR Awal',
       status_date: new Date(Date.now()),
       attribute7: this.toDateOnly(suggestion.callplan_date_start), // Call Plan Start Date
+      // attribute7: '2026-06-26',
       attribute8: this.toDateOnly(suggestion.callplan_date_end), // Call Plan End Date
+      // attribute8: '2026-06-26',
       attribute9: suggestion.sales_nik?.trim(), // Sales_Nik
       // attribute9: '100507.01939B0', // Sales_Nik
       attribute10: suggestion.sales_spv_nik?.trim(), // Sales_Spv_Nik
       attribute11: suggestion.trip_type?.trim(), // trip_type
       attribute12: 'CVS', // CANVASING HARDCODE
       attribute13: suggestion.callplan_number?.trim() || undefined, // Call Plan Number
+      // attribute13: 'JAT/2026/6/500021.1',
       attribute14: suggestion.spb_number?.trim() || undefined, // SPB Number
+      // attribute14: 'SPB/JAT/2026/6/500021.1/5006',
       operation: 'CREATE',
       db_flag: 'T',
       source_system: 'WMS',
       source_header_id: suggestion.id,
+      // source_header_id: 'TEST6_SPB/JAT/2026/6/500021.1/5001',
       iface_status: 'READY',
       iface_mode: 'CREATE_TRANSACT_MO',
       total_lines: validLines.length,

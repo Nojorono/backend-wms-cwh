@@ -3,16 +3,19 @@ import { ClientProxy } from '@nestjs/microservices';
 import { catchError, firstValueFrom, timeout } from 'rxjs';
 import { ensureRmqConnection } from '../../core/helpers/rmq-connection.helper';
 import { CreateMoveOrderWithLinesDto } from './dto/create-move-order-with-lines.dto';
-import { FindMoveOrderByRequestNumberDto } from './dto/find-move-order-by-request-number.dto';
+import { FindMoveOrderBySourceHeaderIdDto } from './dto/find-move-order-by-source-header-id.dto';
+import { normalizeMoveOrderFindData } from './move-order-oracle-sync.mapper';
 import { MoveOrderFindWithLinesResponseDto } from './dto/move-order-find-with-lines-response.dto';
 import {
   MoveOrderWithLinesResponseDto,
 } from './dto/move-order-with-lines-response.dto';
 
+import { MoveOrderIntegrationLogService } from './move-order-integration-log.service';
+
 export { CreateMoveOrderWithLinesDto } from './dto/create-move-order-with-lines.dto';
 export { CreateMoveOrderOracleDto } from './dto/create-move-order-oracle.dto';
 export { CreateMoveOrderLineForHeaderDto } from './dto/create-move-order-line-for-header.dto';
-export { FindMoveOrderByRequestNumberDto } from './dto/find-move-order-by-request-number.dto';
+export { FindMoveOrderBySourceHeaderIdDto } from './dto/find-move-order-by-source-header-id.dto';
 export { MoveOrderFindWithLinesResponseDto } from './dto/move-order-find-with-lines-response.dto';
 export {
   MoveOrderWithLinesResponseDto,
@@ -31,12 +34,13 @@ export class IntegrationMoveOrderService implements OnModuleInit {
   constructor(
     @Inject('MOVE_ORDER_WMS_SERVICE')
     private readonly moveOrderClient: ClientProxy,
+    private readonly integrationLog: MoveOrderIntegrationLogService,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    this.logger.log('Initializing MOVE_ORDER_WMS_SERVICE RabbitMQ integration...');
+    this.integrationLog.info('rmq', 'Initializing MOVE_ORDER_WMS_SERVICE');
     await this.ensureConnection();
-    this.logger.log('MOVE_ORDER_WMS_SERVICE RabbitMQ integration initialization completed');
+    this.integrationLog.info('rmq', 'MOVE_ORDER_WMS_SERVICE ready');
   }
 
   private async ensureConnection(): Promise<void> {
@@ -67,15 +71,12 @@ export class IntegrationMoveOrderService implements OnModuleInit {
       const dtoList = Array.isArray(createDto) ? createDto : [createDto];
       const payload = dtoList.map((dto) => this.mapToMoveOrderWmsPayload(dto));
 
-      this.logger.log('==== Sending move-order-wms.create request ====');
-      this.logger.log(
-        JSON.stringify({
-          batch_count: dtoList.length,
-          request_numbers: dtoList.map((dto) => dto.REQUEST_NUMBER),
-          userId,
-          userName,
-        }),
-      );
+      this.integrationLog.info('rmq-create', 'Sending move-order-wms.create', {
+        batch_count: dtoList.length,
+        request_numbers: dtoList.map((dto) => dto.REQUEST_NUMBER).join(','),
+        user_id: userId,
+        user_name: userName,
+      });
 
       const response = await firstValueFrom(
         this.moveOrderClient
@@ -83,26 +84,26 @@ export class IntegrationMoveOrderService implements OnModuleInit {
           .pipe(
             timeout(this.REQUEST_TIMEOUT_MS),
             catchError((error) => {
-              this.logger.error(
-                `MOVE_ORDER_WMS_SERVICE move-order-wms.create failed: ${error.message || 'Unknown error'}`,
-              );
+              this.integrationLog.error('rmq-create', 'RMQ call failed', {
+                error: error.message || 'Unknown error',
+              });
               this.connectionEstablished = false;
               throw error;
             }),
           ),
       );
 
-      this.logger.log(
-        `move-order-wms.create response: status=${response.status}, message=${response.message}`,
-      );
+      this.integrationLog.info('rmq-create', 'Received move-order-wms.create response', {
+        status: response.status,
+        message: response.message,
+      });
 
       return response;
     } catch (error) {
       this.connectionEstablished = false;
-      this.logger.error(
-        `Error calling move-order-wms.create: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.integrationLog.error('rmq-create', 'move-order-wms.create exception', {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       return {
         status: false,
@@ -114,15 +115,16 @@ export class IntegrationMoveOrderService implements OnModuleInit {
   }
 
   /** RMQ `move-order-wms.findBySourceHeaderId` — fetch header and lines by source_header_id. */
-  async findMoveOrderWithLinesByRequestNumber(
-    payload: FindMoveOrderByRequestNumberDto,
+  async findMoveOrderWithLinesBySourceHeaderId(
+    payload: FindMoveOrderBySourceHeaderIdDto,
   ): Promise<MoveOrderFindWithLinesResponseDto> {
     try {
       await this.ensureConnection();
 
-      const sourceHeaderId = payload.request_number?.trim();
-      this.logger.log('==== Sending move-order-wms.findBySourceHeaderId request ====');
-      this.logger.log(JSON.stringify({ source_header_id: sourceHeaderId }));
+      const sourceHeaderId = payload.source_header_id?.trim();
+      this.integrationLog.info('rmq-find', 'Sending move-order-wms.findBySourceHeaderId', {
+        source_header_id: sourceHeaderId,
+      });
 
       const response = await firstValueFrom(
         this.moveOrderClient
@@ -133,26 +135,29 @@ export class IntegrationMoveOrderService implements OnModuleInit {
           .pipe(
             timeout(this.REQUEST_TIMEOUT_MS),
             catchError((error) => {
-              this.logger.error(
-                `MOVE_ORDER_WMS_SERVICE move-order-wms.findBySourceHeaderId failed: ${error.message || 'Unknown error'}`,
-              );
+              this.integrationLog.error('rmq-find', 'RMQ call failed', {
+                source_header_id: sourceHeaderId,
+                error: error.message || 'Unknown error',
+              });
               this.connectionEstablished = false;
               throw error;
             }),
           ),
       );
 
-      this.logger.log(
-        `move-order-wms.findBySourceHeaderId response: status=${response.status}, message=${response.message}`,
-      );
+      this.integrationLog.info('rmq-find', 'Received move-order-wms.findBySourceHeaderId response', {
+        source_header_id: sourceHeaderId,
+        status: response.status,
+        message: response.message,
+      });
 
-      return response;
+      return this.normalizeFindResponse(response);
     } catch (error) {
       this.connectionEstablished = false;
-      this.logger.error(
-        `Error calling move-order-wms.findBySourceHeaderId: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.integrationLog.error('rmq-find', 'move-order-wms.findBySourceHeaderId exception', {
+        source_header_id: payload.source_header_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       return {
         status: false,
@@ -161,6 +166,23 @@ export class IntegrationMoveOrderService implements OnModuleInit {
         statusCode: 500,
       };
     }
+  }
+
+  private normalizeFindResponse(
+    response: MoveOrderFindWithLinesResponseDto,
+  ): MoveOrderFindWithLinesResponseDto {
+    const normalized = normalizeMoveOrderFindData(
+      response.data as Record<string, unknown> | null | undefined,
+    );
+
+    if (!normalized) {
+      return response;
+    }
+
+    return {
+      ...response,
+      data: normalized,
+    };
   }
 
   private mapToMoveOrderWmsPayload(

@@ -7,6 +7,7 @@ import { CreateMoveOrderIntegrationDto } from './dto/create-move-order-integrati
 import { UpdateMoveOrderIntegrationDto } from './dto/update-move-order-integration.dto';
 import { CreateMoveOrderIntegrationLineDto } from './dto/create-move-order-integration-line.dto';
 import { UpdateMoveOrderIntegrationLineDto } from './dto/update-move-order-integration-line.dto';
+import { MoveOrderIntegrationPaginationQueryDto } from './dto/move-order-integration-pagination.dto';
 
 @Injectable()
 export class MoveOrderIntegrationRepository {
@@ -49,6 +50,52 @@ export class MoveOrderIntegrationRepository {
     return await this.headerRepo.find({
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findAllHeadersPaginated(
+    query: MoveOrderIntegrationPaginationQueryDto,
+  ): Promise<{ data: MoveOrderIntegration[]; total: number }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'DESC';
+
+    const sortableFields = new Set(['createdAt', 'updatedAt', 'request_number', 'iface_status']);
+    const sortField = sortableFields.has(sortBy) ? sortBy : 'createdAt';
+
+    const qb = this.headerRepo
+      .createQueryBuilder('header')
+      .where('header.deletedAt IS NULL');
+
+    if (query.iface_status?.trim()) {
+      qb.andWhere('header.iface_status = :ifaceStatus', {
+        ifaceStatus: query.iface_status.trim(),
+      });
+    }
+
+    if (query.source_system?.trim()) {
+      qb.andWhere('header.source_system = :sourceSystem', {
+        sourceSystem: query.source_system.trim(),
+      });
+    }
+
+    if (query.search?.trim()) {
+      const search = `%${query.search.trim()}%`;
+      qb.andWhere(
+        '(header.request_number ILIKE :search OR header.source_header_id ILIKE :search OR header.iface_message ILIKE :search)',
+        { search },
+      );
+    }
+
+    const total = await qb.getCount();
+
+    const data = await qb
+      .orderBy(`header.${sortField}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, total };
   }
 
   async findHeaderById(id: string): Promise<MoveOrderIntegration | null> {

@@ -142,19 +142,23 @@ export class MoveOrderIntegrationPollWorker implements OnModuleInit, OnModuleDes
         : packet;
 
     const moveOrderIntegrationId = candidate.moveOrderIntegrationId;
-    const request_number = candidate.request_number;
-    if (
-      typeof moveOrderIntegrationId !== 'string' ||
-      moveOrderIntegrationId.trim() === '' ||
-      typeof request_number !== 'string' ||
-      request_number.trim() === ''
-    ) {
+    if (typeof moveOrderIntegrationId !== 'string' || moveOrderIntegrationId.trim() === '') {
       return null;
     }
 
+    const source_header_id = candidate.source_header_id;
+    const request_number = candidate.request_number;
+
     return {
       moveOrderIntegrationId,
-      request_number,
+      source_header_id:
+        typeof source_header_id === 'string' && source_header_id.trim() !== ''
+          ? source_header_id.trim()
+          : undefined,
+      request_number:
+        typeof request_number === 'string' && request_number.trim() !== ''
+          ? request_number.trim()
+          : undefined,
       source_system:
         typeof candidate.source_system === 'string' ? candidate.source_system : undefined,
       retryCount: this.toNumber(candidate.retryCount, 0),

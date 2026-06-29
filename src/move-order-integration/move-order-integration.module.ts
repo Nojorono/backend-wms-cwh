@@ -17,8 +17,10 @@ import { MoveOrderIntegrationQueueConsumer } from './integration/move-order-inte
 import { MoveOrderIntegrationQueueWorker } from './integration/move-order-integration-queue.worker';
 import { MoveOrderIntegrationPollProducer } from './integration/move-order-integration-poll.producer';
 import { MoveOrderIntegrationPollConsumer } from './integration/move-order-integration-poll.consumer';
+import { MoveOrderIntegrationPollService } from './integration/move-order-integration-poll.service';
 import { MoveOrderIntegrationPollWorker } from './integration/move-order-integration-poll.worker';
 import { MoveOrderIntegrationSyncService } from './integration/move-order-integration-sync.service';
+import { MoveOrderIntegrationLogService } from './integration/move-order-integration-log.service';
 
 @Module({
   imports: [
@@ -52,9 +54,11 @@ import { MoveOrderIntegrationSyncService } from './integration/move-order-integr
     MoveOrderIntegrationQueueConsumer,
     MoveOrderIntegrationQueueWorker,
     MoveOrderIntegrationPollProducer,
+    MoveOrderIntegrationPollService,
     MoveOrderIntegrationPollConsumer,
     MoveOrderIntegrationPollWorker,
     MoveOrderIntegrationSyncService,
+    MoveOrderIntegrationLogService,
   ],
   exports: [
     MoveOrderIntegrationService,

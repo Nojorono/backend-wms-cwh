@@ -1,35 +1,42 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { MoveOrderIntegrationRepository } from '../move-order-integration.repository';
 import { IntegrationMoveOrderService } from './integration-move-order.service';
 import { MoveOrderIntegrationPollProducer } from './move-order-integration-poll.producer';
 import { MoveOrderIntegrationInsertJobPayload } from './move-order-integration-queue.types';
 import { mapMoveOrderIntegrationEntityToOracle } from './move-order-integration.mapper';
+import { MoveOrderIntegrationSyncService } from './move-order-integration-sync.service';
+import { MoveOrderIntegrationLogService } from './move-order-integration-log.service';
 
 @Injectable()
 export class MoveOrderIntegrationQueueConsumer {
-  private readonly logger = new Logger(MoveOrderIntegrationQueueConsumer.name);
-
   constructor(
     private readonly repository: MoveOrderIntegrationRepository,
     private readonly integrationMoveOrderService: IntegrationMoveOrderService,
     private readonly pollProducer: MoveOrderIntegrationPollProducer,
+    private readonly syncService: MoveOrderIntegrationSyncService,
+    private readonly integrationLog: MoveOrderIntegrationLogService,
   ) {}
 
   async handleInsertJob(data: MoveOrderIntegrationInsertJobPayload): Promise<void> {
     const moveOrderIntegrationId = data?.moveOrderIntegrationId;
 
     if (!moveOrderIntegrationId) {
-      this.logger.error('Move order insert queue payload is invalid: missing moveOrderIntegrationId');
+      this.integrationLog.error('insert', 'Invalid queue payload', {
+        reason: 'missing moveOrderIntegrationId',
+      });
       return;
     }
 
-    this.logger.log(
-      `Move order insert queue processing id=${moveOrderIntegrationId} request_number=${data.request_number}`,
-    );
+    this.integrationLog.info('insert', 'Processing queued job', {
+      move_order_integration_id: moveOrderIntegrationId,
+      request_number: data.request_number,
+    });
 
     const header = await this.repository.findHeaderById(moveOrderIntegrationId);
     if (!header) {
-      this.logger.warn(`Move order integration not found id=${moveOrderIntegrationId}`);
+      this.integrationLog.warn('insert', 'Header not found', {
+        move_order_integration_id: moveOrderIntegrationId,
+      });
       return;
     }
 
@@ -38,6 +45,9 @@ export class MoveOrderIntegrationQueueConsumer {
       await this.repository.updateHeader(moveOrderIntegrationId, {
         iface_status: 'ERROR',
         iface_message: 'No lines to submit to Oracle',
+      });
+      this.integrationLog.error('insert', 'No lines to submit', {
+        move_order_integration_id: moveOrderIntegrationId,
       });
       return;
     }
@@ -54,14 +64,33 @@ export class MoveOrderIntegrationQueueConsumer {
         iface_status: 'ERROR',
         iface_message: createResult.message,
       });
-      this.logger.error(
-        `Move order create_with_lines failed id=${moveOrderIntegrationId}: ${createResult.message}`,
-      );
+      this.integrationLog.error('insert', 'Oracle create failed', {
+        move_order_integration_id: moveOrderIntegrationId,
+        request_number: data.request_number ?? createDto.REQUEST_NUMBER,
+        source_header_id: header.source_header_id,
+        line_count: lines.length,
+        error: createResult.message,
+      });
       return;
     }
 
+    await this.syncService.syncFromCreateResponse(moveOrderIntegrationId, createResult.data);
+
     const requestNumber = data.request_number || header.request_number || createDto.REQUEST_NUMBER;
+    const sourceHeaderId =
+      header.source_header_id?.trim() || createDto.SOURCE_HEADER_ID?.trim();
     const sourceSystem = data.source_system ?? header.source_system ?? createDto.SOURCE_SYSTEM;
+
+    if (!sourceHeaderId) {
+      await this.repository.updateHeader(moveOrderIntegrationId, {
+        iface_status: 'ERROR',
+        iface_message: 'source_header_id is required for Oracle polling',
+      });
+      this.integrationLog.error('insert', 'Missing source_header_id for polling', {
+        move_order_integration_id: moveOrderIntegrationId,
+      });
+      return;
+    }
 
     await this.repository.updateHeader(moveOrderIntegrationId, {
       iface_status: 'PROCESSING',
@@ -70,10 +99,18 @@ export class MoveOrderIntegrationQueueConsumer {
 
     await this.pollProducer.publish({
       moveOrderIntegrationId,
+      source_header_id: sourceHeaderId,
       request_number: requestNumber,
       source_system: sourceSystem,
       retryCount: 0,
       maxRetry: 20,
+    });
+
+    this.integrationLog.info('insert', 'Oracle create succeeded, poll scheduled', {
+      move_order_integration_id: moveOrderIntegrationId,
+      request_number: requestNumber,
+      source_header_id: sourceHeaderId,
+      line_count: lines.length,
     });
   }
 }
