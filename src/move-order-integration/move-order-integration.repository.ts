@@ -102,6 +102,13 @@ export class MoveOrderIntegrationRepository {
     return await this.headerRepo.findOne({ where: { id } });
   }
 
+  async findHeaderBySourceHeaderId(sourceHeaderId: string): Promise<MoveOrderIntegration | null> {
+    return await this.headerRepo.findOne({
+      where: { source_header_id: sourceHeaderId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async findLinesByHeaderIds(headerIds: string[]): Promise<MoveOrderLineIntegration[]> {
     if (headerIds.length === 0) {
       return [];

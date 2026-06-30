@@ -260,7 +260,7 @@ export class DoSuggestionService {
         to_locator_id: locatorIds.to_locator_id,
         uom_code: 'BKS',
         quantity: Number(quantity),
-        date_required: new Date(dateRequired), // call_plan_date_start
+        date_required: new Date(Date.now()), // date_now
         // date_required: new Date('2026-06-26'),
         transaction_type_id: 105,
         transaction_source_type_id: 4,
@@ -288,11 +288,11 @@ export class DoSuggestionService {
     return {
       master_io_id: suggestion.organization_id ?? undefined,
       request_number: suggestion.spb_number?.trim(),
-      // request_number: 'SPB/JAT/2026/6/500021.1/5006',
+      // request_number: 'SPB/JAT/2026/6/500022.1/5001',
       transaction_type_id: 105,
       move_order_type: 1,
       organization_id: Number(organizationId),
-      date_required: new Date(dateRequired), // call_plan_date_start
+      date_required: new Date(Date.now()), // date_now
       // date_required: new Date('2026-06-26'),
       from_subinventory_code: 'KECIL',
       to_subinventory_code: 'CANVAS',
@@ -301,18 +301,19 @@ export class DoSuggestionService {
       attribute_category: 'FPPR Awal',
       status_date: new Date(Date.now()),
       attribute7: this.toDateOnly(suggestion.callplan_date_start), // Call Plan Start Date
-      // attribute7: '2026-06-26',
+      // attribute7: '2026-06-30',
       attribute8: this.toDateOnly(suggestion.callplan_date_end), // Call Plan End Date
-      // attribute8: '2026-06-26',
+      // attribute8: '2026-06-30',
       attribute9: suggestion.sales_nik?.trim(), // Sales_Nik
       // attribute9: '100507.01939B0', // Sales_Nik
       attribute10: suggestion.sales_spv_nik?.trim(), // Sales_Spv_Nik
       attribute11: suggestion.trip_type?.trim(), // trip_type
+      // attribute11: 'SD', // trip_type
       attribute12: 'CVS', // CANVASING HARDCODE
       attribute13: suggestion.callplan_number?.trim() || undefined, // Call Plan Number
-      // attribute13: 'JAT/2026/6/500021.1',
+      // attribute13: 'JAT/2026/6/500022.1', // Call Plan Number
       attribute14: suggestion.spb_number?.trim() || undefined, // SPB Number
-      // attribute14: 'SPB/JAT/2026/6/500021.1/5006',
+      // attribute14: 'SPB/JAT/2026/6/500022.1/5001', // SPB Number
       operation: 'CREATE',
       db_flag: 'T',
       source_system: 'WMS',

@@ -21,14 +21,14 @@ function renderSalesTable(sales: CallPlanReminderSalesRow[]): string {
     escapeHtml(String(index + 1)),
     escapeHtml(row.salesName),
     escapeHtml(row.salesNik),
-    escapeHtml(row.routeNumber || '-'),
-    escapeHtml(row.callPlanStartDate || '-'),
-    escapeHtml(row.callPlanEndDate || '-'),
-    escapeHtml(formatLuarkota(row.isLuarkota)),
+    // escapeHtml(row.routeNumber || '-'),
+    // escapeHtml(row.callPlanStartDate || '-'),
+    // escapeHtml(row.callPlanEndDate || '-'),
+    // escapeHtml(formatLuarkota(row.isLuarkota)),
   ]);
 
   return renderDataTable(
-    ['No', 'Sales', 'NIK', 'Route', 'Start Date', 'End Date', 'Luar Kota'],
+    ['No', 'Sales', 'NIK'],
     rows,
     'Tidak ada data sales.',
   );

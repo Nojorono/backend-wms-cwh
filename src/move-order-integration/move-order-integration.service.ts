@@ -122,6 +122,23 @@ export class MoveOrderIntegrationService {
     return { ...header, lines };
   }
 
+  async findBySourceHeaderId(sourceHeaderId: string): Promise<MoveOrderIntegrationHeaderWithLines> {
+    const normalizedSourceHeaderId = sourceHeaderId?.trim();
+    if (!normalizedSourceHeaderId) {
+      throw new BadRequestException('sourceHeaderId is required');
+    }
+
+    const header = await this.repository.findHeaderBySourceHeaderId(normalizedSourceHeaderId);
+    if (!header) {
+      throw new NotFoundException(
+        `Move order integration with source_header_id ${normalizedSourceHeaderId} not found`,
+      );
+    }
+
+    const lines = await this.repository.findLinesByHeaderId(header.id);
+    return { ...header, lines };
+  }
+
   async updateHeader(
     id: string,
     dto: UpdateMoveOrderIntegrationDto,

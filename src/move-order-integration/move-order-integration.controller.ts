@@ -157,6 +157,13 @@ export class MoveOrderIntegrationController {
     return this.service.createAndIntegrate(createPayload, userId, userName);
   }
 
+  @Get('find-by-source-header-id/:sourceHeaderId')
+  @ApiOperation({ summary: 'Get move order integration header by source header ID' })
+  @ApiResponse({ status: 200, type: MoveOrderIntegration })
+  findBySourceHeaderId(@Param('sourceHeaderId') sourceHeaderId: string) {
+    return this.service.findBySourceHeaderId(sourceHeaderId);
+  }
+
   @Get('polling/:id')
   @ApiOperation({
     summary: 'Poll Oracle and sync move order integration status',

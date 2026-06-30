@@ -17,7 +17,7 @@ export class ScheduledCallPlanService {
   constructor(
     private readonly snowflakeService: ScheduledCallPlanSnowflakeService,
     private readonly callPlanEmailService: ScheduledCallPlanEmailService,
-  ) {}
+  ) { }
 
   async runFetchNow(
     payload?: ScheduledCallPlanFetchPayload,
@@ -35,15 +35,27 @@ export class ScheduledCallPlanService {
     const snowflakeResult = await this.snowflakeService.fetchCallPlan(payload);
     const data = this.groupCallPlanByAhom(snowflakeResult.data);
 
-    const emailSummary = await this.callPlanEmailService.sendNullCallPlanRemindersForGroupedData(
-      data,
-      snowflakeResult.callPlanStartDate,
-    );
+    const supervisorReminderSummary =
+      await this.callPlanEmailService.sendCallPlanRemindersForGroupedData(
+        data,
+        snowflakeResult.callPlanStartDate,
+      );
+    // const ahomReminderSummary =
+    //   await this.callPlanEmailService.sendNullCallPlanRemindersForGroupedData(
+    //     data,
+    //     snowflakeResult.callPlanStartDate,
+    //   );
 
     this.logger.log(
-      `Call plan null reminders: attempted=${emailSummary.attempted} sent=${emailSummary.sent} ` +
-        `skippedMissingAhom=${emailSummary.skippedMissingAhomEmail}`,
+      `Call plan supervisor reminders: attempted=${supervisorReminderSummary.attempted} ` +
+      `sent=${supervisorReminderSummary.sent} ` +
+      `skippedMissingSupervisor=${supervisorReminderSummary.skippedMissingSupervisorEmail}`,
     );
+    // this.logger.log(
+    //   `Call plan AHOM reminders: attempted=${ahomReminderSummary.attempted} ` +
+    //     `sent=${ahomReminderSummary.sent} ` +
+    //     `skippedMissingAhom=${ahomReminderSummary.skippedMissingAhomEmail}`,
+    // );
 
     return {
       callPlanStartDate: snowflakeResult.callPlanStartDate,

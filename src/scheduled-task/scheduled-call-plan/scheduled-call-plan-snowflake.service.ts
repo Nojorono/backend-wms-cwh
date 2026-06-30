@@ -36,8 +36,6 @@ export class ScheduledCallPlanSnowflakeService {
       `Fetched ${data.length} call plan row(s) for CALL_PLAN_START_DATE=${resolvedDate}`,
     );
 
-    console.log(data);
-
     return {
       callPlanStartDate: resolvedDate,
       totalRows,
