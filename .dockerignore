@@ -74,6 +74,7 @@ scaffold-generator.js
 # TypeScript
 tsconfig*.json
 !tsconfig.json
+!tsconfig.build.json
 
 # ESLint
 eslint.config.*
@@ -83,6 +84,6 @@ eslint.config.*
 jest.config.*
 jest-e2e.json
 
-# NestJS
-nest-cli.json
+# NestJS — nest-cli.json is required at build time to copy email HTML/txt assets into dist
+!nest-cli.json
 

@@ -19,8 +19,9 @@ RUN if [ ! -f package-lock.json ]; then \
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application (nest-cli.json copies email template assets into dist)
+RUN npm run build && \
+    test -f dist/email/template-email/layouts/email-base.layout.html
 
 # Stage 2: Production stage
 FROM node:20-alpine AS production
