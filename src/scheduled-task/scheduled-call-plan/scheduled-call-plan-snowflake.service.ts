@@ -18,22 +18,30 @@ interface SnowflakeStatementsRequest {
   bindings: Record<string, { type: string; value: string }>;
 }
 
+interface SnowflakeAuthContext {
+  accessToken: string;
+  tokenType: string;
+  statementsUrl: string;
+}
+
 @Injectable()
 export class ScheduledCallPlanSnowflakeService {
   private readonly logger = new Logger(ScheduledCallPlanSnowflakeService.name);
 
-  constructor(private readonly configService: ConfigService) { }
+  constructor(private readonly configService: ConfigService) {}
 
   async fetchCallPlan(
     payload: ScheduledCallPlanFetchPayload = {},
   ): Promise<ScheduledCallPlanSnowflakeFetchResult> {
     const resolvedDate = payload.callPlanStartDate?.trim() || this.resolveDefaultCallPlanStartDate();
-    const response = await this.executeStatement(resolvedDate);
-    const data = this.parseResponse(response);
-    const totalRows = response.resultSetMetaData?.numRows ?? data.length;
+    const auth = this.resolveAuthContext();
+    const initialResponse = await this.executeStatement(resolvedDate, auth);
+    const allRows = await this.fetchAllPartitionRows(initialResponse, auth);
+    const data = this.parseRows(allRows);
+    const totalRows = initialResponse.resultSetMetaData?.numRows ?? data.length;
 
     this.logger.log(
-      `Fetched ${data.length} call plan row(s) for CALL_PLAN_START_DATE=${resolvedDate}`,
+      `Fetched ${data.length}/${totalRows} call plan row(s) for CALL_PLAN_START_DATE=${resolvedDate}`,
     );
 
     return {
@@ -56,7 +64,7 @@ export class ScheduledCallPlanSnowflakeService {
     });
   }
 
-  private async executeStatement(callPlanStartDate: string): Promise<SnowflakeStatementsResponse> {
+  private resolveAuthContext(): SnowflakeAuthContext {
     const statementsUrl = this.configService.get<string>('SNOWFLAKE_STATEMENTS_URL')?.trim();
     const accessToken = this.configService.get<string>('SNOWFLAKE_ACCESS_TOKEN')?.trim();
 
@@ -67,6 +75,17 @@ export class ScheduledCallPlanSnowflakeService {
       throw new BadRequestException('SNOWFLAKE_ACCESS_TOKEN is not configured');
     }
 
+    const tokenType =
+      this.configService.get<string>('SNOWFLAKE_TOKEN_TYPE')?.trim() ||
+      'PROGRAMMATIC_ACCESS_TOKEN';
+
+    return { accessToken, tokenType, statementsUrl };
+  }
+
+  private async executeStatement(
+    callPlanStartDate: string,
+    auth: SnowflakeAuthContext,
+  ): Promise<SnowflakeStatementsResponse> {
     const body: SnowflakeStatementsRequest = {
       statement: SNOWFLAKE_CALL_PLAN_STATEMENT,
       database: this.configService.get<string>('SNOWFLAKE_DATABASE')?.trim() || 'DEV_SFA_OUTSYSTEMS',
@@ -78,40 +97,125 @@ export class ScheduledCallPlanSnowflakeService {
       },
     };
 
-    const tokenType =
-      this.configService.get<string>('SNOWFLAKE_TOKEN_TYPE')?.trim() ||
-      'PROGRAMMATIC_ACCESS_TOKEN';
-
-    const response = await fetch(statementsUrl, {
+    return this.requestSnowflake<SnowflakeStatementsResponse>(auth, {
       method: 'POST',
+      url: auth.statementsUrl,
+      body: JSON.stringify(body),
+    });
+  }
+
+  private async fetchAllPartitionRows(
+    initialResponse: SnowflakeStatementsResponse,
+    auth: SnowflakeAuthContext,
+  ): Promise<string[][]> {
+    const mergedRows: string[][] = [...(initialResponse.data ?? [])];
+    const partitionInfo = initialResponse.resultSetMetaData?.partitionInfo ?? [];
+
+    if (partitionInfo.length <= 1) {
+      return mergedRows;
+    }
+
+    const statementHandle = this.resolveStatementHandle(initialResponse, auth.statementsUrl);
+    if (!statementHandle) {
+      this.logger.warn(
+        `Snowflake returned ${partitionInfo.length} partitions but no statement handle; ` +
+          `using partition 0 only (${mergedRows.length} row(s))`,
+      );
+      return mergedRows;
+    }
+
+    this.logger.log(
+      `Fetching Snowflake partitions 1..${partitionInfo.length - 1} for handle=${statementHandle}`,
+    );
+
+    for (let partition = 1; partition < partitionInfo.length; partition++) {
+      const partitionResponse = await this.fetchStatementPartition(
+        auth,
+        statementHandle,
+        partition,
+      );
+      const rows = partitionResponse.data ?? [];
+      mergedRows.push(...rows);
+      this.logger.log(
+        `Fetched Snowflake partition=${partition} rows=${rows.length} ` +
+          `(expected=${partitionInfo[partition]?.rowCount ?? 'unknown'})`,
+      );
+    }
+
+    return mergedRows;
+  }
+
+  private async fetchStatementPartition(
+    auth: SnowflakeAuthContext,
+    statementHandle: string,
+    partition: number,
+  ): Promise<SnowflakeStatementsResponse> {
+    const baseUrl = auth.statementsUrl.replace(/\/+$/, '');
+    const url = `${baseUrl}/${statementHandle}?partition=${partition}`;
+
+    return this.requestSnowflake<SnowflakeStatementsResponse>(auth, {
+      method: 'GET',
+      url,
+    });
+  }
+
+  private resolveStatementHandle(
+    response: SnowflakeStatementsResponse,
+    statementsUrl: string,
+  ): string | undefined {
+    if (response.statementHandle?.trim()) {
+      return response.statementHandle.trim();
+    }
+
+    const statusUrl = response.statementStatusUrl?.trim();
+    if (!statusUrl) {
+      return undefined;
+    }
+
+    const normalizedStatementsUrl = statementsUrl.replace(/\/+$/, '');
+    const path = statusUrl.startsWith(normalizedStatementsUrl)
+      ? statusUrl.slice(normalizedStatementsUrl.length)
+      : statusUrl;
+
+    const handle = path.replace(/^\//, '').split('?')[0]?.trim();
+    return handle || undefined;
+  }
+
+  private async requestSnowflake<T>(
+    auth: SnowflakeAuthContext,
+    init: { method: 'GET' | 'POST'; url: string; body?: string },
+  ): Promise<T> {
+    const response = await fetch(init.url, {
+      method: init.method,
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-        'X-Snowflake-Authorization-Token-Type': tokenType,
+        Authorization: `Bearer ${auth.accessToken}`,
+        'X-Snowflake-Authorization-Token-Type': auth.tokenType,
       },
-      body: JSON.stringify(body),
+      body: init.body,
     });
 
-    const responseBody = (await response.json()) as SnowflakeStatementsResponse;
+    const responseBody = (await response.json()) as T & { message?: string };
 
     if (!response.ok) {
-      const message = responseBody.message || `Snowflake API failed with status ${response.status}`;
-      this.logger.error(`Snowflake request failed: ${message}`);
+      const message =
+        responseBody.message || `Snowflake API failed with status ${response.status}`;
+      this.logger.error(`Snowflake request failed (${init.method} ${init.url}): ${message}`);
       throw new BadRequestException(message);
     }
 
     return responseBody;
   }
 
-  private parseResponse(response: SnowflakeStatementsResponse): CallPlanRowData[] {
-    if (!response.data?.length) {
+  private parseRows(rows: string[][]): CallPlanRowData[] {
+    if (!rows.length) {
       return [];
     }
 
     const parsed: CallPlanRowData[] = [];
 
-    for (const row of response.data) {
+    for (const row of rows) {
       const rawValue = row?.[0];
       if (!rawValue) {
         continue;
