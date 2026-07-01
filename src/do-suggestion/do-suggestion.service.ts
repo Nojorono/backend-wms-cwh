@@ -326,21 +326,6 @@ export class DoSuggestionService {
     };
   }
 
-  private static readonly ORACLE_MONTH_NAMES = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ] as const;
-
   private toDateOnly(value?: Date | string | null): string | undefined {
     if (value == null) {
       return undefined;
@@ -360,7 +345,7 @@ export class DoSuggestionService {
       const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
       if (match) {
         year = Number(match[1]);
-        month = Number(match[2]) - 1;
+        month = Number(match[2]);
         day = Number(match[3]);
       } else {
         const parsed = new Date(trimmed);
@@ -368,7 +353,7 @@ export class DoSuggestionService {
           return undefined;
         }
         year = parsed.getUTCFullYear();
-        month = parsed.getUTCMonth();
+        month = parsed.getUTCMonth() + 1;
         day = parsed.getUTCDate();
       }
     } else {
@@ -376,12 +361,11 @@ export class DoSuggestionService {
         return undefined;
       }
       year = value.getUTCFullYear();
-      month = value.getUTCMonth();
+      month = value.getUTCMonth() + 1;
       day = value.getUTCDate();
     }
 
-    const monthName = DoSuggestionService.ORACLE_MONTH_NAMES[month];
-    return `${String(day).padStart(2, '0')}-${monthName}-${String(year).slice(-2)}`;
+    return `${String(year)}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')} 00:00:00`;
   }
 
   private resolveDateForOracle(source?: Date | string): string {
