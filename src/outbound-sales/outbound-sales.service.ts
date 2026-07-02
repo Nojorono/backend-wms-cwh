@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity';
-import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity'; import { IntegrationOnHandAtrService } from './integration/integration-on-hand-atr.service';
+import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
+import { INDONESIA_TIMEZONE } from '../core/utils/date-transformer.util';
+import { IntegrationOnHandAtrService } from './integration/integration-on-hand-atr.service';
 import { CreateOnHandAtrDto } from './dto/create-on-hand-atr.dto';
 import {
   InvOnHandQtyWithAtrItemDto,
@@ -30,14 +32,23 @@ export class OutboundSalesService {
     organizationId: string | number | null,
   ): Promise<OnHandAtr[]> {
     const resolvedOrganizationId = this.resolveOrganizationId(organizationId);
-    const snapshotDate = this.resolveSnapshotDate(query.date);
+    const savedDate = this.resolveSavedDate(query.date);
+    const subinventoryCodes = this.resolveSubinventoryCodes(query.subinventory_code);
 
     const existData = await this.onHandAtrRepository.findByOrganizationIdAndDate(
       resolvedOrganizationId,
-      snapshotDate,
+      savedDate,
+      query.organization_code,
+      subinventoryCodes,
     );
     if (existData.length > 0) {
-      return existData
+      return existData;
+    }
+
+    // Only fetch from Oracle when requesting today's data (not yet saved).
+    // Historical dates must already exist in DB from when they were saved.
+    if (!this.isTodayInWib(savedDate)) {
+      return [];
     }
 
     const response =
@@ -45,7 +56,11 @@ export class OutboundSalesService {
     const rows = response.data ?? [];
     const createdBy = query.created_by ?? 'SYSTEM';
     if (rows.length > 0) {
-      const dtos = await this.mapOracleRowsToCreateDtos(rows, resolvedOrganizationId, createdBy);
+      const dtos = await this.mapOracleRowsToCreateDtos(
+        rows,
+        resolvedOrganizationId,
+        createdBy,
+      );
       const createdData = await this.createManyOnHandAtr(dtos);
       return createdData;
     }
@@ -76,24 +91,51 @@ export class OutboundSalesService {
     return String(organizationId);
   }
 
-  private resolveSnapshotDate(date: string): string {
+  private resolveSavedDate(date: string): string {
     const normalizedDate = date.trim().split('T')[0];
     if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
       throw new BadRequestException('date must be in YYYY-MM-DD format');
     }
 
-    if (Number.isNaN(new Date(`${normalizedDate}T00:00:00Z`).getTime())) {
+    if (Number.isNaN(new Date(`${normalizedDate}T00:00:00+07:00`).getTime())) {
       throw new BadRequestException('date must be a valid date');
     }
 
     return normalizedDate;
   }
 
-  private async mapOracleRowsToCreateDtos(rows: InvOnHandQtyWithAtrItemDto[],
+  private isTodayInWib(date: string): boolean {
+    return date === this.getTodayInWib();
+  }
+
+  private getTodayInWib(): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: INDONESIA_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+  }
+
+  private resolveSubinventoryCodes(subinventoryCode: string | string[]): string[] {
+    if (Array.isArray(subinventoryCode)) {
+      return subinventoryCode.map((entry) => entry.trim()).filter(Boolean);
+    }
+
+    return String(subinventoryCode)
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  private async mapOracleRowsToCreateDtos(
+    rows: InvOnHandQtyWithAtrItemDto[],
     organizationId: string,
     createdBy: string,
   ): Promise<CreateOnHandAtrDto[]> {
-    return rows.map((row) => this.mapOracleRowToCreateDto(row, organizationId, createdBy));
+    return rows.map((row) =>
+      this.mapOracleRowToCreateDto(row, organizationId, createdBy),
+    );
   }
 
   private mapOracleRowToCreateDto(
@@ -126,13 +168,13 @@ export class OutboundSalesService {
     date: string,
   ): Promise<TotalSubmittedResponseDto> {
     const resolvedOrganizationId = this.resolveOrganizationId(organizationId);
-    const snapshotDate = this.resolveSnapshotDate(date);
+    const savedDate = this.resolveSavedDate(date);
 
     const doSuggestionRows =
       await this.doSuggestionRepository.findByOrganizationIdAndItemCodeAndDate(
         resolvedOrganizationId,
         undefined,
-        snapshotDate,
+        savedDate,
         DoSuggestionStatus.SUBMITTED,
       );
 
@@ -145,7 +187,7 @@ export class OutboundSalesService {
 
     return {
       organization_id: resolvedOrganizationId,
-      date: snapshotDate,
+      date: savedDate,
       status: DoSuggestionStatus.SUBMITTED,
       items,
       grand_total: grandTotal,

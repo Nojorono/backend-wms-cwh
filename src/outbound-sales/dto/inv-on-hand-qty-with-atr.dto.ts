@@ -34,9 +34,9 @@ export class InvOnHandQtyWithAtrParamsDto {
   })
   subinventory_code: string | string[];
 
-  // date only (YYYY-MM-DD), no time
+  // date only (YYYY-MM-DD), no time — filter by when on-hand data was saved (created_at)
   @ApiProperty({
-    description: 'Snapshot date (YYYY-MM-DD)',
+    description: 'Saved date (YYYY-MM-DD) — returns on-hand rows stored on this date (WIB)',
     example: onHandAtrDateNowExample(),
   })
   @IsNotEmpty()
