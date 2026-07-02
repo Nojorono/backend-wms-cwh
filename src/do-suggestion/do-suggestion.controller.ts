@@ -8,14 +8,13 @@ import {
   Param,
   Post,
   Query,
-  Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
 import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionService } from './do-suggestion.service';
 import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
+import { FindDoSuggestionByCallplanDto } from './dto/find-do-suggestion-by-callplan.dto';
 import {
   DoSuggestionCallplanFilterQueryDto,
   DoSuggestionFilterQueryDto,
@@ -90,22 +89,11 @@ export class DoSuggestionController {
     );
   }
 
-  @Get('callplan/:callplanNumber')
-  @ApiOperation({ summary: 'Get DO suggestions by callplan number' })
+  @Post('callplan/find')
+  @ApiOperation({ summary: 'Get DO suggestions by callplan number (request body)' })
   @ApiResponse({ status: 200, type: [DoSuggestion] })
-  findByCallplanNumber(@Param('callplanNumber') callplanNumber: string): Promise<DoSuggestion[]> {
-    return this.doSuggestionService.findByCallplanNumber(this.decodeCallplanNumber(callplanNumber));
-  }
-
-  // Supports callplan values containing slash (e.g. KRW/2026/7/000054.1) when proxy decodes %2F.
-  @Get('callplan/*')
-  @ApiOperation({ summary: 'Get DO suggestions by callplan number (slash-safe route)' })
-  @ApiResponse({ status: 200, type: [DoSuggestion] })
-  findByCallplanNumberWildcard(@Req() req: Request): Promise<DoSuggestion[]> {
-    const wildcardParam = req.params?.[0] ?? '';
-    return this.doSuggestionService.findByCallplanNumber(
-      this.decodeCallplanNumber(wildcardParam),
-    );
+  findByCallplanNumber(@Body() dto: FindDoSuggestionByCallplanDto): Promise<DoSuggestion[]> {
+    return this.doSuggestionService.findByCallplanNumber(dto.callplanNumber);
   }
 
   @Get(':id')
@@ -127,17 +115,5 @@ export class DoSuggestionController {
   @ApiResponse({ status: 200 })
   integrateMoveOrder(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
     return this.doSuggestionService.integrateMoveOrder(id);
-  }
-
-  private decodeCallplanNumber(value: string): string {
-    const trimmed = value?.trim() ?? '';
-    if (!trimmed) {
-      return trimmed;
-    }
-    try {
-      return decodeURIComponent(trimmed);
-    } catch {
-      return trimmed;
-    }
   }
 }
