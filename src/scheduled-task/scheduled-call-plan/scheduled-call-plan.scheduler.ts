@@ -22,37 +22,37 @@ export class ScheduledCallPlanScheduler implements OnApplicationBootstrap {
   constructor(
     private readonly configService: ConfigService,
     private readonly scheduledTaskService: ScheduledTaskService,
-  ) {}
+  ) { }
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.bootstrap();
+    // await this.bootstrap();
   }
 
-  async bootstrap(): Promise<void> {
-    const mode = this.resolveScheduleMode();
-    if (mode === 'off') {
-      this.logger.log('Call plan auto-schedule is disabled (CALL_PLAN_SCHEDULE_MODE=off)');
-      return;
-    }
+  // async bootstrap(): Promise<void> {
+  //   const mode = this.resolveScheduleMode();
+  //   if (mode === 'off') {
+  //     this.logger.log('Call plan auto-schedule is disabled (CALL_PLAN_SCHEDULE_MODE=off)');
+  //     return;
+  //   }
 
-    const cronTime =
-      this.configService.get<string>('CALL_PLAN_CRON')?.trim() || SCHEDULED_CALL_PLAN_FETCH_ALL_CRON;
-    const timezone =
-      this.configService.get<string>('CALL_PLAN_CRON_TIMEZONE')?.trim() ||
-      SCHEDULED_CALL_PLAN_FETCH_ALL_TIMEZONE;
+  //   const cronTime =
+  //     this.configService.get<string>('CALL_PLAN_CRON')?.trim() || SCHEDULED_CALL_PLAN_FETCH_ALL_CRON;
+  //   const timezone =
+  //     this.configService.get<string>('CALL_PLAN_CRON_TIMEZONE')?.trim() ||
+  //     SCHEDULED_CALL_PLAN_FETCH_ALL_TIMEZONE;
 
-    await this.scheduledTaskService.ensureCronJob({
-      name: SCHEDULED_CALL_PLAN_FETCH_ALL_JOB_NAME,
-      cronTime,
-      callbackType: SCHEDULED_CALL_PLAN_CALLBACK_TYPE,
-      timezone,
-      persist: mode === 'database',
-    });
+  //   await this.scheduledTaskService.ensureCronJob({
+  //     name: SCHEDULED_CALL_PLAN_FETCH_ALL_JOB_NAME,
+  //     cronTime,
+  //     callbackType: SCHEDULED_CALL_PLAN_CALLBACK_TYPE,
+  //     timezone,
+  //     persist: mode === 'database',
+  //   });
 
-    this.logger.log(
-      `Call plan schedule ensured mode=${mode} cron="${cronTime}" timezone=${timezone}`,
-    );
-  }
+  //   this.logger.log(
+  //     `Call plan schedule ensured mode=${mode} cron="${cronTime}" timezone=${timezone}`,
+  //   );
+  // }
 
   private resolveScheduleMode(): ScheduledCallPlanScheduleMode {
     const raw = this.configService.get<string>('CALL_PLAN_SCHEDULE_MODE')?.trim().toLowerCase();
