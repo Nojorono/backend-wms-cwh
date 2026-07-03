@@ -16,38 +16,38 @@ export class ScheduledSpbSubmittedScheduler implements OnApplicationBootstrap {
   constructor(
     private readonly configService: ConfigService,
     private readonly scheduledTaskService: ScheduledTaskService,
-  ) {}
+  ) { }
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.bootstrap();
+    // await this.bootstrap();
   }
 
-  async bootstrap(): Promise<void> {
-    const mode = this.resolveScheduleMode();
-    if (mode === 'off') {
-      this.logger.log('SPB submitted auto-schedule is disabled (SPB_SUBMITTED_SCHEDULE_MODE=off)');
-      return;
-    }
+  // async bootstrap(): Promise<void> {
+  //   const mode = this.resolveScheduleMode();
+  //   if (mode === 'off') {
+  //     this.logger.log('SPB submitted auto-schedule is disabled (SPB_SUBMITTED_SCHEDULE_MODE=off)');
+  //     return;
+  //   }
 
-    const cronTime =
-      this.configService.get<string>('SPB_SUBMITTED_CRON')?.trim() ||
-      SCHEDULED_SPB_SUBMITTED_SUBMIT_ALL_CRON;
-    const timezone =
-      this.configService.get<string>('SPB_SUBMITTED_CRON_TIMEZONE')?.trim() ||
-      SCHEDULED_SPB_SUBMITTED_SUBMIT_ALL_TIMEZONE;
+  //   const cronTime =
+  //     this.configService.get<string>('SPB_SUBMITTED_CRON')?.trim() ||
+  //     SCHEDULED_SPB_SUBMITTED_SUBMIT_ALL_CRON;
+  //   const timezone =
+  //     this.configService.get<string>('SPB_SUBMITTED_CRON_TIMEZONE')?.trim() ||
+  //     SCHEDULED_SPB_SUBMITTED_SUBMIT_ALL_TIMEZONE;
 
-    await this.scheduledTaskService.ensureCronJob({
-      name: SCHEDULED_SPB_SUBMITTED_SUBMIT_ALL_JOB_NAME,
-      cronTime,
-      callbackType: SCHEDULED_SPB_SUBMITTED_CALLBACK_TYPE,
-      timezone,
-      persist: mode === 'database',
-    });
+  //   await this.scheduledTaskService.ensureCronJob({
+  //     name: SCHEDULED_SPB_SUBMITTED_SUBMIT_ALL_JOB_NAME,
+  //     cronTime,
+  //     callbackType: SCHEDULED_SPB_SUBMITTED_CALLBACK_TYPE,
+  //     timezone,
+  //     persist: mode === 'database',
+  //   });
 
-    this.logger.log(
-      `SPB submitted schedule ensured mode=${mode} cron="${cronTime}" timezone=${timezone}`,
-    );
-  }
+  //   this.logger.log(
+  //     `SPB submitted schedule ensured mode=${mode} cron="${cronTime}" timezone=${timezone}`,
+  //   );
+  // }
 
   private resolveScheduleMode(): ScheduledSpbSubmittedScheduleMode {
     const raw = this.configService

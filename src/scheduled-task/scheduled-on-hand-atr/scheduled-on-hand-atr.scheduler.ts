@@ -16,38 +16,38 @@ export class ScheduledOnHandAtrScheduler implements OnApplicationBootstrap {
   constructor(
     private readonly configService: ConfigService,
     private readonly scheduledTaskService: ScheduledTaskService,
-  ) {}
+  ) { }
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.bootstrap();
+    // await this.bootstrap();
   }
 
-  async bootstrap(): Promise<void> {
-    const mode = this.resolveScheduleMode();
-    if (mode === 'off') {
-      this.logger.log('On-hand ATR auto-schedule is disabled (ON_HAND_ATR_SCHEDULE_MODE=off)');
-      return;
-    }
+  // async bootstrap(): Promise<void> {
+  //   const mode = this.resolveScheduleMode();
+  //   if (mode === 'off') {
+  //     this.logger.log('On-hand ATR auto-schedule is disabled (ON_HAND_ATR_SCHEDULE_MODE=off)');
+  //     return;
+  //   }
 
-    const cronTime =
-      this.configService.get<string>('ON_HAND_ATR_CRON')?.trim() ||
-      SCHEDULED_ON_HAND_ATR_FETCH_ALL_CRON;
-    const timezone =
-      this.configService.get<string>('ON_HAND_ATR_CRON_TIMEZONE')?.trim() ||
-      SCHEDULED_ON_HAND_ATR_FETCH_ALL_TIMEZONE;
+  //   const cronTime =
+  //     this.configService.get<string>('ON_HAND_ATR_CRON')?.trim() ||
+  //     SCHEDULED_ON_HAND_ATR_FETCH_ALL_CRON;
+  //   const timezone =
+  //     this.configService.get<string>('ON_HAND_ATR_CRON_TIMEZONE')?.trim() ||
+  //     SCHEDULED_ON_HAND_ATR_FETCH_ALL_TIMEZONE;
 
-    await this.scheduledTaskService.ensureCronJob({
-      name: SCHEDULED_ON_HAND_ATR_FETCH_ALL_JOB_NAME,
-      cronTime,
-      callbackType: SCHEDULED_ON_HAND_ATR_CALLBACK_TYPE,
-      timezone,
-      persist: mode === 'database',
-    });
+  //   await this.scheduledTaskService.ensureCronJob({
+  //     name: SCHEDULED_ON_HAND_ATR_FETCH_ALL_JOB_NAME,
+  //     cronTime,
+  //     callbackType: SCHEDULED_ON_HAND_ATR_CALLBACK_TYPE,
+  //     timezone,
+  //     persist: mode === 'database',
+  //   });
 
-    this.logger.log(
-      `On-hand ATR schedule ensured mode=${mode} cron="${cronTime}" timezone=${timezone}`,
-    );
-  }
+  //   this.logger.log(
+  //     `On-hand ATR schedule ensured mode=${mode} cron="${cronTime}" timezone=${timezone}`,
+  //   );
+  // }
 
   private resolveScheduleMode(): ScheduledOnHandAtrScheduleMode {
     const raw = this.configService.get<string>('ON_HAND_ATR_SCHEDULE_MODE')?.trim().toLowerCase();
