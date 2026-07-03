@@ -75,20 +75,20 @@ export class ScheduledTaskController {
     return this.scheduledOnHandAtrService.runFetchNow(payload ?? {});
   }
 
-  @Post('on-hand-atr/bootstrap')
-  @ApiOperation({
-    summary: 'Re-run on-hand ATR schedule bootstrap',
-    description:
-      'Applies ON_HAND_ATR_SCHEDULE_MODE from env (database | memory | off).',
-  })
-  @ApiResponse({ status: 201, description: 'On-hand ATR schedule bootstrap completed.' })
-  async bootstrapOnHandAtrSchedule() {
-    await this.scheduledOnHandAtrScheduler.bootstrap();
-    return {
-      success: true,
-      message: 'On-hand ATR schedule bootstrap completed',
-    };
-  }
+  // @Post('on-hand-atr/bootstrap')
+  // @ApiOperation({
+  //   summary: 'Re-run on-hand ATR schedule bootstrap',
+  //   description:
+  //     'Applies ON_HAND_ATR_SCHEDULE_MODE from env (database | memory | off).',
+  // })
+  // @ApiResponse({ status: 201, description: 'On-hand ATR schedule bootstrap completed.' })
+  // async bootstrapOnHandAtrSchedule() {
+  //   await this.scheduledOnHandAtrScheduler.bootstrap();
+  //   return {
+  //     success: true,
+  //     message: 'On-hand ATR schedule bootstrap completed',
+  //   };
+  // }
 
   @Post('spb-submitted/submit-now')
   @ApiOperation({
@@ -102,36 +102,36 @@ export class ScheduledTaskController {
     return this.scheduledSpbSubmittedService.runSubmitNow(payload ?? {});
   }
 
-  @Post('spb-submitted/bootstrap')
-  @ApiOperation({
-    summary: 'Re-run SPB submitted schedule bootstrap',
-    description:
-      'Applies SPB_SUBMITTED_SCHEDULE_MODE from env (database | memory | off).',
-  })
-  @ApiResponse({ status: 201, description: 'SPB submitted schedule bootstrap completed.' })
-  async bootstrapSpbSubmittedSchedule() {
-    await this.scheduledSpbSubmittedScheduler.bootstrap();
-    return {
-      success: true,
-      message: 'SPB submitted schedule bootstrap completed',
-    };
-  }
+  // @Post('spb-submitted/bootstrap')
+  // @ApiOperation({
+  //   summary: 'Re-run SPB submitted schedule bootstrap',
+  //   description:
+  //     'Applies SPB_SUBMITTED_SCHEDULE_MODE from env (database | memory | off).',
+  // })
+  // @ApiResponse({ status: 201, description: 'SPB submitted schedule bootstrap completed.' })
+  // async bootstrapSpbSubmittedSchedule() {
+  //   await this.scheduledSpbSubmittedScheduler.bootstrap();
+  //   return {
+  //     success: true,
+  //     message: 'SPB submitted schedule bootstrap completed',
+  //   };
+  // }
 
-  @Post('call-plan/bootstrap')
-  @ApiOperation({
-    summary: 'Re-run call plan schedule bootstrap',
-    description:
-      'Applies CALL_PLAN_SCHEDULE_MODE from env (database | memory | off). ' +
-      'Use after changing cron env vars when mode=memory.',
-  })
-  @ApiResponse({ status: 201, description: 'Call plan schedule bootstrap completed.' })
-  async bootstrapCallPlanSchedule() {
-    await this.scheduledCallPlanScheduler.bootstrap();
-    return {
-      success: true,
-      message: 'Call plan schedule bootstrap completed',
-    };
-  }
+  // @Post('call-plan/bootstrap')
+  // @ApiOperation({
+  //   summary: 'Re-run call plan schedule bootstrap',
+  //   description:
+  //     'Applies CALL_PLAN_SCHEDULE_MODE from env (database | memory | off). ' +
+  //     'Use after changing cron env vars when mode=memory.',
+  // })
+  // @ApiResponse({ status: 201, description: 'Call plan schedule bootstrap completed.' })
+  // async bootstrapCallPlanSchedule() {
+  //   await this.scheduledCallPlanScheduler.bootstrap();
+  //   return {
+  //     success: true,
+  //     message: 'Call plan schedule bootstrap completed',
+  //   };
+  // }
 
   @Delete(':name/hard')
   @ApiOperation({ summary: 'Permanently delete a scheduled job' })
