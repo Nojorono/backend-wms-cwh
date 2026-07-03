@@ -31,7 +31,7 @@ export class OutboundSalesController {
   @ApiOperation({
     summary: 'Find Oracle on-hand quantity with attributes for outbound sales',
     description:
-      'Filters by organization_code, subinventory_code, and date (YYYY-MM-DD). ' +
+      'Filters by organization_code, subinventory_code, and saved date (YYYY-MM-DD, WIB). ' +
       `Example: GET /outbound-sales/on-hand?organization_code=JAT&subinventory_code=KECIL&date=${onHandAtrDateNowExample()}`,
   })
   @ApiResponse({ status: 200, description: 'OK', type: [InvOnHandQtyWithAtrItemDto] })

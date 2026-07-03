@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm'; import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
+import { Repository } from 'typeorm';
+import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
+import { INDONESIA_TIMEZONE } from '../core/utils/date-transformer.util';
 import { CreateOnHandAtrDto } from './dto/create-on-hand-atr.dto';
 import { UpdateOnHandAtrDto } from './dto/update-on-hand-atr.dto';
 import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-organization.dto';
-
 const ON_HAND_ATR_RELATIONS = ['organization'] as const;
 
 @Injectable()
@@ -69,23 +70,50 @@ export class OnHandAtrRepository {
         await this.repo.softDelete(id);
     }
 
-    async findByOrganizationIdAndDate(organizationId: string, date: string): Promise<OnHandAtr[]> {
-        return await this.repo
+    async findByOrganizationIdAndDate(
+        organizationId: string,
+        date: string,
+        organizationCode?: string,
+        subinventoryCodes?: string[],
+    ): Promise<OnHandAtr[]> {
+        const normalizedDate = date.trim().split('T')[0];
+        const qb = this.repo
             .createQueryBuilder('onHandAtr')
             .leftJoinAndSelect('onHandAtr.organization', 'organization')
             .where('onHandAtr.organization_id = :organizationId', { organizationId })
-            .andWhere('DATE(onHandAtr.created_at) = :date', { date })
-            .orderBy('onHandAtr.created_at', 'DESC')
-            .getMany();
+            .andWhere(
+                `DATE(onHandAtr.created_at AT TIME ZONE '${INDONESIA_TIMEZONE}') = :savedDate`,
+                { savedDate: normalizedDate },
+            )
+            .andWhere('onHandAtr.deleted_at IS NULL');
+
+        if (organizationCode?.trim()) {
+            qb.andWhere('onHandAtr.organization_code = :organizationCode', {
+                organizationCode: organizationCode.trim(),
+            });
+        }
+
+        if (subinventoryCodes?.length) {
+            qb.andWhere('onHandAtr.subinventory_code IN (:...subinventoryCodes)', {
+                subinventoryCodes,
+            });
+        }
+
+        return await qb.orderBy('onHandAtr.created_at', 'DESC').getMany();
     }
 
     async findByOrganizationIdAndItemCodeAndDate(organizationId: string, itemCode: string, date: string): Promise<OnHandAtr[]> {
+        const normalizedDate = date.trim().split('T')[0];
         return await this.repo
             .createQueryBuilder('onHandAtr')
             .leftJoinAndSelect('onHandAtr.organization', 'organization')
             .where('onHandAtr.organization_id = :organizationId', { organizationId })
             .andWhere('onHandAtr.item_code = :itemCode', { itemCode })
-            .andWhere('DATE(onHandAtr.created_at) = :date', { date })
+            .andWhere(
+                `DATE(onHandAtr.created_at AT TIME ZONE '${INDONESIA_TIMEZONE}') = :savedDate`,
+                { savedDate: normalizedDate },
+            )
+            .andWhere('onHandAtr.deleted_at IS NULL')
             .orderBy('onHandAtr.created_at', 'DESC')
             .getMany();
     }
