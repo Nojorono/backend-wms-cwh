@@ -59,6 +59,7 @@ import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
 import { OutboundSalesModule } from './outbound-sales/outbound-sales.module';
 import { MoveOrderIntegrationModule } from './move-order-integration/move-order-integration.module';
 import { WmsAssistantModule } from './wms-assistant/wms-assistant.module';
+import { WorkScheduledModule } from './work-scheduled/work-scheduled.module';
 import { CommonModule } from './common/common.module';
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { CommonModule } from './common/common.module';
     OutboundSalesModule,
     MoveOrderIntegrationModule,
     WmsAssistantModule,
+    WorkScheduledModule,
   ],
   providers: [
     {
