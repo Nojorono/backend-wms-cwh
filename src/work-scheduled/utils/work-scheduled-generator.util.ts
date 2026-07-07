@@ -29,11 +29,25 @@ export function toDateOnly(date: string): Date {
   return new Date(`${date}T00:00:00.000Z`);
 }
 
-export function formatDateOnly(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
+export function normalizeDateOnly(value: Date | string): Date {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const dateOnly = value.split('T')[0];
+  return new Date(`${dateOnly}T00:00:00.000Z`);
+}
+
+export function formatDateOnly(date: Date | string): string {
+  const normalized = normalizeDateOnly(date);
+  const year = normalized.getUTCFullYear();
+  const month = String(normalized.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(normalized.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function compareDateOnly(left: Date | string, right: Date | string): number {
+  return normalizeDateOnly(left).getTime() - normalizeDateOnly(right).getTime();
 }
 
 export function isWeekendDate(date: Date): boolean {

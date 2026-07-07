@@ -113,7 +113,11 @@ export class WorkScheduledController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List calendar entries with filters' })
+  @ApiOperation({
+    summary: 'List calendar entries with filters',
+    description:
+      'Jika organizationId diisi, hasil = kalender default + override cabang (cabang menimpa tanggal yang sama).',
+  })
   @ApiResponse({ status: 200, type: [WorkScheduled] })
   findAll(@Query() query: WorkScheduledFilterQueryDto): Promise<WorkScheduled[]> {
     return this.workScheduledService.findAll(query);

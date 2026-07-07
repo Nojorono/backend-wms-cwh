@@ -6,6 +6,7 @@ import { CreateWorkScheduledDto } from './dto/create-work-scheduled.dto';
 import { UpdateWorkScheduledDto } from './dto/update-work-scheduled.dto';
 import { WorkScheduledFilterQueryDto } from './dto/work-scheduled-filter-query.dto';
 import { GeneratedWorkScheduledDay } from './utils/work-scheduled-generator.util';
+import { mergeCalendarEntries } from './utils/work-scheduled-merge.util';
 
 export interface WorkScheduledBulkUpsertResult {
   inserted: number;
@@ -35,6 +36,37 @@ export class WorkScheduledRepository {
   }
 
   async findAll(filters: WorkScheduledFilterQueryDto): Promise<WorkScheduled[]> {
+    if (filters.organizationId && filters.defaultOnly !== true) {
+      return this.findResolvedByOrganization(filters);
+    }
+
+    return this.findByFilters(filters);
+  }
+
+  private async findResolvedByOrganization(
+    filters: WorkScheduledFilterQueryDto,
+  ): Promise<WorkScheduled[]> {
+    const { dayType, organizationId } = filters;
+
+    const [defaultEntries, branchEntries] = await Promise.all([
+      this.findByFilters({
+        ...filters,
+        organizationId: undefined,
+        defaultOnly: true,
+        dayType: undefined,
+      }),
+      this.findByFilters({
+        ...filters,
+        organizationId,
+        defaultOnly: false,
+        dayType: undefined,
+      }),
+    ]);
+
+    return mergeCalendarEntries(defaultEntries, branchEntries, dayType);
+  }
+
+  private async findByFilters(filters: WorkScheduledFilterQueryDto): Promise<WorkScheduled[]> {
     const queryBuilder = this.repository
       .createQueryBuilder('workScheduled')
       .leftJoinAndSelect('workScheduled.organization', 'organization')

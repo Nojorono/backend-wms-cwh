@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
-  IsDateString,
+  IsDate,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -21,8 +22,9 @@ export class CreateWorkScheduledDto {
   organizationId?: string;
 
   @ApiProperty({ example: '2026-08-17' })
-  @IsDateString()
+  @IsDate()
   @IsNotEmpty()
+  @Type(() => Date)
   @TransformDate()
   calendarDate: Date;
 
