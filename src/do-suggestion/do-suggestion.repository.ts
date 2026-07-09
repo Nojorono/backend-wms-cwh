@@ -23,6 +23,9 @@ export type DoSuggestionHeaderData = Partial<
     | 'updated_by'
     | 'spb_date'
     | 'spb_number'
+    | 'spb_type'
+    | 'mo_type'
+    | 'preparation_date'
   >
 >;
 
@@ -330,5 +333,11 @@ export class DoSuggestionRepository {
     if (Object.keys(patch).length > 0) {
       await manager.update(DoSuggestionDetail, lineId, patch);
     }
+  }
+
+  async findBySpbNumber(spbNumber: string): Promise<DoSuggestion | null> {
+    return await this.headerRepository.findOne({
+      where: { spb_number: spbNumber },
+    });
   }
 }
