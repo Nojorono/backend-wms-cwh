@@ -26,24 +26,32 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     createUserDto.password = hashedPassword;
 
+    const willCreateUserDetail =
+      createUserDto.employeeId ||
+      createUserDto.email ||
+      createUserDto.phone ||
+      createUserDto.organizationId ||
+      createUserDto.firstName ||
+      createUserDto.lastName ||
+      createUserDto.departementId;
+
+    const resolvedEmployeeId =
+      createUserDto.employeeId?.trim() || `EMP_${createUserDto.username}`;
+
+    if (willCreateUserDetail) {
+      await this.ensureEmployeeIdIsUnique(resolvedEmployeeId);
+    }
+
     try {
       const user = await this.repository.create(createUserDto);
 
-      if (
-        createUserDto.employeeId ||
-        createUserDto.email ||
-        createUserDto.phone ||
-        createUserDto.organizationId ||
-        createUserDto.firstName ||
-        createUserDto.lastName ||
-        createUserDto.departementId
-      ) {
+      if (willCreateUserDetail) {
         const normalizedWarehouseSubId =
           createUserDto.warehouseSubId === null ? undefined : createUserDto.warehouseSubId;
 
         const userDetail = this.userDetailRepository.create({
           userId: user.id,
-          employee_id: createUserDto.employeeId || `EMP_${user.username}`,
+          employee_id: resolvedEmployeeId,
           email: createUserDto.email || `${user.username}@default.com`,
           phone: createUserDto.phone || '0000000000',
           organizationId: createUserDto.organizationId,
@@ -66,6 +74,9 @@ export class UserService {
           // Unique constraint violation
           if (pgError.constraint === 'users_username_key' || pgError.detail?.includes('username')) {
             throw new ConflictException(`User with username ${createUserDto.username} already exists`);
+          }
+          if (pgError.detail?.includes('employee_id')) {
+            throw new ConflictException(`User with employee_id ${resolvedEmployeeId} already exists`);
           }
         }
       }
@@ -145,7 +156,13 @@ export class UserService {
       updateUserDto.departementId !== undefined
     ) {
       const userDetailUpdateData: Partial<UserDetail> = {};
-      if (updateUserDto.employeeId !== undefined) userDetailUpdateData.employee_id = updateUserDto.employeeId;
+      if (updateUserDto.employeeId !== undefined) {
+        const employeeId = updateUserDto.employeeId?.trim();
+        if (employeeId) {
+          await this.ensureEmployeeIdIsUnique(employeeId, user.id);
+        }
+        userDetailUpdateData.employee_id = updateUserDto.employeeId;
+      }
       if (updateUserDto.email !== undefined) userDetailUpdateData.email = updateUserDto.email;
       if (updateUserDto.phone !== undefined) userDetailUpdateData.phone = updateUserDto.phone;
       if (updateUserDto.organizationId !== undefined) userDetailUpdateData.organizationId = updateUserDto.organizationId;
@@ -222,5 +239,32 @@ export class UserService {
     }
 
     await this.repository.hardDelete(id);
+  }
+
+  private async ensureEmployeeIdIsUnique(
+    employeeId: string,
+    excludeUserId?: string,
+  ): Promise<void> {
+    const normalizedEmployeeId = employeeId?.trim();
+    if (!normalizedEmployeeId) {
+      return;
+    }
+
+    const queryBuilder = this.userDetailRepository
+      .createQueryBuilder('userDetail')
+      .where('UPPER(TRIM(userDetail.employee_id)) = UPPER(TRIM(:employeeId))', {
+        employeeId: normalizedEmployeeId,
+      });
+
+    if (excludeUserId) {
+      queryBuilder.andWhere('userDetail.userId <> :excludeUserId', { excludeUserId });
+    }
+
+    const existing = await queryBuilder.getOne();
+    if (existing) {
+      throw new ConflictException(
+        `User with employee_id ${normalizedEmployeeId} already exists`,
+      );
+    }
   }
 }
