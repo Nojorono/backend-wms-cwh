@@ -4,12 +4,15 @@ import { Repository } from 'typeorm';
 import { CreateMasterWarehouseBinDto } from './dto/create-master-warehouse-bin.dto';
 import { UpdateMasterWarehouseBinDto } from './dto/update-master-warehouse-bin.dto';
 import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
+import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
 
 @Injectable()
 export class MasterWarehouseBinRepository {
   constructor(
     @InjectRepository(MasterWarehouseBin)
     private readonly repository: Repository<MasterWarehouseBin>,
+    @InjectRepository(InventoryTracking)
+    private readonly inventoryTrackingRepository: Repository<InventoryTracking>,
   ) { }
 
   async create(
@@ -33,6 +36,18 @@ export class MasterWarehouseBinRepository {
 
   async findByWarehouseSubId(warehouse_sub_id: string): Promise<MasterWarehouseBin[]> {
     return await this.repository.find({ where: { warehouse_sub_id } });
+  }
+
+  async countPalletByBinId(binId: string): Promise<number> {
+    const result = await this.inventoryTrackingRepository
+      .createQueryBuilder('tracking')
+      .select('COUNT(DISTINCT tracking.pallet_id)', 'palletCount')
+      .where('tracking.warehouse_bin_id = :binId', { binId })
+      .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
+      .andWhere('tracking.pallet_id IS NOT NULL')
+      .getRawOne<{ palletCount: string }>();
+
+    return Number(result?.palletCount) || 0;
   }
 
   async countByWarehouseSubId(

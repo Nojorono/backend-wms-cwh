@@ -44,6 +44,15 @@ export class MasterWarehouseBinService {
     return await this.repository.findByWarehouseSubId(warehouse_sub_id);
   }
 
+  async countPalletByBinId(bin_id: string): Promise<number> {
+    if (!bin_id?.trim()) {
+      throw new BadRequestException('bin_id query parameter is required');
+    }
+
+    await this.findOne(bin_id);
+    return await this.repository.countPalletByBinId(bin_id);
+  }
+
   async update(
     id: string,
     updateMasterWarehouseBinDto: UpdateMasterWarehouseBinDto,
