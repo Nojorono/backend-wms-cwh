@@ -16,6 +16,9 @@ export class AssignedHelperRepository {
     return await this.repository.save(entity);
   }
 
+  private readonly userJoinCondition =
+    'helper.helper_user_id IS NOT NULL AND helper.helper_user_id <> \'\' AND "user"."id" = helper.helper_user_id::uuid';
+
   async findAll(): Promise<AssignedHelper[]> {
     return await this.repository
       .createQueryBuilder('helper')
@@ -24,7 +27,7 @@ export class AssignedHelperRepository {
         'helper.user',
         User,
         'user',
-        '"user"."id" = helper.helper_user_id::uuid',
+        this.userJoinCondition,
       )
       .getMany();
   }
@@ -37,7 +40,7 @@ export class AssignedHelperRepository {
         'helper.user',
         User,
         'user',
-        '"user"."id" = helper.helper_user_id::uuid',
+        this.userJoinCondition,
       )
       .where('helper.inbound_id = :inboundId', { inboundId })
       .getMany();

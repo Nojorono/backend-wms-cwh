@@ -158,6 +158,13 @@ export class UserService {
       if (updateUserDto.warehouseSubId !== undefined) {
         userDetailUpdateData.warehouse_sub_id = (normalizedWarehouseSubId ?? null) as any;
       }
+      if (updateUserDto.departementId !== undefined) {
+        userDetailUpdateData.departementId = (
+          updateUserDto.departementId === '' || updateUserDto.departementId === null
+            ? null
+            : updateUserDto.departementId
+        ) as UserDetail['departementId'];
+      }
 
       let userDetail = await this.userDetailRepository.findOne({ where: { userId: user.id } });
       if (!userDetail) {
