@@ -19,6 +19,7 @@ import {
   DoSuggestionCallplanFilterQueryDto,
   DoSuggestionFilterQueryDto,
 } from './dto/do-suggestion-filter-query.dto';
+import { CreateDoDmsDto } from './dto/create-do-dms.dto';
 
 @ApiTags('DO Suggestion')
 @Controller('do-suggestion')
@@ -115,5 +116,12 @@ export class DoSuggestionController {
   @ApiResponse({ status: 200 })
   integrateMoveOrder(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
     return this.doSuggestionService.integrateMoveOrder(id);
+  }
+
+  @Post('dms')
+  @ApiOperation({ summary: 'Create DO suggestion by DMS' })
+  @ApiResponse({ status: 200 })
+  createDoDms(@Body() dto: CreateDoDmsDto): Promise<DoSuggestion> {
+    return this.doSuggestionService.createDoDms(dto);
   }
 }

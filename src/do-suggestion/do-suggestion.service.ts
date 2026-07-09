@@ -14,6 +14,8 @@ import {
   DoSuggestionPersistData,
   DoSuggestionRepository,
 } from './do-suggestion.repository';
+import { CreateDoDmsDto, DoDmsDetailDto } from './dto/create-do-dms.dto';
+import { MasterIO } from '../core/domain/entities/master-io.entity';
 
 @Injectable()
 export class DoSuggestionService {
@@ -23,6 +25,8 @@ export class DoSuggestionService {
     private readonly integrationOnHandAtrService: IntegrationOnHandAtrService,
     @InjectRepository(OnHandAtr)
     private readonly onHandAtrRepository: Repository<OnHandAtr>,
+    @InjectRepository(MasterIO)
+    private readonly masterIORepository: Repository<MasterIO>,
   ) { }
 
   async createOrUpdate(dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
@@ -468,5 +472,82 @@ export class DoSuggestionService {
       .getRawOne<{ organization_code?: string }>();
 
     return row?.organization_code?.trim() || undefined;
+  }
+
+  private async mapDtoToCreateDataDoDms(
+    dto: CreateDoDmsDto,
+  ): Promise<DoSuggestionPersistData> {
+
+    if (!dto.lines?.length) {
+      throw new BadRequestException('At least one line is required');
+    }
+
+    // find organization_id from m_io by organization_code
+    const organization = await this.masterIORepository.findOne({
+      where: {
+        organization_name: dto.organization_code,
+      },
+    });
+
+    if (!organization) {
+      throw new BadRequestException('Organization not found');
+    }
+
+    // find spb_number, this unique
+    const spbNumber = await this.repository.findBySpbNumber(dto.spb_number);
+    if (spbNumber) {
+      throw new BadRequestException('SPB number already exists');
+    }
+
+    // find spb_number, this unique
+
+    const header: DoSuggestionHeaderData = {
+      organization_id: organization.id,
+      callplan_number: dto.callplan_number,
+      callplan_date_start: dto.callplan_date_start ? new Date(dto.callplan_date_start) : undefined,
+      callplan_date_end: dto.callplan_date_end ? new Date(dto.callplan_date_end) : undefined,
+      route_number: dto.route_number,
+      trip_type: dto.trip_type,
+      sales_nik: dto.sales_nik,
+      sales_name: dto.sales_name,
+      sales_spv: dto.sales_spv,
+      sales_spv_nik: dto.sales_spv_nik,
+      status: dto.status,
+      created_by: dto.created_by,
+      updated_by: dto.updated_by,
+      spb_date: dto.spb_date ? new Date(dto.spb_date) : undefined,
+      spb_number: dto.spb_number,
+      spb_type: dto.spb_type,
+      mo_type: dto.mo_type,
+      preparation_date: dto.preparation_date ? new Date(dto.preparation_date) : undefined,
+    };
+
+    delete header.updated_by;
+
+    return {
+      ...header,
+      lines: dto.lines.map((line) => this.mapLineDtoForCreateDoDms(line)),
+    };
+  }
+
+  private mapLineDtoForCreateDoDms(line: DoDmsDetailDto): DoSuggestionDetailData {
+    return {
+      id: undefined,
+      item_code: line.item_code,
+      inventory_item_id: line.inventory_item_id,
+      item_qty_suggestion: line.item_qty_suggestion,
+      item_qty_revision: undefined,
+      item_qty_submitted: undefined,
+      item_qty_final: undefined,
+      contribution_percentage: line.contribution_percentage,
+      item_uom: line.item_uom,
+      line_number: line.line_number,
+    };
+  }
+
+  async createDoDms(dto: CreateDoDmsDto): Promise<DoSuggestion> {
+    const payload = await this.mapDtoToCreateDataDoDms(dto);
+    return await this.repository.create(payload);
+
   }
 }

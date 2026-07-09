@@ -15,6 +15,12 @@ export class DoSuggestion extends BaseEntity {
     @Column({ name: 'organization_id', type: 'uuid', nullable: true })
     organization_id: string;
 
+    @Column({ name: 'spb_type', type: 'bigint', nullable: true })
+    spb_type: number;
+
+    @Column({ name: 'mo_type', type: 'varchar', nullable: true })
+    mo_type: string;
+
     @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
     @JoinColumn({ name: 'organization_id' })
     organization: MasterIO;
@@ -45,6 +51,9 @@ export class DoSuggestion extends BaseEntity {
 
     @Column({ name: 'sales_spv_nik', type: 'varchar', length: 50, nullable: true })
     sales_spv_nik: string;
+
+    @Column({ name: 'preparation_date', type: 'date', nullable: true })
+    preparation_date: Date;
 
     @Column({
         name: 'status',
