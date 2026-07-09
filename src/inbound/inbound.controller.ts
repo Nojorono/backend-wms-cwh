@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, BadRequestException } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -21,6 +21,8 @@ import { AssignedHelper } from '../core/domain/entities/assigned-helper.entity';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
+import { SalesOrderIntegrationService } from './integration/sales-order.integration';
+import { PurchaseOrderIntegrationService } from './integration/purchase-order.integration';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem } from '../core/domain/entities/inbound-item.entity';
 import { OrganizationId } from 'src/core/decorators/organization-id.decorator';
@@ -34,6 +36,8 @@ export class InboundController {
   constructor(
     private readonly service: InboundService,
     private readonly doValidationIntegrationService: DoValidationIntegrationService,
+    private readonly salesOrderIntegrationService: SalesOrderIntegrationService,
+    private readonly purchaseOrderIntegrationService: PurchaseOrderIntegrationService,
   ) { }
 
   @Post()
@@ -95,6 +99,44 @@ export class InboundController {
   @ApiResponse({ status: 200, type: [Inbound] })
   findAllInspection(@Query('status') status: string) {
     return this.service.findAllTransactionScanInbound(status);
+  }
+
+  @Get('sales-order')
+  @ApiOperation({ summary: 'Find sales order by order number' })
+  @ApiQuery({
+    name: 'orderNumber',
+    required: true,
+    type: String,
+    description: 'Sales order number',
+    example: 'SO-2026-00100',
+  })
+  @ApiResponse({ status: 200, description: 'Sales order data from meta service' })
+  findSalesOrder(@Query('orderNumber') orderNumber: string) {
+    const trimmedOrderNumber = orderNumber?.trim();
+    if (!trimmedOrderNumber) {
+      throw new BadRequestException('orderNumber is required');
+    }
+
+    return this.salesOrderIntegrationService.findByOrderNumber(trimmedOrderNumber);
+  }
+
+  @Get('purchase-order')
+  @ApiOperation({ summary: 'Find purchase order by nomor PO' })
+  @ApiQuery({
+    name: 'nomorPO',
+    required: true,
+    type: String,
+    description: 'Purchase order number (same as inbound_do.inbound_po_number)',
+    example: 'PO-2026-00100',
+  })
+  @ApiResponse({ status: 200, description: 'Purchase order data from meta service' })
+  findPurchaseOrder(@Query('nomorPO') nomorPO: string) {
+    const trimmedNomorPO = nomorPO?.trim();
+    if (!trimmedNomorPO) {
+      throw new BadRequestException('nomorPO is required');
+    }
+
+    return this.purchaseOrderIntegrationService.findByOrderNumber(trimmedNomorPO);
   }
 
   @Get(':id')
