@@ -9,7 +9,7 @@ import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MasterWarehouseBin]), MasterPalletModule],
+  imports: [TypeOrmModule.forFeature([MasterWarehouseBin, MasterWarehouseSub]), MasterPalletModule],
   controllers: [MasterWarehouseBinController],
   providers: [MasterWarehouseBinService, MasterWarehouseBinRepository, S3Service, BarcodeService],
   exports: [MasterWarehouseBinService],

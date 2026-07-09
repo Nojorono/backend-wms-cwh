@@ -35,6 +35,21 @@ export class MasterWarehouseBinRepository {
     return await this.repository.find({ where: { warehouse_sub_id } });
   }
 
+  async countByWarehouseSubId(
+    warehouseSubId: string,
+    excludeBinId?: string,
+  ): Promise<number> {
+    const queryBuilder = this.repository
+      .createQueryBuilder('bin')
+      .where('bin.warehouse_sub_id = :warehouseSubId', { warehouseSubId });
+
+    if (excludeBinId) {
+      queryBuilder.andWhere('bin.id <> :excludeBinId', { excludeBinId });
+    }
+
+    return queryBuilder.getCount();
+  }
+
   async update(
     id: string,
     updateMasterWarehouseBinDto: UpdateMasterWarehouseBinDto,
