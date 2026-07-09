@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MasterWarehouseBinService } from './master-warehouse-bin.service';
 import { CreateMasterWarehouseBinDto } from './dto/create-master-warehouse-bin.dto';
 import { UpdateMasterWarehouseBinDto } from './dto/update-master-warehouse-bin.dto';
@@ -37,16 +37,16 @@ export class MasterWarehouseBinController {
     return this.masterWarehouseBinService.findAll();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a Warehouse Bin by id' })
+  @Get('count-pallet')
+  @ApiOperation({ summary: 'Count current pallet by bin ID' })
+  @ApiQuery({ name: 'bin_id', required: true, type: String, description: 'Warehouse bin ID' })
   @ApiResponse({
     status: 200,
-    description: 'Return the Warehouse Bin.',
-    type: MasterWarehouseBin,
+    description: 'Return the number of current pallet by bin ID.',
+    type: Number,
   })
-  @ApiResponse({ status: 404, description: 'Warehouse Bin not found.' })
-  findOne(@Param('id') id: string) {
-    return this.masterWarehouseBinService.findOne(id);
+  countPalletByBinId(@Query('bin_id') bin_id: string) {
+    return this.masterWarehouseBinService.countPalletByBinId(bin_id);
   }
 
   @Get('warehouse-sub/:warehouse_sub_id')
@@ -59,6 +59,18 @@ export class MasterWarehouseBinController {
   @ApiResponse({ status: 404, description: 'Warehouse Bin not found.' })
   findByWarehouseSubId(@Param('warehouse_sub_id') warehouse_sub_id: string) {
     return this.masterWarehouseBinService.findByWarehouseSubId(warehouse_sub_id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a Warehouse Bin by id' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return the Warehouse Bin.',
+    type: MasterWarehouseBin,
+  })
+  @ApiResponse({ status: 404, description: 'Warehouse Bin not found.' })
+  findOne(@Param('id') id: string) {
+    return this.masterWarehouseBinService.findOne(id);
   }
 
   @Patch(':id')
@@ -85,5 +97,4 @@ export class MasterWarehouseBinController {
   remove(@Param('id') id: string) {
     return this.masterWarehouseBinService.remove(id);
   }
-
 }

@@ -876,6 +876,9 @@ export class PickingSuggestionService {
       }
     }
 
+    const binPalletUsage = await this.loadBinPalletUsageByOrganization(organizationId);
+    const binPendingAssignments = new Map<string, number>();
+
     const availableBins = await this.masterWarehouseBinRepository
       .createQueryBuilder('bin')
       .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
@@ -912,7 +915,6 @@ export class PickingSuggestionService {
       palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
     }> = [];
 
-    const usedBinIds = new Set<string>();
     const usedZoneIds = new Set<string>();
 
     for (const stagingPallet of stagingPallets) {
@@ -933,7 +935,15 @@ export class PickingSuggestionService {
         return suggestionGroupKey === groupKey;
       });
 
-      if (existingSuggestion) {
+      if (
+        existingSuggestion?.suggestedBin &&
+        this.canAssignPalletToBin(
+          existingSuggestion.suggestedBin,
+          binPalletUsage,
+          binPendingAssignments,
+        )
+      ) {
+        this.reserveBinPalletSlot(existingSuggestion.suggestedBin, binPendingAssignments);
         palletSuggestions.push({
           stagingPallet,
           suggestedBin: existingSuggestion.suggestedBin,
@@ -987,7 +997,11 @@ export class PickingSuggestionService {
       let suggestedZone: MasterWarehouseSub | undefined;
 
       if (matchingBinsForSameItem.length > 0) {
-        suggestedBin = matchingBinsForSameItem.find((bin) => !usedBinIds.has(bin.id));
+        suggestedBin = this.findFirstBinWithCapacity(
+          matchingBinsForSameItem,
+          binPalletUsage,
+          binPendingAssignments,
+        );
         if (suggestedBin) {
           suggestedZone = availableZones.find(
             (zone) => zone.id === suggestedBin?.warehouse_sub_id,
@@ -1016,7 +1030,11 @@ export class PickingSuggestionService {
           .limit(5)
           .getMany();
 
-        suggestedBin = emptyBins.find((bin) => !usedBinIds.has(bin.id));
+        suggestedBin = this.findFirstBinWithCapacity(
+          emptyBins,
+          binPalletUsage,
+          binPendingAssignments,
+        );
         if (suggestedBin) {
           suggestedZone = availableZones.find(
             (zone) => zone.id === suggestedBin?.warehouse_sub_id,
@@ -1025,7 +1043,11 @@ export class PickingSuggestionService {
       }
 
       if (!suggestedBin) {
-        suggestedBin = availableBins.find((bin) => !usedBinIds.has(bin.id));
+        suggestedBin = this.findFirstBinWithCapacity(
+          availableBins,
+          binPalletUsage,
+          binPendingAssignments,
+        );
         if (suggestedBin) {
           suggestedZone = availableZones.find(
             (zone) => zone.id === suggestedBin?.warehouse_sub_id,
@@ -1041,7 +1063,7 @@ export class PickingSuggestionService {
 
       // Final fallback: Get any regular warehouse bin/zone if still not found
       if (!suggestedBin) {
-        const anyBin = await this.masterWarehouseBinRepository
+        const fallbackBins = await this.masterWarehouseBinRepository
           .createQueryBuilder('bin')
           .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
           .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
@@ -1049,13 +1071,17 @@ export class PickingSuggestionService {
           .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('bin.capacity_pallet > 0')
           .orderBy('bin.capacity_pallet', 'DESC')
-          .limit(1)
-          .getOne();
+          .limit(10)
+          .getMany();
 
-        if (anyBin) {
-          suggestedBin = anyBin;
+        suggestedBin = this.findFirstBinWithCapacity(
+          fallbackBins,
+          binPalletUsage,
+          binPendingAssignments,
+        );
+        if (suggestedBin) {
           suggestedZone = availableZones.find(
-            (zone) => zone.id === anyBin.warehouse_sub_id,
+            (zone) => zone.id === suggestedBin?.warehouse_sub_id,
           ) as MasterWarehouseSub;
         }
       }
@@ -1087,22 +1113,27 @@ export class PickingSuggestionService {
           suggestedZone = anyZone;
           // Try to find a bin in this zone
           if (!suggestedBin) {
-            const binInZone = await this.masterWarehouseBinRepository
+            const binsInZone = await this.masterWarehouseBinRepository
               .createQueryBuilder('bin')
               .where('bin.warehouse_sub_id = :zoneId', { zoneId: anyZone.id })
               .andWhere('bin.capacity_pallet > 0')
               .orderBy('bin.capacity_pallet', 'DESC')
-              .limit(1)
-              .getOne();
+              .limit(10)
+              .getMany();
 
-            if (binInZone) {
-              suggestedBin = binInZone;
-            }
+            suggestedBin = this.findFirstBinWithCapacity(
+              binsInZone,
+              binPalletUsage,
+              binPendingAssignments,
+            );
           }
         }
       }
 
-      // Always add pallet to suggestions, even if bin/zone suggestions are not available
+      if (suggestedBin) {
+        this.reserveBinPalletSlot(suggestedBin, binPendingAssignments);
+      }
+
       palletSuggestions.push({
         stagingPallet,
         suggestedBin: suggestedBin || null,
@@ -1110,14 +1141,67 @@ export class PickingSuggestionService {
         palletItems,
       });
 
-      // Only mark as used if both bin and zone are found
-      if (suggestedBin && suggestedZone) {
-        usedBinIds.add(suggestedBin.id);
+      if (suggestedZone) {
         usedZoneIds.add(suggestedZone.id);
       }
     }
 
     return { palletSuggestions };
+  }
+
+  private async loadBinPalletUsageByOrganization(
+    organizationId: string,
+  ): Promise<Map<string, number>> {
+    const rows = await this.inventoryTrackingRepository
+      .createQueryBuilder('tracking')
+      .innerJoin('tracking.warehouseBin', 'bin')
+      .innerJoin('bin.warehouseSub', 'warehouseSub')
+      .innerJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
+      .select('tracking.warehouse_bin_id', 'binId')
+      .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'palletCount')
+      .where('warehouse.organization_id::uuid = :organizationId', { organizationId })
+      .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
+      .andWhere('tracking.warehouse_bin_id IS NOT NULL')
+      .groupBy('tracking.warehouse_bin_id')
+      .getRawMany<{ binId: string; palletCount: string }>();
+
+    return new Map(rows.map((row) => [row.binId, Number(row.palletCount) || 0]));
+  }
+
+  private canAssignPalletToBin(
+    bin: MasterWarehouseBin | null | undefined,
+    binPalletUsage: Map<string, number>,
+    binPendingAssignments: Map<string, number>,
+  ): boolean {
+    if (!bin?.id) {
+      return false;
+    }
+
+    const capacity = bin.capacity_pallet;
+    if (capacity == null || capacity <= 0) {
+      return false;
+    }
+
+    const dbCount = binPalletUsage.get(bin.id) ?? 0;
+    const pendingCount = binPendingAssignments.get(bin.id) ?? 0;
+    return dbCount + pendingCount < capacity;
+  }
+
+  private reserveBinPalletSlot(
+    bin: MasterWarehouseBin,
+    binPendingAssignments: Map<string, number>,
+  ): void {
+    binPendingAssignments.set(bin.id, (binPendingAssignments.get(bin.id) ?? 0) + 1);
+  }
+
+  private findFirstBinWithCapacity(
+    bins: MasterWarehouseBin[],
+    binPalletUsage: Map<string, number>,
+    binPendingAssignments: Map<string, number>,
+  ): MasterWarehouseBin | undefined {
+    return bins.find((bin) =>
+      this.canAssignPalletToBin(bin, binPalletUsage, binPendingAssignments),
+    );
   }
 }
 
