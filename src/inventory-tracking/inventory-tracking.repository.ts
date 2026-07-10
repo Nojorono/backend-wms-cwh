@@ -206,16 +206,15 @@ export class InventoryTrackingRepository {
       .leftJoinAndSelect('inventory.pallet', 'pallet')
       .leftJoinAndSelect('inventory.warehouse', 'warehouse')
       .leftJoinAndSelect('inventory.warehouseSub', 'warehouseSub')
-      .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin');
-
-    qb.andWhere('inventory.organization_id = :organizationId::uuid', { organizationId });
+      .leftJoinAndSelect('inventory.warehouseBin', 'warehouseBin')
+      .where('warehouse.organization_id = :organizationId::uuid', { organizationId });
 
     if (warehouse_sub_id) {
-      qb.andWhere('warehouseSub.id = :warehouse_sub_id', { warehouse_sub_id });
+      qb.andWhere('inventory.warehouse_sub_id = :warehouse_sub_id', { warehouse_sub_id });
     }
 
     if (warehouse_bin_id) {
-      qb.andWhere('warehouseBin.id = :warehouse_bin_id', { warehouse_bin_id });
+      qb.andWhere('inventory.warehouse_bin_id = :warehouse_bin_id', { warehouse_bin_id });
     }
 
     return await qb.getMany();

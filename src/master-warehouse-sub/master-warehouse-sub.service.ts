@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MasterWarehouseSubRepository } from './master-warehouse-sub.repository';
+import {
+  MasterWarehouseSubRepository,
+  WarehouseSubWithBinsAndPalletCount,
+  WarehouseSubWithBinsFilters,
+} from './master-warehouse-sub.repository';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
 import {
@@ -76,5 +80,12 @@ export class MasterWarehouseSubService {
     is_gate?: boolean,
   ): Promise<MasterWarehouseSub[]> {
     return await this.repository.findByFilters(organizationId, is_staging, is_gate);
+  }
+
+  async findAllWithBinsAndPalletCount(
+    organizationId: string,
+    filters: WarehouseSubWithBinsFilters = {},
+  ): Promise<WarehouseSubWithBinsAndPalletCount[]> {
+    return await this.repository.findAllWithBinsAndPalletCount(organizationId, filters);
   }
 }

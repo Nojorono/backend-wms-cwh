@@ -7,7 +7,6 @@ import {
   Patch,
   Param,
   Delete,
-  ParseIntPipe,
   Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
@@ -93,16 +92,44 @@ export class MasterWarehouseSubController {
     }
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a Warehouse Sub by id' })
+  @Get('with-bins')
+  @ApiOperation({
+    summary: 'Get all warehouse subs with bins and current pallet count per bin',
+  })
+  @ApiQuery({
+    name: 'is_staging',
+    required: false,
+    description: 'Use null to filter warehouse subs without staging type',
+    enum: [...Object.values(WarehouseSubStagingType), 'null'],
+  })
+  @ApiQuery({ name: 'is_good_stock', required: false, type: Boolean })
+  @ApiQuery({ name: 'is_gate', required: false, type: Boolean })
   @ApiResponse({
     status: 200,
-    description: 'Return the Warehouse Sub.',
-    type: MasterWarehouseSub,
+    description: 'Return warehouse subs populated with bins and pallet counts.',
   })
-  @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findOne(@Param('id') id: string) {
-    return this.masterWarehouseSubService.findOne(id);
+  findAllWithBinsAndPalletCount(
+    @OrganizationId() organizationId?: string,
+    @Query('is_staging') is_staging?: string,
+    @Query('is_good_stock') is_good_stock?: string,
+    @Query('is_gate') is_gate?: string,
+  ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
+    const filters = {
+      is_staging:
+        is_staging === 'null'
+          ? null
+          : is_staging
+            ? (is_staging as WarehouseSubStagingType)
+            : undefined,
+      is_good_stock: is_good_stock !== undefined ? is_good_stock === 'true' : undefined,
+      is_gate: is_gate !== undefined ? is_gate === 'true' : undefined,
+    };
+
+    return this.masterWarehouseSubService.findAllWithBinsAndPalletCount(organizationId, filters);
   }
 
   @Get('warehouse/:warehouse_id')
@@ -115,6 +142,18 @@ export class MasterWarehouseSubController {
   @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
   findByWarehouseId(@Param('warehouse_id') warehouse_id: string) {
     return this.masterWarehouseSubService.findByWarehouseId(warehouse_id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a Warehouse Sub by id' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return the Warehouse Sub.',
+    type: MasterWarehouseSub,
+  })
+  @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
+  findOne(@Param('id') id: string) {
+    return this.masterWarehouseSubService.findOne(id);
   }
 
   @Patch(':id')
