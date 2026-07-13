@@ -6,6 +6,7 @@ import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
 import { MoveOrderIntegrationModule } from '../move-order-integration/move-order-integration.module';
 import { OutboundSalesModule } from '../outbound-sales/outbound-sales.module';
+import { AuthModule } from '../infrastructure/modules/auth.module';
 import { DoSuggestionController } from './do-suggestion.controller';
 import { DoSuggestionRepository } from './do-suggestion.repository';
 import { DoSuggestionService } from './do-suggestion.service';
@@ -13,6 +14,7 @@ import { DoSuggestionService } from './do-suggestion.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([DoSuggestion, DoSuggestionDetail, OnHandAtr, MasterIO]),
+    AuthModule,
     MoveOrderIntegrationModule,
     forwardRef(() => OutboundSalesModule),
   ],

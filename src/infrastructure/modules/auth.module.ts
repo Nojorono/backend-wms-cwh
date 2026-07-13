@@ -4,6 +4,8 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from '../strategies/jwt.strategy';
 import { AuthService } from '../services/auth.service';
+import { DmsIntegrationAuthService } from '../services/dms-integration-auth.service';
+import { DmsIntegrationAuthGuard } from '../guards/dms-integration-auth.guard';
 import { AuthController } from 'src/presentation/controllers/auth.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../../core/domain/entities/user.entity';
@@ -29,6 +31,8 @@ import { Permission } from 'src/core/domain/entities/permission.entity';
   controllers: [AuthController],
   providers: [
     AuthService,
+    DmsIntegrationAuthService,
+    DmsIntegrationAuthGuard,
     JwtStrategy,
     {
       provide: 'IUserRepository',
@@ -39,6 +43,6 @@ import { Permission } from 'src/core/domain/entities/permission.entity';
       useClass: PermissionRepository,
     },
   ],
-  exports: [AuthService, JwtStrategy, PassportModule],
+  exports: [AuthService, DmsIntegrationAuthService, DmsIntegrationAuthGuard, JwtStrategy, PassportModule],
 })
 export class AuthModule {}

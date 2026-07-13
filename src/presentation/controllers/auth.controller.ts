@@ -3,7 +3,12 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from '../../infrastructure/services/auth.service';
 import { LoginDto } from '../../core/application/dtos/auth/login.dto';
 import { RefreshTokenDto } from '../../core/application/dtos/auth/refresh-token.dto';
+import {
+  DmsIntegrationTokenRequestDto,
+  DmsIntegrationTokenResponseDto,
+} from '../../core/application/dtos/auth/dms-integration-token.dto';
 import { Public } from '../../core/decorators/public.decorator';
+import { DmsIntegrationAuthService } from '../../infrastructure/services/dms-integration-auth.service';
 import { IPermissionRepository } from 'src/core/domain/interfaces/permission.repository.interface';
 
 @ApiTags('Authentication')
@@ -11,6 +16,7 @@ import { IPermissionRepository } from 'src/core/domain/interfaces/permission.rep
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly dmsIntegrationAuthService: DmsIntegrationAuthService,
     @Inject('IPermissionRepository')
     private readonly permissionRepository: IPermissionRepository,
   ) {}
@@ -49,5 +55,20 @@ export class AuthController {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
+  }
+
+  @Public()
+  @Post('dms/token')
+  @ApiOperation({
+    summary: 'Issue DMS integration bearer token',
+    description:
+      'Exchange app_id and app_secret from environment for a short-lived bearer token used by POST /do-suggestion/dms.',
+  })
+  @ApiResponse({ status: 200, type: DmsIntegrationTokenResponseDto })
+  @ApiResponse({ status: 401, description: 'Invalid DMS integration credentials' })
+  issueDmsIntegrationToken(
+    @Body() dto: DmsIntegrationTokenRequestDto,
+  ): DmsIntegrationTokenResponseDto {
+    return this.dmsIntegrationAuthService.issueToken(dto.app_id, dto.app_secret);
   }
 }
