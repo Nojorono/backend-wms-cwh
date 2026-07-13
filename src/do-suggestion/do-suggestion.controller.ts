@@ -20,6 +20,7 @@ import {
   DoSuggestionFilterQueryDto,
 } from './dto/do-suggestion-filter-query.dto';
 import { CreateDoDmsDto } from './dto/create-do-dms.dto';
+import { DmsIntegrationAuth } from '../core/decorators/dms-integration-auth.decorator';
 
 @ApiTags('DO Suggestion')
 @Controller('do-suggestion')
@@ -119,8 +120,15 @@ export class DoSuggestionController {
   }
 
   @Post('dms')
-  @ApiOperation({ summary: 'Create DO suggestion by DMS' })
+  @DmsIntegrationAuth()
+  @ApiOperation({
+    summary: 'Create DO suggestion by DMS',
+    description:
+      'Auth option 1 (recommended): send headers `x-dms-app-id` and `x-dms-app-secret` from environment. ' +
+      'Auth option 2: send `Authorization: Bearer <token>` from POST /auth/dms/token.',
+  })
   @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 401, description: 'Invalid DMS integration credentials or token' })
   createDoDms(@Body() dto: CreateDoDmsDto): Promise<DoSuggestion> {
     return this.doSuggestionService.createDoDms(dto);
   }

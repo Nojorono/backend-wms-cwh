@@ -101,6 +101,17 @@ async function bootstrap(): Promise<void> {
       },
       'JWT-auth',
     )
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'DMS Integration',
+        description: 'Optional DMS integration bearer token from POST /auth/dms/token. Alternatively use x-dms-app-id and x-dms-app-secret headers.',
+        in: 'header',
+      },
+      'DMS-auth',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
