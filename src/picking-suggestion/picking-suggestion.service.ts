@@ -294,7 +294,7 @@ export class PickingSuggestionService {
         organizationId,
       );
     } catch (error) {
-      console.warn('searchInventoryWithPalletHistory failed:', error.message);
+      console.warn('searchInventoryWithPalletHistory failed:', (error as Error).message);
       return [];
     }
   }
@@ -308,7 +308,7 @@ export class PickingSuggestionService {
         await this.repository.debugInventoryWithJoins();
       }
     } catch (error) {
-      console.warn('debugInventorySearch failed:', error.message);
+      console.warn('debugInventorySearch failed:', (error as Error).message);
     }
   }
 
@@ -571,20 +571,30 @@ export class PickingSuggestionService {
     }
   }
 
+  private getInventoryGroupKey(inv: any): string {
+    const subId = inv.warehouse_sub_id || 'none';
+    const binId = inv.warehouse_bin_id || 'none';
+    const weekNumber = inv.week_number ?? 'null';
+    const productionDate = inv.production_date
+      ? new Date(inv.production_date).toISOString()
+      : 'null';
+
+    return `${subId}_${binId}_${weekNumber}_${productionDate}`;
+  }
+
   private getAllAvailableInventory(
     availableInventory: any[],
     requiredQuantity: number,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
   ): PickingSuggestionLocationDto[] {
-    // Group by unique physical bin (warehouse_sub_id + warehouse_bin_id).
-    // All pallets in the same bin are merged into ONE entry regardless of week_number.
-    const binGroups = new Map<string, any>();
+    // Group by physical location + week/production batch so different weeks are not merged.
+    const locationGroups = new Map<string, any>();
 
     for (const inv of availableInventory) {
-      const binKey = inv.warehouse_bin_id || `sub_${inv.warehouse_sub_id}`;
+      const groupKey = this.getInventoryGroupKey(inv);
 
-      if (!binGroups.has(binKey)) {
-        binGroups.set(binKey, {
+      if (!locationGroups.has(groupKey)) {
+        locationGroups.set(groupKey, {
           warehouse_name: inv.warehouse_name,
           warehouse_sub_name: inv.warehouse_sub_name,
           warehouse_sub_code: inv.warehouse_sub_code,
@@ -596,100 +606,81 @@ export class PickingSuggestionService {
           location_type: inv.location_type,
           location_priority: inv.location_priority,
           place: this.getLocationPlace(inv),
+          week_number: inv.week_number ?? 0,
+          production_date: inv.production_date,
           total_quantity: 0,
+          net_available: 0,
           items: [],
-          // track min/max week for FIFO/LIFO ordering of bins relative to each other
-          min_week_number: inv.week_number ?? 0,
-          max_week_number: inv.week_number ?? 0,
-          earliest_production_date: inv.production_date,
-          latest_production_date: inv.production_date,
         });
       }
 
-      const group = binGroups.get(binKey)!;
-      group.total_quantity += parseFloat(inv.quantity || 0);
-      group.items.push(inv);
+      const group = locationGroups.get(groupKey)!;
+      const quantity = parseFloat(inv.quantity || 0);
+      const availableQuantity = parseFloat(inv.available_quantity ?? inv.quantity ?? 0);
 
-      const wn = inv.week_number ?? 0;
-      if (wn < group.min_week_number) group.min_week_number = wn;
-      if (wn > group.max_week_number) group.max_week_number = wn;
-      const pd = inv.production_date ? new Date(inv.production_date).getTime() : 0;
-      const epd = group.earliest_production_date ? new Date(group.earliest_production_date).getTime() : 0;
-      const lpd = group.latest_production_date ? new Date(group.latest_production_date).getTime() : 0;
-      if (pd && pd < epd) group.earliest_production_date = inv.production_date;
-      if (pd && pd > lpd) group.latest_production_date = inv.production_date;
+      group.total_quantity += quantity;
+      group.net_available += Math.max(0, availableQuantity);
+      group.items.push(inv);
     }
 
-    // Sort bins by location_priority, then FIFO/LIFO week ordering
-    const sortedBins = Array.from(binGroups.values()).sort((a, b) => {
+    const sortedGroups = Array.from(locationGroups.values()).sort((a, b) => {
       if (a.location_priority !== b.location_priority) {
         return a.location_priority - b.location_priority;
       }
-      const weekA = sortMethod === 'FIFO' ? a.min_week_number : a.max_week_number;
-      const weekB = sortMethod === 'FIFO' ? b.min_week_number : b.max_week_number;
-      if (weekA !== weekB) {
-        return sortMethod === 'LIFO' ? weekB - weekA : weekA - weekB;
-      }
-      const pdA = sortMethod === 'FIFO'
-        ? (a.earliest_production_date ? new Date(a.earliest_production_date).getTime() : 0)
-        : (a.latest_production_date ? new Date(a.latest_production_date).getTime() : 0);
-      const pdB = sortMethod === 'FIFO'
-        ? (b.earliest_production_date ? new Date(b.earliest_production_date).getTime() : 0)
-        : (b.latest_production_date ? new Date(b.latest_production_date).getTime() : 0);
-      if (pdA !== pdB) {
-        return sortMethod === 'LIFO' ? pdB - pdA : pdA - pdB;
-      }
-      return b.total_quantity - a.total_quantity;
-    });
 
-    // Per-bin net available from SQL (location_net_available = full bin READY total - reserved)
-    const binNetAvailable = new Map<string, { reserved: number; netAvailable: number }>();
-    for (const bin of sortedBins) {
-      const firstItem = bin.items[0];
-      binNetAvailable.set(bin.bin_id === 'N/A' ? `sub_${bin.warehouse_sub_id}` : bin.bin_id, {
-        reserved: parseFloat(firstItem?.reserved_quantity || 0),
-        netAvailable: Math.max(0, parseFloat(firstItem?.location_net_available || 0)),
-      });
-    }
+      if (a.week_number !== b.week_number) {
+        return sortMethod === 'LIFO'
+          ? b.week_number - a.week_number
+          : a.week_number - b.week_number;
+      }
+
+      const productionDateA = a.production_date ? new Date(a.production_date).getTime() : 0;
+      const productionDateB = b.production_date ? new Date(b.production_date).getTime() : 0;
+      if (productionDateA !== productionDateB) {
+        return sortMethod === 'LIFO'
+          ? productionDateB - productionDateA
+          : productionDateA - productionDateB;
+      }
+
+      return b.net_available - a.net_available;
+    });
 
     const showAll = requiredQuantity <= 0;
     const allSuggestions: any[] = [];
     let remainingQuantity = requiredQuantity;
 
-    for (const bin of sortedBins) {
+    for (const group of sortedGroups) {
       if (!showAll && remainingQuantity <= 0) break;
 
-      const netKey = bin.bin_id === 'N/A' ? `sub_${bin.warehouse_sub_id}` : bin.bin_id;
-      const { reserved, netAvailable } = binNetAvailable.get(netKey) ?? { reserved: 0, netAvailable: 0 };
-
+      const netAvailable = Math.max(0, group.net_available);
       const quantityToTake = showAll
         ? netAvailable
         : Math.min(netAvailable, remainingQuantity);
 
       if (quantityToTake <= 0) continue;
 
-      const representativeItem = bin.items[0];
+      const representativeItem = group.items[0];
 
       allSuggestions.push({
-        total_quantity: bin.total_quantity,
-        reserved_quantity: reserved,
+        total_quantity: group.total_quantity,
+        reserved_quantity: Math.max(0, group.total_quantity - netAvailable),
         available_quantity: netAvailable,
         quantity_ready_to_pick: quantityToTake,
         uom: representativeItem.uom || 'N/A',
-        warehouse_name: bin.warehouse_name,
-        warehouse_sub_name: bin.warehouse_sub_name,
-        warehouse_sub_code: bin.warehouse_sub_code,
-        warehouse_sub_id: bin.warehouse_sub_id,
-        warehouse_bin_id: bin.bin_id !== 'N/A' ? bin.bin_id : null,
-        bin_id: bin.bin_id,
-        bin_name: bin.bin_name,
-        bin_code: bin.bin_code,
-        search_level: bin.search_level,
-        location_type: bin.location_type,
-        location_priority: bin.location_priority,
-        week_number: sortMethod === 'FIFO' ? bin.min_week_number : bin.max_week_number,
-        production_date: sortMethod === 'FIFO' ? bin.earliest_production_date : bin.latest_production_date,
-        place: bin.place,
+        warehouse_name: group.warehouse_name,
+        warehouse_sub_name: group.warehouse_sub_name,
+        warehouse_sub_code: group.warehouse_sub_code,
+        warehouse_sub_id: group.warehouse_sub_id,
+        warehouse_bin_id: group.bin_id !== 'N/A' ? group.bin_id : null,
+        bin_id: group.bin_id,
+        bin_name: group.bin_name,
+        bin_code: group.bin_code,
+        search_level: group.search_level,
+        location_type: group.location_type,
+        location_priority: group.location_priority,
+        week_number: group.week_number,
+        production_date: group.production_date,
+        place: group.place,
       });
 
       remainingQuantity -= quantityToTake;
@@ -872,7 +863,7 @@ export class PickingSuggestionService {
         }));
         allPalletItems.push(...itemsWithPalletId);
       } catch (error) {
-        console.warn(`Failed to fetch items for pallet ${palletId}:`, error.message);
+        console.warn(`Failed to fetch items for pallet ${palletId}:`, (error as Error).message);
       }
     }
 
