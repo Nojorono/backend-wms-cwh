@@ -337,7 +337,6 @@ export class PickingSuggestionRepository {
 
     const params = organizationId ? [itemId, uom ?? null, organizationId] : [itemId, uom ?? null];
     const result = await this.inventoryTrackingRepository.query(query, params);
-    console.log('result', result);
     return result;
   }
 

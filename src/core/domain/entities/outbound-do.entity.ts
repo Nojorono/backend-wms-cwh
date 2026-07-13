@@ -106,4 +106,7 @@ export class OutboundDo extends BaseEntity {
     inverseJoinColumn: { name: 'outbound_memo_id', referencedColumnName: 'id' },
   })
   outbound_memos: OutboundMemo[];
+
+  @Column({ nullable: true })
+  subdist_document: string;
 }

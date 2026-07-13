@@ -29,6 +29,11 @@ export class CreateOutboundDoDto {
   @IsUUID(4, { message: 'organization_id must be a valid UUID' })
   organization_id?: string;
 
+  @ApiPropertyOptional({ example: 'document.pdf' })
+  @IsOptional()
+  @IsString()
+  subdist_document?: string;
+
   @ApiPropertyOptional({ example: 'DO-2025-001', description: 'Auto-generated if not provided' })
   @IsOptional()
   @IsString()
