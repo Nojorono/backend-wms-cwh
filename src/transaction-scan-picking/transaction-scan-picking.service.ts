@@ -23,7 +23,7 @@ export class TransactionScanPickingService {
     private readonly masterWarehouseBinService: MasterWarehouseBinService,
     private readonly outboundMemoService: OutboundMemoService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async create(data: CreateTransactionScanPickingDto): Promise<ScanPickingTransaction> {
     // Wrap entire operation in a database transaction for automatic rollback on error
@@ -32,7 +32,7 @@ export class TransactionScanPickingService {
         // Get transaction picking to retrieve item details
         const transactionPicking = await this.transactionPickingService.findOne(data.transaction_picking_id);
         const memo_id = transactionPicking.memo_id;
-        
+
         if (!memo_id) {
           throw new BadRequestException('Transaction picking must have a memo_id');
         }
@@ -196,7 +196,7 @@ export class TransactionScanPickingService {
 
         // Wrap other errors with context
         console.error('Error creating transaction scan picking:', error);
-        throw new BadRequestException(`Failed to create transaction scan picking: ${error.message}`);
+        throw new BadRequestException(`Failed to create transaction scan picking: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     });
   }
@@ -410,7 +410,7 @@ export class TransactionScanPickingService {
 
         // Wrap other errors with context
         console.error(`Error updating transaction scan picking ${id}:`, error);
-        throw new BadRequestException(`Failed to update transaction scan picking: ${error.message}`);
+        throw new BadRequestException(`Failed to update transaction scan picking: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     });
   }
@@ -448,7 +448,7 @@ export class TransactionScanPickingService {
     }
     return this.repository.update(id, { status: ScanPickingStatus.INSPECTION_APPROVED, inspection_by: inspection_by });
   }
-  
+
   private async revertPalletOperations(
     existing: ScanPickingTransaction,
     itemId: string,
@@ -460,7 +460,7 @@ export class TransactionScanPickingService {
   ): Promise<void> {
     // Get transaction picking for warehouse info
     const transactionPicking = await this.transactionPickingService.findOne(transactionPickingId);
-    
+
     // Check if source and use pallets were the same
     const wasSamePallet = Boolean(existing.pallet_source_id && existing.pallet_use_id && existing.pallet_source_id === existing.pallet_use_id);
 
@@ -582,7 +582,7 @@ export class TransactionScanPickingService {
           destinationWarehouseSubId = warehouseBin.warehouse_sub_id;
         }
       }
-      
+
       // Get warehouse_id from warehouse_sub if we have warehouse_sub_id
       if (destinationWarehouseSubId && !destinationWarehouseId) {
         // Try to get from transaction picking's destination warehouse sub relation
@@ -605,11 +605,11 @@ export class TransactionScanPickingService {
       // If same pallet, move source pallet to destination. If different, move use pallet to destination.
       if (palletUseId && quantityPicked > 0 && destinationWarehouseSubId && destinationWarehouseId) {
         const targetPalletId = isSamePallet ? palletSourceId : palletUseId;
-        
+
         if (!targetPalletId) {
           return;
         }
-        
+
         try {
           // Check if target pallet already has inventory tracking
           let targetPalletTracking;
@@ -622,7 +622,7 @@ export class TransactionScanPickingService {
             }
             targetPalletTracking = null;
           }
-          
+
           if (targetPalletTracking) {
             // Update existing tracking to destination location
             // Always set status to 'PICKED' for pallet use when moved to destination
@@ -632,7 +632,7 @@ export class TransactionScanPickingService {
               warehouse_id: destinationWarehouseId,
               progression_status: ProgressionStatus.COMPLETED,
               inventory_status: 'PICKED',
-              inventory_note: isSamePallet 
+              inventory_note: isSamePallet
                 ? `Picked ${quantityPicked} and moved to destination via transaction scan picking`
                 : `Picked ${quantityPicked} from source pallet and moved to destination via transaction scan picking`,
               inventory_date: new Date(),
@@ -647,7 +647,7 @@ export class TransactionScanPickingService {
               'PICKED',
               ProgressionStatus.COMPLETED,
             );
-            
+
             // Update bin if provided
             if (destinationBinId) {
               const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
@@ -713,7 +713,7 @@ export class TransactionScanPickingService {
             }
             switchPalletTracking = null;
           }
-          
+
           if (switchPalletTracking) {
             // Update existing tracking
             await this.inventoryTrackingService.update(switchPalletTracking.id, {
@@ -734,7 +734,7 @@ export class TransactionScanPickingService {
               'IN_INVENTORY',
               ProgressionStatus.COMPLETED,
             );
-            
+
             // Update bin if provided
             if (finalBinId) {
               const tracking = await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
@@ -763,48 +763,48 @@ export class TransactionScanPickingService {
     wasSamePallet: boolean,
   ): Promise<void> {
     try {
-    // Get source warehouse info from transaction picking
-    let sourceWarehouseSubId = transactionPicking.source_warehouse_sub_id;
-    const sourceBinId = transactionPicking.source_bin_id;
-    let sourceWarehouseId: string | undefined;
+      // Get source warehouse info from transaction picking
+      let sourceWarehouseSubId = transactionPicking.source_warehouse_sub_id;
+      const sourceBinId = transactionPicking.source_bin_id;
+      let sourceWarehouseId: string | undefined;
 
-    if (sourceBinId) {
-      const warehouseBin = await this.masterWarehouseBinService.findOne(sourceBinId);
-      if (warehouseBin?.warehouse_sub_id) {
-        // Use warehouse_sub_id from bin if available
-        sourceWarehouseSubId = warehouseBin.warehouse_sub_id;
+      if (sourceBinId) {
+        const warehouseBin = await this.masterWarehouseBinService.findOne(sourceBinId);
+        if (warehouseBin?.warehouse_sub_id) {
+          // Use warehouse_sub_id from bin if available
+          sourceWarehouseSubId = warehouseBin.warehouse_sub_id;
+        }
       }
-    }
-    
-    // Get warehouse_id from warehouse_sub if we have warehouse_sub_id
-    if (sourceWarehouseSubId && !sourceWarehouseId) {
-      // Try to get from transaction picking's source warehouse sub relation
-      const pickingWithRelations = await this.transactionPickingService.findOne(transactionPicking.id);
-      if (pickingWithRelations?.sourceWarehouseSub?.warehouse_id) {
-        sourceWarehouseId = pickingWithRelations.sourceWarehouseSub.warehouse_id;
+
+      // Get warehouse_id from warehouse_sub if we have warehouse_sub_id
+      if (sourceWarehouseSubId && !sourceWarehouseId) {
+        // Try to get from transaction picking's source warehouse sub relation
+        const pickingWithRelations = await this.transactionPickingService.findOne(transactionPicking.id);
+        if (pickingWithRelations?.sourceWarehouseSub?.warehouse_id) {
+          sourceWarehouseId = pickingWithRelations.sourceWarehouseSub.warehouse_id;
+        }
       }
-    }
 
-    const fallbackSourceLocation = {
-      warehouse_sub_id: sourceWarehouseSubId,
-      warehouse_bin_id: sourceBinId,
-      warehouse_id: sourceWarehouseId,
-    };
+      const fallbackSourceLocation = {
+        warehouse_sub_id: sourceWarehouseSubId,
+        warehouse_bin_id: sourceBinId,
+        warehouse_id: sourceWarehouseId,
+      };
 
-    const sourcePrevLocation = await this.getPreviousInventoryLocation(existing.pallet_source_id);
-    const usePrevLocation = await this.getPreviousInventoryLocation(existing.pallet_use_id);
-    const switchPrevLocation = await this.getPreviousInventoryLocation(existing.pallet_switch_id);
+      const sourcePrevLocation = await this.getPreviousInventoryLocation(existing.pallet_source_id);
+      const usePrevLocation = await this.getPreviousInventoryLocation(existing.pallet_use_id);
+      const switchPrevLocation = await this.getPreviousInventoryLocation(existing.pallet_switch_id);
 
       // Revert source pallet inventory tracking status back to IN_INVENTORY if it exists
       if (existing.pallet_source_id && existing.quantity_picked > 0) {
         try {
           const sourceTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_source_id);
           if (sourceTracking) {
-          const locationToRestore = sourcePrevLocation ?? fallbackSourceLocation;
+            const locationToRestore = sourcePrevLocation ?? fallbackSourceLocation;
             await this.inventoryTrackingService.update(sourceTracking.id, {
-            warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? sourceTracking.warehouse_sub_id,
-            warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? sourceTracking.warehouse_bin_id,
-            warehouse_id: locationToRestore?.warehouse_id ?? sourceTracking.warehouse_id,
+              warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? sourceTracking.warehouse_sub_id,
+              warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? sourceTracking.warehouse_bin_id,
+              warehouse_id: locationToRestore?.warehouse_id ?? sourceTracking.warehouse_id,
               inventory_status: 'IN_INVENTORY',
               inventory_note: `Reverted: Restored from transaction scan picking`,
               inventory_date: new Date(),
@@ -947,7 +947,7 @@ export class TransactionScanPickingService {
     const scanTransactions = await this.repository.findAll({
       transactionPickingId: transactionPickingId,
     });
-    
+
     if (scanTransactions.length === 0) {
       throw new NotFoundException('Transaction scan picking tidak ditemukan untuk memo ini');
     }
