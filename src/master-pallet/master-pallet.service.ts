@@ -933,6 +933,11 @@ export class MasterPalletService {
       qb.andWhere('history.uom = :uom', { uom });
     }
 
+    // Match visible stock lines only (same filter as getPalletItemLatestQuantity)
+    qb.andWhere('history.status_inventory IN (:...statusInventories)', {
+      statusInventories: [StatusInventory.READY, StatusInventory.PENDING],
+    });
+
     // undefined = do not filter by week (backward compatible for updateUOM)
     // null / number = match that specific week stock line
     if (weekNumber !== undefined) {
