@@ -633,27 +633,34 @@ export class TransactionScanPickingService {
           }
 
           if (targetPalletTracking) {
-            // Update existing tracking to destination location
-            // Always set status to 'PICKED' for pallet use when moved to destination
-            await this.inventoryTrackingService.update(targetPalletTracking.id, {
+            // Update location/progression only. Do not change inventory_status for pallet_use.
+            const updatePayload: Record<string, unknown> = {
               warehouse_sub_id: destinationWarehouseSubId,
               warehouse_bin_id: destinationBinId,
               warehouse_id: destinationWarehouseId,
               progression_status: ProgressionStatus.COMPLETED,
-              inventory_status: 'PICKED',
               inventory_note: isSamePallet
                 ? `Picked ${quantityPicked} and moved to destination via transaction scan picking`
                 : `Picked ${quantityPicked} from source pallet and moved to destination via transaction scan picking`,
               inventory_date: new Date(),
-            });
+            };
+
+            // Only update inventory_status when source and use are the same pallet
+            // (tracking belongs to source). Never overwrite inventory_status for pallet_use.
+            if (isSamePallet) {
+              updatePayload.inventory_status = 'PICKED';
+            }
+
+            await this.inventoryTrackingService.update(targetPalletTracking.id, updatePayload);
           } else {
-            // Create new tracking for target pallet at destination location
-            // Always set status to 'PICKED' for pallet use when moved to destination
+            // Create tracking for target pallet at destination.
+            // For pallet_use (different pallet), keep IN_INVENTORY — do not set PICKED.
+            const inventoryStatus = isSamePallet ? 'PICKED' : 'IN_INVENTORY';
             await this.inventoryTrackingService.createOrUpdateInventoryTracking(
               targetPalletId,
               destinationWarehouseSubId,
               destinationWarehouseId,
-              'PICKED',
+              inventoryStatus,
               ProgressionStatus.COMPLETED,
             );
 
@@ -826,7 +833,7 @@ export class TransactionScanPickingService {
         }
       }
 
-      // Revert use pallet inventory tracking (remove or move back to source)
+      // Revert use pallet inventory tracking location only — do not change inventory_status
       if (existing.pallet_use_id && existing.quantity_picked > 0 && !wasSamePallet) {
         try {
           const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_use_id);
@@ -836,7 +843,6 @@ export class TransactionScanPickingService {
               warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? usePalletTracking.warehouse_sub_id,
               warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? usePalletTracking.warehouse_bin_id,
               warehouse_id: locationToRestore?.warehouse_id ?? usePalletTracking.warehouse_id,
-              inventory_status: 'IN_INVENTORY',
               inventory_note: locationToRestore
                 ? `Reverted: Moved back to previous location`
                 : `Reverted: Transaction scan picking reverted`,
