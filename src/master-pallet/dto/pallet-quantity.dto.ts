@@ -271,6 +271,11 @@ export class PalletItemQuantityDto {
   @IsDate()
   production_date?: Date;
 
+  @ApiPropertyOptional({ example: 'READY', description: 'Inventory status' })
+  @IsOptional()
+  @IsString()
+  inventory_status?: string;
+
   @ApiProperty({ example: '2025-01-01T10:00:00.000Z', description: 'Last updated timestamp' })
   last_updated: Date;
 
@@ -283,13 +288,13 @@ export class PalletItemQuantityDto {
   warehouse_sub_id?: string;
 
   @ApiPropertyOptional({ example: 'Zone A', description: 'Warehouse sub name/code' })
-  warehouse_sub_name?: string;
+  warehouse_sub_code?: string;
 
   @ApiPropertyOptional({ example: 'uuid-bin-123', description: 'Warehouse bin ID' })
   warehouse_bin_id?: string;
 
   @ApiPropertyOptional({ example: 'BIN-001', description: 'Warehouse bin name/code' })
-  warehouse_bin_name?: string;
+  warehouse_bin_code?: string;
 
   @ApiPropertyOptional({ example: 'uuid-memo-123', description: 'Outbound memo ID' })
   @IsOptional()
