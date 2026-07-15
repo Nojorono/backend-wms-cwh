@@ -669,10 +669,11 @@ export class OutboundDoService {
       retryCount: 0,
       maxRetry: 20,
       jobType: 'SHIP_CONFIRM',
+      transactionType: shipConfirmTransactionType,
     });
 
     this.logger.log(
-      `Queued ship confirm subdist status job outboundDoId=${id} integrationStatus=${statusCheck.status}`,
+      `Queued ship confirm subdist status job outboundDoId=${id} transactionType=${shipConfirmTransactionType} integrationStatus=${statusCheck.status}`,
     );
 
     return {
@@ -908,10 +909,11 @@ export class OutboundDoService {
       retryCount: 0,
       maxRetry: 20,
       jobType: 'SHIP_CONFIRM',
+      transactionType: pickReleaseTransactionType,
     });
 
     this.logger.log(
-      `Queued pick release subdist status job outboundDoId=${id} integrationStatus=${statusCheck.status}`,
+      `Queued pick release subdist status job outboundDoId=${id} transactionType=${pickReleaseTransactionType} integrationStatus=${statusCheck.status}`,
     );
 
     return {
@@ -1103,8 +1105,13 @@ export class OutboundDoService {
       ship_confirm,
     );
 
+    const shipConfirmTransactionType =
+      ShipConfirmInternalTransactionType.OUTBOUND_GS_MUTASI_SO_INTERNAL;
     const refreshedDeliveries =
-      await this.outboundIntegrationDeliveriesRepository.findByOutboundDoId(id);
+      await this.outboundIntegrationDeliveriesRepository.findByOutboundDoIdAndTransactionTypes(
+        id,
+        [shipConfirmTransactionType],
+      );
     const statusCheck = this.shipConfirmStatusChecker.evaluateDeliveries(refreshedDeliveries);
 
     await this.outboundIntegrationQueueProducer.publish({
@@ -1112,10 +1119,11 @@ export class OutboundDoService {
       retryCount: 0,
       maxRetry: 20,
       jobType: 'SHIP_CONFIRM',
+      transactionType: shipConfirmTransactionType,
     });
 
     this.logger.log(
-      `Queued ship confirm status job outboundDoId=${id} integrationStatus=${statusCheck.status}`,
+      `Queued ship confirm status job outboundDoId=${id} transactionType=${shipConfirmTransactionType} integrationStatus=${statusCheck.status}`,
     );
 
     return {
@@ -1227,8 +1235,12 @@ export class OutboundDoService {
         this.findExistingIntegrationDelivery(existingRows, dto);
 
       if (existing) {
-        await this.outboundIntegrationDeliveriesRepository.update(existing.id, dto);
-        existingByKey.set(this.buildIntegrationDeliveryKey(dto), existing);
+        const merged = this.mergeIntegrationDeliveryUpsert(existing, dto);
+        await this.outboundIntegrationDeliveriesRepository.update(existing.id, merged);
+        existingByKey.set(this.buildIntegrationDeliveryKey(dto), {
+          ...existing,
+          ...merged,
+        } as OutboundIntegrationDeliveries);
         continue;
       }
 
@@ -1250,6 +1262,57 @@ export class OutboundDoService {
     return latestRows.filter(
       (row) => row.outbound_memo_item_id && memoItemIdSet.has(row.outbound_memo_item_id),
     );
+  }
+
+  /**
+   * Re-running create must not wipe Oracle progress already polled into staging
+   * (delivery_id / request ids / terminal S|E statuses).
+   */
+  private mergeIntegrationDeliveryUpsert(
+    existing: OutboundIntegrationDeliveries,
+    dto: CreateOutboundIntegrationDeliveriesDto,
+  ): CreateOutboundIntegrationDeliveriesDto {
+    const merged: CreateOutboundIntegrationDeliveriesDto = { ...dto };
+    const terminal = new Set(['S', 'E']);
+
+    const statusPairs: Array<{
+      status: keyof CreateOutboundIntegrationDeliveriesDto;
+      message: keyof CreateOutboundIntegrationDeliveriesDto;
+    }> = [
+      { status: 'create_delivery_status', message: 'create_delivery_message' },
+      { status: 'update_delivery_status', message: 'update_delivery_message' },
+      { status: 'pick_release_status', message: 'pick_release_message' },
+      { status: 'ship_confirm_status', message: 'ship_confirm_message' },
+    ];
+
+    for (const { status, message } of statusPairs) {
+      const current = existing[status as keyof OutboundIntegrationDeliveries];
+      if (typeof current === 'string' && terminal.has(current.toUpperCase())) {
+        (merged as Record<string, unknown>)[status] = current;
+        const currentMessage = existing[message as keyof OutboundIntegrationDeliveries];
+        if (currentMessage != null) {
+          (merged as Record<string, unknown>)[message] = currentMessage;
+        }
+      }
+    }
+
+    if (existing.delivery_id != null) {
+      merged.delivery_id = existing.delivery_id;
+    }
+    if (existing.delivery_name) {
+      merged.delivery_name = existing.delivery_name;
+    }
+    if (existing.iface_id != null) {
+      merged.iface_id = existing.iface_id;
+    }
+    if (existing.pick_release_request_id != null) {
+      merged.pick_release_request_id = existing.pick_release_request_id;
+    }
+    if (existing.ship_confirm_request_id != null) {
+      merged.ship_confirm_request_id = existing.ship_confirm_request_id;
+    }
+
+    return merged;
   }
 
   private findExistingIntegrationDelivery(
