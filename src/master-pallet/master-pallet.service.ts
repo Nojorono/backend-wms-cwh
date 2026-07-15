@@ -184,22 +184,27 @@ export class MasterPalletService {
         throw new BadRequestException('Pallet capacity must be set and greater than 0');
       }
 
+      // Quantity must be scoped per (item, uom, week). Same item with different
+      // week_number is a separate stock line and must not be summed together.
+      const weekNumberFilter =
+        updateQuantityDto.week_number !== undefined ? updateQuantityDto.week_number : null;
+
       const currentItemQuantity = await this.getItemQuantityOnPallet(
         palletId,
         updateQuantityDto.item_id,
         updateQuantityDto.uom,
+        weekNumberFilter,
       );
       const totalPalletQuantity = pallet.currentQuantity ?? 0;
 
-      // Validate UOM consistency if there's existing quantity for this item
+      // Validate UOM consistency only within the same item + week stock line
       if (currentItemQuantity > 0 && updateQuantityDto.uom) {
-        const existingUomRecord = await this.transactionHistoryRepository.findOne({
-          where: {
-            pallet_id: palletId,
-            item_id: updateQuantityDto.item_id,
-          },
-          order: { createdAt: 'DESC' },
-        });
+        const existingUomRecord = await this.getLatestHistoryRecord(
+          palletId,
+          updateQuantityDto.item_id,
+          undefined,
+          weekNumberFilter,
+        );
 
         if (
           existingUomRecord &&
@@ -207,7 +212,7 @@ export class MasterPalletService {
           existingUomRecord.uom !== updateQuantityDto.uom
         ) {
           throw new BadRequestException(
-            `UOM mismatch. Existing UOM for this item is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`,
+            `UOM mismatch. Existing UOM for this item (week ${weekNumberFilter ?? 'null'}) is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`,
           );
         }
       }
@@ -909,33 +914,55 @@ export class MasterPalletService {
   }
 
   /**
-   * Returns the latest transaction history record for (palletId, itemId, uom?).
-   * Used by updateProductionDate and updateUOM to read current quantity, production_date, week_number.
+   * Returns the latest transaction history record for (palletId, itemId, uom?, week?).
+   * When weekNumber is provided (including null), only that week stock line is considered.
+   * When weekNumber is omitted (undefined), week is not filtered (used by updateUOM).
    */
   private async getLatestHistoryRecord(
     palletId: string,
     itemId: string,
     uom?: string,
+    weekNumber?: number | null,
   ): Promise<PalletTransactionHistory | null> {
-    const whereCondition: Record<string, string> = {
-      pallet_id: palletId,
-      item_id: itemId,
-    };
+    const qb = this.transactionHistoryRepository
+      .createQueryBuilder('history')
+      .where('history.pallet_id = :palletId', { palletId })
+      .andWhere('history.item_id = :itemId', { itemId });
+
     if (uom) {
-      whereCondition.uom = uom;
+      qb.andWhere('history.uom = :uom', { uom });
     }
-    return this.transactionHistoryRepository.findOne({
-      where: whereCondition,
-      order: { createdAt: 'DESC' },
+
+    // Match visible stock lines only (same filter as getPalletItemLatestQuantity)
+    qb.andWhere('history.status_inventory IN (:...statusInventories)', {
+      statusInventories: [StatusInventory.READY, StatusInventory.PENDING],
     });
+
+    // undefined = do not filter by week (backward compatible for updateUOM)
+    // null / number = match that specific week stock line
+    if (weekNumber !== undefined) {
+      if (weekNumber === null) {
+        qb.andWhere('history.week_number IS NULL');
+      } else {
+        qb.andWhere('history.week_number = :weekNumber', { weekNumber });
+      }
+    }
+
+    return qb.orderBy('history.createdAt', 'DESC').getOne();
   }
 
   private async getItemQuantityOnPallet(
     palletId: string,
     itemId: string,
     uom?: string,
+    weekNumber?: number | null,
   ): Promise<number> {
-    const latestRecord = await this.getLatestHistoryRecord(palletId, itemId, uom);
+    const latestRecord = await this.getLatestHistoryRecord(
+      palletId,
+      itemId,
+      uom,
+      weekNumber,
+    );
     return latestRecord ? latestRecord.new_quantity : 0;
   }
 }
