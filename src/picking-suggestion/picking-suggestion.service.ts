@@ -173,15 +173,23 @@ export class PickingSuggestionService {
       );
 
       if (availableInventory.length > 0) {
+        const pendingBookings = organizationId
+          ? await this.repository.getPendingBookedByWeek(item.item_id, item.uom, organizationId)
+          : { byWeek: [], unscoped: 0 };
+
         const suggestedLocations = this.getAllAvailableInventory(
           availableInventory,
           remainingRequired,
           sortMethod,
+          pendingBookings,
         );
         const totalSuggested = suggestedLocations.reduce(
           (sum, s) => sum + s.quantity_ready_to_pick, 0,
         );
-        const netAvailable = this.computeNetAvailable(availableInventory);
+        const netAvailable = suggestedLocations.reduce(
+          (sum, s) => sum + s.available_quantity,
+          0,
+        );
 
         const suggestion = {
           memo_id: memo.id,
@@ -334,45 +342,41 @@ export class PickingSuggestionService {
         return hasEnoughQuantity || hasPartialQuantity;
       })
       .sort((a, b) => {
-        // Primary sort: Location priority (bin > sub > warehouse)
-        if (a.location_priority !== b.location_priority) {
-          return a.location_priority - b.location_priority;
-        }
-
-        // Secondary sort: Week number (FIFO = ASC, LIFO = DESC)
+        // Primary: Week number (FIFO = ASC oldest first, LIFO = DESC newest first)
         if (a.week_number !== b.week_number) {
           const weekA = a.week_number || 0;
           const weekB = b.week_number || 0;
           if (sortMethod === 'LIFO') {
-            return weekB - weekA; // DESC: highest week number first
-          } else {
-            return weekA - weekB; // ASC: lowest week number first
+            return weekB - weekA;
           }
+          return weekA - weekB;
         }
 
-        // Tertiary sort: Production date (FIFO = ASC, LIFO = DESC)
+        // Secondary: Production date
         if (a.production_date !== b.production_date) {
           const prodDateA = a.production_date ? new Date(a.production_date).getTime() : 0;
           const prodDateB = b.production_date ? new Date(b.production_date).getTime() : 0;
           if (sortMethod === 'LIFO') {
-            return prodDateB - prodDateA; // DESC: most recent first
-          } else {
-            return prodDateA - prodDateB; // ASC: oldest first
+            return prodDateB - prodDateA;
           }
+          return prodDateA - prodDateB;
         }
 
-        // Quaternary sort: Inventory date (FIFO = ASC, LIFO = DESC)
+        // Tertiary: Location priority (staging preference within same week/batch)
+        if (a.location_priority !== b.location_priority) {
+          return a.location_priority - b.location_priority;
+        }
+
+        // Quaternary: Inventory date
         const dateA = a.inventory_date ? new Date(a.inventory_date).getTime() : 0;
         const dateB = b.inventory_date ? new Date(b.inventory_date).getTime() : 0;
         if (dateA !== dateB) {
           if (sortMethod === 'LIFO') {
-            return dateB - dateA; // DESC: most recent first
-          } else {
-            return dateA - dateB; // ASC: oldest first
+            return dateB - dateA;
           }
+          return dateA - dateB;
         }
 
-        // Final sort: Quantity (higher first for same date/week)
         return b.quantity - a.quantity;
       });
   }
@@ -586,6 +590,10 @@ export class PickingSuggestionService {
     availableInventory: any[],
     requiredQuantity: number,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    pendingBookings?: {
+      byWeek: Array<{ week_number: number; booked_quantity: number }>;
+      unscoped: number;
+    },
   ): PickingSuggestionLocationDto[] {
     // Group by physical location + week/production batch so different weeks are not merged.
     const locationGroups = new Map<string, any>();
@@ -609,6 +617,7 @@ export class PickingSuggestionService {
           week_number: inv.week_number ?? 0,
           production_date: inv.production_date,
           total_quantity: 0,
+          reserved_quantity: 0,
           net_available: 0,
           items: [],
         });
@@ -616,18 +625,13 @@ export class PickingSuggestionService {
 
       const group = locationGroups.get(groupKey)!;
       const quantity = parseFloat(inv.quantity || 0);
-      const availableQuantity = parseFloat(inv.available_quantity ?? inv.quantity ?? 0);
 
       group.total_quantity += quantity;
-      group.net_available += Math.max(0, availableQuantity);
       group.items.push(inv);
     }
 
     const sortedGroups = Array.from(locationGroups.values()).sort((a, b) => {
-      if (a.location_priority !== b.location_priority) {
-        return a.location_priority - b.location_priority;
-      }
-
+      // Primary: Week number (FIFO = ASC, LIFO = DESC) — must match inventory visibility
       if (a.week_number !== b.week_number) {
         return sortMethod === 'LIFO'
           ? b.week_number - a.week_number
@@ -642,8 +646,15 @@ export class PickingSuggestionService {
           : productionDateA - productionDateB;
       }
 
-      return b.net_available - a.net_available;
+      // Secondary: location priority within same week/batch
+      if (a.location_priority !== b.location_priority) {
+        return a.location_priority - b.location_priority;
+      }
+
+      return b.total_quantity - a.total_quantity;
     });
+
+    this.applyPendingReservationsToGroups(sortedGroups, pendingBookings);
 
     const showAll = requiredQuantity <= 0;
     const allSuggestions: any[] = [];
@@ -657,13 +668,14 @@ export class PickingSuggestionService {
         ? netAvailable
         : Math.min(netAvailable, remainingQuantity);
 
-      if (quantityToTake <= 0) continue;
+      if (!showAll && quantityToTake <= 0) continue;
+      if (showAll && group.total_quantity <= 0) continue;
 
       const representativeItem = group.items[0];
 
       allSuggestions.push({
         total_quantity: group.total_quantity,
-        reserved_quantity: Math.max(0, group.total_quantity - netAvailable),
+        reserved_quantity: group.reserved_quantity,
         available_quantity: netAvailable,
         quantity_ready_to_pick: quantityToTake,
         uom: representativeItem.uom || 'N/A',
@@ -690,10 +702,67 @@ export class PickingSuggestionService {
   }
 
   /**
-   * Compute net available across unique bins using the SQL-provided location_net_available.
-   * This value is computed from the full bin total (including excluded pallets), so it's
-   * accurate even when some pallets are filtered out by progression_status / inventory_status.
-   * Takes the first row per unique (warehouse_sub_id, warehouse_bin_id) pair.
+   * Deduct pending transaction_picking reservations by week (matches visibility dashboard).
+   * Week-specific bookings apply to that week's stock groups; unscoped bookings apply in sort order.
+   */
+  private applyPendingReservationsToGroups(
+    groups: Array<{
+      week_number: number;
+      total_quantity: number;
+      reserved_quantity: number;
+      net_available: number;
+    }>,
+    pendingBookings?: {
+      byWeek: Array<{ week_number: number; booked_quantity: number }>;
+      unscoped: number;
+    },
+  ): void {
+    if (!pendingBookings) {
+      for (const group of groups) {
+        group.reserved_quantity = 0;
+        group.net_available = Math.max(0, group.total_quantity);
+      }
+      return;
+    }
+
+    const weekRemaining = new Map<number, number>(
+      pendingBookings.byWeek.map((row) => [row.week_number, row.booked_quantity]),
+    );
+
+    for (const group of groups) {
+      let reserved = 0;
+      const weekReserved = weekRemaining.get(group.week_number) ?? 0;
+      if (weekReserved > 0) {
+        const allocated = Math.min(group.total_quantity, weekReserved);
+        reserved += allocated;
+        weekRemaining.set(group.week_number, weekReserved - allocated);
+      }
+      group.reserved_quantity = reserved;
+      group.net_available = Math.max(0, group.total_quantity - reserved);
+    }
+
+    let unscopedRemaining = pendingBookings.unscoped;
+    if (unscopedRemaining <= 0) {
+      return;
+    }
+
+    for (const group of groups) {
+      if (unscopedRemaining <= 0) {
+        break;
+      }
+      const allocatable = group.net_available;
+      if (allocatable <= 0) {
+        continue;
+      }
+      const allocated = Math.min(allocatable, unscopedRemaining);
+      group.reserved_quantity += allocated;
+      group.net_available -= allocated;
+      unscopedRemaining -= allocated;
+    }
+  }
+
+  /**
+   * @deprecated Use sum of getAllAvailableInventory available_quantity after pending reservations.
    */
   private computeNetAvailable(availableInventory: any[]): number {
     const seen = new Set<string>();
@@ -797,20 +866,35 @@ export class PickingSuggestionService {
       };
     }
 
-    // Net available per bin using SQL-provided location_net_available (full bin total - reserved)
-    const totalQuantity = this.computeNetAvailable(availableInventory);
+    // Net available after pending bookings (aligned with visibility dashboard)
+    const pendingBookings = await this.repository.getPendingBookedByWeek(
+      itemId,
+      preferredUom,
+      organizationId,
+    );
 
-    const locations = this.getAllAvailableInventory(availableInventory, totalQuantity, sortMethod || 'FIFO');
+    const locations = this.getAllAvailableInventory(
+      availableInventory,
+      0,
+      sortMethod || 'FIFO',
+      pendingBookings,
+    );
+
+    const totalReadyQuantity = locations.reduce((sum, loc) => sum + loc.total_quantity, 0);
+    const totalBookedQuantity = locations.reduce((sum, loc) => sum + loc.reserved_quantity, 0);
+    const totalQuantity = locations.reduce((sum, loc) => sum + loc.available_quantity, 0);
 
     return {
       item_id: itemId,
       item_name: item.description,
       item_code: item.item_number,
+      total_ready_quantity: totalReadyQuantity,
+      total_booked_quantity: totalBookedQuantity,
       total_available_quantity: totalQuantity,
       suggested_locations: locations,
       notes: preferredUom
-        ? `Item tersedia dengan total ${totalQuantity} ${preferredUom} di ${locations.length} lokasi`
-        : `Item tersedia dengan total ${totalQuantity} unit di ${locations.length} lokasi`,
+        ? `Item tersedia: ${totalQuantity} ${preferredUom} siap pick (${totalReadyQuantity} READY - ${totalBookedQuantity} booked) di ${locations.length} lokasi`
+        : `Item tersedia: ${totalQuantity} unit siap pick (${totalReadyQuantity} READY - ${totalBookedQuantity} booked) di ${locations.length} lokasi`,
     };
   }
 

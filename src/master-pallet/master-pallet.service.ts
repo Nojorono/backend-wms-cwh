@@ -376,7 +376,7 @@ export class MasterPalletService {
             inventory_note: 'Pallet is empty',
           } as any);
         }
-        await this.transactionHistoryRepository.delete({ pallet_id: palletId });
+        await this.transactionHistoryRepository.softDelete({ pallet_id: palletId });
         await this.repository.update(palletId, {
           memo_id: null as any,
           currentWeekNumber: 0,
