@@ -557,27 +557,147 @@ export class InventoryTrackingService {
     }
   }
 
-  async getVisibilityInventoryTrackingAllItemInWarehouse(organizationId: string, item_id?: string): Promise<{
-    summary: {
-      total_items: number;
+  private toStockQuantity(value: unknown): number {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return 0;
+    }
+    return Math.round(num);
+  }
+
+  private normalizeVisibilityDashboardItem(item: Record<string, unknown>): Record<string, unknown> {
+    const palletDetails = Array.isArray(item.pallet_details) ? item.pallet_details : [];
+    const bookingDetails = Array.isArray(item.booking_details) ? item.booking_details : [];
+    const uom = String(item.uom ?? '').trim();
+
+    type PalletQty = { quantity?: unknown; status_inventory?: string };
+    const readyFromPallets = palletDetails.reduce((sum, pallet) => {
+      const row = pallet as PalletQty;
+      return row.status_inventory === 'READY' ? sum + this.toStockQuantity(row.quantity) : sum;
+    }, 0);
+    const pendingFromPallets = palletDetails.reduce((sum, pallet) => {
+      const row = pallet as PalletQty;
+      return row.status_inventory === 'PENDING' ? sum + this.toStockQuantity(row.quantity) : sum;
+    }, 0);
+    const totalFromPallets = readyFromPallets + pendingFromPallets;
+    const bookedFromPickings = bookingDetails.reduce(
+      (sum, booking) => sum + this.toStockQuantity((booking as { quantity?: unknown }).quantity),
+      0,
+    );
+
+    const ready_quantity =
+      readyFromPallets || this.toStockQuantity(item.ready_quantity);
+    const pending_quantity =
+      pendingFromPallets || this.toStockQuantity(item.pending_quantity);
+    const total_quantity =
+      totalFromPallets || this.toStockQuantity(item.total_quantity) || ready_quantity + pending_quantity;
+    const booked_quantity = bookedFromPickings || this.toStockQuantity(item.booked_quantity);
+    // Available = READY stock minus pending outbound bookings (same UOM)
+    const available_quantity = Math.max(0, ready_quantity - booked_quantity);
+
+    return {
+      ...item,
+      uom,
+      total_quantity,
+      ready_quantity,
+      pending_quantity,
+      booked_quantity,
+      available_quantity,
+      pallet_count: this.toStockQuantity(item.pallet_count),
+      booking_count: this.toStockQuantity(item.booking_count),
+    };
+  }
+
+  private buildVisibilitySummaryByUom(items: Record<string, unknown>[]): {
+    total_items: number;
+    total_item_uom_rows: number;
+    items_with_pending_bookings: number;
+    by_uom: Array<{
+      uom: string;
+      item_count: number;
       total_quantity: number;
+      total_ready_quantity: number;
+      total_pending_quantity: number;
       total_booked_quantity: number;
       total_available_quantity: number;
       items_with_pending_bookings: number;
+    }>;
+  } {
+    const byUomMap = new Map<
+      string,
+      {
+        uom: string;
+        item_count: number;
+        total_quantity: number;
+        total_ready_quantity: number;
+        total_pending_quantity: number;
+        total_booked_quantity: number;
+        total_available_quantity: number;
+        items_with_pending_bookings: number;
+      }
+    >();
+
+    for (const item of items) {
+      const uom = String(item.uom ?? '').trim() || 'UNKNOWN';
+      const current = byUomMap.get(uom) ?? {
+        uom,
+        item_count: 0,
+        total_quantity: 0,
+        total_ready_quantity: 0,
+        total_pending_quantity: 0,
+        total_booked_quantity: 0,
+        total_available_quantity: 0,
+        items_with_pending_bookings: 0,
+      };
+
+      current.item_count += 1;
+      current.total_quantity += this.toStockQuantity(item.total_quantity);
+      current.total_ready_quantity += this.toStockQuantity(item.ready_quantity);
+      current.total_pending_quantity += this.toStockQuantity(item.pending_quantity);
+      current.total_booked_quantity += this.toStockQuantity(item.booked_quantity);
+      current.total_available_quantity += this.toStockQuantity(item.available_quantity);
+      if (item.has_pending_booking) {
+        current.items_with_pending_bookings += 1;
+      }
+
+      byUomMap.set(uom, current);
+    }
+
+    const by_uom = [...byUomMap.values()].sort((a, b) => a.uom.localeCompare(b.uom));
+    const distinctItemIds = new Set(
+      items.map((item) => String(item.item_id ?? '')).filter((id) => id.length > 0),
+    );
+
+    return {
+      total_items: distinctItemIds.size,
+      total_item_uom_rows: items.length,
+      items_with_pending_bookings: items.filter((item) => item.has_pending_booking).length,
+      by_uom,
+    };
+  }
+
+  async getVisibilityInventoryTrackingAllItemInWarehouse(organizationId: string, item_id?: string): Promise<{
+    summary: {
+      total_items: number;
+      total_item_uom_rows: number;
+      items_with_pending_bookings: number;
+      by_uom: Array<{
+        uom: string;
+        item_count: number;
+        total_quantity: number;
+        total_ready_quantity: number;
+        total_pending_quantity: number;
+        total_booked_quantity: number;
+        total_available_quantity: number;
+        items_with_pending_bookings: number;
+      }>;
     };
     items: any[];
   }> {
     try {
-      const items = await this.repository.getVisibilityDashboard(organizationId, item_id);
-
-      // Calculate summary statistics (ensure numeric conversion)
-      const summary = {
-        total_items: items.length,
-        total_quantity: items.reduce((sum, item) => sum + (Number(item.total_quantity) || 0), 0),
-        total_booked_quantity: items.reduce((sum, item) => sum + (Number(item.booked_quantity) || 0), 0),
-        total_available_quantity: items.reduce((sum, item) => sum + (Number(item.available_quantity) || 0), 0),
-        items_with_pending_bookings: items.filter((item) => item.has_pending_booking).length,
-      };
+      const rawItems = await this.repository.getVisibilityDashboard(organizationId, item_id);
+      const items = rawItems.map((item) => this.normalizeVisibilityDashboardItem(item));
+      const summary = this.buildVisibilitySummaryByUom(items);
 
       return {
         summary,

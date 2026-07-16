@@ -376,7 +376,7 @@ export class MasterPalletService {
             inventory_note: 'Pallet is empty',
           } as any);
         }
-        await this.transactionHistoryRepository.delete({ pallet_id: palletId });
+        await this.transactionHistoryRepository.softDelete({ pallet_id: palletId });
         await this.repository.update(palletId, {
           memo_id: null as any,
           currentWeekNumber: 0,
@@ -785,6 +785,7 @@ export class MasterPalletService {
           item_id: undefined,
           item_name: undefined,
           current_quantity: pallet.currentQuantity ?? 0,
+          capacity: pallet.capacity ?? 0,
           uom: pallet.uom ?? '',
           last_updated: pallet.updatedAt ?? pallet.createdAt ?? new Date(),
           production_date: undefined,
@@ -805,6 +806,7 @@ export class MasterPalletService {
       item_id: history.item_id,
       item_name: history.item?.sku,
       current_quantity: history.new_quantity,
+      capacity: pallet.capacity ?? 0,
       uom: history.uom,
       last_updated: history.createdAt,
       production_date: history.production_date,

@@ -26,11 +26,11 @@ export class TransactionScanPickingService {
   ) { }
 
   async create(data: CreateTransactionScanPickingDto): Promise<ScanPickingTransaction> {
-    // Wrap entire operation in a database transaction for automatic rollback on error
-    return await this.dataSource.transaction(async (transactionalEntityManager) => {
+    return await this.dataSource.transaction(async () => {
       try {
-        // Get transaction picking to retrieve item details
-        const transactionPicking = await this.transactionPickingService.findOne(data.transaction_picking_id);
+        const transactionPicking = await this.transactionPickingService.findOne(
+          data.transaction_picking_id,
+        );
         const memo_id = transactionPicking.memo_id;
 
         if (!memo_id) {
@@ -49,124 +49,63 @@ export class TransactionScanPickingService {
           data.pallet_switch_id,
         ]);
 
-        // Validate pallet_use_id has the same memo_id as transaction picking
-        if (data.pallet_use_id) {
-          const usePallet = await this.masterPalletService.findOne(data.pallet_use_id);
-          if (usePallet.memo_id && usePallet.memo_id !== memo_id) {
-            throw new BadRequestException(
-              `Use pallet (${data.pallet_use_id}) has memo_id ${usePallet.memo_id} which does not match transaction picking memo_id ${memo_id}`,
-            );
-          }
+        if (!data.pallet_source_id) {
+          throw new BadRequestException('pallet_source_id is required');
+        }
+        if (!data.pallet_use_id) {
+          throw new BadRequestException('pallet_use_id is required');
         }
 
-        // Use item_id, uom, week_number from transaction_picking if not provided in DTO
+        await this.validateUsePalletMemo(data.pallet_use_id, memo_id);
+
         const itemId = data.item_id || transactionPicking.item_id;
         const uom = data.uom || transactionPicking.uom;
         const weekNumber = data.week_number ?? transactionPicking.week_number;
         const outboundDoId = transactionPicking.do_id;
-
-        if (!itemId) {
-          throw new BadRequestException('item_id is required (either in request or from transaction_picking)');
-        }
-
-        // Calculate quantities for each pallet
         const quantitySwitch = data.quantity_switch || 0;
 
-        // Validate quantity_switch doesn't exceed quantity_picked
+        if (!itemId) {
+          throw new BadRequestException(
+            'item_id is required (either in request or from transaction_picking)',
+          );
+        }
+        if (weekNumber === undefined || weekNumber === null) {
+          throw new BadRequestException(
+            'week_number is required to pick the correct stock line on the pallet',
+          );
+        }
         if (quantitySwitch > data.quantity_picked) {
           throw new BadRequestException(
             `quantity_switch (${quantitySwitch}) cannot exceed quantity_picked (${data.quantity_picked})`,
           );
         }
 
-        // Check if source and use pallets are the same
-        const isSamePallet = Boolean(data.pallet_source_id && data.pallet_use_id && data.pallet_source_id === data.pallet_use_id);
+        const isSamePallet = data.pallet_source_id === data.pallet_use_id;
+        const productionDate = await this.getPalletItemProductionDate(
+          data.pallet_source_id,
+          itemId,
+          uom,
+          weekNumber,
+        );
 
-        // Get production_date from the matching week stock line on source pallet
-        const productionDate = data.pallet_source_id
-          ? await this.getPalletItemProductionDate(data.pallet_source_id, itemId, uom, weekNumber)
-          : undefined;
+        await this.applyScanPickingPalletQuantities({
+          palletSourceId: data.pallet_source_id,
+          palletUseId: data.pallet_use_id,
+          palletSwitchId: data.pallet_switch_id,
+          quantityPicked: data.quantity_picked,
+          quantitySwitch,
+          itemId,
+          uom,
+          weekNumber,
+          productionDate,
+          outboundDoId,
+          userId: data.user_id,
+          referenceId: data.transaction_picking_id,
+          memoId: memo.id,
+          memoNumber: memo.outbound_memo_number,
+          action: 'CREATE',
+        });
 
-        // Update pallet quantities if pallets are provided
-        // Always perform PICK operation from source pallet
-        if (data.pallet_source_id && data.quantity_picked > 0) {
-          // Pick total quantity from source pallet
-          await this.masterPalletService.updateQuantity(data.pallet_source_id, {
-            item_id: itemId,
-            quantity: data.quantity_picked,
-            operation_type: QuantityOperationType.PICK,
-            uom: uom,
-            week_number: weekNumber,
-            production_date: productionDate,
-            outbound_do_id: outboundDoId,
-            user_id: data.user_id,
-            reference_id: data.transaction_picking_id,
-            reference_type: 'TRANSACTION_SCAN_PICKING',
-            notes: `Picked ${data.quantity_picked} from source pallet for transaction scan picking`,
-            status_inventory: StatusInventory.READY,
-          });
-        }
-
-        if (data.pallet_switch_id && quantitySwitch > 0) {
-          // Add switched quantity to switch pallet
-          await this.masterPalletService.updateQuantity(data.pallet_switch_id, {
-            item_id: itemId,
-            quantity: quantitySwitch,
-            operation_type: QuantityOperationType.ADD,
-            uom: uom,
-            week_number: weekNumber,
-            production_date: productionDate,
-            outbound_do_id: outboundDoId,
-            user_id: data.user_id,
-            reference_id: data.transaction_picking_id,
-            reference_type: 'TRANSACTION_SCAN_PICKING',
-            notes: `Switched ${quantitySwitch} to switch pallet from transaction scan picking`,
-            status_inventory: StatusInventory.READY,
-          });
-        }
-
-        // Handle use pallet quantity
-        if (data.pallet_use_id && data.quantity_picked > 0) {
-          if (isSamePallet) {
-            // If source and use are the same pallet, add back the remaining quantity
-            // (quantity_picked - quantity_switch) stays on the same pallet
-            const remainingQuantity = data.quantity_picked - quantitySwitch;
-            if (remainingQuantity > 0) {
-              await this.masterPalletService.updateQuantity(data.pallet_use_id, {
-                item_id: itemId,
-                quantity: remainingQuantity,
-                operation_type: QuantityOperationType.ADD,
-                uom: uom,
-                week_number: weekNumber,
-                production_date: productionDate,
-                outbound_do_id: outboundDoId,
-                user_id: data.user_id,
-                reference_id: data.transaction_picking_id,
-                reference_type: 'TRANSACTION_SCAN_PICKING',
-                notes: `Added back ${remainingQuantity} to same pallet (remaining after switch)`,
-                status_inventory: StatusInventory.PENDING,
-              });
-            }
-          } else {
-            // If use pallet is different from source, add full quantity_picked to use pallet
-            await this.masterPalletService.updateQuantity(data.pallet_use_id, {
-              item_id: itemId,
-              quantity: data.quantity_picked,
-              operation_type: QuantityOperationType.ADD,
-              uom: uom,
-              week_number: weekNumber,
-              production_date: productionDate,
-              outbound_do_id: outboundDoId,
-              user_id: data.user_id,
-              reference_id: data.transaction_picking_id,
-              reference_type: 'TRANSACTION_SCAN_PICKING',
-              notes: `Added ${data.quantity_picked} to destination pallet from transaction scan picking`,
-              status_inventory: StatusInventory.PENDING,
-            });
-          }
-        }
-
-        // Move inventory tracking for pallets
         await this.moveInventoryTrackingForPallets(
           data.pallet_source_id,
           data.pallet_use_id,
@@ -175,29 +114,229 @@ export class TransactionScanPickingService {
           data.quantity_picked,
           quantitySwitch,
           isSamePallet,
+          memo.outbound_memo_number,
         );
 
-        if (data.pallet_use_id) {
-          await this.masterPalletService.update(data.pallet_use_id, {
+        await this.masterPalletService.update(data.pallet_use_id, {
+          memo_id: memo.id,
+        });
+
+        return this.repository.create({
+          ...data,
+          item_id: itemId,
+          uom,
+          week_number: weekNumber,
+          quantity_switch: quantitySwitch,
+        });
+      } catch (error) {
+        if (error instanceof BadRequestException || error instanceof NotFoundException) {
+          throw error;
+        }
+        console.error('Error creating transaction scan picking:', error);
+        throw new BadRequestException(
+          `Failed to create transaction scan picking: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    });
+  }
+
+  async update(
+    id: string,
+    data: UpdateTransactionScanPickingDto,
+  ): Promise<ScanPickingTransaction> {
+    return await this.dataSource.transaction(async () => {
+      try {
+        const existing = await this.findOne(id);
+
+        const transactionPickingId =
+          data.transaction_picking_id || existing.transaction_picking_id;
+        const transactionPicking =
+          await this.transactionPickingService.findOne(transactionPickingId);
+
+        const memo_id = transactionPicking.memo_id;
+        if (!memo_id) {
+          throw new BadRequestException('Transaction picking must have a memo_id');
+        }
+        const memo = await this.outboundMemoService.findOne(memo_id);
+        if (!memo) {
+          throw new NotFoundException(`Memo with ID ${memo_id} not found`);
+        }
+
+        const itemId = data.item_id || existing.item_id || transactionPicking.item_id;
+        const uom = data.uom || existing.uom || transactionPicking.uom;
+        const weekNumber =
+          data.week_number ?? existing.week_number ?? transactionPicking.week_number;
+        const outboundDoId = transactionPicking.do_id;
+
+        if (!itemId) {
+          throw new BadRequestException(
+            'item_id is required (either in request or from transaction_picking)',
+          );
+        }
+
+        if (data.quantity_picked !== undefined || data.quantity_switch !== undefined) {
+          await this.validateQuantities(
+            data.quantity_picked ?? existing.quantity_picked,
+            data.quantity_switch ?? existing.quantity_switch,
+          );
+        }
+
+        await this.validatePallets([
+          data.pallet_source_id,
+          data.pallet_use_id,
+          data.pallet_switch_id,
+        ]);
+
+        const quantityPicked = data.quantity_picked ?? existing.quantity_picked;
+        const quantitySwitch = data.quantity_switch ?? existing.quantity_switch ?? 0;
+
+        const hasPalletChanges =
+          data.pallet_source_id !== undefined ||
+          data.pallet_use_id !== undefined ||
+          data.pallet_switch_id !== undefined ||
+          data.quantity_picked !== undefined ||
+          data.quantity_switch !== undefined ||
+          data.week_number !== undefined ||
+          data.item_id !== undefined ||
+          data.uom !== undefined;
+
+        if (hasPalletChanges) {
+          if (quantitySwitch > quantityPicked) {
+            throw new BadRequestException(
+              `quantity_switch (${quantitySwitch}) cannot exceed quantity_picked (${quantityPicked})`,
+            );
+          }
+          if (weekNumber === undefined || weekNumber === null) {
+            throw new BadRequestException(
+              'week_number is required to revert/update pallet operations for the correct stock line',
+            );
+          }
+
+          const userId = data.user_id ?? (existing as { user_id?: string }).user_id;
+          const existingWeekNumber = existing.week_number ?? weekNumber;
+
+          // Revert previous ops using the original week/item/uom on the scan row
+          await this.revertPalletOperations(
+            existing,
+            existing.item_id || itemId,
+            existing.uom || uom,
+            existingWeekNumber,
+            existing.transaction_picking_id,
+            outboundDoId,
+            userId,
+            memo.outbound_memo_number,
+          );
+
+          const newPalletSourceId = data.pallet_source_id ?? existing.pallet_source_id;
+          const newPalletUseId = data.pallet_use_id ?? existing.pallet_use_id;
+          const newPalletSwitchId = data.pallet_switch_id ?? existing.pallet_switch_id;
+
+          if (!newPalletSourceId || !newPalletUseId) {
+            throw new BadRequestException('pallet_source_id and pallet_use_id are required');
+          }
+
+          await this.validateUsePalletMemo(newPalletUseId, memo_id);
+
+          const isSamePallet = newPalletSourceId === newPalletUseId;
+          const productionDate = await this.getPalletItemProductionDate(
+            newPalletSourceId,
+            itemId,
+            uom,
+            weekNumber,
+          );
+
+          await this.applyScanPickingPalletQuantities({
+            palletSourceId: newPalletSourceId,
+            palletUseId: newPalletUseId,
+            palletSwitchId: newPalletSwitchId,
+            quantityPicked,
+            quantitySwitch,
+            itemId,
+            uom,
+            weekNumber,
+            productionDate,
+            outboundDoId,
+            userId,
+            referenceId: transactionPickingId,
+            memoId: memo.id,
+            memoNumber: memo.outbound_memo_number,
+            action: 'UPDATE',
+          });
+
+          await this.moveInventoryTrackingForPallets(
+            newPalletSourceId,
+            newPalletUseId,
+            newPalletSwitchId,
+            transactionPicking,
+            quantityPicked,
+            quantitySwitch,
+            isSamePallet,
+            memo.outbound_memo_number,
+          );
+
+          await this.masterPalletService.update(newPalletUseId, {
             memo_id: memo.id,
           });
         }
 
-        return this.repository.create(data);
+        return this.repository.update(id, {
+          ...data,
+          item_id: itemId,
+          uom,
+          week_number: weekNumber,
+          quantity_switch: quantitySwitch,
+        });
       } catch (error) {
-        // Transaction will automatically rollback on error
-        // Re-throw validation and business logic errors as-is
-        if (
-          error instanceof BadRequestException ||
-          error instanceof NotFoundException
-        ) {
+        if (error instanceof BadRequestException || error instanceof NotFoundException) {
           throw error;
         }
-
-        // Wrap other errors with context
-        console.error('Error creating transaction scan picking:', error);
-        throw new BadRequestException(`Failed to create transaction scan picking: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error(`Error updating transaction scan picking ${id}:`, error);
+        throw new BadRequestException(
+          `Failed to update transaction scan picking: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
+    });
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.dataSource.transaction(async () => {
+      const existing = await this.findOne(id);
+
+      const transactionPicking = await this.transactionPickingService.findOne(
+        existing.transaction_picking_id,
+      );
+
+      const itemId = existing.item_id || transactionPicking.item_id;
+      const uom = existing.uom || transactionPicking.uom;
+      const weekNumber = existing.week_number ?? transactionPicking.week_number;
+      const outboundDoId = transactionPicking.do_id;
+      const memoNumber = transactionPicking.memo_id
+        ? (await this.outboundMemoService.findOne(transactionPicking.memo_id))?.outbound_memo_number
+        : undefined;
+
+      if (!itemId) {
+        throw new BadRequestException('item_id is required to revert pallet operations');
+      }
+      if (weekNumber === undefined || weekNumber === null) {
+        throw new BadRequestException(
+          'week_number is required to revert pallet operations for the correct stock line',
+        );
+      }
+
+      const userId = (existing as { user_id?: string }).user_id;
+
+      await this.revertPalletOperations(
+        existing,
+        itemId,
+        uom,
+        weekNumber,
+        existing.transaction_picking_id,
+        outboundDoId,
+        userId,
+        memoNumber,
+      );
+
+      await this.repository.remove(id);
     });
   }
 
@@ -227,239 +366,7 @@ export class TransactionScanPickingService {
     return this.repository.findAll({ transactionPickingId });
   }
 
-  async update(
-    id: string,
-    data: UpdateTransactionScanPickingDto,
-  ): Promise<ScanPickingTransaction> {
-    // Wrap entire operation in a database transaction for automatic rollback on error
-    return await this.dataSource.transaction(async (transactionalEntityManager) => {
-      try {
-        const existing = await this.findOne(id);
 
-        // Get transaction picking to retrieve item details
-        const transactionPickingId = data.transaction_picking_id || existing.transaction_picking_id;
-        const transactionPicking = await this.transactionPickingService.findOne(transactionPickingId);
-
-        if (data.transaction_picking_id && data.transaction_picking_id !== existing.transaction_picking_id) {
-          await this.transactionPickingService.findOne(data.transaction_picking_id);
-        }
-
-        // Use item_id, uom, week_number from transaction_picking if not provided
-        const itemId = data.item_id || existing.item_id || transactionPicking.item_id;
-        const uom = data.uom || existing.uom || transactionPicking.uom;
-        const weekNumber = data.week_number ?? existing.week_number ?? transactionPicking.week_number;
-        const outboundDoId = transactionPicking.do_id;
-
-        if (!itemId) {
-          throw new BadRequestException('item_id is required (either in request or from transaction_picking)');
-        }
-
-        if (
-          data.quantity_picked !== undefined ||
-          data.quantity_switch !== undefined
-        ) {
-          await this.validateQuantities(
-            data.quantity_picked ?? existing.quantity_picked,
-            data.quantity_switch ?? existing.quantity_switch,
-          );
-        }
-
-        await this.validatePallets([
-          data.pallet_source_id,
-          data.pallet_use_id,
-          data.pallet_switch_id,
-        ]);
-
-        // Check if pallet operations need to be updated
-        const quantityPicked = data.quantity_picked ?? existing.quantity_picked;
-        const quantitySwitch = data.quantity_switch ?? existing.quantity_switch ?? 0;
-
-        const hasPalletChanges =
-          data.pallet_source_id !== undefined ||
-          data.pallet_use_id !== undefined ||
-          data.pallet_switch_id !== undefined ||
-          data.quantity_picked !== undefined ||
-          data.quantity_switch !== undefined;
-
-        if (hasPalletChanges) {
-          // Validate quantity_switch
-          if (quantitySwitch > quantityPicked) {
-            throw new BadRequestException(
-              `quantity_switch (${quantitySwitch}) cannot exceed quantity_picked (${quantityPicked})`,
-            );
-          }
-
-          // Get user_id from data or existing (if stored)
-          const userId = data.user_id ?? (existing as any).user_id;
-
-          // Revert existing pallet operations
-          if (weekNumber === undefined || weekNumber === null) {
-            throw new BadRequestException(
-              'week_number is required to revert/update pallet operations for the correct stock line',
-            );
-          }
-          await this.revertPalletOperations(existing, itemId, uom, weekNumber, transactionPickingId, outboundDoId, userId);
-
-          // Apply new pallet operations based on updated data
-          const newPalletSourceId = data.pallet_source_id ?? existing.pallet_source_id;
-          const newPalletUseId = data.pallet_use_id ?? existing.pallet_use_id;
-          const newPalletSwitchId = data.pallet_switch_id ?? existing.pallet_switch_id;
-
-          // Check if source and use pallets are the same
-          const isSamePallet = Boolean(newPalletSourceId && newPalletUseId && newPalletSourceId === newPalletUseId);
-
-          // Get production_date from the matching week stock line on source pallet
-          const productionDate = newPalletSourceId
-            ? await this.getPalletItemProductionDate(newPalletSourceId, itemId, uom, weekNumber)
-            : undefined;
-
-          // Always perform PICK operation from source pallet
-          if (newPalletSourceId && quantityPicked > 0) {
-            await this.masterPalletService.updateQuantity(newPalletSourceId, {
-              item_id: itemId,
-              quantity: quantityPicked,
-              operation_type: QuantityOperationType.PICK,
-              uom: uom,
-              week_number: weekNumber,
-              production_date: productionDate,
-              outbound_do_id: outboundDoId,
-              user_id: userId,
-              reference_id: transactionPickingId,
-              reference_type: 'TRANSACTION_SCAN_PICKING',
-              notes: `Picked ${quantityPicked} from source pallet for transaction scan picking (updated)`,
-              status_inventory: StatusInventory.READY,
-            });
-          }
-
-          // Apply new switch pallet operation
-          if (newPalletSwitchId && quantitySwitch > 0) {
-            await this.masterPalletService.updateQuantity(newPalletSwitchId, {
-              item_id: itemId,
-              quantity: quantitySwitch,
-              operation_type: QuantityOperationType.ADD,
-              uom: uom,
-              week_number: weekNumber,
-              production_date: productionDate,
-              outbound_do_id: outboundDoId,
-              user_id: userId,
-              reference_id: transactionPickingId,
-              reference_type: 'TRANSACTION_SCAN_PICKING',
-              notes: `Switched ${quantitySwitch} to switch pallet from transaction scan picking (updated)`,
-              status_inventory: StatusInventory.READY,
-            });
-          }
-
-          // Handle use pallet quantity
-          if (newPalletUseId && quantityPicked > 0) {
-            if (isSamePallet) {
-              // If source and use are the same pallet, add back the remaining quantity
-              // (quantity_picked - quantity_switch) stays on the same pallet
-              const remainingQuantity = quantityPicked - quantitySwitch;
-              if (remainingQuantity > 0) {
-                await this.masterPalletService.updateQuantity(newPalletUseId, {
-                  item_id: itemId,
-                  quantity: remainingQuantity,
-                  operation_type: QuantityOperationType.ADD,
-                  uom: uom,
-                  week_number: weekNumber,
-                  production_date: productionDate,
-                  outbound_do_id: outboundDoId,
-                  user_id: userId,
-                  reference_id: transactionPickingId,
-                  reference_type: 'TRANSACTION_SCAN_PICKING',
-                  notes: `Added back ${remainingQuantity} to same pallet (remaining after switch) - updated`,
-                  status_inventory: StatusInventory.PENDING,
-                });
-              }
-            } else {
-              // If use pallet is different from source, add full quantity_picked to use pallet
-              await this.masterPalletService.updateQuantity(newPalletUseId, {
-                item_id: itemId,
-                quantity: quantityPicked,
-                operation_type: QuantityOperationType.ADD,
-                uom: uom,
-                week_number: weekNumber,
-                production_date: productionDate,
-                outbound_do_id: outboundDoId,
-                user_id: userId,
-                reference_id: transactionPickingId,
-                reference_type: 'TRANSACTION_SCAN_PICKING',
-                notes: `Added ${quantityPicked} to destination pallet from transaction scan picking (updated)`,
-                status_inventory: StatusInventory.PENDING,
-              });
-            }
-          }
-
-          // Move inventory tracking for updated pallets
-          await this.moveInventoryTrackingForPallets(
-            newPalletSourceId,
-            newPalletUseId,
-            newPalletSwitchId,
-            transactionPicking,
-            quantityPicked,
-            quantitySwitch,
-            isSamePallet,
-          );
-        }
-
-        return this.repository.update(id, data);
-      } catch (error) {
-        // Transaction will automatically rollback on error
-        // Re-throw validation and business logic errors as-is
-        if (
-          error instanceof BadRequestException ||
-          error instanceof NotFoundException
-        ) {
-          throw error;
-        }
-
-        // Wrap other errors with context
-        console.error(`Error updating transaction scan picking ${id}:`, error);
-        throw new BadRequestException(`Failed to update transaction scan picking: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    });
-  }
-
-  async remove(id: string): Promise<void> {
-    await this.dataSource.transaction(async () => {
-      const existing = await this.findOne(id);
-
-      // Get transaction picking to retrieve item details
-      const transactionPicking = await this.transactionPickingService.findOne(
-        existing.transaction_picking_id,
-      );
-
-      // Use item_id, uom, week_number from existing or transaction_picking
-      const itemId = existing.item_id || transactionPicking.item_id;
-      const uom = existing.uom || transactionPicking.uom;
-      const weekNumber = existing.week_number ?? transactionPicking.week_number;
-      const outboundDoId = transactionPicking.do_id;
-
-      if (!itemId) {
-        throw new BadRequestException('item_id is required to revert pallet operations');
-      }
-
-      if (weekNumber === undefined || weekNumber === null) {
-        throw new BadRequestException(
-          'week_number is required to revert pallet operations for the correct stock line',
-        );
-      }
-
-      const userId = (existing as any).user_id;
-
-      await this.revertPalletOperations(
-        existing,
-        itemId,
-        uom,
-        weekNumber,
-        existing.transaction_picking_id,
-        outboundDoId,
-        userId,
-      );
-
-      await this.repository.remove(id);
-    });
-  }
 
   async inspectionApproved(id: string, inspection_by: string): Promise<ScanPickingTransaction> {
     const existing = await this.findOne(id);
@@ -467,6 +374,141 @@ export class TransactionScanPickingService {
       throw new NotFoundException('Transaction scan picking tidak ditemukan');
     }
     return this.repository.update(id, { status: ScanPickingStatus.INSPECTION_APPROVED, inspection_by: inspection_by });
+  }
+
+  private async validateUsePalletMemo(palletUseId: string, memoId: string): Promise<void> {
+    const usePallet = await this.masterPalletService.findOne(palletUseId);
+    if (usePallet.memo_id && usePallet.memo_id !== memoId) {
+      throw new BadRequestException(
+        `Use pallet ${usePallet.pallet_code ?? palletUseId} already bound to memo_id ${usePallet.memo_id}; expected memo_id ${memoId}`,
+      );
+    }
+  }
+
+  private async resolvePalletCode(palletId?: string | null): Promise<string> {
+    if (!palletId) {
+      return 'N/A';
+    }
+    try {
+      const pallet = await this.masterPalletService.findOne(palletId);
+      return pallet.pallet_code || palletId;
+    } catch {
+      return palletId;
+    }
+  }
+
+  /**
+   * Apply scan-picking stock moves:
+   * 1) PICK quantity_picked from source (READY)
+   * 2) ADD quantity_to_use (= picked - switch) to use pallet as PENDING (bound to memo)
+   * 3) ADD quantity_switch to switch pallet as READY (leftover, not for memo)
+   *
+   * Bug fixed: previously different source/use added full quantity_picked to use AND
+   * quantity_switch to switch, double-counting the switch portion.
+   */
+  private async applyScanPickingPalletQuantities(params: {
+    palletSourceId: string;
+    palletUseId: string;
+    palletSwitchId?: string;
+    quantityPicked: number;
+    quantitySwitch: number;
+    itemId: string;
+    uom?: string;
+    weekNumber: number;
+    productionDate?: Date;
+    outboundDoId?: string;
+    userId?: string;
+    referenceId: string;
+    memoId: string;
+    memoNumber?: string | null;
+    action: 'CREATE' | 'UPDATE';
+  }): Promise<void> {
+    const {
+      palletSourceId,
+      palletUseId,
+      palletSwitchId,
+      quantityPicked,
+      quantitySwitch,
+      itemId,
+      uom,
+      weekNumber,
+      productionDate,
+      outboundDoId,
+      userId,
+      referenceId,
+      memoId,
+      memoNumber,
+      action,
+    } = params;
+
+    const quantityToUse = quantityPicked - quantitySwitch;
+    const isSamePallet = palletSourceId === palletUseId;
+    const memoLabel = memoNumber || memoId;
+
+    const [sourceCode, useCode, switchCode] = await Promise.all([
+      this.resolvePalletCode(palletSourceId),
+      this.resolvePalletCode(palletUseId),
+      this.resolvePalletCode(palletSwitchId),
+    ]);
+
+    const basePayload = {
+      item_id: itemId,
+      uom,
+      week_number: weekNumber,
+      production_date: productionDate,
+      outbound_do_id: outboundDoId,
+      user_id: userId,
+      reference_id: referenceId,
+      reference_type: 'TRANSACTION_SCAN_PICKING' as const,
+    };
+
+    if (quantityPicked > 0) {
+      await this.masterPalletService.updateQuantity(palletSourceId, {
+        ...basePayload,
+        quantity: quantityPicked,
+        operation_type: QuantityOperationType.PICK,
+        status_inventory: StatusInventory.READY,
+        notes:
+          `[${action}] PICK ${quantityPicked}${uom ? ` ${uom}` : ''} ` +
+          `FROM source pallet ${sourceCode} (${palletSourceId}) ` +
+          `week=${weekNumber} ` +
+          `FOR memo ${memoLabel} (${memoId}); ` +
+          `route: to_use=${useCode}${isSamePallet ? ' (same as source)' : ''} qty=${quantityToUse}` +
+          (quantitySwitch > 0
+            ? `, to_switch=${switchCode} qty=${quantitySwitch}`
+            : ', to_switch=none'),
+      });
+    }
+
+    if (palletSwitchId && quantitySwitch > 0) {
+      await this.masterPalletService.updateQuantity(palletSwitchId, {
+        ...basePayload,
+        quantity: quantitySwitch,
+        operation_type: QuantityOperationType.ADD,
+        status_inventory: StatusInventory.READY,
+        notes:
+          `[${action}] ADD ${quantitySwitch}${uom ? ` ${uom}` : ''} ` +
+          `TO switch pallet ${switchCode} (${palletSwitchId}) ` +
+          `FROM source pallet ${sourceCode} (${palletSourceId}) ` +
+          `week=${weekNumber}; leftover READY stock (NOT for memo ${memoLabel})`,
+      });
+    }
+
+    if (quantityToUse > 0) {
+      await this.masterPalletService.updateQuantity(palletUseId, {
+        ...basePayload,
+        quantity: quantityToUse,
+        operation_type: QuantityOperationType.ADD,
+        status_inventory: StatusInventory.PENDING,
+        notes:
+          `[${action}] ADD ${quantityToUse}${uom ? ` ${uom}` : ''} ` +
+          `TO use pallet ${useCode} (${palletUseId})` +
+          (isSamePallet ? ' (same as source — convert READY→PENDING)' : '') +
+          ` FROM source pallet ${sourceCode} (${palletSourceId}) ` +
+          `week=${weekNumber} ` +
+          `FOR memo ${memoLabel} (${memoId}); status=PENDING (waiting outbound pick/ship)`,
+      });
+    }
   }
 
   private async revertPalletOperations(
@@ -477,18 +519,19 @@ export class TransactionScanPickingService {
     transactionPickingId: string,
     outboundDoId: string | undefined,
     userId?: string | undefined,
+    memoNumber?: string | null,
   ): Promise<void> {
-    // Get transaction picking for warehouse info
-    const transactionPicking = await this.transactionPickingService.findOne(transactionPickingId);
+    const transactionPicking =
+      await this.transactionPickingService.findOne(transactionPickingId);
+    const memoId = transactionPicking.memo_id;
+    const memoLabel = memoNumber || memoId || 'N/A';
 
-    // Check if source and use pallets were the same
     const wasSamePallet = Boolean(
       existing.pallet_source_id &&
         existing.pallet_use_id &&
         existing.pallet_source_id === existing.pallet_use_id,
     );
 
-    // Resolve production_date for the same week stock line (never mix weeks)
     let productionDate: Date | undefined;
     const productionDatePalletId =
       existing.pallet_use_id || existing.pallet_switch_id || existing.pallet_source_id;
@@ -503,6 +546,13 @@ export class TransactionScanPickingService {
 
     const quantitySwitch = existing.quantity_switch || 0;
     const quantityPicked = existing.quantity_picked || 0;
+    const quantityToUse = quantityPicked - quantitySwitch;
+
+    const [sourceCode, useCode, switchCode] = await Promise.all([
+      this.resolvePalletCode(existing.pallet_source_id),
+      this.resolvePalletCode(existing.pallet_use_id),
+      this.resolvePalletCode(existing.pallet_switch_id),
+    ]);
 
     const basePayload = {
       item_id: itemId,
@@ -512,60 +562,72 @@ export class TransactionScanPickingService {
       outbound_do_id: outboundDoId,
       user_id: userId,
       reference_id: transactionPickingId,
-      reference_type: 'TRANSACTION_SCAN_PICKING',
+      reference_type: 'TRANSACTION_SCAN_PICKING' as const,
     };
 
-    // Undo in reverse order of create:
-    // create = PICK source -> ADD switch -> ADD use
-    // revert = REMOVE use -> REMOVE switch -> ADD source
-
-    // 1) Revert use pallet (undo ADD / ADD-back)
-    if (existing.pallet_use_id && quantityPicked > 0) {
-      if (wasSamePallet) {
-        const remainingQuantity = quantityPicked - quantitySwitch;
-        if (remainingQuantity > 0) {
-          await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
-            ...basePayload,
-            quantity: remainingQuantity,
-            operation_type: QuantityOperationType.REMOVE,
-            notes: `Reverted: Removed ${remainingQuantity} from same pallet (remaining after switch)`,
-            status_inventory: StatusInventory.PENDING,
-          });
-        }
-      } else {
-        await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
-          ...basePayload,
-          quantity: quantityPicked,
-          operation_type: QuantityOperationType.REMOVE,
-          notes: `Reverted: Removed ${quantityPicked} from destination pallet`,
-          status_inventory: StatusInventory.PENDING,
-        });
-      }
+    // Reverse of create: REMOVE use → REMOVE switch → ADD source
+    if (existing.pallet_use_id && quantityToUse > 0) {
+      await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
+        ...basePayload,
+        quantity: quantityToUse,
+        operation_type: QuantityOperationType.REMOVE,
+        status_inventory: StatusInventory.PENDING,
+        notes:
+          `[REVERT] REMOVE ${quantityToUse}${uom ? ` ${uom}` : ''} ` +
+          `FROM use pallet ${useCode} (${existing.pallet_use_id})` +
+          (wasSamePallet ? ' (same as source)' : '') +
+          ` week=${weekNumber} ` +
+          `FOR memo ${memoLabel}` +
+          (memoId ? ` (${memoId})` : '') +
+          `; undo PENDING stock that was for outbound`,
+      });
     }
 
-    // 2) Revert switch pallet (undo ADD)
     if (existing.pallet_switch_id && quantitySwitch > 0) {
       await this.masterPalletService.updateQuantity(existing.pallet_switch_id, {
         ...basePayload,
         quantity: quantitySwitch,
         operation_type: QuantityOperationType.REMOVE,
-        notes: `Reverted: Removed ${quantitySwitch} from switch pallet`,
         status_inventory: StatusInventory.READY,
+        notes:
+          `[REVERT] REMOVE ${quantitySwitch}${uom ? ` ${uom}` : ''} ` +
+          `FROM switch pallet ${switchCode} (${existing.pallet_switch_id}) ` +
+          `week=${weekNumber}; undo leftover READY that came FROM source ${sourceCode}`,
       });
     }
 
-    // 3) Revert source pallet (undo PICK = ADD back)
     if (existing.pallet_source_id && quantityPicked > 0) {
       await this.masterPalletService.updateQuantity(existing.pallet_source_id, {
         ...basePayload,
         quantity: quantityPicked,
         operation_type: QuantityOperationType.ADD,
-        notes: `Reverted: Added back ${quantityPicked} to source pallet`,
         status_inventory: StatusInventory.READY,
+        notes:
+          `[REVERT] ADD ${quantityPicked}${uom ? ` ${uom}` : ''} ` +
+          `TO source pallet ${sourceCode} (${existing.pallet_source_id}) ` +
+          `week=${weekNumber} ` +
+          `FROM use=${useCode} / switch=${switchCode}; ` +
+          `restore READY stock after undoing scan picking for memo ${memoLabel}`,
       });
     }
 
-    // Revert inventory tracking
+    // Clear memo binding on use pallet if it was set for this memo
+    if (existing.pallet_use_id && memoId) {
+      try {
+        const usePallet = await this.masterPalletService.findOne(existing.pallet_use_id);
+        if (usePallet.memo_id === memoId) {
+          await this.masterPalletService.update(existing.pallet_use_id, {
+            memo_id: null,
+          });
+        }
+      } catch (error) {
+        console.warn(
+          `Could not clear memo_id on use pallet ${existing.pallet_use_id}:`,
+          error,
+        );
+      }
+    }
+
     await this.revertInventoryTrackingForPallets(existing, transactionPicking, wasSamePallet);
   }
 
@@ -577,6 +639,7 @@ export class TransactionScanPickingService {
     quantityPicked: number,
     quantitySwitch: number,
     isSamePallet: boolean,
+    memoNumber?: string | null,
   ): Promise<void> {
     try {
       // Get destination warehouse info from transaction picking
@@ -610,73 +673,79 @@ export class TransactionScanPickingService {
         }
       }
 
+      const quantityToUse = quantityPicked - quantitySwitch;
+      const memoLabel = memoNumber ? ` memo=${memoNumber}` : '';
+
       // Move inventory tracking to destination location
       // If same pallet, move source pallet to destination. If different, move use pallet to destination.
-      if (palletUseId && quantityPicked > 0 && destinationWarehouseSubId && destinationWarehouseId) {
+      // pallet_use always gets inventory_status = PICKED.
+      if (palletUseId && quantityToUse > 0) {
         const targetPalletId = isSamePallet ? palletSourceId : palletUseId;
 
-        if (!targetPalletId) {
-          return;
-        }
-
-        try {
-          // Check if target pallet already has inventory tracking
-          let targetPalletTracking;
+        if (targetPalletId && destinationWarehouseSubId && destinationWarehouseId) {
           try {
-            targetPalletTracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
-          } catch (error) {
-            // If not found, we'll create a new one
-            if (!(error instanceof NotFoundException)) {
-              throw error;
-            }
-            targetPalletTracking = null;
-          }
-
-          if (targetPalletTracking) {
-            // Update location/progression only. Do not change inventory_status for pallet_use.
-            const updatePayload: Record<string, unknown> = {
-              warehouse_sub_id: destinationWarehouseSubId,
-              warehouse_bin_id: destinationBinId,
-              warehouse_id: destinationWarehouseId,
-              progression_status: ProgressionStatus.COMPLETED,
-              inventory_note: isSamePallet
-                ? `Picked ${quantityPicked} and moved to destination via transaction scan picking`
-                : `Picked ${quantityPicked} from source pallet and moved to destination via transaction scan picking`,
-              inventory_date: new Date(),
-            };
-
-            // Only update inventory_status when source and use are the same pallet
-            // (tracking belongs to source). Never overwrite inventory_status for pallet_use.
-            if (isSamePallet) {
-              updatePayload.inventory_status = 'PICKED';
+            let targetPalletTracking;
+            try {
+              targetPalletTracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+            } catch (error) {
+              if (!(error instanceof NotFoundException)) {
+                throw error;
+              }
+              targetPalletTracking = null;
             }
 
-            await this.inventoryTrackingService.update(targetPalletTracking.id, updatePayload);
-          } else {
-            // Create tracking for target pallet at destination.
-            // For pallet_use (different pallet), keep IN_INVENTORY — do not set PICKED.
-            const inventoryStatus = isSamePallet ? 'PICKED' : 'IN_INVENTORY';
-            await this.inventoryTrackingService.createOrUpdateInventoryTracking(
-              targetPalletId,
-              destinationWarehouseSubId,
-              destinationWarehouseId,
-              inventoryStatus,
-              ProgressionStatus.COMPLETED,
-            );
+            if (targetPalletTracking) {
+              await this.inventoryTrackingService.update(targetPalletTracking.id, {
+                warehouse_sub_id: destinationWarehouseSubId,
+                warehouse_bin_id: destinationBinId,
+                warehouse_id: destinationWarehouseId,
+                inventory_status: 'PICKED',
+                progression_status: ProgressionStatus.COMPLETED,
+                inventory_note: isSamePallet
+                  ? `Scan picking: ${quantityToUse} on same pallet ${targetPalletId} → PICKED; from source=${palletSourceId}; switch=${quantitySwitch};${memoLabel}`
+                  : `Scan picking: moved ${quantityToUse} FROM source ${palletSourceId} TO use ${palletUseId} → PICKED; switch=${quantitySwitch};${memoLabel}`,
+                inventory_date: new Date(),
+              });
+            } else {
+              await this.inventoryTrackingService.createOrUpdateInventoryTracking(
+                targetPalletId,
+                destinationWarehouseSubId,
+                destinationWarehouseId,
+                'PICKED',
+                ProgressionStatus.COMPLETED,
+              );
 
-            // Update bin if provided
-            if (destinationBinId) {
-              const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
-              if (tracking) {
-                await this.inventoryTrackingService.update(tracking.id, {
-                  warehouse_bin_id: destinationBinId,
-                });
+              if (destinationBinId) {
+                const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+                if (tracking) {
+                  await this.inventoryTrackingService.update(tracking.id, {
+                    warehouse_bin_id: destinationBinId,
+                    inventory_status: 'PICKED',
+                    inventory_note: `Scan picking create tracking FOR use pallet ${targetPalletId} FROM source ${palletSourceId} → PICKED;${memoLabel}`,
+                  });
+                }
               }
             }
+          } catch (error) {
+            console.error(`Failed to move inventory tracking to destination for pallet ${targetPalletId}:`, error);
           }
-        } catch (error) {
-          // Log error but don't fail the operation
-          console.error(`Failed to move inventory tracking to destination for pallet ${targetPalletId}:`, error);
+        } else if (targetPalletId) {
+          // Destination incomplete — still mark use pallet as PICKED
+          try {
+            const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+            if (tracking) {
+              await this.inventoryTrackingService.update(tracking.id, {
+                inventory_status: 'PICKED',
+                progression_status: ProgressionStatus.COMPLETED,
+                inventory_note: `Scan picking: use pallet ${targetPalletId} → PICKED (destination location incomplete);${memoLabel}`,
+                inventory_date: new Date(),
+              });
+            }
+          } catch (error) {
+            if (!(error instanceof NotFoundException)) {
+              console.error(`Failed to set PICKED on use pallet ${targetPalletId}:`, error);
+            }
+          }
         }
       }
 
@@ -737,8 +806,6 @@ export class TransactionScanPickingService {
               warehouse_bin_id: finalBinId,
               warehouse_id: finalWarehouseId,
               inventory_status: 'IN_INVENTORY',
-              inventory_note: `Switched ${quantitySwitch} from source pallet via transaction scan picking`,
-              inventory_date: new Date(),
               progression_status: ProgressionStatus.COMPLETED,
             });
           } else {
@@ -833,7 +900,7 @@ export class TransactionScanPickingService {
         }
       }
 
-      // Revert use pallet inventory tracking location only — do not change inventory_status
+      // Revert use pallet: restore location and clear PICKED → IN_INVENTORY
       if (existing.pallet_use_id && existing.quantity_picked > 0 && !wasSamePallet) {
         try {
           const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_use_id);
@@ -843,9 +910,10 @@ export class TransactionScanPickingService {
               warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? usePalletTracking.warehouse_sub_id,
               warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? usePalletTracking.warehouse_bin_id,
               warehouse_id: locationToRestore?.warehouse_id ?? usePalletTracking.warehouse_id,
+              inventory_status: 'IN_INVENTORY',
               inventory_note: locationToRestore
-                ? `Reverted: Moved back to previous location`
-                : `Reverted: Transaction scan picking reverted`,
+                ? `Reverted: use pallet PICKED → IN_INVENTORY, moved back to previous location`
+                : `Reverted: use pallet PICKED → IN_INVENTORY`,
               inventory_date: new Date(),
               progression_status: ProgressionStatus.COMPLETED,
             });

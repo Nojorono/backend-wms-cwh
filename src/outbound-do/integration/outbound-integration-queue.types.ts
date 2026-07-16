@@ -1,3 +1,5 @@
+import { ShipConfirmInternalTransactionType } from '../../core/domain/entities/outbound-integration-deliveries.entity';
+
 export type OutboundIntegrationJobType = 'PO_INTERNAL_REQ' | 'SHIP_CONFIRM';
 
 export interface OutboundJobPayload {
@@ -5,6 +7,8 @@ export interface OutboundJobPayload {
   retryCount: number;
   maxRetry: number;
   jobType?: OutboundIntegrationJobType;
+  /** Scopes shipconfirm.find / status evaluation to one staging transaction type */
+  transactionType?: ShipConfirmInternalTransactionType;
 }
 
 export type OutboundJobProcessStatus = 'SUCCESS' | 'ERROR' | 'PENDING';

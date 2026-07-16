@@ -132,40 +132,50 @@ export class OutboundIntegrationQueueConsumer {
     const retryCount = data.retryCount ?? 0;
     const maxRetry = data.maxRetry ?? 20;
 
+    const transactionType = data.transactionType;
+
     this.logger.log(
-      `Ship confirm queue processing outboundDoId=${outboundDoId} retryCount=${retryCount}/${maxRetry}`,
+      `Ship confirm queue processing outboundDoId=${outboundDoId} retryCount=${retryCount}/${maxRetry} transactionType=${transactionType ?? 'ALL'}`,
     );
 
     if (retryCount >= maxRetry) {
-      const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus({
-        outboundDoId,
-        retryCount,
-        maxRetry,
-        jobType: 'SHIP_CONFIRM',
-      });
+      const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus(
+        {
+          outboundDoId,
+          retryCount,
+          maxRetry,
+          jobType: 'SHIP_CONFIRM',
+          transactionType,
+        },
+        transactionType,
+      );
       this.logger.error(
-        `Ship confirm queue timeout outboundDoId=${outboundDoId} retryCount=${retryCount} reason=${result.reason}`,
+        `Ship confirm queue timeout outboundDoId=${outboundDoId} retryCount=${retryCount} transactionType=${transactionType ?? 'ALL'} reason=${result.reason}`,
       );
       return;
     }
 
-    const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus({
-      outboundDoId,
-      retryCount,
-      maxRetry,
-      jobType: 'SHIP_CONFIRM',
-    });
+    const result = await this.shipConfirmStatusChecker.checkOutboundDoStatus(
+      {
+        outboundDoId,
+        retryCount,
+        maxRetry,
+        jobType: 'SHIP_CONFIRM',
+        transactionType,
+      },
+      transactionType,
+    );
 
     if (result.status === 'SUCCESS') {
       this.logger.log(
-        `Ship confirm queue status=SUCCESS outboundDoId=${outboundDoId} retryCount=${retryCount}`,
+        `Ship confirm queue status=SUCCESS outboundDoId=${outboundDoId} retryCount=${retryCount} transactionType=${transactionType ?? 'ALL'} deliveriesUpdated=${result.deliveriesUpdated}`,
       );
       return;
     }
 
     if (result.status === 'ERROR') {
       this.logger.error(
-        `Ship confirm queue status=ERROR outboundDoId=${outboundDoId} retryCount=${retryCount} reason=${result.reason}`,
+        `Ship confirm queue status=ERROR outboundDoId=${outboundDoId} retryCount=${retryCount} transactionType=${transactionType ?? 'ALL'} reason=${result.reason}`,
       );
       return;
     }
@@ -175,9 +185,10 @@ export class OutboundIntegrationQueueConsumer {
       retryCount,
       maxRetry,
       jobType: 'SHIP_CONFIRM',
+      transactionType,
     });
     this.logger.log(
-      `Ship confirm queue status=PENDING outboundDoId=${outboundDoId} retryCount=${retryCount} delayMs=${delay} reason=${result.reason}`,
+      `Ship confirm queue status=PENDING outboundDoId=${outboundDoId} retryCount=${retryCount} transactionType=${transactionType ?? 'ALL'} delayMs=${delay} reason=${result.reason} deliveriesUpdated=${result.deliveriesUpdated}`,
     );
   }
 

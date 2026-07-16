@@ -115,16 +115,17 @@ export class ShipConfirmStatusCheckerService {
     payload: OutboundJobPayload,
     transactionType?: ShipConfirmInternalTransactionType,
   ): Promise<ShipConfirmDoCheckResult> {
+    const scopedTransactionType = transactionType ?? payload.transactionType;
     const allDeliveries = await this.deliveriesRepository.findByOutboundDoId(payload.outboundDoId);
-    const deliveries = transactionType
-      ? allDeliveries.filter((row) => row.transaction_type === transactionType)
+    const deliveries = scopedTransactionType
+      ? allDeliveries.filter((row) => row.transaction_type === scopedTransactionType)
       : allDeliveries;
 
     if (!deliveries.length) {
       return {
         status: 'PENDING',
-        reason: transactionType
-          ? `No outbound integration deliveries for transaction_type ${transactionType}`
+        reason: scopedTransactionType
+          ? `No outbound integration deliveries for transaction_type ${scopedTransactionType}`
           : 'No outbound integration deliveries for this outbound DO',
         deliveriesUpdated: 0,
         hasError: false,
@@ -135,7 +136,7 @@ export class ShipConfirmStatusCheckerService {
     const findGroups = this.groupDeliveriesForFind(deliveries);
 
     this.logger.log(
-      `Ship confirm poll outboundDoId=${payload.outboundDoId} transactionType=${transactionType ?? 'ALL'} findGroupCount=${findGroups.size} deliveryCount=${deliveries.length}`,
+      `Ship confirm poll outboundDoId=${payload.outboundDoId} transactionType=${scopedTransactionType ?? 'ALL'} findGroupCount=${findGroups.size} deliveryCount=${deliveries.length}`,
     );
 
     for (const [, group] of findGroups) {
@@ -164,8 +165,8 @@ export class ShipConfirmStatusCheckerService {
     }
 
     const refreshedAll = await this.deliveriesRepository.findByOutboundDoId(payload.outboundDoId);
-    const refreshed = transactionType
-      ? refreshedAll.filter((row) => row.transaction_type === transactionType)
+    const refreshed = scopedTransactionType
+      ? refreshedAll.filter((row) => row.transaction_type === scopedTransactionType)
       : refreshedAll;
     const result = this.evaluateDeliveries(refreshed);
     return {
@@ -329,8 +330,13 @@ export class ShipConfirmStatusCheckerService {
 
     let updated = 0;
     const usedOracleKeys = new Set<string>();
+    const updatedDeliveryIds = new Set<string>();
 
     for (const delivery of pendingScope) {
+      if (updatedDeliveryIds.has(delivery.id)) {
+        continue;
+      }
+
       const oracleRow = oracleRows.find((row) => {
         const key = this.buildOracleRowDedupeKey(row);
         if (usedOracleKeys.has(key)) {
@@ -340,6 +346,15 @@ export class ShipConfirmStatusCheckerService {
         const normalized = this.normalizeOracleRowKeys(row);
         const deliveryId = this.asNumber(normalized.DELIVERY_ID);
         const deliveryName = this.asString(normalized.DELIVERY_NAME);
+        const sourceHeaderId = this.asSourceHeaderId(normalized.SOURCE_HEADER_ID);
+        const sourceLineId = this.asString(normalized.SOURCE_LINE_ID);
+
+        if (sourceLineId) {
+          return (
+            delivery.source_line_id === sourceLineId ||
+            delivery.outbound_memo_item_id === sourceLineId
+          );
+        }
 
         if (deliveryId != null && delivery.delivery_id != null) {
           return Number(delivery.delivery_id) === deliveryId;
@@ -349,6 +364,11 @@ export class ShipConfirmStatusCheckerService {
           return delivery.delivery_name.trim() === deliveryName;
         }
 
+        // Header-level Oracle row: match memo when WMS still has no delivery_id
+        if (sourceHeaderId && this.resolveMemoSourceHeaderId(delivery) === sourceHeaderId) {
+          return true;
+        }
+
         return false;
       });
 
@@ -356,8 +376,39 @@ export class ShipConfirmStatusCheckerService {
         continue;
       }
 
+      const normalized = this.normalizeOracleRowKeys(oracleRow);
+      const sourceLineId = this.asString(normalized.SOURCE_LINE_ID);
+      const deliveryId = this.asNumber(normalized.DELIVERY_ID);
+      const deliveryName = this.asString(normalized.DELIVERY_NAME);
+      const isLineOrDeliverySpecific =
+        !!sourceLineId ||
+        (deliveryId != null &&
+          delivery.delivery_id != null &&
+          Number(delivery.delivery_id) === deliveryId) ||
+        (!!deliveryName &&
+          !!delivery.delivery_name?.trim() &&
+          delivery.delivery_name.trim() === deliveryName);
+
       usedOracleKeys.add(this.buildOracleRowDedupeKey(oracleRow));
-      updated += await this.applyOracleRowToDeliveries(matchPool, oracleRow, [delivery]);
+
+      if (isLineOrDeliverySpecific) {
+        updated += await this.applyOracleRowToDeliveries(matchPool, oracleRow, [delivery]);
+        updatedDeliveryIds.add(delivery.id);
+        continue;
+      }
+
+      // Broadcast header-level statuses to every pending line of the same memo + type
+      const memoId = this.resolveMemoSourceHeaderId(delivery);
+      const cohort = pendingScope.filter(
+        (row) =>
+          !updatedDeliveryIds.has(row.id) &&
+          this.resolveMemoSourceHeaderId(row) === memoId &&
+          row.transaction_type === delivery.transaction_type,
+      );
+      updated += await this.applyOracleRowToDeliveries(matchPool, oracleRow, cohort);
+      for (const row of cohort) {
+        updatedDeliveryIds.add(row.id);
+      }
     }
 
     return updated;
@@ -688,10 +739,16 @@ export class ShipConfirmStatusCheckerService {
         if (typedMatches.length === 1) {
           return typedMatches;
         }
+        if (typedMatches.length > 1) {
+          return typedMatches;
+        }
       }
       if (deliveryMatches.length) {
         return deliveryMatches;
       }
+
+      // Oracle whs_deliveries already has DELIVERY_ID, but WMS staging may still be null
+      // after create. Broadcast later so delivery_id + statuses are written.
     }
 
     if (deliveryName) {
@@ -705,7 +762,7 @@ export class ShipConfirmStatusCheckerService {
         const typedMatches = nameMatches.filter(
           (delivery) => delivery.transaction_type === transactionType,
         );
-        if (typedMatches.length === 1) {
+        if (typedMatches.length) {
           return typedMatches;
         }
       }
@@ -768,6 +825,14 @@ export class ShipConfirmStatusCheckerService {
     }
 
     if (candidates.length === 1) {
+      return candidates;
+    }
+
+    // Header-level Oracle row (common from whs_deliveries find): no unique line identity.
+    // Apply statuses / delivery_id to every staging row for this memo + transaction type.
+    const hasLineIdentity =
+      !!sourceLineId || isoLineId != null || isoInventoryItemId != null;
+    if (!hasLineIdentity && candidates.length > 0 && (sourceHeaderId || transactionType)) {
       return candidates;
     }
 

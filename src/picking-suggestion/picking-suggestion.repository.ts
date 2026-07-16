@@ -90,10 +90,9 @@ export class PickingSuggestionRepository {
     const weekNumberSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
     const dateSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
 
-    // Build location priority CASE statement based on sort method
-    // LIFO: Priority 1 = staging INBOUND at warehouseSub level (with or without bin)
-    // FIFO: Priority 1 = staging OUTBOUND (PRELOAD) at warehouseSub level (with or without bin)
-    // Note: Staging areas are checked first, even if they have bins
+    // Build location priority CASE (secondary after week/date for FIFO/LIFO).
+    // LIFO: Prefer staging INBOUND within the same week
+    // FIFO: Prefer staging OUTBOUND within the same week
     const locationPriorityCase = sortMethod === 'LIFO'
       ? `CASE 
           WHEN it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'INBOUND' THEN 1
@@ -327,9 +326,9 @@ export class PickingSuggestionRepository {
           ), 0)
         ) > 0
       ORDER BY 
+        pth.week_number ${weekNumberSort} NULLS LAST,
+        pth.production_date ${dateSort} NULLS LAST,
         location_priority ASC,
-        pth.week_number ${weekNumberSort},
-        pth.production_date ${dateSort},
         pth.new_quantity DESC
     `;
 
@@ -413,6 +412,50 @@ export class PickingSuggestionRepository {
 
     const result = await this.outboundDoRepository.query(query, params);
     return parseInt(result[0]?.total_picked || '0', 10);
+  }
+
+  /**
+   * Pending transaction_picking booked qty grouped by week (aligned with visibility dashboard).
+   * Bookings without week_number are returned as unscoped total.
+   */
+  async getPendingBookedByWeek(
+    itemId: string,
+    uom: string | undefined,
+    organizationId: string,
+  ): Promise<{ byWeek: Array<{ week_number: number; booked_quantity: number }>; unscoped: number }> {
+    const query = `
+      SELECT
+        tp.week_number,
+        COALESCE(SUM(tp.quantity::numeric), 0)::numeric AS booked_quantity
+      FROM transaction_picking tp
+      INNER JOIN outbound_do od ON od.id = tp.do_id
+      WHERE tp.item_id::text = $1
+        AND tp.status::text = 'PENDING'
+        AND tp.deleted_at IS NULL
+        AND od.organization_id = $3::uuid
+        AND ($2::text IS NULL OR COALESCE(tp.uom, '') = $2::text)
+      GROUP BY tp.week_number
+    `;
+
+    const rows = (await this.outboundDoRepository.query(query, [
+      itemId,
+      uom ?? null,
+      organizationId,
+    ])) as Array<{ week_number: number | null; booked_quantity: string | number }>;
+
+    const byWeek: Array<{ week_number: number; booked_quantity: number }> = [];
+    let unscoped = 0;
+
+    for (const row of rows) {
+      const qty = parseFloat(String(row.booked_quantity ?? 0)) || 0;
+      if (row.week_number == null) {
+        unscoped += qty;
+      } else {
+        byWeek.push({ week_number: Number(row.week_number), booked_quantity: qty });
+      }
+    }
+
+    return { byWeek, unscoped };
   }
 }
 

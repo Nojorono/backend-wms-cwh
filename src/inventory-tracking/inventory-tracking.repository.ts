@@ -465,34 +465,53 @@ export class InventoryTrackingRepository {
 
     const query = `
       WITH latest_pallet_items AS (
-        -- Get latest quantity per item per pallet (grouped by item_id, uom, week_number)
-        -- Same logic as getPalletItemLatestQuantity - using subquery for MAX(created_at)
-        SELECT 
+        -- Latest READY/PENDING qty per pallet + item + uom + week (matches getPalletItemLatestQuantity)
+        -- READY = integrated stock; PENDING = not yet inbound-integrated or waiting outbound pick
+        SELECT DISTINCT ON (
+          pth.pallet_id,
+          pth.item_id,
+          COALESCE(pth.uom, ''),
+          COALESCE(pth.week_number, -2147483648)
+        )
           pth.id,
           pth.item_id::uuid as item_id,
           pth.pallet_id,
           pth.uom,
-          pth.new_quantity::integer as new_quantity,
+          pth.new_quantity::numeric as new_quantity,
           pth.week_number,
           pth.production_date,
           pth.status_inventory,
           pth.created_at
         FROM transaction_pallet_history pth
         WHERE pth.deleted_at IS NULL
-          AND pth.status_inventory = 'READY'
+          AND pth.status_inventory IN ('READY', 'PENDING')
+          AND pth.new_quantity > 0
           ${itemFilter}
-          AND pth.created_at = (
-            SELECT MAX(pth2.created_at)
-            FROM transaction_pallet_history pth2
-            WHERE pth2.pallet_id = pth.pallet_id
-              AND pth2.item_id = pth.item_id
-              AND COALESCE(pth2.uom, '') = COALESCE(pth.uom, '')
-              AND (pth2.week_number = pth.week_number OR (pth2.week_number IS NULL AND pth.week_number IS NULL))
-              AND pth2.deleted_at IS NULL
-          )
+        ORDER BY
+          pth.pallet_id,
+          pth.item_id,
+          COALESCE(pth.uom, ''),
+          COALESCE(pth.week_number, -2147483648),
+          pth.created_at DESC,
+          pth.id DESC
+      ),
+      latest_inventory_tracking AS (
+        -- One active inventory row per pallet to avoid quantity multiplication on join
+        SELECT DISTINCT ON (it.pallet_id)
+          it.pallet_id,
+          it.warehouse_id,
+          it.warehouse_sub_id,
+          it.warehouse_bin_id,
+          it.inventory_status
+        FROM inventory_tracking it
+        INNER JOIN m_warehouse w ON w.id = it.warehouse_id
+        WHERE it.deleted_at IS NULL
+          AND it.pallet_id IS NOT NULL
+          AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED')
+          AND w.organization_id = $1::uuid
+        ORDER BY it.pallet_id, it.created_at DESC, it.id DESC
       ),
       item_inventory AS (
-        -- Join with inventory tracking to get warehouse location info and master table names
         SELECT 
           lpi.item_id,
           lpi.pallet_id,
@@ -501,10 +520,10 @@ export class InventoryTrackingRepository {
           lpi.week_number,
           lpi.production_date,
           lpi.status_inventory,
-          it.warehouse_id,
-          it.warehouse_sub_id,
-          it.warehouse_bin_id,
-          it.inventory_status,
+          lit.warehouse_id,
+          lit.warehouse_sub_id,
+          lit.warehouse_bin_id,
+          lit.inventory_status,
           p.pallet_code,
           w.name as warehouse_name,
           ws.name as warehouse_sub_name,
@@ -513,22 +532,19 @@ export class InventoryTrackingRepository {
           wb.code as warehouse_bin_code,
           lpi.created_at as last_updated
         FROM latest_pallet_items lpi
-        INNER JOIN inventory_tracking it ON it.pallet_id = lpi.pallet_id
+        INNER JOIN latest_inventory_tracking lit ON lit.pallet_id = lpi.pallet_id
         LEFT JOIN m_pallet p ON p.id = lpi.pallet_id
-        LEFT JOIN m_warehouse w ON w.id = it.warehouse_id
-        LEFT JOIN m_warehouse_sub ws ON ws.id = it.warehouse_sub_id
-        LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
-        WHERE lpi.new_quantity > 0
-          AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED')
-          AND it.deleted_at IS NULL
-          AND w.organization_id = $1::uuid
+        LEFT JOIN m_warehouse w ON w.id = lit.warehouse_id
+        LEFT JOIN m_warehouse_sub ws ON ws.id = lit.warehouse_sub_id
+        LEFT JOIN m_warehouse_bin wb ON wb.id = lit.warehouse_bin_id
       ),
       item_totals AS (
-        -- Aggregate total quantity per item (ensure numeric sum)
         SELECT 
           item_id,
           COALESCE(uom, '') as uom,
-          SUM(new_quantity::integer)::integer as total_quantity,
+          SUM(new_quantity)::numeric as total_quantity,
+          SUM(CASE WHEN status_inventory = 'READY' THEN new_quantity ELSE 0 END)::numeric as ready_quantity,
+          SUM(CASE WHEN status_inventory = 'PENDING' THEN new_quantity ELSE 0 END)::numeric as pending_quantity,
           COUNT(DISTINCT pallet_id)::integer as pallet_count,
           MIN(week_number) as min_week_number,
           MAX(week_number) as max_week_number,
@@ -547,6 +563,8 @@ export class InventoryTrackingRepository {
               'warehouse_bin_name', warehouse_bin_name,
               'warehouse_bin_code', warehouse_bin_code,
               'quantity', new_quantity,
+              'uom', uom,
+              'status_inventory', status_inventory,
               'week_number', week_number,
               'production_date', production_date
             ) ORDER BY week_number ASC NULLS LAST, production_date ASC NULLS LAST
@@ -555,11 +573,10 @@ export class InventoryTrackingRepository {
         GROUP BY item_id, COALESCE(uom, '')
       ),
       pending_bookings AS (
-        -- Get pending bookings from transaction_picking with names/codes (ensure numeric sum)
         SELECT 
           tp.item_id::uuid as item_id,
           COALESCE(tp.uom, '') as uom,
-          SUM(tp.quantity::integer)::integer as booked_quantity,
+          SUM(tp.quantity::numeric)::numeric as booked_quantity,
           COUNT(*)::integer as booking_count,
           json_agg(
             json_build_object(
@@ -569,6 +586,7 @@ export class InventoryTrackingRepository {
               'memo_id', tp.memo_id,
               'memo_number', om.outbound_memo_number,
               'quantity', tp.quantity,
+              'uom', tp.uom,
               'week_number', tp.week_number,
               'source_warehouse_sub_id', tp.source_warehouse_sub_id,
               'source_warehouse_sub_name', ws_source.name,
@@ -585,11 +603,11 @@ export class InventoryTrackingRepository {
         LEFT JOIN m_warehouse_bin wb_source ON wb_source.id = tp.source_bin_id
         WHERE tp.status = 'PENDING'
           AND tp.deleted_at IS NULL
+          AND od.organization_id = $1::uuid
           ${item_id ? `AND tp.item_id::uuid = $2::uuid` : ''}
         GROUP BY tp.item_id::uuid, COALESCE(tp.uom, '')
       ),
       combined_items AS (
-        -- Combine item inventory and bookings to get all item-uom combinations
         SELECT DISTINCT
           COALESCE(it_totals.item_id, pb.item_id) as item_id,
           COALESCE(it_totals.uom, pb.uom) as uom
@@ -604,11 +622,16 @@ export class InventoryTrackingRepository {
         it.item_number,
         it.description as item_name,
         COALESCE(ci.uom, '') as uom,
-        COALESCE(it_totals.total_quantity, 0)::integer as total_quantity,
+        COALESCE(it_totals.total_quantity, 0)::numeric as total_quantity,
+        COALESCE(it_totals.ready_quantity, 0)::numeric as ready_quantity,
+        COALESCE(it_totals.pending_quantity, 0)::numeric as pending_quantity,
         COALESCE(it_totals.pallet_count, 0)::integer as pallet_count,
-        COALESCE(pb.booked_quantity, 0)::integer as booked_quantity,
+        COALESCE(pb.booked_quantity, 0)::numeric as booked_quantity,
         COALESCE(pb.booking_count, 0)::integer as booking_count,
-        GREATEST(0, COALESCE(it_totals.total_quantity, 0)::integer - COALESCE(pb.booked_quantity, 0)::integer)::integer as available_quantity,
+        GREATEST(
+          0::numeric,
+          COALESCE(it_totals.ready_quantity, 0)::numeric - COALESCE(pb.booked_quantity, 0)::numeric
+        )::numeric as available_quantity,
         it_totals.min_week_number,
         it_totals.max_week_number,
         it_totals.earliest_production_date,
