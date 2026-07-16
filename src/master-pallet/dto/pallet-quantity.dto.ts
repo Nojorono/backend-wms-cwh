@@ -263,6 +263,9 @@ export class PalletItemQuantityDto {
   @ApiProperty({ example: 50, description: 'Current quantity of this item on the pallet' })
   current_quantity: number;
 
+  @ApiProperty({ example: 100, description: 'Capacity of the pallet' })
+  capacity: number;
+
   @ApiProperty({ example: 'PCS', description: 'Unit of measure for the item' })
   uom: string;
 

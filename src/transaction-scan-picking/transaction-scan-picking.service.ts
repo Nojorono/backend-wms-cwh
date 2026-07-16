@@ -678,72 +678,74 @@ export class TransactionScanPickingService {
 
       // Move inventory tracking to destination location
       // If same pallet, move source pallet to destination. If different, move use pallet to destination.
-      if (palletUseId && quantityToUse > 0 && destinationWarehouseSubId && destinationWarehouseId) {
+      // pallet_use always gets inventory_status = PICKED.
+      if (palletUseId && quantityToUse > 0) {
         const targetPalletId = isSamePallet ? palletSourceId : palletUseId;
 
-        if (!targetPalletId) {
-          // skip destination move; still allow switch pallet handling below
-        } else {
-        try {
-          // Check if target pallet already has inventory tracking
-          let targetPalletTracking;
+        if (targetPalletId && destinationWarehouseSubId && destinationWarehouseId) {
           try {
-            targetPalletTracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
-          } catch (error) {
-            // If not found, we'll create a new one
-            if (!(error instanceof NotFoundException)) {
-              throw error;
-            }
-            targetPalletTracking = null;
-          }
-
-          if (targetPalletTracking) {
-            // Update location/progression only. Do not change inventory_status for pallet_use.
-            const updatePayload: Record<string, unknown> = {
-              warehouse_sub_id: destinationWarehouseSubId,
-              warehouse_bin_id: destinationBinId,
-              warehouse_id: destinationWarehouseId,
-              progression_status: ProgressionStatus.COMPLETED,
-              inventory_note: isSamePallet
-                ? `Scan picking: ${quantityToUse} kept on same pallet ${targetPalletId} as PENDING; from source=${palletSourceId}; switch=${quantitySwitch};${memoLabel}`
-                : `Scan picking: moved ${quantityToUse} FROM source pallet ${palletSourceId} TO use pallet ${palletUseId}; switch=${quantitySwitch};${memoLabel}`,
-              inventory_date: new Date(),
-            };
-
-            // Only update inventory_status when source and use are the same pallet
-            // (tracking belongs to source). Never overwrite inventory_status for pallet_use.
-            if (isSamePallet) {
-              updatePayload.inventory_status = 'PICKED';
+            let targetPalletTracking;
+            try {
+              targetPalletTracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+            } catch (error) {
+              if (!(error instanceof NotFoundException)) {
+                throw error;
+              }
+              targetPalletTracking = null;
             }
 
-            await this.inventoryTrackingService.update(targetPalletTracking.id, updatePayload);
-          } else {
-            // Create tracking for target pallet at destination.
-            // For pallet_use (different pallet), keep IN_INVENTORY — do not set PICKED.
-            const inventoryStatus = isSamePallet ? 'PICKED' : 'IN_INVENTORY';
-            await this.inventoryTrackingService.createOrUpdateInventoryTracking(
-              targetPalletId,
-              destinationWarehouseSubId,
-              destinationWarehouseId,
-              inventoryStatus,
-              ProgressionStatus.COMPLETED,
-            );
+            if (targetPalletTracking) {
+              await this.inventoryTrackingService.update(targetPalletTracking.id, {
+                warehouse_sub_id: destinationWarehouseSubId,
+                warehouse_bin_id: destinationBinId,
+                warehouse_id: destinationWarehouseId,
+                inventory_status: 'PICKED',
+                progression_status: ProgressionStatus.COMPLETED,
+                inventory_note: isSamePallet
+                  ? `Scan picking: ${quantityToUse} on same pallet ${targetPalletId} → PICKED; from source=${palletSourceId}; switch=${quantitySwitch};${memoLabel}`
+                  : `Scan picking: moved ${quantityToUse} FROM source ${palletSourceId} TO use ${palletUseId} → PICKED; switch=${quantitySwitch};${memoLabel}`,
+                inventory_date: new Date(),
+              });
+            } else {
+              await this.inventoryTrackingService.createOrUpdateInventoryTracking(
+                targetPalletId,
+                destinationWarehouseSubId,
+                destinationWarehouseId,
+                'PICKED',
+                ProgressionStatus.COMPLETED,
+              );
 
-            // Update bin if provided
-            if (destinationBinId) {
-              const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
-              if (tracking) {
-                await this.inventoryTrackingService.update(tracking.id, {
-                  warehouse_bin_id: destinationBinId,
-                  inventory_note: `Scan picking create tracking FOR use pallet ${targetPalletId} FROM source ${palletSourceId};${memoLabel}`,
-                });
+              if (destinationBinId) {
+                const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+                if (tracking) {
+                  await this.inventoryTrackingService.update(tracking.id, {
+                    warehouse_bin_id: destinationBinId,
+                    inventory_status: 'PICKED',
+                    inventory_note: `Scan picking create tracking FOR use pallet ${targetPalletId} FROM source ${palletSourceId} → PICKED;${memoLabel}`,
+                  });
+                }
               }
             }
+          } catch (error) {
+            console.error(`Failed to move inventory tracking to destination for pallet ${targetPalletId}:`, error);
           }
-        } catch (error) {
-          // Log error but don't fail the operation
-          console.error(`Failed to move inventory tracking to destination for pallet ${targetPalletId}:`, error);
-        }
+        } else if (targetPalletId) {
+          // Destination incomplete — still mark use pallet as PICKED
+          try {
+            const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+            if (tracking) {
+              await this.inventoryTrackingService.update(tracking.id, {
+                inventory_status: 'PICKED',
+                progression_status: ProgressionStatus.COMPLETED,
+                inventory_note: `Scan picking: use pallet ${targetPalletId} → PICKED (destination location incomplete);${memoLabel}`,
+                inventory_date: new Date(),
+              });
+            }
+          } catch (error) {
+            if (!(error instanceof NotFoundException)) {
+              console.error(`Failed to set PICKED on use pallet ${targetPalletId}:`, error);
+            }
+          }
         }
       }
 
@@ -898,7 +900,7 @@ export class TransactionScanPickingService {
         }
       }
 
-      // Revert use pallet inventory tracking location only — do not change inventory_status
+      // Revert use pallet: restore location and clear PICKED → IN_INVENTORY
       if (existing.pallet_use_id && existing.quantity_picked > 0 && !wasSamePallet) {
         try {
           const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_use_id);
@@ -908,9 +910,10 @@ export class TransactionScanPickingService {
               warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? usePalletTracking.warehouse_sub_id,
               warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? usePalletTracking.warehouse_bin_id,
               warehouse_id: locationToRestore?.warehouse_id ?? usePalletTracking.warehouse_id,
+              inventory_status: 'IN_INVENTORY',
               inventory_note: locationToRestore
-                ? `Reverted: Moved back to previous location`
-                : `Reverted: Transaction scan picking reverted`,
+                ? `Reverted: use pallet PICKED → IN_INVENTORY, moved back to previous location`
+                : `Reverted: use pallet PICKED → IN_INVENTORY`,
               inventory_date: new Date(),
               progression_status: ProgressionStatus.COMPLETED,
             });
