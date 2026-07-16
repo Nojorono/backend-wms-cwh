@@ -31,8 +31,14 @@ export class PalletDetailDto {
   @ApiPropertyOptional({ example: 'BIN-01' })
   warehouse_bin_code?: string;
 
+  @ApiProperty({ example: 'PCS' })
+  uom: string;
+
   @ApiProperty({ example: 100 })
   quantity: number;
+
+  @ApiPropertyOptional({ example: 'READY', enum: ['READY', 'PENDING'] })
+  status_inventory?: string;
 
   @ApiPropertyOptional({ example: 47 })
   week_number?: number;
@@ -60,6 +66,9 @@ export class BookingDetailDto {
   @ApiProperty({ example: 20 })
   quantity: number;
 
+  @ApiPropertyOptional({ example: 'PCS' })
+  uom?: string;
+
   @ApiPropertyOptional({ example: 47 })
   week_number?: number;
 
@@ -82,21 +91,47 @@ export class BookingDetailDto {
   source_bin_code?: string;
 }
 
-export class VisibilityDashboardSummaryDto {
-  @ApiProperty({ example: 150 })
-  total_items: number;
+export class VisibilityDashboardUomSummaryDto {
+  @ApiProperty({ example: 'PCS' })
+  uom: string;
 
-  @ApiProperty({ example: 50000 })
+  @ApiProperty({ example: 12, description: 'Number of item rows for this UOM' })
+  item_count: number;
+
+  @ApiProperty({ example: 50000, description: 'READY + PENDING stock for this UOM' })
   total_quantity: number;
+
+  @ApiProperty({ example: 45000, description: 'READY stock only for this UOM' })
+  total_ready_quantity: number;
+
+  @ApiProperty({ example: 5000, description: 'PENDING stock only for this UOM' })
+  total_pending_quantity: number;
 
   @ApiProperty({ example: 5000 })
   total_booked_quantity: number;
 
-  @ApiProperty({ example: 45000 })
+  @ApiProperty({ example: 40000, description: 'ready - booked for this UOM' })
   total_available_quantity: number;
+
+  @ApiProperty({ example: 3 })
+  items_with_pending_bookings: number;
+}
+
+export class VisibilityDashboardSummaryDto {
+  @ApiProperty({ example: 150, description: 'Distinct items (across all UOMs)' })
+  total_items: number;
+
+  @ApiProperty({ example: 180, description: 'Item + UOM rows' })
+  total_item_uom_rows: number;
 
   @ApiProperty({ example: 25 })
   items_with_pending_bookings: number;
+
+  @ApiProperty({
+    type: [VisibilityDashboardUomSummaryDto],
+    description: 'Quantity totals separated by UOM (do not sum across UOMs)',
+  })
+  by_uom: VisibilityDashboardUomSummaryDto[];
 }
 
 export class VisibilityDashboardItemDto {
@@ -115,8 +150,14 @@ export class VisibilityDashboardItemDto {
   @ApiProperty({ example: 'PCS' })
   uom: string;
 
-  @ApiProperty({ example: 1000 })
+  @ApiProperty({ example: 1000, description: 'READY + PENDING stock' })
   total_quantity: number;
+
+  @ApiProperty({ example: 800, description: 'READY stock only' })
+  ready_quantity: number;
+
+  @ApiProperty({ example: 200, description: 'PENDING stock only' })
+  pending_quantity: number;
 
   @ApiProperty({ example: 10 })
   pallet_count: number;
@@ -127,7 +168,7 @@ export class VisibilityDashboardItemDto {
   @ApiProperty({ example: 3 })
   booking_count: number;
 
-  @ApiProperty({ example: 800 })
+  @ApiProperty({ example: 600, description: 'ready_quantity - booked_quantity' })
   available_quantity: number;
 
   @ApiPropertyOptional({ example: 1 })
