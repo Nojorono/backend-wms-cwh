@@ -149,18 +149,36 @@ export class InventoryReservationService {
    * Counts all transaction_picking records that reference this location
    */
   async getReservedQuantity(palletId: string, itemId: string): Promise<number> {
-    // Query transaction_picking that are PENDING and reference this pallet location
+    // Remaining unpicked PENDING qty only (exclude already scanned)
     const query = `
-      SELECT COALESCE(SUM(tp.quantity), 0) as total_reserved
+      SELECT COALESCE(SUM(
+        GREATEST(
+          0::numeric,
+          COALESCE(tp.quantity::numeric, 0) - COALESCE(scanned.scanned_quantity, 0)
+        )
+      ), 0) as total_reserved
       FROM transaction_picking tp
+      LEFT JOIN (
+        SELECT
+          tsp.transaction_picking_id,
+          COALESCE(SUM(tsp.quantity_picked::numeric), 0)::numeric AS scanned_quantity
+        FROM transaction_scan_picking tsp
+        WHERE tsp.deleted_at IS NULL
+        GROUP BY tsp.transaction_picking_id
+      ) scanned ON scanned.transaction_picking_id = tp.id
       WHERE tp.item_id = $1
         AND tp.status = 'PENDING'
+        AND tp.deleted_at IS NULL
         AND EXISTS (
           SELECT 1 FROM inventory_tracking it
           WHERE it.pallet_id = $2
             AND it.warehouse_sub_id = tp.source_warehouse_sub_id
             AND (tp.source_bin_id IS NULL OR it.warehouse_bin_id = tp.source_bin_id)
         )
+        AND GREATEST(
+          0::numeric,
+          COALESCE(tp.quantity::numeric, 0) - COALESCE(scanned.scanned_quantity, 0)
+        ) > 0
     `;
 
     const result = await this.dataSource.query(query, [itemId, palletId]);
@@ -176,12 +194,30 @@ export class InventoryReservationService {
     itemId: string,
   ): Promise<number> {
     const query = `
-      SELECT COALESCE(SUM(tp.quantity), 0) as total_reserved
+      SELECT COALESCE(SUM(
+        GREATEST(
+          0::numeric,
+          COALESCE(tp.quantity::numeric, 0) - COALESCE(scanned.scanned_quantity, 0)
+        )
+      ), 0) as total_reserved
       FROM transaction_picking tp
+      LEFT JOIN (
+        SELECT
+          tsp.transaction_picking_id,
+          COALESCE(SUM(tsp.quantity_picked::numeric), 0)::numeric AS scanned_quantity
+        FROM transaction_scan_picking tsp
+        WHERE tsp.deleted_at IS NULL
+        GROUP BY tsp.transaction_picking_id
+      ) scanned ON scanned.transaction_picking_id = tp.id
       WHERE tp.item_id = $1
         AND tp.source_warehouse_sub_id = $2
         ${warehouseBinId ? 'AND tp.source_bin_id = $3' : ''}
         AND tp.status = 'PENDING'
+        AND tp.deleted_at IS NULL
+        AND GREATEST(
+          0::numeric,
+          COALESCE(tp.quantity::numeric, 0) - COALESCE(scanned.scanned_quantity, 0)
+        ) > 0
     `;
 
     const params = warehouseBinId 
