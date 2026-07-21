@@ -124,6 +124,15 @@ export class InboundIntegrationService {
     }));
   }
 
+  async findHeaderByInboundDoId(inboundDoId: string): Promise<InboundIntegrationHeaderWithLines | null> {
+    const header = await this.repository.findHeaderByInboundDoId(inboundDoId);
+    if (!header) {
+      return null;
+    }
+    const lines = await this.repository.findLinesByHeaderId(header.id);
+    return { ...header, lines };
+  }
+
   async findHeaderById(id: string): Promise<InboundIntegration> {
     const header = await this.repository.findHeaderById(id);
     if (!header) {

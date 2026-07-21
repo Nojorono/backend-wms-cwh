@@ -528,8 +528,8 @@ export class TransactionScanPickingService {
 
     const wasSamePallet = Boolean(
       existing.pallet_source_id &&
-        existing.pallet_use_id &&
-        existing.pallet_source_id === existing.pallet_use_id,
+      existing.pallet_use_id &&
+      existing.pallet_source_id === existing.pallet_use_id,
     );
 
     let productionDate: Date | undefined;

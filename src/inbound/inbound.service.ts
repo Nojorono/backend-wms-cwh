@@ -11,7 +11,12 @@ import { InboundRepository } from './repositories/inbound.repository';
 import { InboundDoRepository } from './repositories/inbound-do.repository';
 import { InboundItemRepository } from './repositories/inbound-item.repository';
 import { CreateInboundDto } from './dto/create-inbound.dto';
-import { UpdateInboundDto, UpdateInboundStatusDto } from './dto/update-inbound.dto';
+import {
+  UpdateInboundDto,
+  UpdateInboundDoDto,
+  UpdateInboundItemDto,
+  UpdateInboundStatusDto,
+} from './dto/update-inbound.dto';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
@@ -340,6 +345,9 @@ export class InboundService {
             const inboundDo = await this.inboundDoRepo.create({
               inbound_id: inbound.id,
               principal: doDto.principal,
+              vendor_id: doDto.vendor_id,
+              vendor_site_id: doDto.vendor_site_id,
+              total_line_items: doDto.total_line_items,
               inbound_do_number: doDto.inbound_do_number,
               inbound_do_date: doDto.inbound_do_date ? new Date(doDto.inbound_do_date) : undefined,
               attachment: doDto.attachment,
@@ -359,6 +367,7 @@ export class InboundService {
                   quantity: itemDto.quantity,
                   classification_id: itemDto.classification_id,
                   uom: itemDto.uom,
+                  line_number: itemDto.line_number,
                 });
               }
             }
@@ -461,66 +470,69 @@ export class InboundService {
         throw new NotFoundException('Inbound not found');
       }
 
-      // // Validate status transition
-      // if (inbound.status === InboundStatus.UNLOADING) {
-      //   throw new BadRequestException('Cannot update inbound that is already unloading');
-      // }
-
       if (inbound.status === InboundStatus.INTEGRATED) {
         throw new BadRequestException('Cannot update inbound that is already integrated');
       }
 
-      // Validate the update payload
       await this.validateInboundUpdate(payload);
 
       await this.dataSource.transaction(async () => {
-        await this.inboundRepo.update(id, {
-          inbound_id_reference: payload.inbound_id_reference,
-          expedition: payload.expedition,
-          origin: payload.origin,
-          license_plate: payload.license_plate,
-          photo_license_plate: payload.photo_license_plate,
-          photo_condition: payload.photo_condition,
-          photo_seal: payload.photo_seal,
-          driver_name: payload.driver_name,
-          driver_phone: payload.driver_phone,
-          status: payload.status as InboundStatus,
-          inbound_type: payload.inbound_type,
-          arrival_date: payload.arrival_date ? new Date(payload.arrival_date) : undefined,
-        });
+        const updateData: Partial<Inbound> & Record<string, unknown> = {};
 
-        if (payload.inbound_dos) {
-          // Soft remove existing DOs and items
-          await this.inboundItemRepo.softRemoveByInbound(id);
-          await this.inboundDoRepo.softRemoveByInbound(id);
-
-          // Create new DOs and items
-          for (const doDto of payload.inbound_dos) {
-            const inboundDo = await this.inboundDoRepo.create({
-              inbound_id: id,
-              principal: doDto.principal,
-              inbound_do_number: doDto.inbound_do_number,
-              inbound_do_date: doDto.inbound_do_date ? new Date(doDto.inbound_do_date) : undefined,
-              attachment: doDto.attachment,
-              inbound_po_number: doDto.inbound_po_number,
-              inbound_po_date: doDto.inbound_po_date ? new Date(doDto.inbound_po_date) : undefined,
-              flag_validated: doDto.flag_validated ?? false,
-              validation_surat_jalan: doDto.validation_surat_jalan ?? false,
-            });
-
-            if (doDto.inbound_items?.length) {
-              for (const itemDto of doDto.inbound_items) {
-                await this.inboundItemRepo.create({
-                  inbound_id: id,
-                  inbound_do_id: inboundDo.id,
-                  item_id: itemDto.item_id,
-                  quantity: itemDto.quantity,
-                  classification_id: itemDto.classification_id,
-                  uom: itemDto.uom,
-                });
-              }
-            }
+        if (payload.organization_id !== undefined) {
+          updateData.organization_id = payload.organization_id;
+        }
+        if (payload.inbound_id_reference !== undefined) {
+          updateData.inbound_id_reference = payload.inbound_id_reference;
+        }
+        if (payload.expedition !== undefined) {
+          updateData.expedition = payload.expedition;
+        }
+        if (payload.origin !== undefined) {
+          updateData.origin = payload.origin;
+        }
+        if (payload.license_plate !== undefined) {
+          updateData.license_plate = payload.license_plate;
+        }
+        if (payload.photo_license_plate !== undefined) {
+          updateData.photo_license_plate = payload.photo_license_plate;
+        }
+        if (payload.photo_condition !== undefined) {
+          updateData.photo_condition = payload.photo_condition;
+        }
+        if (payload.photo_seal !== undefined) {
+          updateData.photo_seal = payload.photo_seal;
+        }
+        if (payload.driver_name !== undefined) {
+          updateData.driver_name = payload.driver_name;
+        }
+        if (payload.driver_phone !== undefined) {
+          updateData.driver_phone = payload.driver_phone;
+        }
+        if (payload.status !== undefined) {
+          updateData.status = payload.status as InboundStatus;
+        }
+        if (payload.inbound_type !== undefined) {
+          updateData.inbound_type = payload.inbound_type;
+        }
+        if (payload.arrival_date !== undefined) {
+          if (payload.arrival_date) {
+            updateData.arrival_date = new Date(payload.arrival_date);
+          } else {
+            // Clear column in DB (Partial<Inbound> does not allow null)
+            (updateData as { arrival_date: Date | null }).arrival_date = null;
           }
+        }
+        if (payload.notes !== undefined) {
+          updateData.notes = payload.notes;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await this.inboundRepo.update(id, updateData as Partial<Inbound>);
+        }
+
+        if (payload.inbound_dos !== undefined) {
+          await this.upsertInboundDos(id, inbound.inbound_dos ?? [], payload.inbound_dos);
         }
       });
 
@@ -530,7 +542,6 @@ export class InboundService {
       }
       return updated;
     } catch (error) {
-      // Re-throw validation errors as-is
       if (
         error instanceof BadRequestException ||
         error instanceof NotFoundException ||
@@ -539,8 +550,183 @@ export class InboundService {
         throw error;
       }
 
-      // Wrap other errors with more context
       throw new BadRequestException(`Failed to update inbound: ${error.message}`);
+    }
+  }
+
+  /**
+   * Updates existing DOs/items in place (keeps ids). Creates only when no matching id/do_number.
+   */
+  private async upsertInboundDos(
+    inboundId: string,
+    existingDos: InboundDo[],
+    doDtos: UpdateInboundDoDto[],
+  ): Promise<void> {
+    const existingById = new Map(existingDos.map((d) => [d.id, d]));
+    const existingByNumber = new Map(
+      existingDos
+        .filter((d) => !!d.inbound_do_number)
+        .map((d) => [d.inbound_do_number, d]),
+    );
+
+    for (const doDto of doDtos) {
+      const matched =
+        (doDto.id ? existingById.get(doDto.id) : undefined) ??
+        (doDto.inbound_do_number
+          ? existingByNumber.get(doDto.inbound_do_number)
+          : undefined);
+
+      if (doDto.id && !matched) {
+        throw new NotFoundException(
+          `Inbound DO ${doDto.id} not found for inbound ${inboundId}`,
+        );
+      }
+
+      if (matched && matched.inbound_id !== inboundId) {
+        throw new BadRequestException(
+          `Inbound DO ${matched.id} does not belong to inbound ${inboundId}`,
+        );
+      }
+
+      let inboundDoId: string;
+
+      if (matched) {
+        const doUpdate: Partial<InboundDo> = {};
+        if (doDto.principal !== undefined) doUpdate.principal = doDto.principal;
+        if (doDto.vendor_id !== undefined) doUpdate.vendor_id = doDto.vendor_id;
+        if (doDto.vendor_site_id !== undefined) doUpdate.vendor_site_id = doDto.vendor_site_id;
+        if (doDto.total_line_items !== undefined) doUpdate.total_line_items = doDto.total_line_items;
+        if (doDto.inbound_do_number !== undefined) {
+          doUpdate.inbound_do_number = doDto.inbound_do_number;
+        }
+        if (doDto.inbound_do_date !== undefined) {
+          doUpdate.inbound_do_date = doDto.inbound_do_date
+            ? new Date(doDto.inbound_do_date)
+            : undefined;
+        }
+        if (doDto.attachment !== undefined) doUpdate.attachment = doDto.attachment;
+        if (doDto.inbound_po_number !== undefined) {
+          doUpdate.inbound_po_number = doDto.inbound_po_number;
+        }
+        if (doDto.inbound_po_date !== undefined) {
+          doUpdate.inbound_po_date = doDto.inbound_po_date
+            ? new Date(doDto.inbound_po_date)
+            : undefined;
+        }
+        if (doDto.flag_validated !== undefined) {
+          doUpdate.flag_validated = doDto.flag_validated;
+        }
+        if (doDto.validation_surat_jalan !== undefined) {
+          doUpdate.validation_surat_jalan = doDto.validation_surat_jalan;
+        }
+        if (doDto.add_to_receipt_number !== undefined) {
+          doUpdate.add_to_receipt_number = doDto.add_to_receipt_number;
+        }
+
+        if (Object.keys(doUpdate).length > 0) {
+          await this.inboundDoRepo.update(matched.id, doUpdate);
+        }
+        inboundDoId = matched.id;
+      } else {
+        const created = await this.inboundDoRepo.create({
+          inbound_id: inboundId,
+          principal: doDto.principal,
+          vendor_id: doDto.vendor_id,
+          vendor_site_id: doDto.vendor_site_id,
+          total_line_items: doDto.total_line_items,
+          inbound_do_number: doDto.inbound_do_number,
+          inbound_do_date: doDto.inbound_do_date
+            ? new Date(doDto.inbound_do_date)
+            : undefined,
+          attachment: doDto.attachment,
+          inbound_po_number: doDto.inbound_po_number,
+          inbound_po_date: doDto.inbound_po_date
+            ? new Date(doDto.inbound_po_date)
+            : undefined,
+          flag_validated: doDto.flag_validated ?? false,
+          validation_surat_jalan: doDto.validation_surat_jalan ?? false,
+          add_to_receipt_number: doDto.add_to_receipt_number,
+        });
+        inboundDoId = created.id;
+      }
+
+      if (doDto.inbound_items !== undefined) {
+        await this.upsertInboundItems(
+          inboundId,
+          inboundDoId,
+          matched?.inbound_items ?? [],
+          doDto.inbound_items,
+        );
+      }
+    }
+  }
+
+  private async upsertInboundItems(
+    inboundId: string,
+    inboundDoId: string,
+    existingItems: InboundItem[],
+    itemDtos: UpdateInboundItemDto[],
+  ): Promise<void> {
+    const existingById = new Map(existingItems.map((i) => [i.id, i]));
+
+    for (const itemDto of itemDtos) {
+      const matched = itemDto.id ? existingById.get(itemDto.id) : undefined;
+
+      if (itemDto.id && !matched) {
+        // Item may not be loaded on matched DO relation; try direct lookup
+        const found = await this.inboundItemRepo.findOne(itemDto.id);
+        if (!found || found.inbound_do_id !== inboundDoId) {
+          throw new NotFoundException(
+            `Inbound item ${itemDto.id} not found for inbound DO ${inboundDoId}`,
+          );
+        }
+
+        const itemUpdate: Partial<InboundItem> = {};
+        if (itemDto.item_id !== undefined) itemUpdate.item_id = itemDto.item_id;
+        if (itemDto.quantity !== undefined) itemUpdate.quantity = itemDto.quantity;
+        if (itemDto.classification_id !== undefined) {
+          itemUpdate.classification_id = itemDto.classification_id;
+        }
+        if (itemDto.uom !== undefined) itemUpdate.uom = itemDto.uom;
+        if (itemDto.line_number !== undefined) itemUpdate.line_number = itemDto.line_number;
+
+        if (Object.keys(itemUpdate).length > 0) {
+          await this.inboundItemRepo.update(found.id, itemUpdate);
+        }
+        continue;
+      }
+
+      if (matched) {
+        const itemUpdate: Partial<InboundItem> = {};
+        if (itemDto.item_id !== undefined) itemUpdate.item_id = itemDto.item_id;
+        if (itemDto.quantity !== undefined) itemUpdate.quantity = itemDto.quantity;
+        if (itemDto.classification_id !== undefined) {
+          itemUpdate.classification_id = itemDto.classification_id;
+        }
+        if (itemDto.uom !== undefined) itemUpdate.uom = itemDto.uom;
+        if (itemDto.line_number !== undefined) itemUpdate.line_number = itemDto.line_number;
+
+        if (Object.keys(itemUpdate).length > 0) {
+          await this.inboundItemRepo.update(matched.id, itemUpdate);
+        }
+        continue;
+      }
+
+      if (!itemDto.item_id || itemDto.quantity === undefined) {
+        throw new BadRequestException(
+          'item_id and quantity are required when creating a new inbound item',
+        );
+      }
+
+      await this.inboundItemRepo.create({
+        inbound_id: inboundId,
+        inbound_do_id: inboundDoId,
+        item_id: itemDto.item_id,
+        quantity: itemDto.quantity,
+        classification_id: itemDto.classification_id,
+        uom: itemDto.uom,
+        line_number: itemDto.line_number,
+      });
     }
   }
 

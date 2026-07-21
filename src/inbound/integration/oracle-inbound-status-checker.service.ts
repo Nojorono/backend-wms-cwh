@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   InboundIntegrationService,
   InboundIntegrationHeaderWithLines,
@@ -6,6 +6,10 @@ import {
 import { RcvReceiptTransactionType } from 'src/core/domain/entities/inbound-integration.entity';
 import { RcvReceiptIntegrationService } from './rcv-receipt.integration';
 import { InboundJobPayload, InboundJobProcessStatus } from './inbound-integration-queue.types';
+import {
+  InboundIntegrationPollResponseDto,
+  InboundIntegrationPollStatus,
+} from 'src/inbound-integration/dto/inbound-integration-poll-response.dto';
 
 type CheckResult = {
   status: InboundJobProcessStatus;
@@ -73,6 +77,63 @@ export class OracleInboundStatusCheckerService {
       return { status: 'SUCCESS', reason: 'All Oracle integration headers are successful' };
     }
     return { status: 'PENDING', reason: 'No terminal status found yet' };
+  }
+
+  /**
+   * Manual poll: load staging by inbound_do_id, call Oracle findBySourceHeaderId, sync WMS rows.
+   */
+  async pollByInboundDoId(inboundDoId: string): Promise<InboundIntegrationPollResponseDto> {
+    const header = await this.inboundIntegrationService.findHeaderByInboundDoId(inboundDoId);
+    if (!header) {
+      throw new NotFoundException(
+        `Inbound integration for inbound_do_id ${inboundDoId} not found`,
+      );
+    }
+
+    const result = await this.checkPerHeader(header, header.request_id ?? undefined);
+    const refreshed =
+      (await this.inboundIntegrationService.findHeaderByInboundDoId(inboundDoId)) ?? header;
+
+    return this.buildPollResponse(inboundDoId, refreshed, result);
+  }
+
+  private buildPollResponse(
+    inboundDoId: string,
+    headerWithLines: InboundIntegrationHeaderWithLines,
+    check: CheckResult,
+  ): InboundIntegrationPollResponseDto {
+    const status = this.mapPollStatus(check, headerWithLines.status);
+    const { lines, ...header } = headerWithLines;
+
+    return {
+      success: status === 'INTEGRATED',
+      status,
+      message: check.reason,
+      inbound_do_id: inboundDoId,
+      inbound_integration_id: headerWithLines.id,
+      source_header_id: headerWithLines.source_header_id ?? undefined,
+      request_id: headerWithLines.request_id ?? undefined,
+      header,
+      lines,
+    };
+  }
+
+  private mapPollStatus(
+    check: CheckResult,
+    headerStatus?: string | null,
+  ): InboundIntegrationPollStatus {
+    if (check.status === 'SUCCESS') {
+      return 'INTEGRATED';
+    }
+    if (check.status === 'ERROR') {
+      return 'ERROR';
+    }
+
+    const normalized = (headerStatus ?? '').trim().toUpperCase();
+    if (normalized === 'CREATED' || normalized === 'PROCESSING' || normalized === 'U') {
+      return 'PROCESSING';
+    }
+    return 'PENDING';
   }
 
   private async checkPerHeader(
