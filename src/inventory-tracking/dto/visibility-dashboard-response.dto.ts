@@ -63,8 +63,26 @@ export class BookingDetailDto {
   @ApiPropertyOptional({ example: 'MEMO-2025-001' })
   memo_number?: string;
 
-  @ApiProperty({ example: 20 })
+  @ApiProperty({
+    example: 20,
+    description: 'Remaining unpicked booked qty (original - scanned)',
+  })
   quantity: number;
+
+  @ApiPropertyOptional({
+    example: 20,
+    description: 'Same as quantity — remaining booked after scans',
+  })
+  booked_quantity?: number;
+
+  @ApiPropertyOptional({ example: 30, description: 'Original transaction_picking.quantity' })
+  original_quantity?: number;
+
+  @ApiPropertyOptional({ example: 10, description: 'Sum of transaction_scan_picking.quantity_picked' })
+  scanned_quantity?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'True when at least one scan picking exists' })
+  has_scan?: boolean;
 
   @ApiPropertyOptional({ example: 'PCS' })
   uom?: string;

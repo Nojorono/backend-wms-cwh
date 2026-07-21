@@ -1,10 +1,49 @@
-import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './create-inbound.dto';
 
-export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) { }
-export class UpdateInboundDoDto extends PartialType(CreateInboundDoDto) { }
-export class UpdateInboundDto extends PartialType(CreateInboundDto) {
+export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) {
+  @ApiPropertyOptional({
+    example: 'uuid-inbound-item-1',
+    description: 'Existing item id to update in place',
+  })
+  @IsOptional()
+  @IsUUID(4, { message: 'id must be a valid UUID' })
+  id?: string;
+}
+
+export class UpdateInboundDoDto extends PartialType(
+  OmitType(CreateInboundDoDto, ['inbound_items'] as const),
+) {
+  @ApiPropertyOptional({
+    example: 'uuid-inbound-do-1',
+    description: 'Existing DO id to update in place',
+  })
+  @IsOptional()
+  @IsUUID(4, { message: 'id must be a valid UUID' })
+  id?: string;
+
+  @ApiPropertyOptional({
+    type: () => UpdateInboundItemDto,
+    isArray: true,
+  })
+  @IsOptional()
+  @IsArray({ message: 'inbound_items must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => UpdateInboundItemDto)
+  inbound_items?: UpdateInboundItemDto[];
+}
+
+export class UpdateInboundDto extends PartialType(
+  OmitType(CreateInboundDto, ['inbound_dos'] as const),
+) {
   @ApiPropertyOptional({ description: 'Photo Condition' })
   @IsOptional()
   @IsString()
@@ -19,6 +58,22 @@ export class UpdateInboundDto extends PartialType(CreateInboundDto) {
   @IsOptional()
   @IsString()
   photo_seal?: string;
+
+  @ApiPropertyOptional({ description: 'Notes' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiPropertyOptional({
+    type: () => UpdateInboundDoDto,
+    isArray: true,
+    description: 'Update existing DOs by id (keeps ids). Omit id only for truly new DOs.',
+  })
+  @IsOptional()
+  @IsArray({ message: 'inbound_dos must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => UpdateInboundDoDto)
+  inbound_dos?: UpdateInboundDoDto[];
 }
 
 export class UpdateInboundStatusDto {

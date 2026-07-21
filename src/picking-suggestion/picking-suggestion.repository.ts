@@ -175,9 +175,19 @@ export class PickingSuggestionRepository {
                 AND pth3.status_inventory = 'READY'
             )
         ), 0) as location_total_quantity,
-        -- Calculate reserved quantity from pending transaction_picking (NULL-safe location match)
+        -- Remaining reserved qty from PENDING pickings minus already scanned
         COALESCE((
-          SELECT SUM(tp.quantity)
+          SELECT SUM(
+            GREATEST(
+              0::numeric,
+              COALESCE(tp.quantity::numeric, 0) - COALESCE((
+                SELECT SUM(tsp.quantity_picked::numeric)
+                FROM transaction_scan_picking tsp
+                WHERE tsp.transaction_picking_id = tp.id
+                  AND tsp.deleted_at IS NULL
+              ), 0)
+            )
+          )
           FROM transaction_picking tp
           WHERE tp.item_id::text = pth.item_id::text
             AND (
@@ -191,9 +201,19 @@ export class PickingSuggestionRepository {
             AND tp.status::text = 'PENDING'
             AND tp.deleted_at IS NULL
         ), 0) as reserved_quantity,
-        -- Calculate actual available quantity (total - reserved)
+        -- Calculate actual available quantity (total - remaining reserved)
         pth.new_quantity - COALESCE((
-          SELECT SUM(tp.quantity)
+          SELECT SUM(
+            GREATEST(
+              0::numeric,
+              COALESCE(tp.quantity::numeric, 0) - COALESCE((
+                SELECT SUM(tsp.quantity_picked::numeric)
+                FROM transaction_scan_picking tsp
+                WHERE tsp.transaction_picking_id = tp.id
+                  AND tsp.deleted_at IS NULL
+              ), 0)
+            )
+          )
           FROM transaction_picking tp
           WHERE tp.item_id::text = pth.item_id::text
             AND (
@@ -235,7 +255,17 @@ export class PickingSuggestionRepository {
             )
         ), 0)
         - COALESCE((
-          SELECT SUM(tp2.quantity)
+          SELECT SUM(
+            GREATEST(
+              0::numeric,
+              COALESCE(tp2.quantity::numeric, 0) - COALESCE((
+                SELECT SUM(tsp2.quantity_picked::numeric)
+                FROM transaction_scan_picking tsp2
+                WHERE tsp2.transaction_picking_id = tp2.id
+                  AND tsp2.deleted_at IS NULL
+              ), 0)
+            )
+          )
           FROM transaction_picking tp2
           WHERE tp2.item_id::text = pth.item_id::text
             AND (
@@ -310,7 +340,17 @@ export class PickingSuggestionRepository {
           ), 0)
           -
           COALESCE((
-            SELECT SUM(tp.quantity)
+            SELECT SUM(
+              GREATEST(
+                0::numeric,
+                COALESCE(tp.quantity::numeric, 0) - COALESCE((
+                  SELECT SUM(tsp.quantity_picked::numeric)
+                  FROM transaction_scan_picking tsp
+                  WHERE tsp.transaction_picking_id = tp.id
+                    AND tsp.deleted_at IS NULL
+                ), 0)
+              )
+            )
             FROM transaction_picking tp
             WHERE tp.item_id::text = pth.item_id::text
               AND (
@@ -416,7 +456,8 @@ export class PickingSuggestionRepository {
 
   /**
    * Pending transaction_picking booked qty grouped by week (aligned with visibility dashboard).
-   * Bookings without week_number are returned as unscoped total.
+   * Uses remaining unpicked qty: PENDING quantity minus scanned quantity_picked.
+   * Fully scanned bookings are excluded. Bookings without week_number are unscoped.
    */
   async getPendingBookedByWeek(
     itemId: string,
@@ -426,14 +467,32 @@ export class PickingSuggestionRepository {
     const query = `
       SELECT
         tp.week_number,
-        COALESCE(SUM(tp.quantity::numeric), 0)::numeric AS booked_quantity
+        COALESCE(SUM(
+          GREATEST(
+            0::numeric,
+            COALESCE(tp.quantity::numeric, 0)
+              - COALESCE(scanned.scanned_quantity, 0)
+          )
+        ), 0)::numeric AS booked_quantity
       FROM transaction_picking tp
       INNER JOIN outbound_do od ON od.id = tp.do_id
+      LEFT JOIN (
+        SELECT
+          tsp.transaction_picking_id,
+          COALESCE(SUM(tsp.quantity_picked::numeric), 0)::numeric AS scanned_quantity
+        FROM transaction_scan_picking tsp
+        WHERE tsp.deleted_at IS NULL
+        GROUP BY tsp.transaction_picking_id
+      ) scanned ON scanned.transaction_picking_id = tp.id
       WHERE tp.item_id::text = $1
         AND tp.status::text = 'PENDING'
         AND tp.deleted_at IS NULL
         AND od.organization_id = $3::uuid
         AND ($2::text IS NULL OR COALESCE(tp.uom, '') = $2::text)
+        AND GREATEST(
+          0::numeric,
+          COALESCE(tp.quantity::numeric, 0) - COALESCE(scanned.scanned_quantity, 0)
+        ) > 0
       GROUP BY tp.week_number
     `;
 

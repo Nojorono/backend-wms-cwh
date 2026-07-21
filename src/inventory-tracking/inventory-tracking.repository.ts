@@ -573,10 +573,12 @@ export class InventoryTrackingRepository {
         GROUP BY item_id, COALESCE(uom, '')
       ),
       pending_bookings AS (
-        SELECT 
+        -- Only unpicked booking qty: PENDING pickings minus already scanned quantity_picked.
+        -- Fully scanned (or COMPLETED) bookings no longer reserve READY stock.
+        SELECT
           tp.item_id::uuid as item_id,
           COALESCE(tp.uom, '') as uom,
-          SUM(tp.quantity::numeric)::numeric as booked_quantity,
+          SUM(remaining.remaining_quantity)::numeric as booked_quantity,
           COUNT(*)::integer as booking_count,
           json_agg(
             json_build_object(
@@ -585,7 +587,11 @@ export class InventoryTrackingRepository {
               'do_number', od.outbound_do_number,
               'memo_id', tp.memo_id,
               'memo_number', om.outbound_memo_number,
-              'quantity', tp.quantity,
+              'quantity', remaining.remaining_quantity,
+              'booked_quantity', remaining.remaining_quantity,
+              'original_quantity', tp.quantity,
+              'scanned_quantity', remaining.scanned_quantity,
+              'has_scan', remaining.has_scan,
               'uom', tp.uom,
               'week_number', tp.week_number,
               'source_warehouse_sub_id', tp.source_warehouse_sub_id,
@@ -597,6 +603,23 @@ export class InventoryTrackingRepository {
             )
           ) as booking_details
         FROM transaction_picking tp
+        INNER JOIN (
+          SELECT
+            tp_inner.id as transaction_picking_id,
+            COALESCE(SUM(tsp.quantity_picked::numeric), 0)::numeric as scanned_quantity,
+            CASE WHEN COUNT(tsp.id) > 0 THEN true ELSE false END as has_scan,
+            GREATEST(
+              0::numeric,
+              COALESCE(tp_inner.quantity::numeric, 0) - COALESCE(SUM(tsp.quantity_picked::numeric), 0)
+            )::numeric as remaining_quantity
+          FROM transaction_picking tp_inner
+          LEFT JOIN transaction_scan_picking tsp
+            ON tsp.transaction_picking_id = tp_inner.id
+            AND tsp.deleted_at IS NULL
+          WHERE tp_inner.status = 'PENDING'
+            AND tp_inner.deleted_at IS NULL
+          GROUP BY tp_inner.id, tp_inner.quantity
+        ) remaining ON remaining.transaction_picking_id = tp.id
         LEFT JOIN outbound_do od ON od.id = tp.do_id
         LEFT JOIN outbound_memo om ON om.id = tp.memo_id
         LEFT JOIN m_warehouse_sub ws_source ON ws_source.id = tp.source_warehouse_sub_id
@@ -604,6 +627,7 @@ export class InventoryTrackingRepository {
         WHERE tp.status = 'PENDING'
           AND tp.deleted_at IS NULL
           AND od.organization_id = $1::uuid
+          AND remaining.remaining_quantity > 0
           ${item_id ? `AND tp.item_id::uuid = $2::uuid` : ''}
         GROUP BY tp.item_id::uuid, COALESCE(tp.uom, '')
       ),

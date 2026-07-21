@@ -1,22 +1,24 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InboundIntegration } from 'src/core/domain/entities/inbound-integration.entity';
 import { InboundIntegrationLines } from 'src/core/domain/entities/inbound-integration-lines.entity';
-import { CreateInboundIntegrationDto } from './dto/create-inbound-integration.dto';
-import { UpdateInboundIntegrationDto } from './dto/update-inbound-integration.dto';
 import { CreateInboundIntegrationLineDto } from './dto/create-inbound-integration-line.dto';
 import { UpdateInboundIntegrationLineDto } from './dto/update-inbound-integration-line.dto';
 import { InboundIntegrationService } from './inbound-integration.service';
 import { CreateInboundIntegrationPayloadDto } from './dto/create-inbound-integration-payload.dto';
 import { UpdateInboundIntegrationPayloadDto } from './dto/update-inbound-integration-payload.dto';
 import { InboundIntegrationHeaderWithLines } from './inbound-integration.service';
+import { InboundIntegrationPollService } from './inbound-integration-poll.service';
+import { InboundIntegrationPollResponseDto } from './dto/inbound-integration-poll-response.dto';
 
 @ApiTags('Inbound Integration')
 @ApiBearerAuth('JWT-auth')
 @Controller('inbound-integration')
 export class InboundIntegrationController {
-  constructor(private readonly service: InboundIntegrationService) {}
-
+  constructor(
+    private readonly service: InboundIntegrationService,
+    private readonly pollService: InboundIntegrationPollService,
+  ) {}
   @Post()
   @ApiOperation({ summary: 'Create inbound integration header with optional lines' })
   @ApiResponse({ status: 201 })
@@ -29,6 +31,21 @@ export class InboundIntegrationController {
   @ApiResponse({ status: 200 })
   findAllHeaders(): Promise<InboundIntegrationHeaderWithLines[]> {
     return this.service.findAllHeaders();
+  }
+
+  @Get('polling/inbound-do/:inboundDoId')
+  @ApiOperation({
+    summary: 'Poll Oracle and sync inbound integration status by inbound DO id',
+    description:
+      'Calls rcv-receipt.findBySourceHeaderId using source_header_id from the staging row for this inbound_do_id, updates header/lines, and returns current status.',
+  })
+  @ApiParam({ name: 'inboundDoId', description: 'Inbound DO UUID' })
+  @ApiResponse({ status: 200, type: InboundIntegrationPollResponseDto })
+  @ApiResponse({ status: 404, description: 'Inbound integration not found for this DO' })
+  pollingByInboundDoId(
+    @Param('inboundDoId') inboundDoId: string,
+  ): Promise<InboundIntegrationPollResponseDto> {
+    return this.pollService.pollByInboundDoId(inboundDoId);
   }
 
   @Get(':id')

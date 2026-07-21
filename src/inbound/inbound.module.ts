@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Inbound } from 'src/core/domain/entities/inbound.entity';
 import { InboundDo } from 'src/core/domain/entities/inbound-do.entity';
@@ -28,7 +28,7 @@ import { TransactionScanInboundModule } from 'src/transaction-scan-inbound/trans
 @Module({
   imports: [
     ConfigModule,
-    InboundIntegrationModule,
+    forwardRef(() => InboundIntegrationModule),
     TransactionScanInboundModule,
     TypeOrmModule.forFeature([Inbound, InboundDo, InboundItem, PalletTransactionHistory]),
     ClientsModule.registerAsync([
@@ -114,6 +114,6 @@ import { TransactionScanInboundModule } from 'src/transaction-scan-inbound/trans
     InboundIntegrationQueueWorker,
     OracleInboundStatusCheckerService,
   ],
-  exports: [InboundService],
+  exports: [InboundService, OracleInboundStatusCheckerService],
 })
 export class InboundModule { }
