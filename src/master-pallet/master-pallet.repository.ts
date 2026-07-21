@@ -37,7 +37,7 @@ export class MasterPalletRepository {
 
   async findByPalletCode(palletCode: string): Promise<MasterPallet | null> {
     const pallet = await this.repository.findOne({
-      where: { pallet_code: palletCode },
+      where: { pallet_code: palletCode, isActive: true },
     });
     if (!pallet) {
       return null;
