@@ -667,33 +667,53 @@ export class InboundService {
     existingItems: InboundItem[],
     itemDtos: UpdateInboundItemDto[],
   ): Promise<void> {
-    const existingById = new Map(existingItems.map((i) => [i.id, i]));
+    // Always reload DO lines from DB so update works even if relation was not loaded.
+    const dbItems = await this.inboundItemRepo.findAllByInboundDo(inboundDoId);
+    const items =
+      dbItems.length > 0
+        ? dbItems
+        : existingItems.filter((item) => item.inbound_do_id === inboundDoId);
+
+    const existingById = new Map(items.map((i) => [i.id, i]));
 
     for (const itemDto of itemDtos) {
-      const matched = itemDto.id ? existingById.get(itemDto.id) : undefined;
+      let matched = itemDto.id ? existingById.get(itemDto.id) : undefined;
 
       if (itemDto.id && !matched) {
-        // Item may not be loaded on matched DO relation; try direct lookup
         const found = await this.inboundItemRepo.findOne(itemDto.id);
-        if (!found || found.inbound_do_id !== inboundDoId) {
-          throw new NotFoundException(
-            `Inbound item ${itemDto.id} not found for inbound DO ${inboundDoId}`,
+
+        if (found && found.inbound_do_id === inboundDoId) {
+          matched = found;
+        } else if (found && found.inbound_do_id !== inboundDoId) {
+          throw new BadRequestException(
+            `Inbound item id=${itemDto.id} belongs to another DO (${found.inbound_do_id}), not DO ${inboundDoId}`,
           );
-        }
+        } else {
+          // Common FE mistake: sending master item_id as inbound_item.id
+          const looksLikeMasterItemId =
+            !!itemDto.item_id && itemDto.id === itemDto.item_id;
 
-        const itemUpdate: Partial<InboundItem> = {};
-        if (itemDto.item_id !== undefined) itemUpdate.item_id = itemDto.item_id;
-        if (itemDto.quantity !== undefined) itemUpdate.quantity = itemDto.quantity;
-        if (itemDto.classification_id !== undefined) {
-          itemUpdate.classification_id = itemDto.classification_id;
+          const fallback = this.findExistingInboundItemByBusinessKey(items, itemDto);
+          if (fallback) {
+            matched = fallback;
+          } else if (looksLikeMasterItemId) {
+            throw new BadRequestException(
+              `Invalid inbound_items[].id="${itemDto.id}". ` +
+                `This value matches item_id (master item), not inbound_item row id. ` +
+                `Send the inbound_item UUID from GET /inbound/:id, or omit id to create/update by item_id+uom on DO ${inboundDoId}.`,
+            );
+          } else {
+            throw new NotFoundException(
+              `Inbound item id=${itemDto.id} was not found under inbound DO ${inboundDoId}. ` +
+                `Use inbound_item.id (row UUID), not master item_id. ` +
+                `Omit id to create a new line when item_id+quantity are provided.`,
+            );
+          }
         }
-        if (itemDto.uom !== undefined) itemUpdate.uom = itemDto.uom;
-        if (itemDto.line_number !== undefined) itemUpdate.line_number = itemDto.line_number;
+      }
 
-        if (Object.keys(itemUpdate).length > 0) {
-          await this.inboundItemRepo.update(found.id, itemUpdate);
-        }
-        continue;
+      if (!matched && itemDto.item_id) {
+        matched = this.findExistingInboundItemByBusinessKey(items, itemDto);
       }
 
       if (matched) {
@@ -714,11 +734,11 @@ export class InboundService {
 
       if (!itemDto.item_id || itemDto.quantity === undefined) {
         throw new BadRequestException(
-          'item_id and quantity are required when creating a new inbound item',
+          `Cannot create inbound item on DO ${inboundDoId}: item_id and quantity are required when id is missing or not found`,
         );
       }
 
-      await this.inboundItemRepo.create({
+      const created = await this.inboundItemRepo.create({
         inbound_id: inboundId,
         inbound_do_id: inboundDoId,
         item_id: itemDto.item_id,
@@ -727,7 +747,47 @@ export class InboundService {
         uom: itemDto.uom,
         line_number: itemDto.line_number,
       });
+      existingById.set(created.id, created);
+      items.push(created);
     }
+  }
+
+  private findExistingInboundItemByBusinessKey(
+    items: InboundItem[],
+    itemDto: UpdateInboundItemDto,
+  ): InboundItem | undefined {
+    if (!itemDto.item_id) {
+      return undefined;
+    }
+
+    const sameItem = items.filter((item) => item.item_id === itemDto.item_id);
+    if (!sameItem.length) {
+      return undefined;
+    }
+
+    if (itemDto.uom !== undefined) {
+      const byUom = sameItem.filter(
+        (item) => (item.uom ?? '') === (itemDto.uom ?? ''),
+      );
+      if (byUom.length === 1) {
+        return byUom[0];
+      }
+      if (itemDto.line_number !== undefined) {
+        return byUom.find((item) => item.line_number === itemDto.line_number);
+      }
+      if (byUom.length > 1) {
+        return byUom[0];
+      }
+    }
+
+    if (itemDto.line_number !== undefined) {
+      const byLine = sameItem.find((item) => item.line_number === itemDto.line_number);
+      if (byLine) {
+        return byLine;
+      }
+    }
+
+    return sameItem.length === 1 ? sameItem[0] : undefined;
   }
 
   async remove(id: string): Promise<void> {
