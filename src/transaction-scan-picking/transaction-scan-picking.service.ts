@@ -3,6 +3,7 @@ import { TransactionScanPickingRepository } from './transaction-scan-picking.rep
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';
 import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
+import { PickingTransaction } from '../core/domain/entities/transaction-picking.entity';
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { QuantityOperationType, StatusInventory } from '../core/domain/entities/transaction-pallet-history.entity';
@@ -308,7 +309,12 @@ export class TransactionScanPickingService {
 
       const itemId = existing.item_id || transactionPicking.item_id;
       const uom = existing.uom || transactionPicking.uom;
-      const weekNumber = existing.week_number ?? transactionPicking.week_number;
+      const weekNumber = await this.resolveWeekNumberForStockLineRevert(
+        existing,
+        transactionPicking,
+        itemId,
+        uom,
+      );
       const outboundDoId = transactionPicking.do_id;
       const memoNumber = transactionPicking.memo_id
         ? (await this.outboundMemoService.findOne(transactionPicking.memo_id))?.outbound_memo_number
@@ -316,11 +322,6 @@ export class TransactionScanPickingService {
 
       if (!itemId) {
         throw new BadRequestException('item_id is required to revert pallet operations');
-      }
-      if (weekNumber === undefined || weekNumber === null) {
-        throw new BadRequestException(
-          'week_number is required to revert pallet operations for the correct stock line',
-        );
       }
 
       const userId = (existing as { user_id?: string }).user_id;
@@ -365,8 +366,6 @@ export class TransactionScanPickingService {
   ): Promise<ScanPickingTransaction[]> {
     return this.repository.findAll({ transactionPickingId });
   }
-
-
 
   async inspectionApproved(id: string, inspection_by: string): Promise<ScanPickingTransaction> {
     const existing = await this.findOne(id);
@@ -878,10 +877,20 @@ export class TransactionScanPickingService {
       const usePrevLocation = await this.getPreviousInventoryLocation(existing.pallet_use_id);
       const switchPrevLocation = await this.getPreviousInventoryLocation(existing.pallet_switch_id);
 
+      const shouldRevertSourceInventory =
+        existing.pallet_source_id &&
+        existing.quantity_picked > 0 &&
+        !(await this.repository.existsActivePickingsOnPalletExcludingTransaction(
+          existing.pallet_source_id,
+          transactionPicking.id,
+        ));
+
       // Revert source pallet inventory tracking status back to IN_INVENTORY if it exists
-      if (existing.pallet_source_id && existing.quantity_picked > 0) {
+      if (shouldRevertSourceInventory) {
         try {
-          const sourceTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_source_id);
+          const sourceTracking = await this.inventoryTrackingService.findOneByPalletId(
+            existing.pallet_source_id!,
+          );
           if (sourceTracking) {
             const locationToRestore = sourcePrevLocation ?? fallbackSourceLocation;
             await this.inventoryTrackingService.update(sourceTracking.id, {
@@ -900,10 +909,21 @@ export class TransactionScanPickingService {
         }
       }
 
+      const shouldRevertUseInventory =
+        existing.pallet_use_id &&
+        existing.quantity_picked > 0 &&
+        !wasSamePallet &&
+        !(await this.repository.existsActivePickingsOnPalletExcludingTransaction(
+          existing.pallet_use_id,
+          transactionPicking.id,
+        ));
+
       // Revert use pallet: restore location and clear PICKED → IN_INVENTORY
-      if (existing.pallet_use_id && existing.quantity_picked > 0 && !wasSamePallet) {
+      if (shouldRevertUseInventory) {
         try {
-          const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_use_id);
+          const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(
+            existing.pallet_use_id!,
+          );
           if (usePalletTracking) {
             const locationToRestore = usePrevLocation ?? fallbackSourceLocation;
             await this.inventoryTrackingService.update(usePalletTracking.id, {
@@ -953,6 +973,77 @@ export class TransactionScanPickingService {
       // Log error but don't fail the operation
       console.error('Error reverting inventory tracking for pallets:', error);
     }
+  }
+
+  private async resolveWeekNumberForStockLineRevert(
+    scan: ScanPickingTransaction,
+    transactionPicking: PickingTransaction,
+    itemId: string,
+    uom?: string,
+  ): Promise<number> {
+    const explicitWeek = scan.week_number ?? transactionPicking.week_number;
+    if (explicitWeek !== undefined && explicitWeek !== null) {
+      return explicitWeek;
+    }
+
+    const palletId = scan.pallet_use_id || scan.pallet_source_id;
+    if (!palletId) {
+      throw new BadRequestException(
+        `Cannot revert scan ${scan.id}: week_number is required when the same SKU can exist in multiple weeks`,
+      );
+    }
+
+    const quantityToUse = (scan.quantity_picked || 0) - (scan.quantity_switch || 0);
+    const palletLines = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
+    const sameSkuLines = palletLines.filter(
+      (line) =>
+        line.item_id === itemId &&
+        (!uom || !line.uom || line.uom === uom) &&
+        line.current_quantity > 0,
+    );
+
+    const pendingOutboundLines = sameSkuLines.filter(
+      (line) => line.status_inventory === StatusInventory.PENDING,
+    );
+
+    const matchByQty = (lines: typeof sameSkuLines): number | undefined => {
+      if (quantityToUse <= 0) {
+        return undefined;
+      }
+      const matches = lines.filter((line) => line.current_quantity === quantityToUse);
+      if (matches.length === 1 && matches[0].week_number != null) {
+        return matches[0].week_number;
+      }
+      return undefined;
+    };
+
+    const fromPendingQty = matchByQty(pendingOutboundLines);
+    if (fromPendingQty !== undefined) {
+      return fromPendingQty;
+    }
+
+    if (pendingOutboundLines.length === 1 && pendingOutboundLines[0].week_number != null) {
+      return pendingOutboundLines[0].week_number;
+    }
+
+    const fromAnyQty = matchByQty(sameSkuLines);
+    if (fromAnyQty !== undefined) {
+      return fromAnyQty;
+    }
+
+    if (sameSkuLines.length === 1 && sameSkuLines[0].week_number != null) {
+      return sameSkuLines[0].week_number;
+    }
+
+    const weekHint = sameSkuLines
+      .map((line) => `week ${line.week_number} qty=${line.current_quantity} (${line.status_inventory})`)
+      .join(', ');
+
+    throw new BadRequestException(
+      `Cannot revert scan ${scan.id}: same SKU on pallet has multiple week stock lines` +
+        (weekHint ? ` (${weekHint})` : '') +
+        `. Set week_number on the scan or transaction picking.`,
+    );
   }
 
   private async getPalletItemProductionDate(

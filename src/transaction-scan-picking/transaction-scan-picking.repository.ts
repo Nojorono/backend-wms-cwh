@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Repository, SelectQueryBuilder } from 'typeorm';
 import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
+import { Status as PickingTransactionStatus } from '../core/domain/entities/transaction-picking.entity';
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';
 
@@ -78,6 +79,25 @@ export class TransactionScanPickingRepository {
 
   async remove(id: string): Promise<void> {
     await this.repository.softDelete(id);
+  }
+
+  async existsActivePickingsOnPalletExcludingTransaction(
+    palletId: string,
+    excludeTransactionPickingId: string,
+  ): Promise<boolean> {
+    const count = await this.repository
+      .createQueryBuilder('scan')
+      .innerJoin('scan.transactionPicking', 'tp')
+      .where('tp.status = :pending', { pending: PickingTransactionStatus.PENDING })
+      .andWhere('tp.id != :excludeId', { excludeId: excludeTransactionPickingId })
+      .andWhere('scan.deletedAt IS NULL')
+      .andWhere(
+        '(scan.pallet_source_id = :palletId OR scan.pallet_use_id = :palletId OR scan.pallet_switch_id = :palletId)',
+        { palletId },
+      )
+      .getCount();
+
+    return count > 0;
   }
 
   private createBaseQueryBuilder(): SelectQueryBuilder<ScanPickingTransaction> {
