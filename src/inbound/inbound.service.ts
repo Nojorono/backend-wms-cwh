@@ -832,7 +832,13 @@ export class InboundService {
 
       const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
       await this.createInboundIntegrationRecords(dataIntegration);
-      const inbound_integrations = await this.inboundIntegrationService.findAllByInbound(id);
+      const inbound_integrations =
+        await this.inboundIntegrationService.findAllByInboundActiveDos(id);
+      if (!inbound_integrations.length) {
+        throw new BadRequestException(
+          'No inbound integration staging rows for active inbound DOs. Check inbound_dos after update.',
+        );
+      }
 
       let rcv_receipt_results: RcvReceiptResponseDto[];
       try {
@@ -841,8 +847,11 @@ export class InboundService {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(`Failed to create RCV receipt for inboundId=${id}: ${errorMessage}`);
+        await this.inboundIntegrationService.markHeadersPollResult(id, 'E', errorMessage);
         throw new BadRequestException(`Failed to create RCV receipt: ${errorMessage}`);
       }
+
+      await this.persistRcvReceiptResultsToStaging(inbound_integrations, rcv_receipt_results);
 
       const requestId = this.extractRequestIdFromRcvResults(rcv_receipt_results);
 
@@ -924,6 +933,19 @@ export class InboundService {
     const isPo = ['PO'].includes(
       (inbound.inbound_type ?? '').toUpperCase(),
     );
+
+    const activeDoIds = (inbound.inbound_dos ?? [])
+      .map((d) => d.id)
+      .filter((doId): doId is string => Boolean(doId));
+    const pruned = await this.inboundIntegrationService.pruneStaleHeadersForInbound(
+      inbound.id,
+      activeDoIds,
+    );
+    if (pruned > 0) {
+      this.logger.warn(
+        `Pruned ${pruned} stale inbound_integration header(s) for inboundId=${inbound.id} (DO replaced/removed)`,
+      );
+    }
 
     for (const inboundDo of inbound.inbound_dos ?? []) {
       const hasAddToReceiptNumber =
@@ -1079,6 +1101,97 @@ export class InboundService {
       return responseData as RcvReceiptResponseDto[];
     }
     return [response];
+  }
+
+  /**
+   * Writes Oracle rcv-receipt.create feedback into inbound_integration staging (status/message/request_id).
+   */
+  private async persistRcvReceiptResultsToStaging(
+    headers: InboundIntegrationHeaderWithLines[],
+    responses: RcvReceiptResponseDto[],
+  ): Promise<void> {
+    for (const header of headers) {
+      const sourceHeaderId = header.source_header_id;
+      if (!sourceHeaderId) {
+        continue;
+      }
+      const match = this.findRcvResultForSourceHeaderId(responses, sourceHeaderId);
+      if (!match) {
+        continue;
+      }
+
+      const status = this.firstNonEmptyIntegrationString(
+        match.STATUS,
+        match.status,
+        match.IFACE_STATUS_IR,
+        match.REQUEST_STATUS,
+      );
+      const message = this.firstNonEmptyIntegrationString(
+        match.MESSAGE,
+        match.message,
+        match.error,
+        match.errorMessage,
+      );
+      const requestId = this.extractRequestIdFromUnknown(match);
+
+      const update: Record<string, unknown> = {};
+      if (status) {
+        update.status = status.length === 1 ? status : status.slice(0, 30);
+      }
+      if (message) {
+        update.message = message.slice(0, 240);
+      }
+      if (requestId != null) {
+        update.request_id = requestId;
+      }
+
+      if (Object.keys(update).length > 0) {
+        await this.inboundIntegrationService.updateHeader(header.id, update as any);
+      }
+    }
+  }
+
+  private findRcvResultForSourceHeaderId(
+    responses: RcvReceiptResponseDto[],
+    sourceHeaderId: string,
+  ): Record<string, unknown> | null {
+    const stack: unknown[] = [...responses];
+    while (stack.length) {
+      const current = stack.pop();
+      if (current == null) {
+        continue;
+      }
+      if (Array.isArray(current)) {
+        stack.push(...current);
+        continue;
+      }
+      if (typeof current !== 'object') {
+        continue;
+      }
+      const obj = current as Record<string, unknown>;
+      const candidateSource = this.firstNonEmptyIntegrationString(
+        obj.SOURCE_HEADER_ID,
+        obj.source_header_id,
+      );
+      if (candidateSource === sourceHeaderId) {
+        return obj;
+      }
+      for (const nested of Object.values(obj)) {
+        if (nested != null && (typeof nested === 'object' || Array.isArray(nested))) {
+          stack.push(nested);
+        }
+      }
+    }
+    return null;
+  }
+
+  private firstNonEmptyIntegrationString(...values: unknown[]): string | null {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim() !== '') {
+        return value.trim();
+      }
+    }
+    return null;
   }
 
   private extractRequestIdFromRcvResults(

@@ -124,6 +124,47 @@ export class InboundIntegrationService {
     }));
   }
 
+  /** Active DOs only — used for Oracle poll / queue (ignores orphan staging after DO replace). */
+  async findAllByInboundActiveDos(inboundId: string): Promise<InboundIntegrationHeaderWithLines[]> {
+    const headers = await this.repository.findAllHeadersByInboundIdWithActiveDo(inboundId);
+    if (!headers.length) {
+      return [];
+    }
+    const headerIds = headers.map((h) => h.id);
+    const lines = await this.repository.findLinesByHeaderIds(headerIds);
+    const linesByHeader = new Map<string, InboundIntegrationLines[]>();
+    for (const line of lines) {
+      if (!line.inbound_integration_id) {
+        continue;
+      }
+      const list = linesByHeader.get(line.inbound_integration_id) ?? [];
+      list.push(line);
+      linesByHeader.set(line.inbound_integration_id, list);
+    }
+    return headers.map((header) => ({
+      ...header,
+      lines: linesByHeader.get(header.id) ?? [],
+    }));
+  }
+
+  async pruneStaleHeadersForInbound(inboundId: string, activeDoIds: string[]): Promise<number> {
+    return this.repository.softDeleteHeadersNotInDoIds(inboundId, activeDoIds);
+  }
+
+  async markHeadersPollResult(
+    inboundId: string,
+    status: string,
+    message: string,
+    headerIds?: string[],
+  ): Promise<void> {
+    const trimmedMessage = message.trim().slice(0, 240);
+    await this.repository.updateHeadersByInboundId(
+      inboundId,
+      { status, message: trimmedMessage || undefined },
+      headerIds,
+    );
+  }
+
   async findHeaderByInboundDoId(inboundDoId: string): Promise<InboundIntegrationHeaderWithLines | null> {
     const header = await this.repository.findHeaderByInboundDoId(inboundDoId);
     if (!header) {

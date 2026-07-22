@@ -64,6 +64,50 @@ export class InboundIntegrationRepository {
     });
   }
 
+  /** Staging headers whose inbound_do still exists (not soft-deleted). */
+  async findAllHeadersByInboundIdWithActiveDo(inboundId: string): Promise<InboundIntegration[]> {
+    return await this.inboundIntegrationRepo
+      .createQueryBuilder('h')
+      .innerJoin('inbound_do', 'd', 'd.id = h.inbound_do_id AND d.deleted_at IS NULL')
+      .where('h.inbound_id = :inboundId', { inboundId })
+      .andWhere('h.deleted_at IS NULL')
+      .orderBy('h.created_at', 'ASC')
+      .getMany();
+  }
+
+  async softDeleteHeadersNotInDoIds(inboundId: string, activeDoIds: string[]): Promise<number> {
+    if (!activeDoIds.length) {
+      return 0;
+    }
+    const result = await this.inboundIntegrationRepo
+      .createQueryBuilder()
+      .softDelete()
+      .where('inbound_id = :inboundId', { inboundId })
+      .andWhere('(inbound_do_id IS NULL OR inbound_do_id NOT IN (:...activeDoIds))', {
+        activeDoIds,
+      })
+      .execute();
+    return result.affected ?? 0;
+  }
+
+  async updateHeadersByInboundId(
+    inboundId: string,
+    dto: UpdateInboundIntegrationDto,
+    onlyHeaderIds?: string[],
+  ): Promise<void> {
+    const qb = this.inboundIntegrationRepo
+      .createQueryBuilder()
+      .update(InboundIntegration)
+      .set(dto as Partial<InboundIntegration>)
+      .where('inbound_id = :inboundId', { inboundId })
+      .andWhere('deleted_at IS NULL');
+
+    if (onlyHeaderIds?.length) {
+      qb.andWhere('id IN (:...onlyHeaderIds)', { onlyHeaderIds });
+    }
+    await qb.execute();
+  }
+
   async findLinesByHeaderIds(headerIds: string[]): Promise<InboundIntegrationLines[]> {
     if (headerIds.length === 0) {
       return [];
