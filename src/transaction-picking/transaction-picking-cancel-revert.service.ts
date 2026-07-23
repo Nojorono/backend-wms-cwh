@@ -14,6 +14,11 @@ import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 import { TransactionPickingRepository } from './transaction-picking.repository';
 
+/**
+ * On transaction-picking cancel: keep stock on pallet_use_id, convert PENDING → READY,
+ * set inventory tracking to IN_INVENTORY (location unchanged), and clear memo_id.
+ * Does NOT move quantities back to pallet_source / pallet_switch.
+ */
 @Injectable()
 export class TransactionPickingCancelRevertService {
   constructor(
@@ -22,7 +27,7 @@ export class TransactionPickingCancelRevertService {
     private readonly scanPickingRepository: Repository<ScanPickingTransaction>,
     private readonly masterPalletService: MasterPalletService,
     private readonly inventoryTrackingService: InventoryTrackingService,
-  ) {}
+  ) { }
 
   async revertForCancelledTransaction(transactionPickingId: string): Promise<void> {
     const transactionPicking =
@@ -40,14 +45,22 @@ export class TransactionPickingCancelRevertService {
     }
 
     for (const scan of scans) {
-      await this.revertScanStockForCancel(scan, transactionPicking);
+      await this.releaseUsePalletStockForCancel(scan, transactionPicking);
     }
   }
 
-  private async revertScanStockForCancel(
+  /**
+   * Convert outbound PENDING on pallet_use → READY, set IN_INVENTORY, clear memo.
+   * Switch leftover and source are left as-is (no quantity revert).
+   */
+  private async releaseUsePalletStockForCancel(
     scan: ScanPickingTransaction,
     transactionPicking: PickingTransaction,
   ): Promise<void> {
+    if (!scan.pallet_use_id) {
+      return;
+    }
+
     const itemId = scan.item_id || transactionPicking.item_id;
     const uom = scan.uom || transactionPicking.uom;
 
@@ -64,21 +77,15 @@ export class TransactionPickingCancelRevertService {
       uom,
     );
 
-    const productionDatePalletId =
-      scan.pallet_use_id || scan.pallet_switch_id || scan.pallet_source_id;
-    const productionDate =
-      productionDatePalletId && itemId
-        ? await this.getPalletItemProductionDate(
-            productionDatePalletId,
-            itemId,
-            uom,
-            weekNumber,
-          )
-        : undefined;
+    const productionDate = await this.getPalletItemProductionDate(
+      scan.pallet_use_id,
+      itemId,
+      uom,
+      weekNumber,
+    );
 
-    const quantitySwitch = scan.quantity_switch || 0;
-    const quantityPicked = scan.quantity_picked || 0;
-    const quantityToUse = quantityPicked - quantitySwitch;
+    // quantity_picked = outbound qty on use pallet (PENDING). Switch is independent — leave it.
+    const quantityToUse = scan.quantity_picked || 0;
     const memoId = transactionPicking.memo_id;
 
     const basePayload = {
@@ -92,37 +99,38 @@ export class TransactionPickingCancelRevertService {
       reference_type: 'TRANSACTION_PICKING_CANCEL' as const,
     };
 
-    if (scan.pallet_use_id && quantityToUse > 0) {
+    if (quantityToUse > 0) {
+      // PENDING and READY are separate stock lines — convert by REMOVE PENDING then ADD READY.
+      // Skip empty cleanup between steps so history/memo are not wiped mid-convert.
+      await this.masterPalletService.updateQuantity(
+        scan.pallet_use_id,
+        {
+          ...basePayload,
+          quantity: quantityToUse,
+          operation_type: QuantityOperationType.REMOVE,
+          status_inventory: StatusInventory.PENDING,
+          notes:
+            `[CANCEL] REMOVE ${quantityToUse}${uom ? ` ${uom}` : ''} PENDING ` +
+            `week=${weekNumber} from use pallet ${scan.pallet_use_id} ` +
+            `(convert to READY — stock stays on pallet)`,
+        },
+        undefined,
+        true,
+      );
+
       await this.masterPalletService.updateQuantity(scan.pallet_use_id, {
         ...basePayload,
         quantity: quantityToUse,
-        operation_type: QuantityOperationType.REMOVE,
-        status_inventory: StatusInventory.PENDING,
-        notes: `[CANCEL] REMOVE ${quantityToUse} PENDING week=${weekNumber} from use pallet ${scan.pallet_use_id}`,
-      });
-    }
-
-    if (scan.pallet_switch_id && quantitySwitch > 0) {
-      await this.masterPalletService.updateQuantity(scan.pallet_switch_id, {
-        ...basePayload,
-        quantity: quantitySwitch,
-        operation_type: QuantityOperationType.REMOVE,
-        status_inventory: StatusInventory.READY,
-        notes: `[CANCEL] REMOVE ${quantitySwitch} READY week=${weekNumber} from switch pallet ${scan.pallet_switch_id}`,
-      });
-    }
-
-    if (scan.pallet_source_id && quantityPicked > 0) {
-      await this.masterPalletService.updateQuantity(scan.pallet_source_id, {
-        ...basePayload,
-        quantity: quantityPicked,
         operation_type: QuantityOperationType.ADD,
         status_inventory: StatusInventory.READY,
-        notes: `[CANCEL] ADD ${quantityPicked} READY week=${weekNumber} to source pallet ${scan.pallet_source_id}`,
+        notes:
+          `[CANCEL] ADD ${quantityToUse}${uom ? ` ${uom}` : ''} READY ` +
+          `week=${weekNumber} to use pallet ${scan.pallet_use_id} ` +
+          `(released from outbound PENDING after cancel)`,
       });
     }
 
-    if (scan.pallet_use_id && memoId) {
+    if (memoId) {
       try {
         const usePallet = await this.masterPalletService.findOne(scan.pallet_use_id);
         if (usePallet.memo_id === memoId) {
@@ -141,15 +149,12 @@ export class TransactionPickingCancelRevertService {
       }
     }
 
-    const inventoryPalletId = scan.pallet_use_id;
-    if (inventoryPalletId) {
-      const otherActiveOnUse = await this.existsActivePickingsOnPalletExcludingTransaction(
-        inventoryPalletId,
-        transactionPicking.id,
-      );
-      if (!otherActiveOnUse) {
-        await this.setUsePalletInventoryInInventory(inventoryPalletId);
-      }
+    const otherActiveOnUse = await this.existsActivePickingsOnPalletExcludingTransaction(
+      scan.pallet_use_id,
+      transactionPicking.id,
+    );
+    if (!otherActiveOnUse) {
+      await this.setUsePalletInventoryInInventory(scan.pallet_use_id);
     }
   }
 
@@ -210,7 +215,7 @@ export class TransactionPickingCancelRevertService {
       );
     }
 
-    const quantityToUse = (scan.quantity_picked || 0) - (scan.quantity_switch || 0);
+    const quantityToUse = scan.quantity_picked || 0;
     const palletLines = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
     const sameSkuLines = palletLines.filter(
       (line) =>
@@ -261,8 +266,8 @@ export class TransactionPickingCancelRevertService {
 
     throw new BadRequestException(
       `Cannot revert scan ${scan.id}: same SKU on pallet has multiple week stock lines` +
-        (weekHint ? ` (${weekHint})` : '') +
-        `. Set week_number on the scan or transaction picking.`,
+      (weekHint ? ` (${weekHint})` : '') +
+      `. Set week_number on the scan or transaction picking.`,
     );
   }
 
@@ -280,9 +285,21 @@ export class TransactionPickingCancelRevertService {
           (!uom || item.uom === uom) &&
           (weekNumber === undefined ||
             weekNumber === null ||
-            item.week_number === weekNumber),
+            item.week_number === weekNumber) &&
+          item.status_inventory === StatusInventory.PENDING,
       );
-      return sourceItem?.production_date ?? undefined;
+      return (
+        sourceItem?.production_date ??
+        palletItems.find(
+          (item) =>
+            item.item_id === itemId &&
+            (!uom || item.uom === uom) &&
+            (weekNumber === undefined ||
+              weekNumber === null ||
+              item.week_number === weekNumber),
+        )?.production_date ??
+        undefined
+      );
     } catch {
       return undefined;
     }
