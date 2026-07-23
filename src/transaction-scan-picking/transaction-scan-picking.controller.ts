@@ -29,12 +29,13 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 @Controller('transaction-scan-picking')
 @ApiBearerAuth('JWT-auth')
 export class TransactionScanPickingController {
-  constructor(private readonly service: TransactionScanPickingService) {}
+  constructor(private readonly service: TransactionScanPickingService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create transaction scan picking' })
   @ApiResponse({ status: 201, description: 'Transaction scan picking created', type: ScanPickingTransaction })
   async create(@Body() dto: CreateTransactionScanPickingDto) {
+    // console.log('dto', dto);
     return await this.service.create(dto);
   }
 
@@ -68,7 +69,7 @@ export class TransactionScanPickingController {
     @Query('status') status?: string,
     @Query('pallet_id') pallet_id?: string,
   ) {
-      return await this.service.findAll(transaction_picking_id, status, pallet_id);
+    return await this.service.findAll(transaction_picking_id, status, pallet_id);
   }
 
   @Get('picking/:transactionPickingId')
@@ -153,7 +154,7 @@ export class TransactionScanPickingController {
   @ApiParam({ name: 'transactionPickingId', description: 'ID transaction picking' })
   @ApiParam({ name: 'status', description: 'Status to update', enum: ScanPickingStatus })
   @ApiQuery({ name: 'inspection_by', required: false, type: String, description: 'User yang melakukan inspeksi' })
-  @ApiResponse({  type: [ScanPickingTransaction], description: 'Transaction scan picking berhasil diupdate' })
+  @ApiResponse({ type: [ScanPickingTransaction], description: 'Transaction scan picking berhasil diupdate' })
   async updateManyStatusTo(
     @Param('transactionPickingId') transactionPickingId: string,
     @Param('status') status: ScanPickingStatus,

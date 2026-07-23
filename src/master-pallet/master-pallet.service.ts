@@ -184,26 +184,29 @@ export class MasterPalletService {
         throw new BadRequestException('Pallet capacity must be set and greater than 0');
       }
 
-      // Quantity must be scoped per (item, uom, week). Same item with different
-      // week_number is a separate stock line and must not be summed together.
+      // Quantity must be scoped per (item, uom, week, status_inventory).
+      // READY leftover and PENDING outbound on the same pallet are separate stock lines.
       const weekNumberFilter =
         updateQuantityDto.week_number !== undefined ? updateQuantityDto.week_number : null;
+      const statusInventoryFilter = updateQuantityDto.status_inventory;
 
       const currentItemQuantity = await this.getItemQuantityOnPallet(
         palletId,
         updateQuantityDto.item_id,
         updateQuantityDto.uom,
         weekNumberFilter,
+        statusInventoryFilter,
       );
       const totalPalletQuantity = pallet.currentQuantity ?? 0;
 
-      // Validate UOM consistency only within the same item + week stock line
+      // Validate UOM consistency only within the same item + week + status stock line
       if (currentItemQuantity > 0 && updateQuantityDto.uom) {
         const existingUomRecord = await this.getLatestHistoryRecord(
           palletId,
           updateQuantityDto.item_id,
           undefined,
           weekNumberFilter,
+          statusInventoryFilter,
         );
 
         if (
@@ -760,6 +763,9 @@ export class MasterPalletService {
           .andWhere('h2.status_inventory IN (:...statusInventories)', {
             statusInventories: [StatusInventory.READY, StatusInventory.PENDING],
           })
+          .andWhere(
+            '(h2.status_inventory = history.status_inventory OR (h2.status_inventory IS NULL AND history.status_inventory IS NULL))',
+          )
           .andWhere('(h2.week_number = history.week_number OR (h2.week_number IS NULL AND history.week_number IS NULL))') // Include week_number in grouping
           .getQuery();
         return `history.createdAt = ${subQuery}`;
@@ -916,15 +922,16 @@ export class MasterPalletService {
   }
 
   /**
-   * Returns the latest transaction history record for (palletId, itemId, uom?, week?).
-   * When weekNumber is provided (including null), only that week stock line is considered.
-   * When weekNumber is omitted (undefined), week is not filtered (used by updateUOM).
+   * Returns the latest transaction history record for (palletId, itemId, uom?, week?, status?).
+   * When statusInventory is provided, only that status stock line is considered
+   * (READY vs PENDING are separate lines on the same pallet).
    */
   private async getLatestHistoryRecord(
     palletId: string,
     itemId: string,
     uom?: string,
     weekNumber?: number | null,
+    statusInventory?: StatusInventory,
   ): Promise<PalletTransactionHistory | null> {
     const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
@@ -935,10 +942,14 @@ export class MasterPalletService {
       qb.andWhere('history.uom = :uom', { uom });
     }
 
-    // Match visible stock lines only (same filter as getPalletItemLatestQuantity)
-    qb.andWhere('history.status_inventory IN (:...statusInventories)', {
-      statusInventories: [StatusInventory.READY, StatusInventory.PENDING],
-    });
+    if (statusInventory) {
+      qb.andWhere('history.status_inventory = :statusInventory', { statusInventory });
+    } else {
+      // Match visible stock lines only (same filter as getPalletItemLatestQuantity)
+      qb.andWhere('history.status_inventory IN (:...statusInventories)', {
+        statusInventories: [StatusInventory.READY, StatusInventory.PENDING],
+      });
+    }
 
     // undefined = do not filter by week (backward compatible for updateUOM)
     // null / number = match that specific week stock line
@@ -958,12 +969,14 @@ export class MasterPalletService {
     itemId: string,
     uom?: string,
     weekNumber?: number | null,
+    statusInventory?: StatusInventory,
   ): Promise<number> {
     const latestRecord = await this.getLatestHistoryRecord(
       palletId,
       itemId,
       uom,
       weekNumber,
+      statusInventory,
     );
     return latestRecord ? latestRecord.new_quantity : 0;
   }
