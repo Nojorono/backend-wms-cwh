@@ -10,6 +10,9 @@ import { CreateInboundIntegrationPayloadDto } from './dto/create-inbound-integra
 import {
   UpdateInboundIntegrationPayloadDto,
 } from './dto/update-inbound-integration-payload.dto';
+import { InboundIntegrationPaginationQueryDto } from './dto/inbound-integration-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 
 export type InboundIntegrationAggregateResult = {
   header: InboundIntegration;
@@ -21,7 +24,10 @@ export type InboundIntegrationHeaderWithLines = InboundIntegration & {
 
 @Injectable()
 export class InboundIntegrationService {
-  constructor(private readonly repository: InboundIntegrationRepository) {}
+  constructor(
+    private readonly repository: InboundIntegrationRepository,
+    private readonly paginationService: PaginationService,
+  ) {}
 
   async createHeader(dto: CreateInboundIntegrationDto): Promise<InboundIntegration> {
     return await this.repository.createHeader(dto);
@@ -57,11 +63,26 @@ export class InboundIntegrationService {
 
   async findAllHeaders(): Promise<InboundIntegrationHeaderWithLines[]> {
     const headers = await this.repository.findAllHeaders();
+    return this.attachLinesToHeaders(headers);
+  }
+
+  async findAllHeadersPaginated(
+    query: InboundIntegrationPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<InboundIntegrationHeaderWithLines>> {
+    const { data, total } = await this.repository.findAllHeadersPaginated(query);
+    const headersWithLines = await this.attachLinesToHeaders(data);
+    return this.paginationService.createPaginatedResponse(headersWithLines, query, total);
+  }
+
+  private async attachLinesToHeaders(
+    headers: InboundIntegration[],
+  ): Promise<InboundIntegrationHeaderWithLines[]> {
     if (!headers.length) {
       return [];
     }
 
-    const lines = await this.repository.findAllLines();
+    const headerIds = headers.map((h) => h.id);
+    const lines = await this.repository.findLinesByHeaderIds(headerIds);
     const linesByHeader = new Map<string, InboundIntegrationLines[]>();
     for (const line of lines) {
       if (!line.inbound_integration_id) {

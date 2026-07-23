@@ -10,6 +10,9 @@ import { PollShipConfirmByMemoQueryDto } from './dto/poll-ship-confirm-by-memo-q
 import { OutboundIntegrationDeliveriesRepository } from './outbound-integration-deliveries.repository';
 import { ShipConfirmStatusCheckerService } from '../outbound-do/integration/ship-confirm-status-checker.service';
 import { OutboundJobProcessStatus } from '../outbound-do/integration/outbound-integration-queue.types';
+import { OutboundIntegrationDeliveriesPaginationQueryDto } from './dto/outbound-integration-deliveries-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 
 @Injectable()
 export class OutboundIntegrationDeliveriesService {
@@ -17,6 +20,7 @@ export class OutboundIntegrationDeliveriesService {
     private readonly repository: OutboundIntegrationDeliveriesRepository,
     @Inject(forwardRef(() => ShipConfirmStatusCheckerService))
     private readonly shipConfirmStatusChecker: ShipConfirmStatusCheckerService,
+    private readonly paginationService: PaginationService,
   ) {}
 
   async create(dto: CreateOutboundIntegrationDeliveriesDto): Promise<OutboundIntegrationDeliveries> {
@@ -25,6 +29,13 @@ export class OutboundIntegrationDeliveriesService {
 
   async findAll(): Promise<OutboundIntegrationDeliveries[]> {
     return await this.repository.findAll();
+  }
+
+  async findAllPaginated(
+    query: OutboundIntegrationDeliveriesPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<OutboundIntegrationDeliveries>> {
+    const { data, total } = await this.repository.findAllPaginated(query);
+    return this.paginationService.createPaginatedResponse(data, query, total);
   }
 
   async findByOutboundDoId(outboundDoId: string): Promise<OutboundIntegrationDeliveries[]> {

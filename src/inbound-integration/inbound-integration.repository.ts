@@ -7,6 +7,7 @@ import { CreateInboundIntegrationDto } from './dto/create-inbound-integration.dt
 import { UpdateInboundIntegrationDto } from './dto/update-inbound-integration.dto';
 import { CreateInboundIntegrationLineDto } from './dto/create-inbound-integration-line.dto';
 import { UpdateInboundIntegrationLineDto } from './dto/update-inbound-integration-line.dto';
+import { InboundIntegrationPaginationQueryDto } from './dto/inbound-integration-pagination.dto';
 
 @Injectable()
 export class InboundIntegrationRepository {
@@ -48,6 +49,70 @@ export class InboundIntegrationRepository {
     return await this.inboundIntegrationRepo.find({
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findAllHeadersPaginated(
+    query: InboundIntegrationPaginationQueryDto,
+  ): Promise<{ data: InboundIntegration[]; total: number }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'DESC';
+
+    const sortableFields = new Set([
+      'createdAt',
+      'updatedAt',
+      'status',
+      'do_number',
+      'source_header_id',
+      'receipt_number',
+      'source_system',
+    ]);
+    const sortField = sortableFields.has(sortBy) ? sortBy : 'createdAt';
+
+    const qb = this.inboundIntegrationRepo
+      .createQueryBuilder('header')
+      .where('header.deletedAt IS NULL');
+
+    if (query.status?.trim()) {
+      qb.andWhere('header.status = :status', { status: query.status.trim() });
+    }
+
+    if (query.inbound_id?.trim()) {
+      qb.andWhere('header.inbound_id = :inboundId', {
+        inboundId: query.inbound_id.trim(),
+      });
+    }
+
+    if (query.inbound_do_id?.trim()) {
+      qb.andWhere('header.inbound_do_id = :inboundDoId', {
+        inboundDoId: query.inbound_do_id.trim(),
+      });
+    }
+
+    if (query.source_system?.trim()) {
+      qb.andWhere('header.source_system = :sourceSystem', {
+        sourceSystem: query.source_system.trim(),
+      });
+    }
+
+    if (query.search?.trim()) {
+      const search = `%${query.search.trim()}%`;
+      qb.andWhere(
+        '(header.do_number ILIKE :search OR header.source_header_id ILIKE :search OR header.receipt_number ILIKE :search OR header.message ILIKE :search)',
+        { search },
+      );
+    }
+
+    const total = await qb.getCount();
+
+    const data = await qb
+      .orderBy(`header.${sortField}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, total };
   }
 
   async findAllHeadersByInboundId(inboundId: string): Promise<InboundIntegration[]> {
