@@ -167,8 +167,10 @@ export class MasterPalletController {
     return this.masterPalletService.getPalletItemLatestQuantityByPalletCode(palletCode);
   }
 
-  @Get('by-code/:palletCode/item/:itemId/history')
-  @ApiOperation({ summary: 'Get item quantity history by pallet code and item ID' })
+  @Get('by-code/:palletCode/item/history')
+  @ApiOperation({
+    summary: 'Get item quantity history by pallet code (optional item_id / uom filters)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Return item quantity history.',
@@ -177,7 +179,7 @@ export class MasterPalletController {
   @ApiResponse({ status: 404, description: 'Pallet not found.' })
   getItemQuantityHistoryByPalletCode(
     @Param('palletCode') palletCode: string,
-    @Param('itemId') itemId: string,
+    @Query('item_id') itemId?: string,
     @Query('uom') uom?: string,
   ) {
     return this.masterPalletService.getItemQuantityHistoryByPalletCode(palletCode, itemId, uom);

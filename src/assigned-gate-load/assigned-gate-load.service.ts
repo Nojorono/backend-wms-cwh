@@ -12,7 +12,10 @@ import { UpdateAssignedGateLoadDto } from '../assigned-gate/dto/update-assigned-
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { PalletItemQuantityDto } from '../master-pallet/dto/pallet-quantity.dto';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
-import { QuantityOperationType } from '../core/domain/entities/transaction-pallet-history.entity';
+import {
+  QuantityOperationType,
+  StatusInventory,
+} from '../core/domain/entities/transaction-pallet-history.entity';
 
 export type AssignedGateLoadWithPalletItems = AssignedGateLoad & {
   pallet_stock_line?: PalletItemQuantityDto | null;
@@ -220,6 +223,59 @@ export class AssignedGateLoadService {
     return updated;
   }
 
+  /**
+   * Decide which stock line the gate load should decrement.
+   * Prefers the reserved outbound PENDING line (with enough quantity), falling back to
+   * READY only if no suitable PENDING line exists. Defaults to PENDING (outbound intent).
+   */
+  private async resolveGateLoadStockStatus(
+    palletId: string,
+    itemId: string,
+    uom: string,
+    weekNumber: number | undefined,
+    quantityLoaded: number,
+  ): Promise<StatusInventory> {
+    try {
+      const lines = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
+
+      const matches = lines.filter(
+        (line) =>
+          line.item_id === itemId &&
+          (!uom || !line.uom || line.uom === uom) &&
+          (weekNumber === undefined ||
+            weekNumber === null ||
+            line.week_number === weekNumber),
+      );
+
+      const pending = matches.find(
+        (line) =>
+          line.status_inventory === StatusInventory.PENDING &&
+          (line.current_quantity ?? 0) >= quantityLoaded,
+      );
+      if (pending) {
+        return StatusInventory.PENDING;
+      }
+
+      const ready = matches.find(
+        (line) =>
+          line.status_inventory === StatusInventory.READY &&
+          (line.current_quantity ?? 0) >= quantityLoaded,
+      );
+      if (ready) {
+        return StatusInventory.READY;
+      }
+
+      // No line has enough on its own — prefer PENDING if any PENDING exists.
+      if (matches.some((line) => line.status_inventory === StatusInventory.PENDING)) {
+        return StatusInventory.PENDING;
+      }
+    } catch {
+      // fall through to default
+    }
+
+    return StatusInventory.PENDING;
+  }
+
   async approve(
     id: string,
     status: AssignedGateLoadStatus.APPROVED,
@@ -235,8 +291,19 @@ export class AssignedGateLoadService {
       throw new BadRequestException('Pallet ID, Item ID, and UOM are required for approval');
     }
 
-    // Cut quantity from pallet using quantity_loaded
+    // Cut quantity from pallet using quantity_loaded.
+    // The reserved outbound stock sits on the use pallet as PENDING (from scan picking),
+    // so loading to the gate must consume the PENDING stock line — NOT the READY leftover
+    // (e.g. switch-pallet stock) that stays in inventory.
     if (existing.quantity_loaded > 0) {
+      const outboundStatus = await this.resolveGateLoadStockStatus(
+        existing.pallet_id,
+        existing.item_id,
+        existing.uom,
+        existing.week_number ?? undefined,
+        existing.quantity_loaded,
+      );
+
       await this.masterPalletService.updateQuantity(existing.pallet_id, {
         item_id: existing.item_id,
         quantity: existing.quantity_loaded,
@@ -244,7 +311,10 @@ export class AssignedGateLoadService {
         uom: existing.uom,
         week_number: existing.week_number ?? undefined,
         production_date: existing.production_date ?? undefined,
-        notes: `Quantity removed due to load approval. Load ID: ${id}`,
+        status_inventory: outboundStatus,
+        notes:
+          `Quantity removed due to load approval (${outboundStatus}). ` +
+          `Load ID: ${id}`,
       });
     }
 

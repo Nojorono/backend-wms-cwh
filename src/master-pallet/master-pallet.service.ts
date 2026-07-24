@@ -678,29 +678,39 @@ export class MasterPalletService {
 
   async getItemQuantityHistory(
     palletId: string,
-    itemId: string,
+    itemId?: string,
     uom?: string,
   ): Promise<PalletQuantityHistoryResponseDto[]> {
     await this.findOne(palletId);
 
     const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
-      .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id')
-      .where('history.pallet_id = :palletId', { palletId })
-      .andWhere('history.item_id = :itemId', { itemId });
+      .leftJoinAndMapOne(
+        'history.item',
+        MasterItem,
+        'item',
+        'item.id = history.item_id::uuid',
+      )
+      .where('history.pallet_id = :palletId', { palletId });
 
-    // Add UOM filtering if provided
+    if (itemId) {
+      qb.andWhere('history.item_id = :itemId', { itemId });
+    }
+
     if (uom) {
       qb.andWhere('history.uom = :uom', { uom });
     }
 
-    const history = await qb.orderBy('history.createdAt', 'DESC').getMany();
+    const history = await qb
+      .orderBy('history.created_at', 'DESC')
+      .addOrderBy('history.id', 'DESC')
+      .getMany();
 
     return history.map((record: any) => ({
       id: record.id,
       pallet_id: record.pallet_id,
       item_id: record.item_id,
-      item_name: record.item.sku,
+      item_name: record.item?.sku,
       previous_quantity: record.previous_quantity,
       quantity_change: record.quantity_change,
       new_quantity: record.new_quantity,
@@ -713,6 +723,7 @@ export class MasterPalletService {
       createdAt: record.createdAt,
       production_date: record.production_date,
       week_number: record.week_number,
+      status_inventory: record.status_inventory,
     }));
   }
 
@@ -853,7 +864,7 @@ export class MasterPalletService {
 
   async getItemQuantityHistoryByPalletCode(
     palletCode: string,
-    itemId: string,
+    itemId?: string,
     uom?: string,
   ): Promise<PalletQuantityHistoryResponseDto[]> {
     const pallet = await this.repository.findByPalletCode(palletCode);
