@@ -6,10 +6,7 @@ import {
   PickingTransaction,
   Status as PickingTransactionStatus,
 } from '../core/domain/entities/transaction-picking.entity';
-import {
-  QuantityOperationType,
-  StatusInventory,
-} from '../core/domain/entities/transaction-pallet-history.entity';
+import { StatusInventory } from '../core/domain/entities/transaction-pallet-history.entity';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
 import { TransactionPickingRepository } from './transaction-picking.repository';
@@ -77,57 +74,30 @@ export class TransactionPickingCancelRevertService {
       uom,
     );
 
-    const productionDate = await this.getPalletItemProductionDate(
-      scan.pallet_use_id,
-      itemId,
-      uom,
-      weekNumber,
-    );
-
-    // quantity_picked = outbound qty on use pallet (PENDING). Switch is independent — leave it.
-    const quantityToUse = scan.quantity_picked || 0;
     const memoId = transactionPicking.memo_id;
 
-    const basePayload = {
-      item_id: itemId,
-      uom,
-      week_number: weekNumber,
-      production_date: productionDate,
-      outbound_do_id: transactionPicking.do_id,
-      user_id: scan.user_id,
-      reference_id: transactionPicking.id,
-      reference_type: 'TRANSACTION_PICKING_CANCEL' as const,
-    };
+    // Release the reserved outbound stock: flip the PENDING stock line → READY IN PLACE.
+    // Do NOT remove + recreate — the same physical stock just changes status, staying on
+    // the use pallet at the same location/quantity.
+    const converted = await this.masterPalletService.convertStockLineStatusInPlace(
+      scan.pallet_use_id,
+      {
+        itemId,
+        uom,
+        weekNumber,
+        from: StatusInventory.PENDING,
+        to: StatusInventory.READY,
+        appendNote:
+          `[CANCEL] PENDING→READY week=${weekNumber} ` +
+          `(released from outbound after picking cancel; memo ${memoId ?? 'N/A'})`,
+      },
+    );
 
-    if (quantityToUse > 0) {
-      // PENDING and READY are separate stock lines — convert by REMOVE PENDING then ADD READY.
-      // Skip empty cleanup between steps so history/memo are not wiped mid-convert.
-      await this.masterPalletService.updateQuantity(
-        scan.pallet_use_id,
-        {
-          ...basePayload,
-          quantity: quantityToUse,
-          operation_type: QuantityOperationType.REMOVE,
-          status_inventory: StatusInventory.PENDING,
-          notes:
-            `[CANCEL] REMOVE ${quantityToUse}${uom ? ` ${uom}` : ''} PENDING ` +
-            `week=${weekNumber} from use pallet ${scan.pallet_use_id} ` +
-            `(convert to READY — stock stays on pallet)`,
-        },
-        undefined,
-        true,
+    if (converted === 0) {
+      console.warn(
+        `[CANCEL] No PENDING stock line found to release on use pallet ${scan.pallet_use_id} ` +
+          `for item ${itemId} week ${weekNumber} (already READY or loaded).`,
       );
-
-      await this.masterPalletService.updateQuantity(scan.pallet_use_id, {
-        ...basePayload,
-        quantity: quantityToUse,
-        operation_type: QuantityOperationType.ADD,
-        status_inventory: StatusInventory.READY,
-        notes:
-          `[CANCEL] ADD ${quantityToUse}${uom ? ` ${uom}` : ''} READY ` +
-          `week=${weekNumber} to use pallet ${scan.pallet_use_id} ` +
-          `(released from outbound PENDING after cancel)`,
-      });
     }
 
     if (memoId) {
@@ -269,39 +239,5 @@ export class TransactionPickingCancelRevertService {
       (weekHint ? ` (${weekHint})` : '') +
       `. Set week_number on the scan or transaction picking.`,
     );
-  }
-
-  private async getPalletItemProductionDate(
-    palletId: string,
-    itemId: string,
-    uom?: string,
-    weekNumber?: number | null,
-  ): Promise<Date | undefined> {
-    try {
-      const palletItems = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
-      const sourceItem = palletItems.find(
-        (item) =>
-          item.item_id === itemId &&
-          (!uom || item.uom === uom) &&
-          (weekNumber === undefined ||
-            weekNumber === null ||
-            item.week_number === weekNumber) &&
-          item.status_inventory === StatusInventory.PENDING,
-      );
-      return (
-        sourceItem?.production_date ??
-        palletItems.find(
-          (item) =>
-            item.item_id === itemId &&
-            (!uom || item.uom === uom) &&
-            (weekNumber === undefined ||
-              weekNumber === null ||
-              item.week_number === weekNumber),
-        )?.production_date ??
-        undefined
-      );
-    } catch {
-      return undefined;
-    }
   }
 }

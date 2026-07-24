@@ -933,6 +933,59 @@ export class MasterPalletService {
   }
 
   /**
+   * Flip a stock line's status_inventory IN PLACE (e.g. PENDING → READY) on the existing
+   * history rows for (pallet, item, uom?, week?). Does NOT change quantities and does NOT
+   * create REMOVE/ADD rows — the same physical stock simply changes status.
+   * Returns the number of history rows updated.
+   */
+  async convertStockLineStatusInPlace(
+    palletId: string,
+    params: {
+      itemId: string;
+      uom?: string;
+      weekNumber?: number | null;
+      from: StatusInventory;
+      to: StatusInventory;
+      appendNote?: string;
+    },
+  ): Promise<number> {
+    const { itemId, uom, weekNumber, from, to, appendNote } = params;
+
+    const qb = this.transactionHistoryRepository
+      .createQueryBuilder('history')
+      .where('history.pallet_id = :palletId', { palletId })
+      .andWhere('history.item_id = :itemId', { itemId })
+      .andWhere('history.status_inventory = :from', { from });
+
+    if (uom) {
+      qb.andWhere('history.uom = :uom', { uom });
+    }
+
+    if (weekNumber !== undefined) {
+      if (weekNumber === null) {
+        qb.andWhere('history.week_number IS NULL');
+      } else {
+        qb.andWhere('history.week_number = :weekNumber', { weekNumber });
+      }
+    }
+
+    const rows = await qb.getMany();
+    if (rows.length === 0) {
+      return 0;
+    }
+
+    for (const row of rows) {
+      row.status_inventory = to;
+      if (appendNote) {
+        row.notes = row.notes ? `${row.notes} | ${appendNote}` : appendNote;
+      }
+    }
+
+    await this.transactionHistoryRepository.save(rows);
+    return rows.length;
+  }
+
+  /**
    * Returns the latest transaction history record for (palletId, itemId, uom?, week?, status?).
    * When statusInventory is provided, only that status stock line is considered
    * (READY vs PENDING are separate lines on the same pallet).
