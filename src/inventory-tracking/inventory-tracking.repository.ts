@@ -485,7 +485,10 @@ export class InventoryTrackingRepository {
         FROM transaction_pallet_history pth
         WHERE pth.deleted_at IS NULL
           AND pth.status_inventory IN ('READY', 'PENDING')
-          AND pth.new_quantity > 0
+          -- NOTE: do NOT filter new_quantity > 0 here. We must select the TRUE latest
+          -- line per (pallet, item, uom, week). If the latest is 0 (e.g. DUS converted
+          -- to BAL, or fully picked), filtering here would fall back to a stale older
+          -- non-zero row and over-count. The zero rows are dropped in item_inventory.
           ${itemFilter}
         ORDER BY
           pth.pallet_id,
@@ -537,6 +540,8 @@ export class InventoryTrackingRepository {
         LEFT JOIN m_warehouse w ON w.id = lit.warehouse_id
         LEFT JOIN m_warehouse_sub ws ON ws.id = lit.warehouse_sub_id
         LEFT JOIN m_warehouse_bin wb ON wb.id = lit.warehouse_bin_id
+        -- Drop stock lines whose latest state is empty (0 qty) so they don't get counted.
+        WHERE lpi.new_quantity > 0
       ),
       item_totals AS (
         SELECT 

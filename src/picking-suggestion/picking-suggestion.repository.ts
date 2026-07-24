@@ -117,6 +117,10 @@ export class PickingSuggestionRepository {
 
     const query = `
       WITH latest_pallet_items AS (
+        -- Pick the TRUE latest row per (pallet, item, uom, week) among READY/PENDING.
+        -- Do NOT filter new_quantity > 0 here: if the latest row is 0 (e.g. after a
+        -- UOM change or full pick), we must see that 0 and drop it below — not fall back
+        -- to a stale older non-zero row.
         SELECT DISTINCT ON (
           pth.pallet_id,
           pth.item_id,
@@ -134,8 +138,7 @@ export class PickingSuggestionRepository {
           pth.created_at
         FROM transaction_pallet_history pth
         WHERE pth.deleted_at IS NULL
-          AND pth.status_inventory = 'READY'
-          AND pth.new_quantity > 0
+          AND pth.status_inventory IN ('READY', 'PENDING')
           AND pth.item_id::text = $1::text
           AND ($2::text IS NULL OR COALESCE(pth.uom, '') = $2::text)
         ORDER BY
@@ -217,6 +220,9 @@ export class PickingSuggestionRepository {
       LEFT JOIN m_warehouse_sub ws ON ws.id = lit.warehouse_sub_id
       LEFT JOIN m_warehouse_bin wb ON wb.id = lit.warehouse_bin_id
       WHERE (lit.warehouse_bin_id IS NOT NULL OR lit.warehouse_sub_id IS NOT NULL)
+        -- Only pickable READY stock whose LATEST line is still positive.
+        AND lpi.status_inventory = 'READY'
+        AND lpi.new_quantity > 0
         ${organizationFilter}
       ORDER BY
         lpi.week_number ${weekNumberSort} NULLS LAST,
