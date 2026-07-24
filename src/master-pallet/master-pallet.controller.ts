@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExtraModels, ApiQuery } from '@nestjs/swagger';
 import { MasterPalletService } from './master-pallet.service';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
@@ -171,6 +171,8 @@ export class MasterPalletController {
   @ApiOperation({
     summary: 'Get item quantity history by pallet code (optional item_id / uom filters)',
   })
+  @ApiQuery({ name: 'item_id', required: false, type: String, description: 'Filter by item ID' })
+  @ApiQuery({ name: 'uom', required: false, type: String, description: 'Filter by UOM' })
   @ApiResponse({
     status: 200,
     description: 'Return item quantity history.',
