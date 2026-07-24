@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { MasterPalletRepository } from './master-pallet.repository';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
@@ -413,15 +413,16 @@ export class MasterPalletService {
   }
 
   /**
-   * Update production date for an item line on a pallet without changing quantity.
-   * Marks all history rows matching item_id and production_date_before as UPDATED_PROD_DATE,
-   * then creates a new ADJUST record with the new production_date (using the latest of those rows for quantity/week_number).
+   * Update production date / week for an item line without changing quantity.
+   * Treated as REMOVE from the old (item, uom, week, prod_date) stock line
+   * then ADD the same qty under the new production_date / week — same pattern as updateUOM.
+   * Does NOT use ADJUST (ADJUST scopes by the new week and double-counts against capacity).
    */
   async updateProductionDate(
     palletId: string,
     dto: UpdateProductionDateDto,
   ): Promise<MasterPallet> {
-    return await this.dataSource.transaction(async (manager) => {
+    return await this.dataSource.transaction(async () => {
       try {
         await this.findOne(palletId);
 
@@ -431,19 +432,27 @@ export class MasterPalletService {
           return s.slice(0, 10);
         };
         const dateBefore = toDateOnly(dto.production_date_before);
+        const dateAfter = toDateOnly(dto.production_date_after);
         if (!dateBefore) {
           throw new BadRequestException(
             'production_date_before is required to identify which records to update.',
           );
         }
+        if (!dateAfter) {
+          throw new BadRequestException(
+            'production_date_after is required for the new production date.',
+          );
+        }
 
-        // Match both date and date+1 day: API returns UTC (e.g. 2026-01-25T17:00:00Z) but DB
-        // may store in local time (2026-01-26 00:00 in GMT+7). toDateOnly gives "2026-01-25".
-        const qb = manager
-          .getRepository(PalletTransactionHistory)
+        // Match both date and date+1 day: API may send UTC while DB stores local midnight.
+        const qb = this.transactionHistoryRepository
           .createQueryBuilder('h')
           .where('h.pallet_id = :palletId', { palletId })
           .andWhere('h.item_id = :itemId', { itemId: dto.item_id })
+          .andWhere('h.status_inventory IN (:...statuses)', {
+            statuses: [StatusInventory.READY, StatusInventory.PENDING],
+          })
+          .andWhere('h.new_quantity > 0')
           .andWhere(
             `(h.production_date)::date IN (CAST(:dateBefore AS date), (CAST(:dateBefore AS date) + INTERVAL '1 day')::date)`,
             { dateBefore },
@@ -460,41 +469,62 @@ export class MasterPalletService {
           );
         }
 
-        const ids = rows.map((r) => r.id);
-        await manager.update(
-          PalletTransactionHistory,
-          { id: In(ids) },
-          { status_inventory: StatusInventory.UPDATED_PROD_DATE },
-        );
-
         const latest = rows[0];
-        if ((latest.new_quantity ?? 0) === 0) {
+        const quantity = latest.new_quantity ?? 0;
+        if (quantity <= 0) {
           throw new BadRequestException(
             `Latest record for item ${dto.item_id} with production date ${dateBefore} has zero quantity. Cannot update production date.`,
           );
         }
 
+        const oldWeek =
+          latest.week_number !== undefined && latest.week_number !== null
+            ? Number(latest.week_number)
+            : undefined;
+        const newWeekRaw = dto.week_number ?? oldWeek;
+        const newWeek =
+          newWeekRaw !== undefined && newWeekRaw !== null
+            ? Number(newWeekRaw)
+            : undefined;
+        const stockStatus = latest.status_inventory ?? StatusInventory.READY;
+        const uom = latest.uom ?? dto.uom;
         const notes =
           dto.notes ??
-          `Production date updated from ${dateBefore} to ${toDateOnly(dto.production_date_after)}`;
+          `Production date/week updated from ${dateBefore} (week ${oldWeek ?? 'n/a'}) ` +
+            `to ${dateAfter} (week ${newWeek ?? 'n/a'}) — REMOVE old line + ADD new line`;
 
-        return await this.updateQuantity(
+        const basePayload = {
+          item_id: dto.item_id,
+          uom,
+          user_id: dto.user_id,
+          notes,
+          reference_id: dto.reference_id,
+          reference_type: dto.reference_type ?? 'PALLET_UPDATE_PROD_DATE',
+          status_inventory: stockStatus,
+        };
+
+        // REMOVE from the old week / production_date stock line (skip empty cleanup mid-op).
+        await this.updateQuantity(
           palletId,
           {
-            item_id: dto.item_id,
-            operation_type: QuantityOperationType.ADJUST,
-            quantity: latest.new_quantity,
-            uom: latest.uom ?? dto.uom,
-            week_number: dto.week_number ?? latest.week_number ?? undefined,
-            production_date: dto.production_date_after as Date,
-            user_id: dto.user_id,
-            notes,
-            reference_id: dto.reference_id,
-            reference_type: dto.reference_type ?? 'PALLET_UPDATE_PROD_DATE',
-            status_inventory: StatusInventory.READY,
+            ...basePayload,
+            operation_type: QuantityOperationType.REMOVE,
+            quantity,
+            week_number: oldWeek,
+            production_date: latest.production_date ?? (dto.production_date_before as Date),
           },
-          manager,
+          undefined,
+          true,
         );
+
+        // ADD same qty under the new production_date / week.
+        return await this.updateQuantity(palletId, {
+          ...basePayload,
+          operation_type: QuantityOperationType.ADD,
+          quantity,
+          week_number: newWeek,
+          production_date: dto.production_date_after as Date,
+        });
       } catch (err) {
         if (
           err instanceof BadRequestException ||

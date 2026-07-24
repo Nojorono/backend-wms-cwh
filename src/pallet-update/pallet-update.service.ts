@@ -508,8 +508,12 @@ export class PalletUpdateService {
       await this.masterPalletService.updateProductionDate(scanAfterUpdate.palletId, {
         production_date_before: new Date(itemBeforeUpdate.productionDate),
         production_date_after: new Date(scanAfterUpdate.productionDate),
-        week_number: scanAfterUpdate.weekNumber,
+        week_number:
+          scanAfterUpdate.weekNumber != null
+            ? Number(scanAfterUpdate.weekNumber)
+            : undefined,
         item_id: scanAfterUpdate.itemId ?? '',
+        uom: scanAfterUpdate.uom ?? itemBeforeUpdate.uom ?? undefined,
         reference_id: palletUpdate.id,
         reference_type: 'PALLET_UPDATE_PROD_DATE',
         user_id: palletUpdate.initiatedByUserId,
