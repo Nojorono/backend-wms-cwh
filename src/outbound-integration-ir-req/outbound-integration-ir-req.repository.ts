@@ -7,6 +7,7 @@ import { CreateOutboundIntegrationIrReqDto } from './dto/create-outbound-integra
 import { UpdateOutboundIntegrationIrReqDto } from './dto/update-outbound-integration-ir-req.dto';
 import { CreateOutboundIntegrationIrReqLineDto } from './dto/create-outbound-integration-ir-req-line.dto';
 import { UpdateOutboundIntegrationIrReqLineDto } from './dto/update-outbound-integration-ir-req-line.dto';
+import { OutboundIntegrationIrReqPaginationQueryDto } from './dto/outbound-integration-ir-req-pagination.dto';
 
 @Injectable()
 export class OutboundIntegrationIrReqRepository {
@@ -53,6 +54,73 @@ export class OutboundIntegrationIrReqRepository {
     return await this.headerRepo.find({
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findAllHeadersPaginated(
+    query: OutboundIntegrationIrReqPaginationQueryDto,
+  ): Promise<{ data: OutboundIntegrationIrReq[]; total: number }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'DESC';
+
+    const sortableFields = new Set([
+      'createdAt',
+      'updatedAt',
+      'iface_status_ir',
+      'iface_status_io',
+      'iface_status_oi',
+      'source_header_id',
+      'batch_number',
+      'transaction_type',
+    ]);
+    const sortField = sortableFields.has(sortBy) ? sortBy : 'createdAt';
+
+    const qb = this.headerRepo
+      .createQueryBuilder('header')
+      .where('header.deletedAt IS NULL');
+
+    if (query.iface_status_ir?.trim()) {
+      qb.andWhere('header.iface_status_ir = :ifaceStatusIr', {
+        ifaceStatusIr: query.iface_status_ir.trim(),
+      });
+    }
+
+    if (query.outbound_do_id?.trim()) {
+      qb.andWhere('header.outbound_do_id = :outboundDoId', {
+        outboundDoId: query.outbound_do_id.trim(),
+      });
+    }
+
+    if (query.outbound_memo_id?.trim()) {
+      qb.andWhere('header.outbound_memo_id = :outboundMemoId', {
+        outboundMemoId: query.outbound_memo_id.trim(),
+      });
+    }
+
+    if (query.transaction_type?.trim()) {
+      qb.andWhere('header.transaction_type = :transactionType', {
+        transactionType: query.transaction_type.trim(),
+      });
+    }
+
+    if (query.search?.trim()) {
+      const search = `%${query.search.trim()}%`;
+      qb.andWhere(
+        '(header.source_header_id ILIKE :search OR header.batch_number ILIKE :search OR header.iface_message_ir ILIKE :search OR header.iface_message_io ILIKE :search OR header.iface_message_oi ILIKE :search)',
+        { search },
+      );
+    }
+
+    const total = await qb.getCount();
+
+    const data = await qb
+      .orderBy(`header.${sortField}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, total };
   }
 
   async findHeaderById(id: string): Promise<OutboundIntegrationIrReq | null> {

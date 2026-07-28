@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { MasterItemService } from './master-item.service';
 import { CreateMasterItemDto } from './dto/create-master-item.dto';
 import { UpdateMasterItemDto } from './dto/update-master-item.dto';
 import { MasterItem } from '../core/domain/entities/master-item.entity';
 import { FindByBranchResponseDto } from './dto/find-by-branch-response.dto';
+import { ValidateItemQueryDto } from './dto/validate-item-query.dto';
+import { MetaItemListItemDto } from './dto/meta-item-list-item.dto';
 
 @ApiTags('Master Item')
 @Controller('master-item')
@@ -36,6 +38,18 @@ export class MasterItemController {
   })
   findAll() {
     return this.masterItemService.findAll();
+  }
+
+  @Get('validate-item')
+  @ApiOperation({ summary: 'Find item list by organization code and inventory item id' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return item list matching organization code and inventory item id from meta service.',
+    type: [MetaItemListItemDto],
+  })
+  @ApiResponse({ status: 404, description: 'Item not found.' })
+  findByOrgCodeAndInventoryItemId(@Query() query: ValidateItemQueryDto) {
+    return this.masterItemService.findByOrgCodeAndInventoryItemId(query);
   }
 
   @Get(':id')

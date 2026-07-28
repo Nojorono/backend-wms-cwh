@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InboundIntegration } from 'src/core/domain/entities/inbound-integration.entity';
 import { InboundIntegrationLines } from 'src/core/domain/entities/inbound-integration-lines.entity';
@@ -10,6 +10,8 @@ import { UpdateInboundIntegrationPayloadDto } from './dto/update-inbound-integra
 import { InboundIntegrationHeaderWithLines } from './inbound-integration.service';
 import { InboundIntegrationPollService } from './inbound-integration-poll.service';
 import { InboundIntegrationPollResponseDto } from './dto/inbound-integration-poll-response.dto';
+import { InboundIntegrationPaginationQueryDto } from './dto/inbound-integration-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @ApiTags('Inbound Integration')
 @ApiBearerAuth('JWT-auth')
@@ -27,10 +29,12 @@ export class InboundIntegrationController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List inbound integration headers' })
+  @ApiOperation({ summary: 'List inbound integration headers with lines (paginated)' })
   @ApiResponse({ status: 200 })
-  findAllHeaders(): Promise<InboundIntegrationHeaderWithLines[]> {
-    return this.service.findAllHeaders();
+  findAllHeaders(
+    @Query() query: InboundIntegrationPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<InboundIntegrationHeaderWithLines>> {
+    return this.service.findAllHeadersPaginated(query);
   }
 
   @Get('polling/inbound-do/:inboundDoId')

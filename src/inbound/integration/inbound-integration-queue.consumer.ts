@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InboundRepository } from '../repositories/inbound.repository';
 import { InboundDoRepository } from '../repositories/inbound-do.repository';
 import { InboundStatus } from 'src/core/domain/entities/inbound.entity';
@@ -104,6 +104,11 @@ export class InboundIntegrationQueueConsumer {
       }
 
       if (result.status === 'ERROR') {
+        await this.inboundIntegrationService.markHeadersPollResult(
+          inboundId,
+          'E',
+          result.reason,
+        );
         await this.inboundRepo.update(inboundId, {
           status: InboundStatus.FAILED,
           notes: result.reason,
@@ -178,7 +183,7 @@ export class InboundIntegrationQueueConsumer {
     inboundId: string,
     targetStatus: IntegrationStatus,
   ): Promise<void> {
-    const headers = await this.inboundIntegrationService.findAllByInboundAnyStatus(inboundId);
+    const headers = await this.inboundIntegrationService.findAllByInboundActiveDos(inboundId);
     const inboundDoIds = Array.from(
       new Set(
         headers
@@ -188,9 +193,20 @@ export class InboundIntegrationQueueConsumer {
     );
 
     for (const inboundDoId of inboundDoIds) {
-      await this.inboundDoRepo.update(inboundDoId, {
-        integration_status: targetStatus,
-      });
+      try {
+        await this.inboundDoRepo.update(inboundDoId, {
+          integration_status: targetStatus,
+        });
+      } catch (error) {
+        if (this.isInboundDoMissingError(error)) {
+          // Keep queue progressing when stale inbound_integration rows reference deleted DOs.
+          this.logger.warn(
+            `Skip missing inbound_do_id=${inboundDoId} while updating integration_status=${targetStatus} for inboundId=${inboundId}`,
+          );
+          continue;
+        }
+        throw error;
+      }
     }
 
     if (inboundDoIds.length === 0) {
@@ -198,6 +214,14 @@ export class InboundIntegrationQueueConsumer {
         `No inbound_do_id found in inbound_integration headers for inboundId=${inboundId}; skip inbound_do integration_status update`,
       );
     }
+  }
+
+  private isInboundDoMissingError(error: unknown): boolean {
+    if (error instanceof NotFoundException) {
+      return true;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return /inbound do not found/i.test(message);
   }
 
   private async updateInventoryReadyIfAllDoSuccess(inboundId: string): Promise<void> {

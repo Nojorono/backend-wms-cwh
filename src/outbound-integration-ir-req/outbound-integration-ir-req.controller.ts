@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { OutboundIntegrationIrReq } from '../core/domain/entities/outbound-integration-ir-req.entity';
 import { OutboundIntegrationIrReqLines } from '../core/domain/entities/outbound-integration-ir-req-lines.entity';
@@ -9,6 +9,8 @@ import { CreateOutboundIntegrationIrReqPayloadDto } from './dto/create-outbound-
 import { UpdateOutboundIntegrationIrReqPayloadDto } from './dto/update-outbound-integration-ir-req-payload.dto';
 import { PollIntegrationStatusResponseDto } from './dto/poll-integration-status-response.dto';
 import { OutboundIntegrationIrReqHeaderWithLines } from './outbound-integration-ir-req.service';
+import { OutboundIntegrationIrReqPaginationQueryDto } from './dto/outbound-integration-ir-req-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @ApiTags('Outbound Integration IR Req')
 @ApiBearerAuth('JWT-auth')
@@ -24,10 +26,12 @@ export class OutboundIntegrationIrReqController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List outbound integration IR req headers with lines' })
+  @ApiOperation({ summary: 'List outbound integration IR req headers with lines (paginated)' })
   @ApiResponse({ status: 200 })
-  findAllHeaders(): Promise<OutboundIntegrationIrReqHeaderWithLines[]> {
-    return this.service.findAllHeaders();
+  findAllHeaders(
+    @Query() query: OutboundIntegrationIrReqPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<OutboundIntegrationIrReqHeaderWithLines>> {
+    return this.service.findAllHeadersPaginated(query);
   }
 
   @Get('poll-status/outbound-do/:outboundDoId')

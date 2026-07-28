@@ -11,11 +11,12 @@ import { CreateInboundDto, CreateInboundDoDto, CreateInboundItemDto } from './cr
 
 export class UpdateInboundItemDto extends PartialType(CreateInboundItemDto) {
   @ApiPropertyOptional({
-    example: 'uuid-inbound-item-1',
-    description: 'Existing item id to update in place',
+    example: 'uuid-inbound-item-row-1',
+    description:
+      'Existing inbound_item row UUID (not master item_id). Omit to create a new line or match by item_id+uom.',
   })
   @IsOptional()
-  @IsUUID(4, { message: 'id must be a valid UUID' })
+  @IsUUID(4, { message: 'id must be a valid UUID of inbound_item row' })
   id?: string;
 }
 

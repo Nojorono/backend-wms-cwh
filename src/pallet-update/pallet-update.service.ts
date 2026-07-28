@@ -363,6 +363,7 @@ export class PalletUpdateService {
           uom: mergeItem.uom ?? undefined,
           production_date: mergeItem.productionDate ?? undefined,
           week_number: mergeItem.weekNumber ?? undefined,
+          status_inventory: StatusInventory.READY,
         });
         mergeItemsProcessed++;
       }
@@ -437,6 +438,7 @@ export class PalletUpdateService {
               operation_type: QuantityOperationType.ADD,
               quantity: mergeItem.quantity ?? 0,
               week_number: mergeItem.weekNumber ?? undefined,
+              status_inventory: StatusInventory.READY,
             });
           }
           for (let i = destinationPalletsProcessed - 1; i >= 0; i--) {
@@ -452,6 +454,7 @@ export class PalletUpdateService {
               operation_type: QuantityOperationType.REMOVE,
               quantity: dp.quantity ?? 0,
               week_number: dp.weekNumber ?? undefined,
+              status_inventory: StatusInventory.READY,
             });
           }
           this.logger.log(`Rollback completed for pallet update ${palletUpdateId}`);
@@ -508,8 +511,12 @@ export class PalletUpdateService {
       await this.masterPalletService.updateProductionDate(scanAfterUpdate.palletId, {
         production_date_before: new Date(itemBeforeUpdate.productionDate),
         production_date_after: new Date(scanAfterUpdate.productionDate),
-        week_number: scanAfterUpdate.weekNumber,
+        week_number:
+          scanAfterUpdate.weekNumber != null
+            ? Number(scanAfterUpdate.weekNumber)
+            : undefined,
         item_id: scanAfterUpdate.itemId ?? '',
+        uom: scanAfterUpdate.uom ?? itemBeforeUpdate.uom ?? undefined,
         reference_id: palletUpdate.id,
         reference_type: 'PALLET_UPDATE_PROD_DATE',
         user_id: palletUpdate.initiatedByUserId,

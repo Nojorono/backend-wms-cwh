@@ -702,50 +702,110 @@ export class PickingSuggestionService {
   }
 
   /**
-   * Deduct pending transaction_picking reservations by week (matches visibility dashboard).
-   * Week-specific bookings apply to that week's stock groups; unscoped bookings apply in sort order.
+   * Deduct pending transaction_picking reservations.
+   * Prefer booking source location (sub + bin) within the same week, then any same-week
+   * location, then unscoped bookings in sort order — matches visibility totals.
    */
   private applyPendingReservationsToGroups(
     groups: Array<{
       week_number: number;
+      warehouse_sub_id?: string | null;
+      bin_id?: string | null;
       total_quantity: number;
       reserved_quantity: number;
       net_available: number;
     }>,
     pendingBookings?: {
-      byWeek: Array<{ week_number: number; booked_quantity: number }>;
+      byWeek: Array<{
+        week_number: number;
+        booked_quantity: number;
+        source_warehouse_sub_id?: string | null;
+        source_bin_id?: string | null;
+      }>;
       unscoped: number;
     },
   ): void {
-    if (!pendingBookings) {
-      for (const group of groups) {
-        group.reserved_quantity = 0;
-        group.net_available = Math.max(0, group.total_quantity);
-      }
-      return;
-    }
-
-    const weekRemaining = new Map<number, number>(
-      pendingBookings.byWeek.map((row) => [row.week_number, row.booked_quantity]),
-    );
-
     for (const group of groups) {
-      let reserved = 0;
-      const weekReserved = weekRemaining.get(group.week_number) ?? 0;
-      if (weekReserved > 0) {
-        const allocated = Math.min(group.total_quantity, weekReserved);
-        reserved += allocated;
-        weekRemaining.set(group.week_number, weekReserved - allocated);
-      }
-      group.reserved_quantity = reserved;
-      group.net_available = Math.max(0, group.total_quantity - reserved);
+      group.reserved_quantity = 0;
+      group.net_available = Math.max(0, group.total_quantity);
     }
 
-    let unscopedRemaining = pendingBookings.unscoped;
-    if (unscopedRemaining <= 0) {
+    if (!pendingBookings) {
       return;
     }
 
+    const normalizeBin = (binId?: string | null): string | null => {
+      if (!binId || binId === 'N/A' || binId === 'none') {
+        return null;
+      }
+      return binId;
+    };
+
+    const matchesSourceLocation = (
+      group: (typeof groups)[number],
+      booking: (typeof pendingBookings.byWeek)[number],
+    ): boolean => {
+      if (!booking.source_warehouse_sub_id) {
+        return false;
+      }
+      if (group.warehouse_sub_id !== booking.source_warehouse_sub_id) {
+        return false;
+      }
+      const bookingBin = normalizeBin(booking.source_bin_id);
+      if (!bookingBin) {
+        return true;
+      }
+      return normalizeBin(group.bin_id) === bookingBin;
+    };
+
+    // Pass 1: allocate each booking to matching source location + week first.
+    for (const booking of pendingBookings.byWeek) {
+      let remaining = booking.booked_quantity;
+      if (remaining <= 0) {
+        continue;
+      }
+
+      for (const group of groups) {
+        if (remaining <= 0) {
+          break;
+        }
+        if (group.week_number !== booking.week_number) {
+          continue;
+        }
+        if (!matchesSourceLocation(group, booking)) {
+          continue;
+        }
+        const allocatable = group.net_available;
+        if (allocatable <= 0) {
+          continue;
+        }
+        const allocated = Math.min(allocatable, remaining);
+        group.reserved_quantity += allocated;
+        group.net_available -= allocated;
+        remaining -= allocated;
+      }
+
+      // Pass 2 for this booking: leftover to any same-week location.
+      for (const group of groups) {
+        if (remaining <= 0) {
+          break;
+        }
+        if (group.week_number !== booking.week_number) {
+          continue;
+        }
+        const allocatable = group.net_available;
+        if (allocatable <= 0) {
+          continue;
+        }
+        const allocated = Math.min(allocatable, remaining);
+        group.reserved_quantity += allocated;
+        group.net_available -= allocated;
+        remaining -= allocated;
+      }
+    }
+
+    // Pass 3: unscoped bookings (no week) in current sort order.
+    let unscopedRemaining = pendingBookings.unscoped;
     for (const group of groups) {
       if (unscopedRemaining <= 0) {
         break;

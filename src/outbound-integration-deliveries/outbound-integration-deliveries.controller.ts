@@ -5,7 +5,9 @@ import { CreateOutboundIntegrationDeliveriesDto } from './dto/create-outbound-in
 import { UpdateOutboundIntegrationDeliveriesDto } from './dto/update-outbound-integration-deliveries.dto';
 import { PollShipConfirmStatusResponseDto } from './dto/poll-ship-confirm-status-response.dto';
 import { PollShipConfirmByMemoQueryDto } from './dto/poll-ship-confirm-by-memo-query.dto';
+import { OutboundIntegrationDeliveriesPaginationQueryDto } from './dto/outbound-integration-deliveries-pagination.dto';
 import { OutboundIntegrationDeliveriesService } from './outbound-integration-deliveries.service';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 
 @ApiTags('Outbound Integration Deliveries')
 @ApiBearerAuth('JWT-auth')
@@ -21,10 +23,12 @@ export class OutboundIntegrationDeliveriesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List all outbound integration delivery records' })
-  @ApiResponse({ status: 200, type: [OutboundIntegrationDeliveries] })
-  findAll(): Promise<OutboundIntegrationDeliveries[]> {
-    return this.service.findAll();
+  @ApiOperation({ summary: 'List outbound integration delivery records (paginated)' })
+  @ApiResponse({ status: 200 })
+  findAll(
+    @Query() query: OutboundIntegrationDeliveriesPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<OutboundIntegrationDeliveries>> {
+    return this.service.findAllPaginated(query);
   }
 
   @Get('outbound-do/:outboundDoId')

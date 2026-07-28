@@ -111,6 +111,11 @@ export class ShipConfirmStatusCheckerService {
    * Poll Oracle by memo id (`source_header_id` = `outbound_memo_id` for all ship confirm types).
    * outboundDoId is only used to load WMS staging rows for that DO — not sent to Oracle.
    */
+  async hasDeliveriesForOutboundDo(outboundDoId: string): Promise<boolean> {
+    const rows = await this.deliveriesRepository.findByOutboundDoId(outboundDoId);
+    return rows.length > 0;
+  }
+
   async checkOutboundDoStatus(
     payload: OutboundJobPayload,
     transactionType?: ShipConfirmInternalTransactionType,
@@ -213,12 +218,43 @@ export class ShipConfirmStatusCheckerService {
 
     const response = await this.shipConfirmIntegrationService.find(findPayload);
 
-    return await this.syncDeliveriesFromOracleResponse(
+    const responseObj = response as Record<string, unknown>;
+    const successFlag = this.asBooleanFlag(responseObj.status);
+    const responseMessage = this.firstNonEmptyString(
+      responseObj.message,
+      responseObj.error,
+      responseObj.errorMessage,
+      responseObj.MESSAGE,
+    );
+
+    // Oracle find returned an explicit failure (e.g. validation) with no delivery payload.
+    if (successFlag === false) {
+      const reason =
+        responseMessage ||
+        `shipconfirm.find returned status=false for sourceHeaderId=${input.sourceHeaderId}`;
+      this.logger.warn(reason);
+      await this.markScopeDeliveriesError(input.scopeDeliveries, input.transactionType, reason);
+      return input.scopeDeliveries.length;
+    }
+
+    const updated = await this.syncDeliveriesFromOracleResponse(
       input.scopeDeliveries,
       response,
       matchPool,
       input.transactionType,
     );
+
+    // Find succeeded but no rows matched/extracted — keep polling (PENDING) unless message is terminal.
+    if (updated === 0 && responseMessage && this.isTerminalFailureMessage(responseMessage)) {
+      await this.markScopeDeliveriesError(
+        input.scopeDeliveries,
+        input.transactionType,
+        responseMessage,
+      );
+      return input.scopeDeliveries.length;
+    }
+
+    return updated;
   }
 
   async checkStatusBySourceHeader(input: {
@@ -228,12 +264,93 @@ export class ShipConfirmStatusCheckerService {
     matchPool?: OutboundIntegrationDeliveries[];
   }): Promise<ShipConfirmDoCheckResult> {
     const deliveriesUpdated = await this.findAndSyncBySourceHeader(input);
-    const result = this.evaluateDeliveries(input.scopeDeliveries);
+    const scopeIds = new Set(input.scopeDeliveries.map((d) => d.id));
+    const outboundDoId = input.scopeDeliveries[0]?.outbound_do_id;
+    const refreshed = outboundDoId
+      ? (await this.deliveriesRepository.findByOutboundDoId(outboundDoId)).filter((row) =>
+          scopeIds.has(row.id),
+        )
+      : input.scopeDeliveries;
+    const result = this.evaluateDeliveries(refreshed);
 
     return {
       ...result,
       deliveriesUpdated,
     };
+  }
+
+  private async markScopeDeliveriesError(
+    scopeDeliveries: OutboundIntegrationDeliveries[],
+    transactionType: ShipConfirmInternalTransactionType,
+    reason: string,
+  ): Promise<void> {
+    const message = reason.trim().slice(0, 240);
+    const rawPatch: UpdateOutboundIntegrationDeliveriesDto = {};
+
+    if (transactionType === ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM) {
+      rawPatch.ship_confirm_status = 'E';
+      rawPatch.ship_confirm_message = message;
+    } else if (
+      transactionType === ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE
+    ) {
+      rawPatch.create_delivery_status = 'E';
+      rawPatch.create_delivery_message = message;
+      rawPatch.update_delivery_status = 'E';
+      rawPatch.update_delivery_message = message;
+      rawPatch.pick_release_status = 'E';
+      rawPatch.pick_release_message = message;
+    } else {
+      rawPatch.create_delivery_status = 'E';
+      rawPatch.create_delivery_message = message;
+      rawPatch.update_delivery_status = 'E';
+      rawPatch.update_delivery_message = message;
+      rawPatch.pick_release_status = 'E';
+      rawPatch.pick_release_message = message;
+      rawPatch.ship_confirm_status = 'E';
+      rawPatch.ship_confirm_message = message;
+    }
+
+    const patch = this.filterOraclePatchForTransactionType(transactionType, rawPatch);
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+
+    for (const delivery of scopeDeliveries) {
+      await this.deliveriesRepository.update(delivery.id, patch);
+    }
+  }
+
+  private asBooleanFlag(value: unknown): boolean | null {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      if (v === 'true') return true;
+      if (v === 'false') return false;
+    }
+    return null;
+  }
+
+  private firstNonEmptyString(...values: unknown[]): string | null {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim() !== '') {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  private isTerminalFailureMessage(message: string): boolean {
+    const normalized = message.trim().toLowerCase();
+    return (
+      normalized.includes('validation') ||
+      normalized.includes('failed') ||
+      normalized.includes('error') ||
+      normalized.includes('not found') ||
+      normalized.includes('cancelled') ||
+      normalized.includes('terminated')
+    );
   }
 
   private buildShipConfirmFindPayload(
@@ -828,11 +945,11 @@ export class ShipConfirmStatusCheckerService {
       return candidates;
     }
 
-    // Header-level Oracle row (common from whs_deliveries find): no unique line identity.
+    // Header-level Oracle row (common from whs_deliveries find): no SOURCE_LINE_ID.
+    // Oracle often still sends ISO_* on the header — that must NOT block broadcast.
     // Apply statuses / delivery_id to every staging row for this memo + transaction type.
-    const hasLineIdentity =
-      !!sourceLineId || isoLineId != null || isoInventoryItemId != null;
-    if (!hasLineIdentity && candidates.length > 0 && (sourceHeaderId || transactionType)) {
+    const isHeaderLevelRow = !sourceLineId;
+    if (isHeaderLevelRow && candidates.length > 0 && (sourceHeaderId || transactionType)) {
       return candidates;
     }
 
