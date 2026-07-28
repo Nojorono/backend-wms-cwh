@@ -1100,6 +1100,12 @@ export class OutboundDoService {
     );
     const ship_confirm = await this.shipConfirmIntegrationService.create(shipConfirmPayloads);
 
+    if (!ship_confirm.status) {
+      throw new BadRequestException(
+        ship_confirm.message || 'Ship confirm internal integration failed',
+      );
+    }
+
     await this.shipConfirmStatusChecker.syncDeliveriesFromCreateResponse(
       outbound_integration_deliveries,
       ship_confirm,

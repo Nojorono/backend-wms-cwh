@@ -3,26 +3,17 @@ import { TransactionPickingRepository } from './transaction-picking.repository';
 import { CreateTransactionPickingDto, CreateManyTransactionPickingDto } from './dto/create-transaction-picking.dto';
 import { UpdateTransactionPickingDto } from './dto/update-transaction-picking.dto';
 import { PickingTransaction, Status } from '../core/domain/entities/transaction-picking.entity';
-import { PaginationQueryDto, PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { TransactionPickingPaginationDto } from './dto/transaction-picking-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
-import { TransactionScanPickingRepository } from '../transaction-scan-picking/transaction-scan-picking.repository';
-import { InventoryTrackingService } from '../inventory-tracking/inventory-tracking.service';
-import { MasterPalletService } from '../master-pallet/master-pallet.service';
-import { StatusInventory, QuantityOperationType, PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { TransactionPickingCancelRevertService } from './transaction-picking-cancel-revert.service';
 
 @Injectable()
 export class TransactionPickingService {
   constructor(
     private readonly repository: TransactionPickingRepository,
     private readonly paginationService: PaginationService,
-    private readonly transactionScanPickingRepository: TransactionScanPickingRepository,
-    private readonly inventoryTrackingService: InventoryTrackingService,
-    private readonly masterPalletService: MasterPalletService,
-    @InjectRepository(PalletTransactionHistory)
-    private readonly palletHistoryRepository: Repository<PalletTransactionHistory>,
+    private readonly cancelRevertService: TransactionPickingCancelRevertService,
   ) { }
 
   async create(data: CreateTransactionPickingDto): Promise<PickingTransaction> {
@@ -156,162 +147,34 @@ export class TransactionPickingService {
   }
 
   async cancelTransaction(transactionId: string): Promise<void> {
+    const existing = await this.repository.findOne(transactionId);
+    if (!existing) {
+      throw new NotFoundException('Transaction picking tidak ditemukan');
+    }
+    if (existing.status === Status.CANCELLED) {
+      return;
+    }
+    if (existing.status === Status.COMPLETED) {
+      throw new BadRequestException(
+        'Tidak dapat membatalkan transaction picking yang sudah COMPLETED',
+      );
+    }
+
+    await this.cancelRevertService.revertForCancelledTransaction(transactionId);
     await this.repository.cancelTransaction(transactionId);
-
-    // Update inventory tracking status from PICKED to IN_INVENTORY for related pallets
-    await this.revertInventoryTrackingStatus(transactionId);
-
-    // Set items to READY status in transaction_pallet_history for pallet_use_id
-    await this.setItemsToReadyStatus(transactionId);
   }
 
   async cancelTransactionByMemoId(memoId: string): Promise<void> {
-    await this.repository.cancelTransactionByMemoId(memoId);
-
     const transactions = await this.repository.findByMemoId(memoId);
     for (const transaction of transactions) {
-      await this.revertInventoryTrackingStatus(transaction.id);
-      // Set status_inventory to READY for each item scan in transaction_pallet_history
-      await this.setItemsToReadyStatus(transaction.id);
+      if (
+        transaction.status !== Status.CANCELLED &&
+        transaction.status !== Status.COMPLETED
+      ) {
+        await this.cancelRevertService.revertForCancelledTransaction(transaction.id);
+      }
     }
-  }
-
-  /**
-   * Revert inventory tracking status from PICKED to IN_INVENTORY for all pallets
-   * related to this transaction picking (cancelled). Always reverts and clears memo_id
-   * so the pallet is freed for this cancelled transaction.
-   */
-  private async revertInventoryTrackingStatus(transactionPickingId: string): Promise<void> {
-    try {
-      const scanPickingTransactions = await this.transactionScanPickingRepository.findAll({
-        transactionPickingId: transactionPickingId,
-      });
-
-      if (scanPickingTransactions.length === 0) {
-        return;
-      }
-
-      const palletIds = new Set<string>();
-      for (const scanPicking of scanPickingTransactions) {
-        if (scanPicking.pallet_use_id) {
-          palletIds.add(scanPicking.pallet_use_id);
-        }
-      }
-
-      for (const palletId of palletIds) {
-        try {
-          // 1. Clear memo_id on pallet (cancelled transaction no longer ties pallet to memo)
-          try {
-            await this.masterPalletService.update(palletId, { memo_id: null as any });
-          } catch (palletError) {
-            console.error(`Failed to clear memo_id for pallet ${palletId}:`, palletError);
-          }
-
-          // 2. Revert inventory_status to IN_INVENTORY for this pallet (no skip)
-          const inventoryTrackings = await this.inventoryTrackingService.findAllByPalletId(
-            palletId,
-            'PICKED',
-          );
-
-          if (inventoryTrackings.length === 0) {
-            continue;
-          }
-
-          const revertNote = `Reverted from PICKED to IN_INVENTORY due to transaction picking cancellation`;
-          for (const inventoryTracking of inventoryTrackings) {
-            await this.inventoryTrackingService.updateStatusToInInventory(
-              inventoryTracking.id,
-              revertNote,
-            );
-          }
-        } catch (error) {
-          if (error instanceof NotFoundException) {
-            continue;
-          }
-          console.error(`Failed to revert inventory tracking for pallet ${palletId}:`, error);
-        }
-      }
-    } catch (error) {
-      console.error(`Failed to revert inventory tracking status for transaction ${transactionPickingId}:`, error);
-    }
-  }
-
-  /**
-   * Set items to READY status in transaction_pallet_history for pallet_use_id
-   * when transaction picking is cancelled
-   */
-  private async setItemsToReadyStatus(transactionPickingId: string): Promise<void> {
-    try {
-      // Find all transaction-scan-picking records for this transaction picking
-      const scanPickingTransactions = await this.transactionScanPickingRepository.findAll({
-        transactionPickingId: transactionPickingId,
-      });
-
-      if (scanPickingTransactions.length === 0) {
-        return;
-      }
-
-      // Process each scan picking transaction to update items in pallet_use_id
-      for (const scanPicking of scanPickingTransactions) {
-        if (!scanPicking.pallet_use_id || !scanPicking.item_id) {
-          continue;
-        }
-
-        try {
-          // Build where condition for querying latest history record
-          const whereCondition: any = {
-            pallet_id: scanPicking.pallet_use_id,
-            item_id: scanPicking.item_id,
-          };
-
-          // Only add UOM filter if it exists
-          if (scanPicking.uom) {
-            whereCondition.uom = scanPicking.uom;
-          }
-
-          // Get the latest history record for this item on the pallet using query builder
-          // to handle soft deletes properly
-          const queryBuilder = this.palletHistoryRepository
-            .createQueryBuilder('history')
-            .where('history.pallet_id = :palletId', { palletId: scanPicking.pallet_use_id })
-            .andWhere('history.item_id = :itemId', { itemId: scanPicking.item_id })
-            .andWhere('history.deletedAt IS NULL')
-            .orderBy('history.createdAt', 'DESC');
-
-          // Only add UOM filter if it exists
-          if (scanPicking.uom) {
-            queryBuilder.andWhere('history.uom = :uom', { uom: scanPicking.uom });
-          }
-
-          const latestHistory = await queryBuilder.getOne();
-
-          if (!latestHistory || latestHistory.new_quantity === 0) {
-            // No quantity on pallet or no history record, skip
-            continue;
-          }
-
-          // Only update if current status is PENDING
-          if (latestHistory.status_inventory === StatusInventory.PENDING) {
-            // Use query builder to update the status
-            await this.palletHistoryRepository
-              .createQueryBuilder()
-              .update(PalletTransactionHistory)
-              .set({ status_inventory: StatusInventory.READY })
-              .where('id = :id', { id: latestHistory.id })
-              .andWhere('deletedAt IS NULL')
-              .execute();
-          }
-        } catch (error) {
-          console.error(
-            `Failed to set item ${scanPicking.item_id} to READY status for pallet ${scanPicking.pallet_use_id}:`,
-            error,
-          );
-        }
-      }
-    } catch (error) {
-      // Log error but don't fail the cancellation
-      console.error(`Failed to set items to READY status for transaction ${transactionPickingId}:`, error);
-    }
+    await this.repository.cancelTransactionByMemoId(memoId);
   }
 
   async detachDo(doId: string): Promise<void> {

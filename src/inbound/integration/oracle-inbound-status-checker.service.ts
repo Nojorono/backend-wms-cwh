@@ -39,7 +39,7 @@ export class OracleInboundStatusCheckerService {
   ) { }
 
   async checkInboundStatus(payload: InboundJobPayload): Promise<CheckResult> {
-    const headers = await this.inboundIntegrationService.findAllByInboundAnyStatus(payload.inboundId);
+    const headers = await this.inboundIntegrationService.findAllByInboundActiveDos(payload.inboundId);
     if (!headers.length) {
       return { status: 'PENDING', reason: 'No inbound integration headers found yet' };
     }
@@ -150,12 +150,21 @@ export class OracleInboundStatusCheckerService {
       `Oracle findBySourceHeaderId response sourceHeaderId=${sourceHeaderId} payload=${this.safeJson(response)}`,
     );
     const successFlag = this.asBoolean((response as Record<string, unknown>).status);
+    const responseMessage = this.extractResponseMessage(response);
     if (successFlag === false) {
+      if (responseMessage && this.isTerminalFailureMessage(responseMessage)) {
+        await this.markHeaderPollError(header.id, responseMessage);
+        return { status: 'ERROR', reason: responseMessage };
+      }
       return { status: 'PENDING', reason: `No Oracle receipt data yet for ${sourceHeaderId}` };
     }
 
     const data = this.extractOracleHeaderPayload(response, sourceHeaderId);
     if (!data) {
+      if (responseMessage && this.isTerminalFailureMessage(responseMessage)) {
+        await this.markHeaderPollError(header.id, responseMessage);
+        return { status: 'ERROR', reason: responseMessage };
+      }
       return { status: 'PENDING', reason: `No receipt payload found for ${sourceHeaderId}` };
     }
 
@@ -192,9 +201,11 @@ export class OracleInboundStatusCheckerService {
           data.IFACE_MESSAGE_IO,
           data.IFACE_MESSAGE_OI,
         );
+        const finalReason = reason || `Oracle terminal status E for ${sourceHeaderId}`;
+        await this.markHeaderPollError(header.id, finalReason);
         return {
           status: 'ERROR',
-          reason: reason || `Oracle terminal status E for ${sourceHeaderId}`,
+          reason: finalReason,
         };
       }
       return { status: 'SUCCESS', reason: `Oracle terminal status S for ${sourceHeaderId}` };
@@ -231,7 +242,9 @@ export class OracleInboundStatusCheckerService {
         data.MESSAGE,
         data.MESSAGE_SELISIH,
       );
-      return { status: 'ERROR', reason: reason || `Oracle error status for ${sourceHeaderId}` };
+      const finalReason = reason || `Oracle error status for ${sourceHeaderId}`;
+      await this.markHeaderPollError(header.id, finalReason);
+      return { status: 'ERROR', reason: finalReason };
     }
 
     if (candidateStatuses.some((s) => this.inProgressStatuses.has(s))) {
@@ -243,6 +256,40 @@ export class OracleInboundStatusCheckerService {
     }
 
     return { status: 'PENDING', reason: `Unknown status from Oracle for ${sourceHeaderId}` };
+  }
+
+  private async markHeaderPollError(headerId: string, reason: string): Promise<void> {
+    const message = reason.trim().slice(0, 240);
+    await this.inboundIntegrationService.updateHeader(headerId, {
+      status: 'E',
+      message: message || undefined,
+    });
+  }
+
+  private extractResponseMessage(response: Record<string, unknown>): string | null {
+    return this.firstNonEmptyString(
+      response.message,
+      response.error,
+      response.errorMessage,
+      response.MESSAGE,
+      (response.data as Record<string, unknown> | undefined)?.message,
+      (response.data as Record<string, unknown> | undefined)?.MESSAGE,
+    );
+  }
+
+  private isTerminalFailureMessage(message: string): boolean {
+    const normalized = message.trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+    return (
+      normalized.includes('validation') ||
+      normalized.includes('failed') ||
+      normalized.includes('error') ||
+      normalized.includes('no receipt created') ||
+      normalized.includes('cancelled') ||
+      normalized.includes('terminated')
+    );
   }
 
   private normalizeStatus(value: unknown): string {

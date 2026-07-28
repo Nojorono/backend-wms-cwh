@@ -7,6 +7,7 @@ import { CreateInboundIntegrationDto } from './dto/create-inbound-integration.dt
 import { UpdateInboundIntegrationDto } from './dto/update-inbound-integration.dto';
 import { CreateInboundIntegrationLineDto } from './dto/create-inbound-integration-line.dto';
 import { UpdateInboundIntegrationLineDto } from './dto/update-inbound-integration-line.dto';
+import { InboundIntegrationPaginationQueryDto } from './dto/inbound-integration-pagination.dto';
 
 @Injectable()
 export class InboundIntegrationRepository {
@@ -50,6 +51,70 @@ export class InboundIntegrationRepository {
     });
   }
 
+  async findAllHeadersPaginated(
+    query: InboundIntegrationPaginationQueryDto,
+  ): Promise<{ data: InboundIntegration[]; total: number }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'DESC';
+
+    const sortableFields = new Set([
+      'createdAt',
+      'updatedAt',
+      'status',
+      'do_number',
+      'source_header_id',
+      'receipt_number',
+      'source_system',
+    ]);
+    const sortField = sortableFields.has(sortBy) ? sortBy : 'createdAt';
+
+    const qb = this.inboundIntegrationRepo
+      .createQueryBuilder('header')
+      .where('header.deletedAt IS NULL');
+
+    if (query.status?.trim()) {
+      qb.andWhere('header.status = :status', { status: query.status.trim() });
+    }
+
+    if (query.inbound_id?.trim()) {
+      qb.andWhere('header.inbound_id = :inboundId', {
+        inboundId: query.inbound_id.trim(),
+      });
+    }
+
+    if (query.inbound_do_id?.trim()) {
+      qb.andWhere('header.inbound_do_id = :inboundDoId', {
+        inboundDoId: query.inbound_do_id.trim(),
+      });
+    }
+
+    if (query.source_system?.trim()) {
+      qb.andWhere('header.source_system = :sourceSystem', {
+        sourceSystem: query.source_system.trim(),
+      });
+    }
+
+    if (query.search?.trim()) {
+      const search = `%${query.search.trim()}%`;
+      qb.andWhere(
+        '(header.do_number ILIKE :search OR header.source_header_id ILIKE :search OR header.receipt_number ILIKE :search OR header.message ILIKE :search)',
+        { search },
+      );
+    }
+
+    const total = await qb.getCount();
+
+    const data = await qb
+      .orderBy(`header.${sortField}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, total };
+  }
+
   async findAllHeadersByInboundId(inboundId: string): Promise<InboundIntegration[]> {
     return await this.inboundIntegrationRepo.find({
       where: { inbound_id: inboundId, status: 'CREATED' },
@@ -62,6 +127,50 @@ export class InboundIntegrationRepository {
       where: { inbound_id: inboundId },
       order: { createdAt: 'ASC' },
     });
+  }
+
+  /** Staging headers whose inbound_do still exists (not soft-deleted). */
+  async findAllHeadersByInboundIdWithActiveDo(inboundId: string): Promise<InboundIntegration[]> {
+    return await this.inboundIntegrationRepo
+      .createQueryBuilder('h')
+      .innerJoin('inbound_do', 'd', 'd.id = h.inbound_do_id AND d.deleted_at IS NULL')
+      .where('h.inbound_id = :inboundId', { inboundId })
+      .andWhere('h.deleted_at IS NULL')
+      .orderBy('h.created_at', 'ASC')
+      .getMany();
+  }
+
+  async softDeleteHeadersNotInDoIds(inboundId: string, activeDoIds: string[]): Promise<number> {
+    if (!activeDoIds.length) {
+      return 0;
+    }
+    const result = await this.inboundIntegrationRepo
+      .createQueryBuilder()
+      .softDelete()
+      .where('inbound_id = :inboundId', { inboundId })
+      .andWhere('(inbound_do_id IS NULL OR inbound_do_id NOT IN (:...activeDoIds))', {
+        activeDoIds,
+      })
+      .execute();
+    return result.affected ?? 0;
+  }
+
+  async updateHeadersByInboundId(
+    inboundId: string,
+    dto: UpdateInboundIntegrationDto,
+    onlyHeaderIds?: string[],
+  ): Promise<void> {
+    const qb = this.inboundIntegrationRepo
+      .createQueryBuilder()
+      .update(InboundIntegration)
+      .set(dto as Partial<InboundIntegration>)
+      .where('inbound_id = :inboundId', { inboundId })
+      .andWhere('deleted_at IS NULL');
+
+    if (onlyHeaderIds?.length) {
+      qb.andWhere('id IN (:...onlyHeaderIds)', { onlyHeaderIds });
+    }
+    await qb.execute();
   }
 
   async findLinesByHeaderIds(headerIds: string[]): Promise<InboundIntegrationLines[]> {

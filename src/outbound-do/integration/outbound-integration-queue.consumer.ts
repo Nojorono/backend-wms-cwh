@@ -119,9 +119,12 @@ export class OutboundIntegrationQueueConsumer {
           retryCount: data.retryCount ?? 0,
           maxRetry: data.maxRetry ?? 20,
           jobType: retryJobType,
+          // Must preserve type scope — dropping it mixes pick-release / ship-confirm polls
+          // and can route AMO ship-confirm into PO_INTERNAL_REQ path.
+          transactionType: data.transactionType,
         });
         this.logger.warn(
-          `Outbound queue rescheduled after failure outboundDoId=${data.outboundDoId} retryCount=${data.retryCount ?? 0} delayMs=${delay}`,
+          `Outbound queue rescheduled after failure outboundDoId=${data.outboundDoId} retryCount=${data.retryCount ?? 0} jobType=${retryJobType} transactionType=${data.transactionType ?? 'ALL'} delayMs=${delay}`,
         );
       }
     }
@@ -206,6 +209,16 @@ export class OutboundIntegrationQueueConsumer {
     const outboundType = await this.outboundDoRepository.findOutboundTypeById(outboundDoId);
     if (outboundType === OutboundDoType.SUBDIST) {
       return 'SHIP_CONFIRM';
+    }
+
+    // AMO / internal ship-confirm uses deliveries staging; if IR req jobType was dropped
+    // on retry, detect deliveries and keep SHIP_CONFIRM routing.
+    if (jobType == null || jobType === 'PO_INTERNAL_REQ') {
+      const hasShipConfirmDeliveries =
+        await this.shipConfirmStatusChecker.hasDeliveriesForOutboundDo(outboundDoId);
+      if (hasShipConfirmDeliveries && outboundType === OutboundDoType.AMO) {
+        return 'SHIP_CONFIRM';
+      }
     }
 
     return jobType ?? 'PO_INTERNAL_REQ';

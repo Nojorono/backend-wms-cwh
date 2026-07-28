@@ -673,37 +673,106 @@ export class AssignedGateService {
         // find all assigned gate load
         const assignedGateLoads = await this.assignedGateLoadRepo.findAllByAssignedGate(id);
         for (const assignedGateLoad of assignedGateLoads) {
+          if (assignedGateLoad.status === AssignedGateLoadStatus.APPROVED) {
+            continue;
+          }
+
+          const quantityLoaded = assignedGateLoad.quantity_loaded || 0;
+          if (quantityLoaded <= 0) {
+            await this.assignedGateLoadRepo.update(assignedGateLoad.id, {
+              status: AssignedGateLoadStatus.APPROVED,
+            });
+            continue;
+          }
+
+          if (!assignedGateLoad.pallet_id || !assignedGateLoad.item_id || !assignedGateLoad.uom) {
+            throw new BadRequestException(
+              `Assigned gate load ${assignedGateLoad.id} is missing pallet_id, item_id, or uom`,
+            );
+          }
+
           // clear memo_id in pallet
           await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: null });
 
-          // update pallet quantity within the same DB transaction
+          // Gate-loaded stock is outbound reserved (PENDING + PICKED), not READY inventory.
+          // Prefer PENDING stock line; fall back to READY only if no PENDING line exists.
+          const outboundStatus = await this.resolveGateLoadStockStatus(
+            assignedGateLoad.pallet_id,
+            assignedGateLoad.item_id,
+            assignedGateLoad.uom,
+            assignedGateLoad.week_number ?? undefined,
+            quantityLoaded,
+          );
+
           await this.masterPalletService.updateQuantity(
             assignedGateLoad.pallet_id,
             {
               item_id: assignedGateLoad.item_id,
-              quantity: assignedGateLoad.quantity_loaded,
+              quantity: quantityLoaded,
               operation_type: QuantityOperationType.REMOVE,
               outbound_do_id: assignedGateLoad.outbound_memo_id,
-              notes: `Loaded quantity ${assignedGateLoad.quantity_loaded} to gate ${
-                assignedGate.gate.name || assignedGate.gate.code
-              }`,
+              notes:
+                `Loaded quantity ${quantityLoaded} to gate ${
+                  assignedGate.gate.name || assignedGate.gate.code
+                } (${outboundStatus})`,
               uom: assignedGateLoad.uom,
               week_number: assignedGateLoad.week_number,
               production_date: assignedGateLoad.production_date,
               reference_id: assignedGateLoad.id,
               reference_type: 'ASSIGNED_GATE_LOAD',
-              status_inventory: StatusInventory.READY,
+              status_inventory: outboundStatus,
             },
             manager,
           );
 
-          // update inventory tracking
-          await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
-            inventory_status: 'IN_INVENTORY',
-            progression_status: ProgressionStatus.COMPLETED,
-            inventory_note: `Loaded is done`,
-            inventory_date: new Date(),
-          });
+          // After removing loaded qty: leftover stock is released back to inventory.
+          // Convert any remaining PENDING lines → READY and set tracking to IN_INVENTORY.
+          const remainingLines = await this.masterPalletService.getPalletItemLatestQuantity(
+            assignedGateLoad.pallet_id,
+          );
+          const remainingQty = remainingLines.reduce(
+            (sum, line) => sum + (line.current_quantity || 0),
+            0,
+          );
+
+          if (remainingQty > 0) {
+            const pendingRemainders = remainingLines.filter(
+              (line) =>
+                line.status_inventory === StatusInventory.PENDING &&
+                (line.current_quantity || 0) > 0 &&
+                line.item_id,
+            );
+
+            for (const line of pendingRemainders) {
+              await this.masterPalletService.convertStockLineStatusInPlace(
+                assignedGateLoad.pallet_id,
+                {
+                  itemId: line.item_id as string,
+                  uom: line.uom,
+                  weekNumber: line.week_number ?? null,
+                  from: StatusInventory.PENDING,
+                  to: StatusInventory.READY,
+                  appendNote:
+                    `[GATE APPROVE] PENDING→READY week=${line.week_number ?? 'n/a'} ` +
+                    `(leftover after load approve; released to inventory)`,
+                },
+              );
+            }
+
+            await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
+              inventory_status: 'IN_INVENTORY',
+              progression_status: ProgressionStatus.COMPLETED,
+              inventory_note: `Loaded done — leftover stock released to READY / IN_INVENTORY`,
+              inventory_date: new Date(),
+            });
+          } else {
+            await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
+              inventory_status: 'IN_INVENTORY',
+              progression_status: ProgressionStatus.COMPLETED,
+              inventory_note: `Loaded is done`,
+              inventory_date: new Date(),
+            });
+          }
 
           // update assigned gate load status to approved
           await this.assignedGateLoadRepo.update(assignedGateLoad.id, {
@@ -746,8 +815,60 @@ export class AssignedGateService {
       }
 
       console.error(`Failed to approve assigned gate ${id}:`, error);
-      throw new BadRequestException('Failed to approve assigned gate');
+      throw new BadRequestException(
+        `Failed to approve assigned gate: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
+  }
+
+  /**
+   * Gate load removes reserved outbound stock (PENDING), not READY leftover.
+   */
+  private async resolveGateLoadStockStatus(
+    palletId: string,
+    itemId: string,
+    uom: string,
+    weekNumber: number | undefined,
+    quantityLoaded: number,
+  ): Promise<StatusInventory> {
+    try {
+      const lines = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
+
+      const matches = lines.filter(
+        (line) =>
+          line.item_id === itemId &&
+          (!uom || !line.uom || line.uom === uom) &&
+          (weekNumber === undefined ||
+            weekNumber === null ||
+            line.week_number === weekNumber),
+      );
+
+      const pending = matches.find(
+        (line) =>
+          line.status_inventory === StatusInventory.PENDING &&
+          (line.current_quantity ?? 0) >= quantityLoaded,
+      );
+      if (pending) {
+        return StatusInventory.PENDING;
+      }
+
+      const ready = matches.find(
+        (line) =>
+          line.status_inventory === StatusInventory.READY &&
+          (line.current_quantity ?? 0) >= quantityLoaded,
+      );
+      if (ready) {
+        return StatusInventory.READY;
+      }
+
+      if (matches.some((line) => line.status_inventory === StatusInventory.PENDING)) {
+        return StatusInventory.PENDING;
+      }
+    } catch {
+      // fall through
+    }
+
+    return StatusInventory.PENDING;
   }
 }
 

@@ -3,6 +3,7 @@ import { TransactionScanPickingRepository } from './transaction-scan-picking.rep
 import { CreateTransactionScanPickingDto } from './dto/create-transaction-scan-picking.dto';
 import { UpdateTransactionScanPickingDto } from './dto/update-transaction-scan-picking.dto';
 import { ScanPickingStatus, ScanPickingTransaction } from '../core/domain/entities/transaction-scan-picking.entity';
+import { PickingTransaction } from '../core/domain/entities/transaction-picking.entity';
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { QuantityOperationType, StatusInventory } from '../core/domain/entities/transaction-pallet-history.entity';
@@ -74,11 +75,10 @@ export class TransactionScanPickingService {
             'week_number is required to pick the correct stock line on the pallet',
           );
         }
-        if (quantitySwitch > data.quantity_picked) {
-          throw new BadRequestException(
-            `quantity_switch (${quantitySwitch}) cannot exceed quantity_picked (${data.quantity_picked})`,
-          );
-        }
+        // quantity_picked = qty going to the USE pallet (PENDING/outbound).
+        // quantity_switch = SEPARATE leftover moved to the switch pallet.
+        // Total taken from source READY = quantity_picked + quantity_switch;
+        // availability is validated by masterPalletService.updateQuantity (PICK).
 
         const isSamePallet = data.pallet_source_id === data.pallet_use_id;
         const productionDate = await this.getPalletItemProductionDate(
@@ -201,11 +201,8 @@ export class TransactionScanPickingService {
           data.uom !== undefined;
 
         if (hasPalletChanges) {
-          if (quantitySwitch > quantityPicked) {
-            throw new BadRequestException(
-              `quantity_switch (${quantitySwitch}) cannot exceed quantity_picked (${quantityPicked})`,
-            );
-          }
+          // quantity_picked (use/outbound) and quantity_switch (leftover) are independent.
+          // Total taken from source = quantity_picked + quantity_switch (validated on PICK).
           if (weekNumber === undefined || weekNumber === null) {
             throw new BadRequestException(
               'week_number is required to revert/update pallet operations for the correct stock line',
@@ -308,7 +305,12 @@ export class TransactionScanPickingService {
 
       const itemId = existing.item_id || transactionPicking.item_id;
       const uom = existing.uom || transactionPicking.uom;
-      const weekNumber = existing.week_number ?? transactionPicking.week_number;
+      const weekNumber = await this.resolveWeekNumberForStockLineRevert(
+        existing,
+        transactionPicking,
+        itemId,
+        uom,
+      );
       const outboundDoId = transactionPicking.do_id;
       const memoNumber = transactionPicking.memo_id
         ? (await this.outboundMemoService.findOne(transactionPicking.memo_id))?.outbound_memo_number
@@ -316,11 +318,6 @@ export class TransactionScanPickingService {
 
       if (!itemId) {
         throw new BadRequestException('item_id is required to revert pallet operations');
-      }
-      if (weekNumber === undefined || weekNumber === null) {
-        throw new BadRequestException(
-          'week_number is required to revert pallet operations for the correct stock line',
-        );
       }
 
       const userId = (existing as { user_id?: string }).user_id;
@@ -365,8 +362,6 @@ export class TransactionScanPickingService {
   ): Promise<ScanPickingTransaction[]> {
     return this.repository.findAll({ transactionPickingId });
   }
-
-
 
   async inspectionApproved(id: string, inspection_by: string): Promise<ScanPickingTransaction> {
     const existing = await this.findOne(id);
@@ -441,7 +436,11 @@ export class TransactionScanPickingService {
       action,
     } = params;
 
-    const quantityToUse = quantityPicked - quantitySwitch;
+    // quantity_picked = qty going to USE pallet (PENDING/outbound).
+    // quantity_switch = SEPARATE leftover moved to the switch pallet.
+    // Both come out of the source READY line.
+    const quantityToUse = quantityPicked;
+    const totalFromSource = quantityPicked + quantitySwitch;
     const isSamePallet = palletSourceId === palletUseId;
     const memoLabel = memoNumber || memoId;
 
@@ -462,22 +461,33 @@ export class TransactionScanPickingService {
       reference_type: 'TRANSACTION_SCAN_PICKING' as const,
     };
 
-    if (quantityPicked > 0) {
-      await this.masterPalletService.updateQuantity(palletSourceId, {
-        ...basePayload,
-        quantity: quantityPicked,
-        operation_type: QuantityOperationType.PICK,
-        status_inventory: StatusInventory.READY,
-        notes:
-          `[${action}] PICK ${quantityPicked}${uom ? ` ${uom}` : ''} ` +
-          `FROM source pallet ${sourceCode} (${palletSourceId}) ` +
-          `week=${weekNumber} ` +
-          `FOR memo ${memoLabel} (${memoId}); ` +
-          `route: to_use=${useCode}${isSamePallet ? ' (same as source)' : ''} qty=${quantityToUse}` +
-          (quantitySwitch > 0
-            ? `, to_switch=${switchCode} qty=${quantitySwitch}`
-            : ', to_switch=none'),
-      });
+    if (totalFromSource > 0) {
+      // Skip empty cleanup when stock will be ADDed back to source/use/switch in this flow
+      // (PICK→0 would otherwise clear inventory tracking and wipe history mid-operation).
+      const willRestockSourceOrUse =
+        (isSamePallet && quantityToUse > 0) ||
+        (palletSwitchId === palletSourceId && quantitySwitch > 0);
+
+      await this.masterPalletService.updateQuantity(
+        palletSourceId,
+        {
+          ...basePayload,
+          quantity: totalFromSource,
+          operation_type: QuantityOperationType.PICK,
+          status_inventory: StatusInventory.READY,
+          notes:
+            `[${action}] PICK ${totalFromSource}${uom ? ` ${uom}` : ''} ` +
+            `FROM source pallet ${sourceCode} (${palletSourceId}) ` +
+            `week=${weekNumber} ` +
+            `FOR memo ${memoLabel} (${memoId}); ` +
+            `route: to_use=${useCode}${isSamePallet ? ' (same as source)' : ''} qty=${quantityToUse}` +
+            (quantitySwitch > 0
+              ? `, to_switch=${switchCode} qty=${quantitySwitch}`
+              : ', to_switch=none'),
+        },
+        undefined,
+        willRestockSourceOrUse,
+      );
     }
 
     if (palletSwitchId && quantitySwitch > 0) {
@@ -546,7 +556,10 @@ export class TransactionScanPickingService {
 
     const quantitySwitch = existing.quantity_switch || 0;
     const quantityPicked = existing.quantity_picked || 0;
-    const quantityToUse = quantityPicked - quantitySwitch;
+    // Mirror apply: use pallet held quantity_picked (PENDING), switch held quantity_switch;
+    // source READY must be restored with the sum of both.
+    const quantityToUse = quantityPicked;
+    const totalToSource = quantityPicked + quantitySwitch;
 
     const [sourceCode, useCode, switchCode] = await Promise.all([
       this.resolvePalletCode(existing.pallet_source_id),
@@ -567,20 +580,27 @@ export class TransactionScanPickingService {
 
     // Reverse of create: REMOVE use → REMOVE switch → ADD source
     if (existing.pallet_use_id && quantityToUse > 0) {
-      await this.masterPalletService.updateQuantity(existing.pallet_use_id, {
-        ...basePayload,
-        quantity: quantityToUse,
-        operation_type: QuantityOperationType.REMOVE,
-        status_inventory: StatusInventory.PENDING,
-        notes:
-          `[REVERT] REMOVE ${quantityToUse}${uom ? ` ${uom}` : ''} ` +
-          `FROM use pallet ${useCode} (${existing.pallet_use_id})` +
-          (wasSamePallet ? ' (same as source)' : '') +
-          ` week=${weekNumber} ` +
-          `FOR memo ${memoLabel}` +
-          (memoId ? ` (${memoId})` : '') +
-          `; undo PENDING stock that was for outbound`,
-      });
+      await this.masterPalletService.updateQuantity(
+        existing.pallet_use_id,
+        {
+          ...basePayload,
+          quantity: quantityToUse,
+          operation_type: QuantityOperationType.REMOVE,
+          status_inventory: StatusInventory.PENDING,
+          notes:
+            `[REVERT] REMOVE ${quantityToUse}${uom ? ` ${uom}` : ''} ` +
+            `FROM use pallet ${useCode} (${existing.pallet_use_id})` +
+            (wasSamePallet ? ' (same as source)' : '') +
+            ` week=${weekNumber} ` +
+            `FOR memo ${memoLabel}` +
+            (memoId ? ` (${memoId})` : '') +
+            `; undo PENDING stock that was for outbound`,
+        },
+        undefined,
+        // Same pallet: READY line is 0 until we ADD back below — skip empty cleanup
+        // so history/memo is not wiped mid-revert.
+        wasSamePallet,
+      );
     }
 
     if (existing.pallet_switch_id && quantitySwitch > 0) {
@@ -596,17 +616,17 @@ export class TransactionScanPickingService {
       });
     }
 
-    if (existing.pallet_source_id && quantityPicked > 0) {
+    if (existing.pallet_source_id && totalToSource > 0) {
       await this.masterPalletService.updateQuantity(existing.pallet_source_id, {
         ...basePayload,
-        quantity: quantityPicked,
+        quantity: totalToSource,
         operation_type: QuantityOperationType.ADD,
         status_inventory: StatusInventory.READY,
         notes:
-          `[REVERT] ADD ${quantityPicked}${uom ? ` ${uom}` : ''} ` +
+          `[REVERT] ADD ${totalToSource}${uom ? ` ${uom}` : ''} ` +
           `TO source pallet ${sourceCode} (${existing.pallet_source_id}) ` +
           `week=${weekNumber} ` +
-          `FROM use=${useCode} / switch=${switchCode}; ` +
+          `FROM use=${useCode} (${quantityToUse}) / switch=${switchCode} (${quantitySwitch}); ` +
           `restore READY stock after undoing scan picking for memo ${memoLabel}`,
       });
     }
@@ -673,20 +693,54 @@ export class TransactionScanPickingService {
         }
       }
 
-      const quantityToUse = quantityPicked - quantitySwitch;
+      // quantity_picked goes to the USE pallet (outbound PENDING → PICKED at destination).
+      const quantityToUse = quantityPicked;
       const memoLabel = memoNumber ? ` memo=${memoNumber}` : '';
+      const useTargetPalletId =
+        palletUseId && quantityToUse > 0
+          ? isSamePallet
+            ? palletSourceId
+            : palletUseId
+          : undefined;
+
+      // Capture the source pallet's location BEFORE the use pallet is moved to the
+      // destination. When source === use, the switch pallet must stay at this original
+      // location (the leftover READY stock never leaves the source bin).
+      let preScanSourceLocation:
+        | {
+          warehouse_sub_id?: string;
+          warehouse_bin_id?: string;
+          warehouse_id?: string;
+        }
+        | undefined;
+      if (palletSourceId) {
+        try {
+          const preSourceTracking =
+            await this.inventoryTrackingService.findOneByPalletId(palletSourceId);
+          if (preSourceTracking) {
+            preScanSourceLocation = {
+              warehouse_sub_id: preSourceTracking.warehouse_sub_id,
+              warehouse_bin_id: preSourceTracking.warehouse_bin_id,
+              warehouse_id: preSourceTracking.warehouse_id,
+            };
+          }
+        } catch (error) {
+          if (!(error instanceof NotFoundException)) {
+            throw error;
+          }
+        }
+      }
 
       // Move inventory tracking to destination location
       // If same pallet, move source pallet to destination. If different, move use pallet to destination.
-      // pallet_use always gets inventory_status = PICKED.
-      if (palletUseId && quantityToUse > 0) {
-        const targetPalletId = isSamePallet ? palletSourceId : palletUseId;
-
-        if (targetPalletId && destinationWarehouseSubId && destinationWarehouseId) {
+      // pallet_use always gets inventory_status = PICKED when it holds outbound PENDING qty.
+      if (useTargetPalletId) {
+        if (destinationWarehouseSubId && destinationWarehouseId) {
           try {
             let targetPalletTracking;
             try {
-              targetPalletTracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+              targetPalletTracking =
+                await this.inventoryTrackingService.findOneByPalletId(useTargetPalletId);
             } catch (error) {
               if (!(error instanceof NotFoundException)) {
                 throw error;
@@ -702,13 +756,13 @@ export class TransactionScanPickingService {
                 inventory_status: 'PICKED',
                 progression_status: ProgressionStatus.COMPLETED,
                 inventory_note: isSamePallet
-                  ? `Scan picking: ${quantityToUse} on same pallet ${targetPalletId} → PICKED; from source=${palletSourceId}; switch=${quantitySwitch};${memoLabel}`
+                  ? `Scan picking: ${quantityToUse} on same pallet ${useTargetPalletId} → PICKED; from source=${palletSourceId}; switch=${quantitySwitch};${memoLabel}`
                   : `Scan picking: moved ${quantityToUse} FROM source ${palletSourceId} TO use ${palletUseId} → PICKED; switch=${quantitySwitch};${memoLabel}`,
                 inventory_date: new Date(),
               });
             } else {
               await this.inventoryTrackingService.createOrUpdateInventoryTracking(
-                targetPalletId,
+                useTargetPalletId,
                 destinationWarehouseSubId,
                 destinationWarehouseId,
                 'PICKED',
@@ -716,122 +770,184 @@ export class TransactionScanPickingService {
               );
 
               if (destinationBinId) {
-                const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+                const tracking =
+                  await this.inventoryTrackingService.findOneByPalletId(useTargetPalletId);
                 if (tracking) {
                   await this.inventoryTrackingService.update(tracking.id, {
                     warehouse_bin_id: destinationBinId,
                     inventory_status: 'PICKED',
-                    inventory_note: `Scan picking create tracking FOR use pallet ${targetPalletId} FROM source ${palletSourceId} → PICKED;${memoLabel}`,
+                    inventory_note: `Scan picking create tracking FOR use pallet ${useTargetPalletId} FROM source ${palletSourceId} → PICKED;${memoLabel}`,
                   });
                 }
               }
             }
           } catch (error) {
-            console.error(`Failed to move inventory tracking to destination for pallet ${targetPalletId}:`, error);
+            console.error(
+              `Failed to move inventory tracking to destination for pallet ${useTargetPalletId}:`,
+              error,
+            );
           }
-        } else if (targetPalletId) {
+        } else {
           // Destination incomplete — still mark use pallet as PICKED
           try {
-            const tracking = await this.inventoryTrackingService.findOneByPalletId(targetPalletId);
+            const tracking =
+              await this.inventoryTrackingService.findOneByPalletId(useTargetPalletId);
             if (tracking) {
               await this.inventoryTrackingService.update(tracking.id, {
                 inventory_status: 'PICKED',
                 progression_status: ProgressionStatus.COMPLETED,
-                inventory_note: `Scan picking: use pallet ${targetPalletId} → PICKED (destination location incomplete);${memoLabel}`,
+                inventory_note: `Scan picking: use pallet ${useTargetPalletId} → PICKED (destination location incomplete);${memoLabel}`,
                 inventory_date: new Date(),
               });
             }
           } catch (error) {
             if (!(error instanceof NotFoundException)) {
-              console.error(`Failed to set PICKED on use pallet ${targetPalletId}:`, error);
+              console.error(
+                `Failed to set PICKED on use pallet ${useTargetPalletId}:`,
+                error,
+              );
             }
           }
         }
       }
 
-      // Move inventory tracking to switch pallet if provided
+      // Move inventory tracking to switch pallet if provided (leftover READY stays IN_INVENTORY).
+      // Never overwrite the use/outbound pallet that must remain PICKED.
       if (palletSwitchId && quantitySwitch > 0) {
-        try {
-          // Get source pallet location for new inventory tracking if needed
-          let sourceWarehouseSubId: string | undefined;
-          let sourceBinId: string | undefined;
-          let sourceWarehouseId: string | undefined;
+        const switchIsUseOutbound =
+          !!useTargetPalletId && palletSwitchId === useTargetPalletId;
 
-          if (palletSourceId) {
-            try {
-              const sourceTracking = await this.inventoryTrackingService.findOneByPalletId(palletSourceId);
-              if (sourceTracking) {
-                sourceWarehouseSubId = sourceTracking.warehouse_sub_id;
-                sourceBinId = sourceTracking.warehouse_bin_id;
-                sourceWarehouseId = sourceTracking.warehouse_id;
-              }
-            } catch (error) {
-              // If source pallet doesn't have tracking, use destination location
-              if (error instanceof NotFoundException) {
-                sourceWarehouseSubId = destinationWarehouseSubId;
-                sourceBinId = destinationBinId;
-                sourceWarehouseId = destinationWarehouseId;
-              } else {
-                throw error;
-              }
-            }
-          }
-
-          // Use source location if available, otherwise use destination location
-          const finalWarehouseSubId = sourceWarehouseSubId || destinationWarehouseSubId;
-          const finalBinId = sourceBinId || destinationBinId;
-          const finalWarehouseId = sourceWarehouseId || destinationWarehouseId;
-
-          if (!finalWarehouseSubId || !finalWarehouseId) {
-            console.warn(`Cannot create inventory tracking for switch pallet ${palletSwitchId}: missing warehouse information`);
-            return;
-          }
-
-          // Check if switch pallet already has inventory tracking
-          let switchPalletTracking;
+        if (switchIsUseOutbound) {
+          // Switch leftover landed on the same pallet as outbound use — keep PICKED.
+          console.warn(
+            `pallet_switch_id equals use pallet ${palletSwitchId}; keeping inventory_status=PICKED`,
+          );
+        } else {
           try {
-            switchPalletTracking = await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
-          } catch (error) {
-            // If not found, we'll create a new one
-            if (!(error instanceof NotFoundException)) {
-              throw error;
+            // Prefer source location BEFORE scan moved use to destination.
+            // If source === use (already PICKED at destination), use picking source location
+            // or destination as fallback for the leftover switch pallet only.
+            let sourceWarehouseSubId: string | undefined;
+            let sourceBinId: string | undefined;
+            let sourceWarehouseId: string | undefined;
+
+            // Prefer the location captured BEFORE the use pallet was moved to the
+            // destination. This keeps the switch (leftover) pallet at the source's
+            // original bin even when source === use.
+            if (preScanSourceLocation?.warehouse_sub_id) {
+              sourceWarehouseSubId = preScanSourceLocation.warehouse_sub_id;
+              sourceBinId = preScanSourceLocation.warehouse_bin_id;
+              sourceWarehouseId = preScanSourceLocation.warehouse_id;
             }
-            switchPalletTracking = null;
-          }
 
-          if (switchPalletTracking) {
-            // Update existing tracking
-            await this.inventoryTrackingService.update(switchPalletTracking.id, {
-              warehouse_sub_id: finalWarehouseSubId,
-              warehouse_bin_id: finalBinId,
-              warehouse_id: finalWarehouseId,
-              inventory_status: 'IN_INVENTORY',
-              progression_status: ProgressionStatus.COMPLETED,
-            });
-          } else {
-            // Create new tracking for switch pallet using source pallet location
-            await this.inventoryTrackingService.createOrUpdateInventoryTracking(
-              palletSwitchId,
-              finalWarehouseSubId,
-              finalWarehouseId,
-              'IN_INVENTORY',
-              ProgressionStatus.COMPLETED,
-            );
-
-            // Update bin if provided
-            if (finalBinId) {
-              const tracking = await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
-              if (tracking) {
-                await this.inventoryTrackingService.update(tracking.id, {
-                  warehouse_bin_id: finalBinId,
-                  progression_status: ProgressionStatus.COMPLETED,
-                });
+            if (
+              !sourceWarehouseSubId &&
+              palletSourceId &&
+              palletSourceId !== useTargetPalletId
+            ) {
+              try {
+                const sourceTracking =
+                  await this.inventoryTrackingService.findOneByPalletId(palletSourceId);
+                if (sourceTracking) {
+                  sourceWarehouseSubId = sourceTracking.warehouse_sub_id;
+                  sourceBinId = sourceTracking.warehouse_bin_id;
+                  sourceWarehouseId = sourceTracking.warehouse_id;
+                }
+              } catch (error) {
+                if (!(error instanceof NotFoundException)) {
+                  throw error;
+                }
               }
             }
+
+            if (!sourceWarehouseSubId) {
+              sourceWarehouseSubId =
+                transactionPicking.source_warehouse_sub_id || destinationWarehouseSubId;
+              sourceBinId = transactionPicking.source_bin_id || destinationBinId;
+              sourceWarehouseId = destinationWarehouseId;
+            }
+
+            const finalWarehouseSubId = sourceWarehouseSubId || destinationWarehouseSubId;
+            const finalBinId = sourceBinId || destinationBinId;
+            const finalWarehouseId = sourceWarehouseId || destinationWarehouseId;
+
+            if (!finalWarehouseSubId || !finalWarehouseId) {
+              console.warn(
+                `Cannot create inventory tracking for switch pallet ${palletSwitchId}: missing warehouse information`,
+              );
+            } else {
+              let switchPalletTracking;
+              try {
+                switchPalletTracking =
+                  await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
+              } catch (error) {
+                if (!(error instanceof NotFoundException)) {
+                  throw error;
+                }
+                switchPalletTracking = null;
+              }
+
+              if (switchPalletTracking) {
+                await this.inventoryTrackingService.update(switchPalletTracking.id, {
+                  warehouse_sub_id: finalWarehouseSubId,
+                  warehouse_bin_id: finalBinId,
+                  warehouse_id: finalWarehouseId,
+                  inventory_status: 'IN_INVENTORY',
+                  progression_status: ProgressionStatus.COMPLETED,
+                  inventory_note: `Scan picking: leftover ${quantitySwitch} on switch pallet ${palletSwitchId} → IN_INVENTORY;${memoLabel}`,
+                  inventory_date: new Date(),
+                });
+              } else {
+                await this.inventoryTrackingService.createOrUpdateInventoryTracking(
+                  palletSwitchId,
+                  finalWarehouseSubId,
+                  finalWarehouseId,
+                  'IN_INVENTORY',
+                  ProgressionStatus.COMPLETED,
+                );
+
+                if (finalBinId) {
+                  const tracking =
+                    await this.inventoryTrackingService.findOneByPalletId(palletSwitchId);
+                  if (tracking) {
+                    await this.inventoryTrackingService.update(tracking.id, {
+                      warehouse_bin_id: finalBinId,
+                      inventory_status: 'IN_INVENTORY',
+                      progression_status: ProgressionStatus.COMPLETED,
+                    });
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error(
+              `Failed to move inventory tracking to switch pallet ${palletSwitchId}:`,
+              error,
+            );
+          }
+        }
+      }
+
+      // Re-assert PICKED on use/outbound pallet after switch handling (guards against overwrite)
+      if (useTargetPalletId) {
+        try {
+          const tracking =
+            await this.inventoryTrackingService.findOneByPalletId(useTargetPalletId);
+          if (tracking && tracking.inventory_status !== 'PICKED') {
+            await this.inventoryTrackingService.update(tracking.id, {
+              inventory_status: 'PICKED',
+              progression_status: ProgressionStatus.COMPLETED,
+              inventory_note: `Scan picking: ensure use pallet ${useTargetPalletId} → PICKED after switch handling;${memoLabel}`,
+              inventory_date: new Date(),
+            });
           }
         } catch (error) {
-          // Log error but don't fail the operation
-          console.error(`Failed to move inventory tracking to switch pallet ${palletSwitchId}:`, error);
+          if (!(error instanceof NotFoundException)) {
+            console.error(
+              `Failed to re-assert PICKED on use pallet ${useTargetPalletId}:`,
+              error,
+            );
+          }
         }
       }
     } catch (error) {
@@ -846,50 +962,98 @@ export class TransactionScanPickingService {
     wasSamePallet: boolean,
   ): Promise<void> {
     try {
-      // Get source warehouse info from transaction picking
-      let sourceWarehouseSubId = transactionPicking.source_warehouse_sub_id;
-      const sourceBinId = transactionPicking.source_bin_id;
-      let sourceWarehouseId: string | undefined;
+      // Destination of scan picking (often staging) — must NOT be used as restore target
+      let destinationWarehouseSubId = transactionPicking.destination_warehouse_sub_id as
+        | string
+        | undefined;
+      const destinationBinId = transactionPicking.destination_bin_id as string | undefined;
 
-      if (sourceBinId) {
-        const warehouseBin = await this.masterWarehouseBinService.findOne(sourceBinId);
-        if (warehouseBin?.warehouse_sub_id) {
-          // Use warehouse_sub_id from bin if available
-          sourceWarehouseSubId = warehouseBin.warehouse_sub_id;
+      if (destinationBinId) {
+        try {
+          const warehouseBin = await this.masterWarehouseBinService.findOne(destinationBinId);
+          if (warehouseBin?.warehouse_sub_id) {
+            destinationWarehouseSubId = warehouseBin.warehouse_sub_id;
+          }
+        } catch {
+          // ignore — destination exclude is best-effort
         }
       }
 
-      // Get warehouse_id from warehouse_sub if we have warehouse_sub_id
+      // Source on picking header can also be staging; only use as fallback if it differs from destination
+      let sourceWarehouseSubId = transactionPicking.source_warehouse_sub_id as string | undefined;
+      const sourceBinId = transactionPicking.source_bin_id as string | undefined;
+      let sourceWarehouseId: string | undefined;
+
+      if (sourceBinId) {
+        try {
+          const warehouseBin = await this.masterWarehouseBinService.findOne(sourceBinId);
+          if (warehouseBin?.warehouse_sub_id) {
+            sourceWarehouseSubId = warehouseBin.warehouse_sub_id;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       if (sourceWarehouseSubId && !sourceWarehouseId) {
-        // Try to get from transaction picking's source warehouse sub relation
-        const pickingWithRelations = await this.transactionPickingService.findOne(transactionPicking.id);
+        const pickingWithRelations = await this.transactionPickingService.findOne(
+          transactionPicking.id,
+        );
         if (pickingWithRelations?.sourceWarehouseSub?.warehouse_id) {
           sourceWarehouseId = pickingWithRelations.sourceWarehouseSub.warehouse_id;
         }
       }
 
-      const fallbackSourceLocation = {
-        warehouse_sub_id: sourceWarehouseSubId,
-        warehouse_bin_id: sourceBinId,
-        warehouse_id: sourceWarehouseId,
-      };
+      const sourceIsNotDestination =
+        !!sourceWarehouseSubId && sourceWarehouseSubId !== destinationWarehouseSubId;
 
-      const sourcePrevLocation = await this.getPreviousInventoryLocation(existing.pallet_source_id);
-      const usePrevLocation = await this.getPreviousInventoryLocation(existing.pallet_use_id);
-      const switchPrevLocation = await this.getPreviousInventoryLocation(existing.pallet_switch_id);
+      const fallbackSourceLocation = sourceIsNotDestination
+        ? {
+          warehouse_sub_id: sourceWarehouseSubId,
+          warehouse_bin_id: sourceBinId,
+          warehouse_id: sourceWarehouseId,
+        }
+        : null;
+
+      const sourcePrevLocation = await this.getLocationBeforeScanPicking(
+        existing.pallet_source_id,
+        destinationWarehouseSubId,
+      );
+      const usePrevLocation = await this.getLocationBeforeScanPicking(
+        existing.pallet_use_id,
+        destinationWarehouseSubId,
+      );
+      const switchPrevLocation = await this.getLocationBeforeScanPicking(
+        existing.pallet_switch_id,
+        destinationWarehouseSubId,
+      );
+
+      const shouldRevertSourceInventory =
+        existing.pallet_source_id &&
+        existing.quantity_picked > 0 &&
+        !(await this.repository.existsActivePickingsOnPalletExcludingTransaction(
+          existing.pallet_source_id,
+          transactionPicking.id,
+        ));
 
       // Revert source pallet inventory tracking status back to IN_INVENTORY if it exists
-      if (existing.pallet_source_id && existing.quantity_picked > 0) {
+      if (shouldRevertSourceInventory) {
         try {
-          const sourceTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_source_id);
+          const sourceTracking = await this.inventoryTrackingService.findOneByPalletId(
+            existing.pallet_source_id!,
+          );
           if (sourceTracking) {
             const locationToRestore = sourcePrevLocation ?? fallbackSourceLocation;
             await this.inventoryTrackingService.update(sourceTracking.id, {
-              warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? sourceTracking.warehouse_sub_id,
-              warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? sourceTracking.warehouse_bin_id,
+              warehouse_sub_id:
+                locationToRestore?.warehouse_sub_id ?? sourceTracking.warehouse_sub_id,
+              warehouse_bin_id:
+                locationToRestore?.warehouse_bin_id ?? sourceTracking.warehouse_bin_id,
               warehouse_id: locationToRestore?.warehouse_id ?? sourceTracking.warehouse_id,
               inventory_status: 'IN_INVENTORY',
-              inventory_note: `Reverted: Restored from transaction scan picking`,
+              inventory_note: locationToRestore
+                ? `Reverted: Restored to pre-scan location from transaction scan picking`
+                : `Reverted: Restored from transaction scan picking (location unchanged)`,
               inventory_date: new Date(),
             });
           }
@@ -900,15 +1064,28 @@ export class TransactionScanPickingService {
         }
       }
 
+      const shouldRevertUseInventory =
+        existing.pallet_use_id &&
+        existing.quantity_picked > 0 &&
+        !wasSamePallet &&
+        !(await this.repository.existsActivePickingsOnPalletExcludingTransaction(
+          existing.pallet_use_id,
+          transactionPicking.id,
+        ));
+
       // Revert use pallet: restore location and clear PICKED → IN_INVENTORY
-      if (existing.pallet_use_id && existing.quantity_picked > 0 && !wasSamePallet) {
+      if (shouldRevertUseInventory) {
         try {
-          const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_use_id);
+          const usePalletTracking = await this.inventoryTrackingService.findOneByPalletId(
+            existing.pallet_use_id!,
+          );
           if (usePalletTracking) {
             const locationToRestore = usePrevLocation ?? fallbackSourceLocation;
             await this.inventoryTrackingService.update(usePalletTracking.id, {
-              warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? usePalletTracking.warehouse_sub_id,
-              warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? usePalletTracking.warehouse_bin_id,
+              warehouse_sub_id:
+                locationToRestore?.warehouse_sub_id ?? usePalletTracking.warehouse_sub_id,
+              warehouse_bin_id:
+                locationToRestore?.warehouse_bin_id ?? usePalletTracking.warehouse_bin_id,
               warehouse_id: locationToRestore?.warehouse_id ?? usePalletTracking.warehouse_id,
               inventory_status: 'IN_INVENTORY',
               inventory_note: locationToRestore
@@ -920,7 +1097,10 @@ export class TransactionScanPickingService {
           }
         } catch (error) {
           if (!(error instanceof NotFoundException)) {
-            console.error(`Failed to revert inventory tracking for use pallet ${existing.pallet_use_id}:`, error);
+            console.error(
+              `Failed to revert inventory tracking for use pallet ${existing.pallet_use_id}:`,
+              error,
+            );
           }
         }
       }
@@ -928,12 +1108,16 @@ export class TransactionScanPickingService {
       // Revert switch pallet inventory tracking
       if (existing.pallet_switch_id && existing.quantity_switch && existing.quantity_switch > 0) {
         try {
-          const switchPalletTracking = await this.inventoryTrackingService.findOneByPalletId(existing.pallet_switch_id);
+          const switchPalletTracking = await this.inventoryTrackingService.findOneByPalletId(
+            existing.pallet_switch_id,
+          );
           if (switchPalletTracking) {
             const locationToRestore = switchPrevLocation ?? fallbackSourceLocation;
             await this.inventoryTrackingService.update(switchPalletTracking.id, {
-              warehouse_sub_id: locationToRestore?.warehouse_sub_id ?? switchPalletTracking.warehouse_sub_id,
-              warehouse_bin_id: locationToRestore?.warehouse_bin_id ?? switchPalletTracking.warehouse_bin_id,
+              warehouse_sub_id:
+                locationToRestore?.warehouse_sub_id ?? switchPalletTracking.warehouse_sub_id,
+              warehouse_bin_id:
+                locationToRestore?.warehouse_bin_id ?? switchPalletTracking.warehouse_bin_id,
               warehouse_id: locationToRestore?.warehouse_id ?? switchPalletTracking.warehouse_id,
               inventory_status: 'IN_INVENTORY',
               inventory_note: locationToRestore
@@ -945,7 +1129,10 @@ export class TransactionScanPickingService {
           }
         } catch (error) {
           if (!(error instanceof NotFoundException)) {
-            console.error(`Failed to revert inventory tracking for switch pallet ${existing.pallet_switch_id}:`, error);
+            console.error(
+              `Failed to revert inventory tracking for switch pallet ${existing.pallet_switch_id}:`,
+              error,
+            );
           }
         }
       }
@@ -953,6 +1140,78 @@ export class TransactionScanPickingService {
       // Log error but don't fail the operation
       console.error('Error reverting inventory tracking for pallets:', error);
     }
+  }
+
+  private async resolveWeekNumberForStockLineRevert(
+    scan: ScanPickingTransaction,
+    transactionPicking: PickingTransaction,
+    itemId: string,
+    uom?: string,
+  ): Promise<number> {
+    const explicitWeek = scan.week_number ?? transactionPicking.week_number;
+    if (explicitWeek !== undefined && explicitWeek !== null) {
+      return explicitWeek;
+    }
+
+    const palletId = scan.pallet_use_id || scan.pallet_source_id;
+    if (!palletId) {
+      throw new BadRequestException(
+        `Cannot revert scan ${scan.id}: week_number is required when the same SKU can exist in multiple weeks`,
+      );
+    }
+
+    // Use pallet held quantity_picked as PENDING (switch is separate).
+    const quantityToUse = scan.quantity_picked || 0;
+    const palletLines = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
+    const sameSkuLines = palletLines.filter(
+      (line) =>
+        line.item_id === itemId &&
+        (!uom || !line.uom || line.uom === uom) &&
+        line.current_quantity > 0,
+    );
+
+    const pendingOutboundLines = sameSkuLines.filter(
+      (line) => line.status_inventory === StatusInventory.PENDING,
+    );
+
+    const matchByQty = (lines: typeof sameSkuLines): number | undefined => {
+      if (quantityToUse <= 0) {
+        return undefined;
+      }
+      const matches = lines.filter((line) => line.current_quantity === quantityToUse);
+      if (matches.length === 1 && matches[0].week_number != null) {
+        return matches[0].week_number;
+      }
+      return undefined;
+    };
+
+    const fromPendingQty = matchByQty(pendingOutboundLines);
+    if (fromPendingQty !== undefined) {
+      return fromPendingQty;
+    }
+
+    if (pendingOutboundLines.length === 1 && pendingOutboundLines[0].week_number != null) {
+      return pendingOutboundLines[0].week_number;
+    }
+
+    const fromAnyQty = matchByQty(sameSkuLines);
+    if (fromAnyQty !== undefined) {
+      return fromAnyQty;
+    }
+
+    if (sameSkuLines.length === 1 && sameSkuLines[0].week_number != null) {
+      return sameSkuLines[0].week_number;
+    }
+
+    const weekHint = sameSkuLines
+      .map((line) => `week ${line.week_number} qty=${line.current_quantity} (${line.status_inventory})`)
+      .join(', ');
+
+    throw new BadRequestException(
+      `Cannot revert scan ${scan.id}: same SKU on pallet has multiple week stock lines` +
+      (weekHint ? ` (${weekHint})` : '') +
+      `. Set week_number on the scan or transaction picking.`,
+    );
   }
 
   private async getPalletItemProductionDate(
@@ -978,8 +1237,18 @@ export class TransactionScanPickingService {
     }
   }
 
-  private async getPreviousInventoryLocation(
+  /**
+   * Find pallet location before scan picking moved it (e.g. put-away JT-08),
+   * not the older staging create row and not the current PICKED/destination row.
+   *
+   * Blind history[1] was wrong when history looks like:
+   *   [0] STG PICKED (scan)  or  [0] JT-08 overwritten PICKED
+   *   [1] JT-08 put away     or  [1] STG inspection  ← wrongly restored
+   *   [2] STG inspection
+   */
+  private async getLocationBeforeScanPicking(
     palletId?: string,
+    excludeWarehouseSubId?: string,
   ): Promise<{ warehouse_sub_id?: string; warehouse_bin_id?: string; warehouse_id?: string } | null> {
     if (!palletId) {
       return null;
@@ -987,21 +1256,83 @@ export class TransactionScanPickingService {
 
     try {
       const history = await this.inventoryTrackingService.findHistoryByPalletId(palletId);
-      if (!history || history.length < 2) {
+      if (!history || history.length === 0) {
         return null;
       }
 
-      const previousEntry = history[1];
-      return {
-        warehouse_sub_id: previousEntry.warehouse_sub_id,
-        warehouse_bin_id: previousEntry.warehouse_bin_id,
-        warehouse_id: previousEntry.warehouse_id,
+      const isScanPickingEntry = (entry: {
+        inventory_status?: string;
+        inventory_note?: string | null;
+        warehouse_sub_id?: string | null;
+      }): boolean => {
+        const note = (entry.inventory_note || '').toLowerCase();
+        if (entry.inventory_status === 'PICKED') {
+          return true;
+        }
+        if (note.includes('scan picking') || note.includes('reverted:')) {
+          return true;
+        }
+        if (
+          excludeWarehouseSubId &&
+          entry.warehouse_sub_id === excludeWarehouseSubId &&
+          (entry.inventory_status === 'PICKED' || note.includes('scan'))
+        ) {
+          return true;
+        }
+        return false;
       };
+
+      const toLocation = (entry: {
+        warehouse_sub_id?: string | null;
+        warehouse_bin_id?: string | null;
+        warehouse_id?: string | null;
+      }) => ({
+        warehouse_sub_id: entry.warehouse_sub_id ?? undefined,
+        warehouse_bin_id: entry.warehouse_bin_id ?? undefined,
+        warehouse_id: entry.warehouse_id ?? undefined,
+      });
+
+      // 1) Prefer latest IN_INVENTORY row that is not the scan destination/staging
+      for (const entry of history) {
+        if (isScanPickingEntry(entry)) {
+          continue;
+        }
+        if (entry.inventory_status !== 'IN_INVENTORY' || !entry.warehouse_sub_id) {
+          continue;
+        }
+        if (excludeWarehouseSubId && entry.warehouse_sub_id === excludeWarehouseSubId) {
+          continue;
+        }
+        return toLocation(entry);
+      }
+
+      // 2) Any non-scan row with a location different from destination
+      for (const entry of history) {
+        if (isScanPickingEntry(entry) || !entry.warehouse_sub_id) {
+          continue;
+        }
+        if (excludeWarehouseSubId && entry.warehouse_sub_id === excludeWarehouseSubId) {
+          continue;
+        }
+        return toLocation(entry);
+      }
+
+      // 3) Latest IN_INVENTORY even if same area (better than staying PICKED)
+      for (const entry of history) {
+        if (isScanPickingEntry(entry)) {
+          continue;
+        }
+        if (entry.inventory_status === 'IN_INVENTORY' && entry.warehouse_sub_id) {
+          return toLocation(entry);
+        }
+      }
+
+      return null;
     } catch (error) {
       if (error instanceof NotFoundException) {
         return null;
       }
-      console.error(`Failed to get previous inventory location for pallet ${palletId}:`, error);
+      console.error(`Failed to get pre-scan inventory location for pallet ${palletId}:`, error);
       return null;
     }
   }

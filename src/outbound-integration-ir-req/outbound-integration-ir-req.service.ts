@@ -16,6 +16,9 @@ import {
   OutboundJobProcessStatus,
   OutboundMemoCheckResult,
 } from '../outbound-do/integration/outbound-integration-queue.types';
+import { OutboundIntegrationIrReqPaginationQueryDto } from './dto/outbound-integration-ir-req-pagination.dto';
+import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { PaginationService } from '../core/services/pagination.service';
 
 export type OutboundIntegrationIrReqAggregateResult = {
   header: OutboundIntegrationIrReq;
@@ -33,6 +36,7 @@ export class OutboundIntegrationIrReqService {
     @Inject(forwardRef(() => PoInternalReqStatusCheckerService))
     private readonly statusChecker: PoInternalReqStatusCheckerService,
     private readonly outboundDoRepository: OutboundDoRepository,
+    private readonly paginationService: PaginationService,
   ) { }
 
   async createHeader(dto: CreateOutboundIntegrationIrReqDto): Promise<OutboundIntegrationIrReq> {
@@ -69,6 +73,20 @@ export class OutboundIntegrationIrReqService {
 
   async findAllHeaders(): Promise<OutboundIntegrationIrReqHeaderWithLines[]> {
     const headers = await this.repository.findAllHeaders();
+    return this.attachLinesToHeaders(headers);
+  }
+
+  async findAllHeadersPaginated(
+    query: OutboundIntegrationIrReqPaginationQueryDto,
+  ): Promise<PaginatedResponseDto<OutboundIntegrationIrReqHeaderWithLines>> {
+    const { data, total } = await this.repository.findAllHeadersPaginated(query);
+    const headersWithLines = await this.attachLinesToHeaders(data);
+    return this.paginationService.createPaginatedResponse(headersWithLines, query, total);
+  }
+
+  private async attachLinesToHeaders(
+    headers: OutboundIntegrationIrReq[],
+  ): Promise<OutboundIntegrationIrReqHeaderWithLines[]> {
     if (!headers.length) {
       return [];
     }

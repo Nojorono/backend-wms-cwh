@@ -18,6 +18,9 @@ import {
 } from './integration/sales-item-integration.service';
 import { MetaSalesItemDtoByBranch } from './dto/meta-sales-item-by-branch.dto';
 import { FindByBranchResponseDto } from './dto/find-by-branch-response.dto';
+import { ValidateItemQueryDto } from './dto/validate-item-query.dto';
+import { MetaItemListDtoByInventoryItemId } from './dto/meta-item-list-by-inventory-item-id.dto';
+import { MetaItemListItemDto } from './dto/meta-item-list-item.dto';
 
 @Injectable()
 export class MasterItemService {
@@ -102,6 +105,26 @@ export class MasterItemService {
     }
 
     return itemLists;
+  }
+
+  async findByOrgCodeAndInventoryItemId(
+    query: ValidateItemQueryDto,
+  ): Promise<MetaItemListItemDto[]> {
+    const dto: MetaItemListDtoByInventoryItemId = {
+      organization_code: query.organization_code,
+      inventory_item_id: query.inventory_item_id,
+    };
+    const response =
+      await this.itemListIntegrationService.findWhereOrgCodeAndInventoryItemId(dto);
+
+    const items = (response?.data || []) as unknown as MetaItemListItemDto[];
+    if (items.length === 0) {
+      throw new NotFoundException(
+        `Item not found for organization_code ${query.organization_code} and inventory_item_id ${query.inventory_item_id}`,
+      );
+    }
+
+    return items;
   }
 
   async findByBranch(org_code: string): Promise<FindByBranchResponseDto> {
