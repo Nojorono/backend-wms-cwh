@@ -26,6 +26,10 @@ import {
 } from '../core/domain/entities/transaction-pallet-history.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import {
+  InventoryTrackingAction,
+  InventoryTrackingHistory,
+} from '../core/domain/entities/inventory-tracking-history.entity';
 import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
 import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
 import { PaginationService } from '../core/services/pagination.service';
@@ -371,13 +375,48 @@ export class MasterPalletService {
       if (updatedPallet.currentQuantity === 0 && !skipEmptyPalletCleanup) {
         const inventoryTracking = await this.inventoryTrackingRepository.findOne({
           where: { pallet_id: palletId },
+          order: { createdAt: 'DESC' },
         });
         if (inventoryTracking) {
+          // Snapshot last known location into history BEFORE clearing sub/bin.
+          // Empty cleanup used to null location without history, so delete/revert
+          // of scan-picking could not restore PRELOAD/bin (stayed null).
+          const historyRepo = this.dataSource.getRepository(InventoryTrackingHistory);
+          if (inventoryTracking.warehouse_sub_id || inventoryTracking.warehouse_bin_id) {
+            await historyRepo.save(
+              historyRepo.create({
+                inventory_tracking_id: inventoryTracking.id,
+                pallet_id: palletId,
+                warehouse_id: inventoryTracking.warehouse_id,
+                warehouse_sub_id: inventoryTracking.warehouse_sub_id,
+                warehouse_bin_id: inventoryTracking.warehouse_bin_id,
+                inventory_date: new Date(),
+                inventory_status: inventoryTracking.inventory_status || 'IN_INVENTORY',
+                inventory_note: 'Last location before pallet emptied',
+                action: InventoryTrackingAction.UPDATED,
+              }),
+            );
+          }
+
           await this.inventoryTrackingRepository.update(inventoryTracking.id, {
             warehouse_sub_id: null as any,
             warehouse_bin_id: null as any,
             inventory_note: 'Pallet is empty',
           } as any);
+
+          await historyRepo.save(
+            historyRepo.create({
+              inventory_tracking_id: inventoryTracking.id,
+              pallet_id: palletId,
+              warehouse_id: inventoryTracking.warehouse_id,
+              warehouse_sub_id: null as any,
+              warehouse_bin_id: null as any,
+              inventory_date: new Date(),
+              inventory_status: inventoryTracking.inventory_status || 'IN_INVENTORY',
+              inventory_note: 'Pallet is empty',
+              action: InventoryTrackingAction.MOVED,
+            }),
+          );
         }
         await this.transactionHistoryRepository.softDelete({ pallet_id: palletId });
         await this.repository.update(palletId, {
