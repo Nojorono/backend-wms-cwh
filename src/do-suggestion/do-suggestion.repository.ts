@@ -338,6 +338,26 @@ export class DoSuggestionRepository {
   async findBySpbNumber(spbNumber: string): Promise<DoSuggestion | null> {
     return await this.headerRepository.findOne({
       where: { spb_number: spbNumber },
+      relations: [...DO_SUGGESTION_RELATIONS],
     });
+  }
+
+  async updateStatus(
+    id: string,
+    status: DoSuggestionStatus,
+    updatedBy?: string,
+  ): Promise<DoSuggestion> {
+    const existing = await this.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`DO suggestion with ID ${id} not found`);
+    }
+
+    const patch: Partial<DoSuggestion> = { status };
+    if (updatedBy !== undefined) {
+      patch.updated_by = updatedBy;
+    }
+
+    await this.headerRepository.update(id, patch);
+    return (await this.findById(id)) as DoSuggestion;
   }
 }
