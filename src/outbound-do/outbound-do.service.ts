@@ -1285,11 +1285,11 @@ export class OutboundDoService {
       status: keyof CreateOutboundIntegrationDeliveriesDto;
       message: keyof CreateOutboundIntegrationDeliveriesDto;
     }> = [
-      { status: 'create_delivery_status', message: 'create_delivery_message' },
-      { status: 'update_delivery_status', message: 'update_delivery_message' },
-      { status: 'pick_release_status', message: 'pick_release_message' },
-      { status: 'ship_confirm_status', message: 'ship_confirm_message' },
-    ];
+        { status: 'create_delivery_status', message: 'create_delivery_message' },
+        { status: 'update_delivery_status', message: 'update_delivery_message' },
+        { status: 'pick_release_status', message: 'pick_release_message' },
+        { status: 'ship_confirm_status', message: 'ship_confirm_message' },
+      ];
 
     for (const { status, message } of statusPairs) {
       const current = existing[status as keyof OutboundIntegrationDeliveries];
@@ -1541,14 +1541,22 @@ export class OutboundDoService {
     );
 
     return {
+      // delivery_attribute_category,
+      // delivery_attribute6: outboundDo.vendor_id,
+      // delivery_attribute7: outboundDo.driver_name,
+      // delivery_attribute8: outboundDo.license_plate,
+      // delivery_attribute9: outboundDo.seal_number,
+      // delivery_attribute10: outboundDo.truck_utilitas,
+      // delivery_attribute11: outboundDo.container_number,
+      // delivery_attribute12: outboundDo.vendor_po_number,
       delivery_attribute_category,
       delivery_attribute6: outboundDo.vendor_id,
       delivery_attribute7: outboundDo.driver_name,
       delivery_attribute8: outboundDo.license_plate,
       delivery_attribute9: outboundDo.seal_number,
-      delivery_attribute10: outboundDo.truck_utilitas,
-      delivery_attribute11: outboundDo.container_number,
-      delivery_attribute12: outboundDo.vendor_po_number,
+      delivery_attribute10: outboundDo.vendor_po_number,
+      delivery_attribute11: outboundDo.truck_utilitas,
+      delivery_attribute12: outboundDo.container_number,
       delivery_attribute13: outboundDo.delivery_date
         ? new Date(outboundDo.delivery_date).toISOString()
         : undefined,
