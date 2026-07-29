@@ -20,6 +20,7 @@ import {
   DoSuggestionFilterQueryDto,
 } from './dto/do-suggestion-filter-query.dto';
 import { CreateDoDmsDto } from './dto/create-do-dms.dto';
+import { VoidDoDmsDto } from './dto/void-do-dms.dto';
 import { DmsIntegrationAuth } from '../core/decorators/dms-integration-auth.decorator';
 
 @ApiTags('DO Suggestion')
@@ -75,7 +76,7 @@ export class DoSuggestionController {
   @ApiOperation({
     summary: 'Get DO suggestions by callplan date start and organization ID',
     description:
-      'Optional query: sales_spv_nik, status (DRAFT | REVISED | SUBMITTED | FINAL).',
+      'Optional query: sales_spv_nik, status (DRAFT | REVISED | SUBMITTED | FINAL | VOID).',
   })
   @ApiResponse({ status: 200, type: [DoSuggestion] })
   findByCallplanDateStart(
@@ -131,5 +132,21 @@ export class DoSuggestionController {
   @ApiResponse({ status: 401, description: 'Invalid DMS integration credentials or token' })
   createDoDms(@Body() dto: CreateDoDmsDto): Promise<DoSuggestion> {
     return this.doSuggestionService.createDoDms(dto);
+  }
+
+  @Post('dms/void')
+  @DmsIntegrationAuth()
+  @ApiOperation({
+    summary: 'Void DO suggestion by DMS (update status to VOID)',
+    description:
+      'Sets DO suggestion status to VOID by unique `spb_number`. ' +
+      'Auth option 1 (recommended): send headers `x-dms-app-id` and `x-dms-app-secret` from environment. ' +
+      'Auth option 2: send `Authorization: Bearer <token>` from POST /auth/dms/token.',
+  })
+  @ApiResponse({ status: 200, type: DoSuggestion })
+  @ApiResponse({ status: 401, description: 'Invalid DMS integration credentials or token' })
+  @ApiResponse({ status: 404, description: 'DO suggestion with given SPB number not found' })
+  voidDoDms(@Body() dto: VoidDoDmsDto): Promise<DoSuggestion> {
+    return this.doSuggestionService.voidDoDms(dto);
   }
 }

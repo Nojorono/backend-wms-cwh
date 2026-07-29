@@ -15,6 +15,7 @@ import {
   DoSuggestionRepository,
 } from './do-suggestion.repository';
 import { CreateDoDmsDto, DoDmsDetailDto } from './dto/create-do-dms.dto';
+import { VoidDoDmsDto } from './dto/void-do-dms.dto';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
 
 @Injectable()
@@ -549,5 +550,24 @@ export class DoSuggestionService {
     const payload = await this.mapDtoToCreateDataDoDms(dto);
     return await this.repository.create(payload);
 
+  }
+
+  async voidDoDms(dto: VoidDoDmsDto): Promise<DoSuggestion> {
+    const existing = await this.repository.findBySpbNumber(dto.spb_number);
+    if (!existing) {
+      throw new NotFoundException(
+        `DO suggestion with SPB number ${dto.spb_number} not found`,
+      );
+    }
+
+    if (existing.status === DoSuggestionStatus.VOID) {
+      return existing;
+    }
+
+    return await this.repository.updateStatus(
+      existing.id,
+      DoSuggestionStatus.VOID,
+      dto.updated_by,
+    );
   }
 }
