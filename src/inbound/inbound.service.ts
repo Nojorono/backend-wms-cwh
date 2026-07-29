@@ -699,14 +699,14 @@ export class InboundService {
           } else if (looksLikeMasterItemId) {
             throw new BadRequestException(
               `Invalid inbound_items[].id="${itemDto.id}". ` +
-                `This value matches item_id (master item), not inbound_item row id. ` +
-                `Send the inbound_item UUID from GET /inbound/:id, or omit id to create/update by item_id+uom on DO ${inboundDoId}.`,
+              `This value matches item_id (master item), not inbound_item row id. ` +
+              `Send the inbound_item UUID from GET /inbound/:id, or omit id to create/update by item_id+uom on DO ${inboundDoId}.`,
             );
           } else {
             throw new NotFoundException(
               `Inbound item id=${itemDto.id} was not found under inbound DO ${inboundDoId}. ` +
-                `Use inbound_item.id (row UUID), not master item_id. ` +
-                `Omit id to create a new line when item_id+quantity are provided.`,
+              `Use inbound_item.id (row UUID), not master item_id. ` +
+              `Omit id to create a new line when item_id+quantity are provided.`,
             );
           }
         }
@@ -846,6 +846,17 @@ export class InboundService {
 
     await this.inboundDoRepo.update(payload.inbound_do_id, {
       integration_status: targetStatus,
+    });
+
+    // find inbound by inbound_do_id
+    const inbound = await this.inboundRepo.findOne(payload.inbound_do_id);
+    if (!inbound) {
+      throw new NotFoundException('Inbound not found');
+    }
+
+    // i need update inbound status INSPECTION
+    await this.inboundRepo.update(inbound.id, {
+      status: InboundStatus.INSPECTION,
     });
 
     return updateSaldo;
