@@ -8,6 +8,7 @@ import { UpdateInboundIntegrationDto } from './dto/update-inbound-integration.dt
 import { CreateInboundIntegrationLineDto } from './dto/create-inbound-integration-line.dto';
 import { UpdateInboundIntegrationLineDto } from './dto/update-inbound-integration-line.dto';
 import { InboundIntegrationPaginationQueryDto } from './dto/inbound-integration-pagination.dto';
+import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 
 @Injectable()
 export class InboundIntegrationRepository {
@@ -145,12 +146,22 @@ export class InboundIntegrationRepository {
       return 0;
     }
     const result = await this.inboundIntegrationRepo
-      .createQueryBuilder()
+      .createQueryBuilder('h')
       .softDelete()
-      .where('inbound_id = :inboundId', { inboundId })
-      .andWhere('(inbound_do_id IS NULL OR inbound_do_id NOT IN (:...activeDoIds))', {
+      .where('h.inbound_id = :inboundId', { inboundId })
+      .andWhere('(h.inbound_do_id IS NULL OR h.inbound_do_id NOT IN (:...activeDoIds))', {
         activeDoIds,
       })
+      // Never prune staging rows tied to a cancelled inbound DO (audit/history).
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM inbound_do d
+          WHERE d.id = h.inbound_do_id
+            AND d.integration_status = :cancelledStatus
+            AND d.deleted_at IS NULL
+        )`,
+        { cancelledStatus: IntegrationStatus.CANCELLED },
+      )
       .execute();
     return result.affected ?? 0;
   }
