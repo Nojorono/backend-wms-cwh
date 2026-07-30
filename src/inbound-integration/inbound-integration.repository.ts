@@ -145,18 +145,19 @@ export class InboundIntegrationRepository {
     if (!activeDoIds.length) {
       return 0;
     }
+    // softDelete() generates UPDATE without a FROM alias — use bare column names on
+    // inbound_integration and quote "inbound_do" so TypeORM does not mangle it to inbound_do_id.
     const result = await this.inboundIntegrationRepo
-      .createQueryBuilder('h')
+      .createQueryBuilder()
       .softDelete()
-      .where('h.inbound_id = :inboundId', { inboundId })
-      .andWhere('(h.inbound_do_id IS NULL OR h.inbound_do_id NOT IN (:...activeDoIds))', {
+      .where('inbound_id = :inboundId', { inboundId })
+      .andWhere('(inbound_do_id IS NULL OR inbound_do_id NOT IN (:...activeDoIds))', {
         activeDoIds,
       })
-      // Never prune staging rows tied to a cancelled inbound DO (audit/history).
       .andWhere(
         `NOT EXISTS (
-          SELECT 1 FROM inbound_do d
-          WHERE d.id = h.inbound_do_id
+          SELECT 1 FROM "inbound_do" d
+          WHERE d.id = "inbound_integration"."inbound_do_id"
             AND d.integration_status = :cancelledStatus
             AND d.deleted_at IS NULL
         )`,
