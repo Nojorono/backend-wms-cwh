@@ -848,16 +848,16 @@ export class InboundService {
       integration_status: targetStatus,
     });
 
-    // find inbound by inbound_do_id
-    const inbound = await this.inboundRepo.findOne(payload.inbound_do_id);
-    if (!inbound) {
-      throw new NotFoundException('Inbound not found');
-    }
+    // // find inbound by inbound_do_id
+    // const inboundDo = await this.inboundDoRepo.findOne(payload.inbound_do_id);
+    // if (!inboundDo) {
+    //   throw new NotFoundException('Inbound not found');
+    // }
 
-    // i need update inbound status INSPECTION
-    await this.inboundRepo.update(inbound.id, {
-      status: InboundStatus.INSPECTION,
-    });
+    // // i need update inbound status INSPECTION
+    // await this.inboundRepo.update(inboundDo.inbound_id, {
+    //   status: InboundStatus.INSPECTION,
+    // });
 
     return updateSaldo;
   }
