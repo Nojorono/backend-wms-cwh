@@ -902,6 +902,8 @@ export class InboundService {
       }
 
       const dataIntegration = await this.inboundMappingIntegrationService.build(inbound);
+      console.log('dataIntegration', dataIntegration);
+      console.log('inbound', inbound);
       await this.createInboundIntegrationRecords(dataIntegration);
       const inbound_integrations =
         await this.inboundIntegrationService.findAllByInboundActiveDos(id);
