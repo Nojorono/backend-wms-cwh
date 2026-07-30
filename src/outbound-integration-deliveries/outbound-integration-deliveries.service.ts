@@ -70,7 +70,10 @@ export class OutboundIntegrationDeliveriesService {
 
   /**
    * Poll Oracle for an outbound DO, filtered by transaction_type.
-   * shipconfirm.find uses source_header_id (= memo id) + transaction_type per memo group.
+   * Uses the same find process as the background worker:
+   *  - PICK_RELEASE → per-row find by source_line_id
+   *  - SHIP_CONFIRM → per-row find by delivery_id
+   *  - MUTASI → header-level find by source_header_id + iso_header_id
    */
   async pollStatusByOutboundDoId(
     outboundDoId: string,
@@ -100,7 +103,12 @@ export class OutboundIntegrationDeliveriesService {
       query.transaction_type,
     ]);
 
-    return this.buildPollStatusResponse(outboundDoId, result, refreshed);
+    return this.buildPollStatusResponse(
+      outboundDoId,
+      result,
+      refreshed,
+      query.transaction_type,
+    );
   }
 
   private buildPollStatusResponse(
@@ -112,6 +120,7 @@ export class OutboundIntegrationDeliveriesService {
       hasError: boolean;
     },
     deliveries: OutboundIntegrationDeliveries[],
+    transactionType: ShipConfirmInternalTransactionType,
   ): PollShipConfirmStatusResponseDto {
     return {
       status: result.status,
@@ -120,6 +129,7 @@ export class OutboundIntegrationDeliveriesService {
       deliveries_updated: result.deliveriesUpdated,
       has_error: result.hasError,
       source_headers: this.buildSourceHeaderSummaries(deliveries),
+      find_keys: this.buildFindKeySummaries(deliveries, transactionType),
       outbound_integration_deliveries: deliveries,
     };
   }
@@ -149,6 +159,119 @@ export class OutboundIntegrationDeliveriesService {
         delivery_count: rows.length,
       };
     });
+  }
+
+  /**
+   * Mirror the find process keys used by ShipConfirmStatusCheckerService:
+   *  - PICK_RELEASE → source_line_id
+   *  - SHIP_CONFIRM → delivery_id
+   *  - MUTASI → source_header_id (+ iso_header_id)
+   */
+  private buildFindKeySummaries(
+    deliveries: OutboundIntegrationDeliveries[],
+    transactionType: ShipConfirmInternalTransactionType,
+  ): PollShipConfirmStatusResponseDto['find_keys'] {
+    return deliveries.map((delivery) => {
+      const sourceHeaderId =
+        delivery.outbound_memo_id?.trim() || delivery.source_header_id?.trim() || undefined;
+      const sourceLineId =
+        delivery.source_line_id?.trim() || delivery.outbound_memo_item_id?.trim() || undefined;
+      const deliveryId =
+        delivery.delivery_id != null ? String(delivery.delivery_id) : undefined;
+      const isoHeaderId =
+        delivery.iso_header_id != null ? Number(delivery.iso_header_id) : undefined;
+
+      const rowStatus = this.deriveProcessStatusForDeliveries([delivery]);
+
+      if (
+        transactionType ===
+        ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE
+      ) {
+        if (!sourceLineId) {
+          return {
+            delivery_row_id: delivery.id,
+            source_header_id: sourceHeaderId,
+            source_line_id: undefined,
+            iso_header_id: isoHeaderId,
+            status: 'SKIPPED' as const,
+            reason: 'Missing source_line_id — shipconfirm.find skipped for this row',
+          };
+        }
+        if (isoHeaderId == null) {
+          return {
+            delivery_row_id: delivery.id,
+            source_header_id: sourceHeaderId,
+            source_line_id: sourceLineId,
+            iso_header_id: undefined,
+            status: 'SKIPPED' as const,
+            reason: 'Missing iso_header_id — shipconfirm.find skipped for this row',
+          };
+        }
+        return {
+          delivery_row_id: delivery.id,
+          source_header_id: sourceHeaderId,
+          source_line_id: sourceLineId,
+          iso_header_id: isoHeaderId,
+          status: rowStatus,
+          reason: this.buildFindKeyReason(rowStatus, 'source_line_id', sourceLineId),
+        };
+      }
+
+      if (
+        transactionType ===
+        ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM
+      ) {
+        if (!deliveryId) {
+          return {
+            delivery_row_id: delivery.id,
+            source_header_id: sourceHeaderId,
+            delivery_id: undefined,
+            status: 'SKIPPED' as const,
+            reason:
+              'Missing delivery_id — shipconfirm.find skipped until pick-release populates it',
+          };
+        }
+        return {
+          delivery_row_id: delivery.id,
+          source_header_id: sourceHeaderId,
+          delivery_id: deliveryId,
+          status: rowStatus,
+          reason: this.buildFindKeyReason(rowStatus, 'delivery_id', deliveryId),
+        };
+      }
+
+      // MUTASI / default — header-level find
+      if (!sourceHeaderId || isoHeaderId == null) {
+        return {
+          delivery_row_id: delivery.id,
+          source_header_id: sourceHeaderId,
+          iso_header_id: isoHeaderId,
+          status: 'SKIPPED' as const,
+          reason: 'Missing source_header_id or iso_header_id — shipconfirm.find skipped',
+        };
+      }
+      return {
+        delivery_row_id: delivery.id,
+        source_header_id: sourceHeaderId,
+        iso_header_id: isoHeaderId,
+        status: rowStatus,
+        reason: this.buildFindKeyReason(rowStatus, 'source_header_id', sourceHeaderId),
+      };
+    });
+  }
+
+  private buildFindKeyReason(
+    status: OutboundJobProcessStatus,
+    keyName: string,
+    keyValue: string,
+  ): string {
+    if (status === 'PENDING') {
+      return `Find by ${keyName}=${keyValue}: still non-terminal Oracle status`;
+    }
+    if (status === 'ERROR') {
+      return `Find by ${keyName}=${keyValue}: terminal with at least one E`;
+    }
+    return `Find by ${keyName}=${keyValue}: all required Oracle statuses terminal (S)`;
   }
 
   private deriveProcessStatusForDeliveries(
