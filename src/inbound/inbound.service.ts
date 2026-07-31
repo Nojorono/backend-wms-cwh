@@ -726,6 +726,14 @@ export class InboundService {
         if (itemDto.uom !== undefined) itemUpdate.uom = itemDto.uom;
         if (itemDto.line_number !== undefined) itemUpdate.line_number = itemDto.line_number;
 
+        // If an approved line is edited, mark inspection as EDITED.
+        if (
+          Object.keys(itemUpdate).length > 0 &&
+          matched.inspection_status === InspectionStatus.APPROVED
+        ) {
+          itemUpdate.inspection_status = InspectionStatus.EDITED;
+        }
+
         if (Object.keys(itemUpdate).length > 0) {
           await this.inboundItemRepo.update(matched.id, itemUpdate);
         }

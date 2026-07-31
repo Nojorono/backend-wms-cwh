@@ -8,6 +8,7 @@ export enum InspectionStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  EDITED = 'EDITED',
 }
 
 @Entity('inbound_item')
