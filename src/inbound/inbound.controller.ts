@@ -233,6 +233,7 @@ export class InboundController {
   }
 
   // integration to oracle by inbound id
+  // need tracing for this endpoint with issue still include inbound_do that is cancelled
   @Post('integration-to-oracle/:id')
   @ApiOperation({ summary: 'Integration to oracle by inbound id' })
   @ApiResponse({ status: 200, type: Inbound })

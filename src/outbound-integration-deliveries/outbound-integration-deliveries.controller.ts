@@ -44,8 +44,13 @@ export class OutboundIntegrationDeliveriesController {
   @ApiOperation({
     summary: 'Poll Oracle ship confirm / pick release status by outbound DO',
     description:
-      'Loads outbound_integration_deliveries for the outbound DO and transaction_type, ' +
-      'then calls shipconfirm.find per memo with source_header_id (= memo id) + transaction_type.',
+      'Loads outbound_integration_deliveries for the outbound DO and transaction_type, then runs the same ' +
+      'shipconfirm.find process as the background worker:\n' +
+      '- OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE → one find per delivery row using source_line_id ' +
+      '(+ source_header_id / memo id + iso_header_id)\n' +
+      '- OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM → one find per delivery row using source_header_id + delivery_id only (no iso_header_id)\n' +
+      '- OUTBOUND_GS_MUTASI_SO_INTERNAL → header-level find using source_header_id + iso_header_id\n' +
+      'Each find result updates only the matching outbound_integration_deliveries row.',
   })
   @ApiResponse({ status: 200, type: PollShipConfirmStatusResponseDto })
   @ApiResponse({

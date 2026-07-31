@@ -182,6 +182,13 @@ export class ShipConfirmStatusCheckerService {
 
   /**
    * Poll Oracle with required source_header_id (memo id) + transaction_type, then sync staging rows.
+   *
+   * Find keys differ per transaction type:
+   *  - PICK_RELEASE  → find per staging row using its `source_line_id` (+ source_header_id + iso_header_id)
+   *  - SHIP_CONFIRM  → find per staging row using source_header_id + delivery_id only (no iso_header_id)
+   *  - MUTASI (default) → header-level find using source_header_id + iso_header_id
+   *
+   * PICK_RELEASE / SHIP_CONFIRM update only the specific staging row they targeted.
    */
   async findAndSyncBySourceHeader(input: {
     sourceHeaderId: string;
@@ -190,16 +197,24 @@ export class ShipConfirmStatusCheckerService {
     matchPool?: OutboundIntegrationDeliveries[];
   }): Promise<number> {
     const matchPool = input.matchPool ?? input.scopeDeliveries;
+
+    if (
+      input.transactionType ===
+        ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE ||
+      input.transactionType ===
+        ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM
+    ) {
+      return this.findAndSyncPerDelivery(input, matchPool);
+    }
+
+    // Default (Mutasi SO Internal): header-level find + sync.
     const isoHeaderId = this.resolveIsoHeaderIdForFind(
       matchPool,
       input.sourceHeaderId,
       input.scopeDeliveries[0],
     );
 
-    const requiresIsoHeaderId =
-      input.transactionType !== ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM;
-
-    if (requiresIsoHeaderId && isoHeaderId == null) {
+    if (isoHeaderId == null) {
       this.logger.warn(
         `Skip shipconfirm.find; missing iso_header_id sourceHeaderId=${input.sourceHeaderId} transactionType=${input.transactionType}`,
       );
@@ -217,7 +232,118 @@ export class ShipConfirmStatusCheckerService {
     );
 
     const response = await this.shipConfirmIntegrationService.find(findPayload);
+    return this.processFindResponse(
+      response,
+      input.scopeDeliveries,
+      matchPool,
+      input.transactionType,
+      input.sourceHeaderId,
+    );
+  }
 
+  /**
+   * PICK_RELEASE / SHIP_CONFIRM fan-out: one Oracle find per staging row keyed by
+   * `source_line_id` (pick release) or `delivery_id` (ship confirm). Each find result
+   * is synced back to that single, specific outbound_integration_deliveries row.
+   */
+  private async findAndSyncPerDelivery(
+    input: {
+      sourceHeaderId: string;
+      transactionType: ShipConfirmInternalTransactionType;
+      scopeDeliveries: OutboundIntegrationDeliveries[];
+      matchPool?: OutboundIntegrationDeliveries[];
+    },
+    matchPool: OutboundIntegrationDeliveries[],
+  ): Promise<number> {
+    const isPickRelease =
+      input.transactionType ===
+      ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE;
+
+    let updated = 0;
+
+    for (const delivery of input.scopeDeliveries) {
+      const sourceHeaderId =
+        this.resolveMemoSourceHeaderId(delivery) ?? input.sourceHeaderId;
+
+      const sourceLineId = isPickRelease
+        ? this.asString(delivery.source_line_id) ??
+          this.asString(delivery.outbound_memo_item_id)
+        : undefined;
+      const deliveryId =
+        !isPickRelease && delivery.delivery_id != null
+          ? String(delivery.delivery_id)
+          : undefined;
+
+      if (isPickRelease && !sourceLineId) {
+        this.logger.warn(
+          `Skip shipconfirm.find PICK_RELEASE; missing source_line_id deliveryRowId=${delivery.id} sourceHeaderId=${sourceHeaderId}`,
+        );
+        continue;
+      }
+
+      if (!isPickRelease && !deliveryId) {
+        // delivery_id is populated during pick release/create; keep polling until it exists.
+        this.logger.warn(
+          `Skip shipconfirm.find SHIP_CONFIRM; missing delivery_id deliveryRowId=${delivery.id} sourceHeaderId=${sourceHeaderId}`,
+        );
+        continue;
+      }
+
+      // iso_header_id is required for PICK_RELEASE only.
+      // SHIP_CONFIRM find uses only source_header_id + delivery_id (no iso_header_id).
+      let isoHeaderId: number | null = null;
+      if (isPickRelease) {
+        isoHeaderId = this.resolveIsoHeaderIdForFind(matchPool, sourceHeaderId, delivery);
+        if (isoHeaderId == null) {
+          this.logger.warn(
+            `Skip shipconfirm.find PICK_RELEASE; missing iso_header_id deliveryRowId=${delivery.id} sourceHeaderId=${sourceHeaderId}`,
+          );
+          continue;
+        }
+      }
+
+      const findPayload = this.buildShipConfirmFindPayload(
+        sourceHeaderId,
+        input.transactionType,
+        isoHeaderId,
+        { sourceLineId, deliveryId },
+      );
+
+      this.logger.log(
+        `shipconfirm.find source_header_id=${findPayload.source_header_id} transaction_type=${findPayload.transaction_type} ` +
+          `iso_header_id=${findPayload.iso_header_id ?? 'N/A'} source_line_id=${findPayload.source_line_id ?? 'N/A'} delivery_id=${findPayload.delivery_id ?? 'N/A'} deliveryRowId=${delivery.id}`,
+      );
+
+      try {
+        const response = await this.shipConfirmIntegrationService.find(findPayload);
+        updated += await this.processFindResponse(
+          response,
+          [delivery],
+          matchPool,
+          input.transactionType,
+          sourceHeaderId,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `shipconfirm.find failed deliveryRowId=${delivery.id} sourceHeaderId=${sourceHeaderId} transactionType=${input.transactionType}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * Shared handling of a shipconfirm.find response for a given delivery scope:
+   * explicit failure → mark error; otherwise sync rows; empty + terminal message → mark error.
+   */
+  private async processFindResponse(
+    response: ShipConfirmInternalResponseDto,
+    scopeDeliveries: OutboundIntegrationDeliveries[],
+    matchPool: OutboundIntegrationDeliveries[],
+    transactionType: ShipConfirmInternalTransactionType,
+    sourceHeaderId: string,
+  ): Promise<number> {
     const responseObj = response as Record<string, unknown>;
     const successFlag = this.asBooleanFlag(responseObj.status);
     const responseMessage = this.firstNonEmptyString(
@@ -231,27 +357,23 @@ export class ShipConfirmStatusCheckerService {
     if (successFlag === false) {
       const reason =
         responseMessage ||
-        `shipconfirm.find returned status=false for sourceHeaderId=${input.sourceHeaderId}`;
+        `shipconfirm.find returned status=false for sourceHeaderId=${sourceHeaderId}`;
       this.logger.warn(reason);
-      await this.markScopeDeliveriesError(input.scopeDeliveries, input.transactionType, reason);
-      return input.scopeDeliveries.length;
+      await this.markScopeDeliveriesError(scopeDeliveries, transactionType, reason);
+      return scopeDeliveries.length;
     }
 
     const updated = await this.syncDeliveriesFromOracleResponse(
-      input.scopeDeliveries,
+      scopeDeliveries,
       response,
       matchPool,
-      input.transactionType,
+      transactionType,
     );
 
     // Find succeeded but no rows matched/extracted — keep polling (PENDING) unless message is terminal.
     if (updated === 0 && responseMessage && this.isTerminalFailureMessage(responseMessage)) {
-      await this.markScopeDeliveriesError(
-        input.scopeDeliveries,
-        input.transactionType,
-        responseMessage,
-      );
-      return input.scopeDeliveries.length;
+      await this.markScopeDeliveriesError(scopeDeliveries, transactionType, responseMessage);
+      return scopeDeliveries.length;
     }
 
     return updated;
@@ -357,12 +479,42 @@ export class ShipConfirmStatusCheckerService {
     sourceHeaderId: string,
     transactionType: ShipConfirmInternalTransactionType,
     isoHeaderId: number | null,
+    extra?: { sourceLineId?: string; deliveryId?: string },
   ): ShipConfirmInternalFindDto {
-    return {
+    const payload: ShipConfirmInternalFindDto = {
       source_header_id: sourceHeaderId,
       transaction_type: transactionType,
-      ...(isoHeaderId != null ? { iso_header_id: isoHeaderId } : {}),
     };
+
+    // PICK_RELEASE / MUTASI may include iso_header_id.
+    // SHIP_CONFIRM never sends iso_header_id — only source_header_id + delivery_id.
+    if (
+      transactionType !==
+        ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM &&
+      isoHeaderId != null
+    ) {
+      payload.iso_header_id = isoHeaderId;
+    }
+
+    // PICK_RELEASE narrows the find to a single source line.
+    if (
+      transactionType ===
+        ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_PICK_RELEASE &&
+      extra?.sourceLineId
+    ) {
+      payload.source_line_id = extra.sourceLineId;
+    }
+
+    // SHIP_CONFIRM narrows the find to a specific delivery.
+    if (
+      transactionType ===
+        ShipConfirmInternalTransactionType.OUTBOUND_GS_SO_SUBDIST_SHIP_CONFIRM &&
+      extra?.deliveryId
+    ) {
+      payload.delivery_id = extra.deliveryId;
+    }
+
+    return payload;
   }
 
   async syncDeliveriesFromCreateResponse(

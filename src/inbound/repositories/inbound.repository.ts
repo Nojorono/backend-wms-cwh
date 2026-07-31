@@ -132,7 +132,7 @@ export class InboundRepository {
 
   /**
    * Finds one inbound by id where at least one DO has integration_status READY or FAILED.
-   * Loads full inbound relations, then service can decide which DOs to process.
+   * Loads inbound relations excluding inbound_dos with integration_status CANCELLED.
    */
   async findOneForIntegration(id: string): Promise<Inbound | null> {
     const qb = this.repository.createQueryBuilder('inbound');
@@ -144,13 +144,19 @@ export class InboundRepository {
         .from('inbound_do', 'd')
         .where('d.inbound_id = inbound.id')
         .andWhere('d.integration_status IN (:...statuses)')
+        .andWhere('d.deleted_at IS NULL')
         .getQuery();
       return `EXISTS ${sq}`;
     })
-      .setParameter('statuses', [IntegrationStatus.READY, IntegrationStatus.FAILED]);
+      .setParameter('statuses', [IntegrationStatus.READY, IntegrationStatus.FAILED])
+      .setParameter('cancelledDoStatus', IntegrationStatus.CANCELLED);
 
     const entity = await qb
-      .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect(
+        'inbound.inbound_dos',
+        'inbound_dos',
+        'inbound_dos.integration_status IS DISTINCT FROM :cancelledDoStatus',
+      )
       .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(

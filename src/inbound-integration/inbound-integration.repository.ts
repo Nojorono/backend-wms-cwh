@@ -8,6 +8,7 @@ import { UpdateInboundIntegrationDto } from './dto/update-inbound-integration.dt
 import { CreateInboundIntegrationLineDto } from './dto/create-inbound-integration-line.dto';
 import { UpdateInboundIntegrationLineDto } from './dto/update-inbound-integration-line.dto';
 import { InboundIntegrationPaginationQueryDto } from './dto/inbound-integration-pagination.dto';
+import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 
 @Injectable()
 export class InboundIntegrationRepository {
@@ -144,6 +145,8 @@ export class InboundIntegrationRepository {
     if (!activeDoIds.length) {
       return 0;
     }
+    // softDelete() generates UPDATE without a FROM alias — use bare column names on
+    // inbound_integration and quote "inbound_do" so TypeORM does not mangle it to inbound_do_id.
     const result = await this.inboundIntegrationRepo
       .createQueryBuilder()
       .softDelete()
@@ -151,6 +154,15 @@ export class InboundIntegrationRepository {
       .andWhere('(inbound_do_id IS NULL OR inbound_do_id NOT IN (:...activeDoIds))', {
         activeDoIds,
       })
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM "inbound_do" d
+          WHERE d.id = "inbound_integration"."inbound_do_id"
+            AND d.integration_status = :cancelledStatus
+            AND d.deleted_at IS NULL
+        )`,
+        { cancelledStatus: IntegrationStatus.CANCELLED },
+      )
       .execute();
     return result.affected ?? 0;
   }
