@@ -20,7 +20,7 @@ export class InboundIntegrationController {
   constructor(
     private readonly service: InboundIntegrationService,
     private readonly pollService: InboundIntegrationPollService,
-  ) {}
+  ) { }
   @Post()
   @ApiOperation({ summary: 'Create inbound integration header with optional lines' })
   @ApiResponse({ status: 201 })
