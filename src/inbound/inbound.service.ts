@@ -1406,6 +1406,12 @@ export class InboundService {
     const updated = await this.inboundDoRepo.update(id, {
       integration_status: IntegrationStatus.CANCELLED,
     });
+
+    const inboundItems = await this.inboundItemRepo.findAllByInboundDo(id);
+    for (const item of inboundItems) {
+      await this.inboundItemRepo.update(item.id, { inspection_status: InspectionStatus.REJECTED });
+    }
+
     if (!updated) {
       throw new NotFoundException('Inbound DO not found');
     }
