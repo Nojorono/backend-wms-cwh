@@ -17,6 +17,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InboundStatus } from '../../core/domain/entities/inbound.entity';
+import { InspectionStatus } from 'src/core/domain/entities/inbound-item.entity';
 
 export class CreateInboundItemDto {
   @ApiPropertyOptional({ example: 'uuid-inbound-123' })
@@ -57,6 +58,11 @@ export class CreateInboundItemDto {
   @IsNumber({}, { message: 'line_number must be a number' })
   @IsPositive({ message: 'line_number must be a positive number' })
   line_number?: number;
+
+  @ApiPropertyOptional({ example: 'EDITED' })
+  @IsOptional()
+  @IsEnum(InspectionStatus, { message: 'inspection_status must be a valid InspectionStatus' })
+  inspection_status?: InspectionStatus;
 }
 
 export class CreateInboundDoDto {

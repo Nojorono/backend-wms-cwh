@@ -7,6 +7,8 @@ import { MasterWarehouse } from './master-warehouse.entity';
 export enum InspectionStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  EDITED = 'EDITED',
 }
 
 @Entity('inbound_item')
