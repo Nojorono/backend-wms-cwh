@@ -56,6 +56,7 @@ import { ScheduledCallPlanModule } from './scheduled-task/scheduled-call-plan/sc
 import { ScheduledOnHandAtrModule } from './scheduled-task/scheduled-on-hand-atr/scheduled-on-hand-atr.module';
 import { ScheduledSpbSubmittedModule } from './scheduled-task/scheduled-spb-submitted/scheduled-spb-submitted.module';
 import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
+import { BtbModule } from './btb/btb.module';
 import { OutboundSalesModule } from './outbound-sales/outbound-sales.module';
 import { MoveOrderIntegrationModule } from './move-order-integration/move-order-integration.module';
 import { WmsAssistantModule } from './wms-assistant/wms-assistant.module';
@@ -124,6 +125,7 @@ import { CommonModule } from './common/common.module';
     ScheduledOnHandAtrModule,
     ScheduledSpbSubmittedModule,
     DoSuggestionModule,
+    BtbModule,
     OutboundSalesModule,
     MoveOrderIntegrationModule,
     WmsAssistantModule,
