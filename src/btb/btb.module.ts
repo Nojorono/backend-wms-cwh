@@ -6,11 +6,12 @@ import { PaginationModule } from '../core/modules/pagination.module';
 import { BtbController } from './btb.controller';
 import { BtbService } from './btb.service';
 import { BtbRepository } from './btb.repository';
+import { DoSuggestionModule } from 'src/do-suggestion/do-suggestion.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Btb, BtbDetails]), PaginationModule],
+  imports: [TypeOrmModule.forFeature([Btb, BtbDetails]), PaginationModule, DoSuggestionModule],
   controllers: [BtbController],
   providers: [BtbService, BtbRepository],
   exports: [BtbService, BtbRepository],
 })
-export class BtbModule {}
+export class BtbModule { }

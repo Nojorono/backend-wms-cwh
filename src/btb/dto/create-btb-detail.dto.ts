@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -35,7 +36,7 @@ export class CreateBtbDetailDto {
 
   @ApiProperty({ example: 10 })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @IsNotEmpty()
   btb_qty: number;
 

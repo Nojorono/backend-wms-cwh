@@ -11,7 +11,7 @@ import { BtbPaginationQueryDto } from './dto/btb-pagination.dto';
 @ApiBearerAuth('JWT-auth')
 @Controller('btb')
 export class BtbController {
-  constructor(private readonly service: BtbService) {}
+  constructor(private readonly service: BtbService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create BTB header with optional detail lines' })
@@ -71,5 +71,13 @@ export class BtbController {
     @Param('detailId') detailId: string,
   ): Promise<{ success: boolean; message: string }> {
     return this.service.removeDetail(id, detailId);
+  }
+
+  // create dummy data JAT for btb table from do suggestion table where organization_id = 'db72a8e1-0ca6-4353-b157-9b798f703179'
+  @Post('create-dummy-data-jat')
+  @ApiOperation({ summary: 'Create dummy data JAT for btb table from do suggestion table' })
+  @ApiResponse({ status: 200 })
+  createDummyDataJat(): Promise<{ success: boolean; message: string }> {
+    return this.service.createDummyDataJat();
   }
 }
