@@ -23,7 +23,7 @@ export class BtbDetails extends BaseEntity {
   @Column({ name: 'item_name', type: 'varchar', length: 255, nullable: true })
   item_name: string;
 
-  @Column({ name: 'btb_qty', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  @Column({ name: 'btb_qty', type: 'int', nullable: true })
   btb_qty: number;
 
   @Column({ name: 'btb_uom', type: 'varchar', length: 50, nullable: true })

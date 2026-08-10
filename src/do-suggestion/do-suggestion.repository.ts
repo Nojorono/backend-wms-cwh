@@ -360,4 +360,11 @@ export class DoSuggestionRepository {
     await this.headerRepository.update(id, patch);
     return (await this.findById(id)) as DoSuggestion;
   }
+
+  async findByOrganizationId(organizationId: string): Promise<DoSuggestion[]> {
+    return await this.headerRepository.find({
+      where: { organization_id: organizationId },
+      relations: [...DO_SUGGESTION_RELATIONS],
+    });
+  }
 }
