@@ -49,6 +49,40 @@ export class InventoryLocatorParamsDto {
 
 /** Oracle inventory locator row (`get_inv_locator`). */
 export class InventoryLocatorItemDto {
+  @ApiPropertyOptional({ example: 111 })
+  ORGANIZATION_ID?: number;
+
+  @ApiPropertyOptional({ example: 'JAKARTA TIMUR' })
+  NAME?: string;
+
+  @ApiPropertyOptional({ example: 'JAT', name: 'Org Code' })
+  'Org Code'?: string;
+
+  @ApiPropertyOptional({ example: 'JAKARTA TIMUR', name: 'Organization Name' })
+  'Organization Name'?: string;
+
+  @ApiPropertyOptional({ example: 'CANVAS' })
+  Subinventory?: string;
+
+  @ApiPropertyOptional({
+    example: 'On Hand Salesman / Stock Unit',
+    name: 'Subinventory Description',
+  })
+  'Subinventory Description'?: string;
+
+  @ApiPropertyOptional({ example: 16081 })
+  locator_id?: number;
+
+  @ApiPropertyOptional({ example: 'GIT' })
+  Locator?: string;
+
+  @ApiPropertyOptional({ example: 'GOOD IN TRANSIT', name: 'Locator Description' })
+  'Locator Description'?: string;
+
+  @ApiPropertyOptional({ example: 'Prespecified', name: 'Locator Control Type' })
+  'Locator Control Type'?: string;
+
+  /** Legacy uppercase aliases from other Oracle integrations. */
   @ApiPropertyOptional({ example: 'GOOD-RK-1' })
   SUBINVENTORY_CODE?: string;
 
@@ -63,9 +97,6 @@ export class InventoryLocatorItemDto {
 
   @ApiPropertyOptional({ example: 'CWH' })
   ORGANIZATION_CODE?: string;
-
-  @ApiPropertyOptional({ example: 111 })
-  ORGANIZATION_ID?: number;
 }
 
 export class InventoryLocatorResponseDto {

@@ -91,6 +91,7 @@ export class DoSuggestionService {
   async integrateMoveOrderGIT(id: string): Promise<{ success: boolean; message: string }> {
     const suggestion = await this.findOne(id);
     const payload = await this.mapDoSuggestionToMoveOrderIntegrationPayloadGIT(suggestion);
+    console.log('payload', payload);
     const queued = await this.moveOrderIntegrationService.createAndIntegrate(payload);
 
     return {
@@ -607,14 +608,36 @@ export class DoSuggestionService {
       );
     }
 
-    const toLocator = Number(response.data?.find(
-      (row) => row.LOCATOR_ID != null,
-    )?.LOCATOR_ID);
+    const toLocator = this.pickInventoryLocatorId(response.data);
+
+    if (toLocator == null) {
+      throw new BadRequestException(
+        `To locator not found for organization_code=${suggestion.organization?.organization_name?.trim()}, subinventory_code=CANVAS, locator=GIT`,
+      );
+    }
 
     return {
       from_locator_id: fromLocator,
       to_locator_id: toLocator,
     };
+  }
+
+  private pickInventoryLocatorId(
+    rows: Array<{ locator_id?: number | null; LOCATOR_ID?: number | null }> | undefined,
+  ): number | undefined {
+    for (const row of rows ?? []) {
+      const raw = row.locator_id ?? row.LOCATOR_ID;
+      if (raw == null) {
+        continue;
+      }
+
+      const parsed = Number(raw);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+
+    return undefined;
   }
 
   private async resolveOrganizationCodeFromOnHand(
