@@ -88,6 +88,19 @@ export class DoSuggestionService {
     };
   }
 
+  async integrateMoveOrderGIT(id: string): Promise<{ success: boolean; message: string }> {
+    const suggestion = await this.findOne(id);
+    const payload = await this.mapDoSuggestionToMoveOrderIntegrationPayloadGIT(suggestion);
+    const queued = await this.moveOrderIntegrationService.createAndIntegrate(payload);
+
+    return {
+      success: true,
+      message:
+        queued.message ||
+        `Move order integration queued successfully (id=${queued.move_order_integration_id})`,
+    };
+  }
+
   async findByCallplanNumber(callplanNumber: string): Promise<DoSuggestion[]> {
     if (!callplanNumber?.trim()) {
       throw new BadRequestException('callplanNumber is required');
@@ -237,6 +250,97 @@ export class DoSuggestionService {
     return Object.fromEntries(
       Object.entries(obj).filter(([, value]) => value !== undefined),
     ) as Partial<T>;
+  }
+
+  private async mapDoSuggestionToMoveOrderIntegrationPayloadGIT(
+    suggestion: DoSuggestion,
+  ): Promise<CreateMoveOrderIntegrationPayloadDto> {
+    const organizationId = suggestion.organization?.organization_id;
+    if (organizationId == null) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no mapped organization_id in m_io`,
+      );
+    }
+
+    const dateRequired = this.resolveDateForOracle(suggestion.callplan_date_start);
+    // find locator to GIT
+    const locatorIds = await this.resolveLocatorIdsGIT(suggestion);
+
+    const lines = (suggestion.details ?? []).map((line, index) => {
+      const quantity =
+        line.item_qty_final
+      return {
+        line_number: line.line_number,
+        organization_id: Number(organizationId),
+        inventory_item_id: Number(line.inventory_item_id),
+        from_subinventory_code: 'KECIL',
+        from_locator_id: locatorIds.from_locator_id,
+        to_subinventory_code: 'CANVAS',
+        to_locator_id: locatorIds.to_locator_id,
+        uom_code: 'BKS',
+        quantity: Number(quantity),
+        date_required: new Date(Date.now()), // date_now
+        transaction_type_id: 105,
+        transaction_source_type_id: 4,
+        line_status: 7,
+        status_date: new Date(dateRequired), // call_plan_date_start
+        source_system: 'WMS',
+        source_header_id: suggestion.id,
+        source_line_id: line.id,
+        iface_status: 'READY',
+        operation: 'CREATE',
+        db_flag: 'T',
+      };
+    });
+
+    const validLines = lines.filter(
+      (line) => Number.isFinite(line.inventory_item_id) && line.quantity > 0,
+    );
+    if (!validLines.length) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no valid detail lines to integrate`,
+      );
+    }
+
+    return {
+      master_io_id: suggestion.organization_id ?? undefined,
+      request_number: suggestion.spb_number?.trim(),
+      // request_number: 'SPB/JAT/2026/6/500022.1/5001',
+      transaction_type_id: 105,
+      move_order_type: 1,
+      organization_id: Number(organizationId),
+      date_required: new Date(Date.now()), // date_now
+      // date_required: new Date('2026-06-26'),
+      from_subinventory_code: 'KECIL',
+      to_subinventory_code: 'CANVAS',
+      header_status: 7,
+      description: suggestion.sales_name?.trim() || undefined,
+      attribute_category: 'FPPR Awal',
+      status_date: new Date(Date.now()),
+      attribute7: this.toDateOnly(suggestion.callplan_date_start), // Call Plan Start Date
+      // attribute7: '2026-06-30',
+      attribute8: this.toDateOnly(suggestion.callplan_date_end), // Call Plan End Date
+      // attribute8: '2026-06-30',
+      attribute9: suggestion.sales_nik?.trim(), // Sales_Nik
+      // attribute9: '100507.01939B0', // Sales_Nik
+      attribute10: suggestion.sales_spv_nik?.trim(), // Sales_Spv_Nik
+      attribute11: suggestion.trip_type?.trim(), // trip_type
+      // attribute11: 'SD', // trip_type
+      attribute12: 'CVS', // CANVASING HARDCODE
+      attribute13: suggestion.callplan_number?.trim() || undefined, // Call Plan Number
+      // attribute13: 'JAT/2026/6/500022.1', // Call Plan Number
+      attribute14: suggestion.spb_number?.trim() || undefined, // SPB Number
+      // attribute14: 'SPB/JAT/2026/6/500022.1/5001', // SPB Number
+      operation: 'CREATE',
+      db_flag: 'T',
+      source_system: 'WMS',
+      source_header_id: suggestion.id,
+      // source_header_id: 'TEST6_SPB/JAT/2026/6/500021.1/5001',
+      iface_status: 'READY',
+      iface_mode: 'CREATE_TRANSACT_MO',
+      total_lines: validLines.length,
+      lines: validLines,
+    };
   }
 
   private async mapDoSuggestionToMoveOrderIntegrationPayload(
@@ -451,6 +555,61 @@ export class DoSuggestionService {
     }
 
     const toLocator = Number(locatorFromSales);
+
+    return {
+      from_locator_id: fromLocator,
+      to_locator_id: toLocator,
+    };
+  }
+
+
+  private async resolveLocatorIdsGIT(
+    suggestion: DoSuggestion,
+  ): Promise<{ from_locator_id?: number; to_locator_id?: number }> {
+    const organizationId = String(suggestion.organization_id);
+    const rows = await this.onHandAtrRepository
+      .createQueryBuilder('onHandAtr')
+      .select('onHandAtr.subinventory_code', 'subinventory_code')
+      .addSelect('onHandAtr.locator_id', 'locator_id')
+      .where('onHandAtr.organization_id = :organizationId', { organizationId })
+      .andWhere('onHandAtr.locator_id IS NOT NULL')
+      .andWhere('onHandAtr.deleted_at IS NULL')
+      .distinct(true)
+      .getRawMany<{ subinventory_code: string | null; locator_id: number | string | null }>();
+
+    const pickLocator = (subinventory: string): number | undefined => {
+      const found = rows.find(
+        (row) =>
+          (row.subinventory_code ?? '').trim().toUpperCase() === subinventory &&
+          row.locator_id != null,
+      );
+      return found?.locator_id != null ? Number(found.locator_id) : undefined;
+    };
+
+    const fromLocator = pickLocator('KECIL');
+    if (fromLocator == null) {
+      throw new BadRequestException(
+        `From locator not found for organization_id=${organizationId} and subinventory KECIL`,
+      );
+    }
+
+
+    const response = await this.integrationOnHandAtrService.getInventoryLocator({
+      organization_code: suggestion.organization?.organization_name?.trim(),
+      subinventory_code: 'CANVAS',
+      locator: 'GIT',
+    });
+
+    if (!response.status) {
+      throw new BadRequestException(
+        response.message ||
+        `Failed to get inventory locator for organization_code=${suggestion.organization?.organization_name?.trim()}, subinventory_code=CANVAS, locator=GIT`,
+      );
+    }
+
+    const toLocator = Number(response.data?.find(
+      (row) => row.LOCATOR_ID != null,
+    )?.LOCATOR_ID);
 
     return {
       from_locator_id: fromLocator,
