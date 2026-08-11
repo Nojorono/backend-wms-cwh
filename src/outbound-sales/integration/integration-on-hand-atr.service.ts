@@ -35,7 +35,7 @@ export class IntegrationOnHandAtrService implements OnModuleInit {
   constructor(
     @Inject('INV_ON_HAND_QTY_SERVICE')
     private readonly invOnHandQtyClient: ClientProxy,
-  ) {}
+  ) { }
 
   async onModuleInit(): Promise<void> {
     this.logger.log('Initializing INV_ON_HAND_QTY_SERVICE on-hand ATR integration...');

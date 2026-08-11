@@ -7,6 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { OutboundSalesService } from './outbound-sales.service';
 import {
+  InvOnHandQtyWithAtrDto,
   InvOnHandQtyWithAtrItemDto,
   InvOnHandQtyWithAtrParamsDto,
   onHandAtrDateNowExample,
@@ -26,6 +27,19 @@ import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-orga
 @Controller('outbound-sales')
 export class OutboundSalesController {
   constructor(private readonly service: OutboundSalesService) { }
+
+  @Get('on-hand-meta')
+  @ApiOperation({
+    summary: 'Find Oracle inventory locator',
+    description:
+      'Find Oracle inventory locator by organization_code and subinventory_code.',
+  })
+  @ApiResponse({ status: 200, description: 'OK' })
+  findOnHandMeta(
+    @Query() query: InvOnHandQtyWithAtrParamsDto,
+  ): Promise<any> {
+    return this.service.findOnHandMeta(query);
+  }
 
   @Get('on-hand')
   @ApiOperation({
