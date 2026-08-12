@@ -747,7 +747,7 @@ export class DoSuggestionService {
 
   }
 
-  async voidDoDms(dto: VoidDoDmsDto): Promise<DoSuggestion> {
+  async voidDoDms(dto: VoidDoDmsDto): Promise<any> {
     const existing = await this.repository.findBySpbNumber(dto.spb_number);
     if (!existing) {
       throw new NotFoundException(
@@ -755,14 +755,25 @@ export class DoSuggestionService {
       );
     }
 
-    if (existing.status === DoSuggestionStatus.VOID) {
-      return existing;
+    if (existing.status === DoSuggestionStatus.VOID || existing.status === DoSuggestionStatus.VOID_NEED_ACTION) {
+      throw new BadRequestException(
+        `DO suggestion with SPB number ${dto.spb_number} is already void`,
+      );
     }
 
-    return await this.repository.updateStatus(
-      existing.id,
-      DoSuggestionStatus.VOID,
-      dto.updated_by,
-    );
+    // IF MOVE ORDER INTEGRATION EXISTS, VOID IT
+    if (existing.move_order_integration) {
+      await this.repository.updateStatus(
+        existing.id,
+        DoSuggestionStatus.VOID_NEED_ACTION,
+        dto.updated_by,
+      );
+    } else {
+      await this.repository.updateStatus(
+        existing.id,
+        DoSuggestionStatus.VOID,
+        dto.updated_by,
+      );
+    }
   }
 }

@@ -8,7 +8,8 @@ export enum DoSuggestionStatus {
     REVISED = 'REVISED',
     SUBMITTED = 'SUBMITTED',
     FINAL = 'FINAL',
-    VOID = 'VOID'
+    VOID = 'VOID',
+    VOID_NEED_ACTION = 'VOID_NEED_ACTION'
 }
 
 @Entity('do_suggestion')

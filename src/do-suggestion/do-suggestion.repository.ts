@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'; import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm'; import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
+import { MoveOrderIntegration } from '../core/domain/entities/move-order-integration.entity';
 import { formatSpbNumber, parseSpbSequence } from './do-suggestion-spb.util';
 
 const DO_SUGGESTION_RELATIONS = ['details', 'organization'] as const;
@@ -335,11 +336,26 @@ export class DoSuggestionRepository {
     }
   }
 
-  async findBySpbNumber(spbNumber: string): Promise<DoSuggestion | null> {
-    return await this.headerRepository.findOne({
-      where: { spb_number: spbNumber },
-      relations: [...DO_SUGGESTION_RELATIONS],
-    });
+  async findBySpbNumber(spbNumber: string): Promise<
+    (DoSuggestion & { move_order_integration?: MoveOrderIntegration | null }) | null
+  > {
+    const result = await this.headerRepository
+      .createQueryBuilder('ds')
+      .leftJoinAndSelect('ds.details', 'details')
+      .leftJoinAndSelect('ds.organization', 'organization')
+      .leftJoinAndMapOne(
+        'ds.move_order_integration',
+        MoveOrderIntegration,
+        'move_order_integration',
+        'move_order_integration.source_header_id = CAST(ds.id AS varchar) AND move_order_integration.deleted_at IS NULL',
+      )
+      .where('ds.spb_number = :spbNumber', { spbNumber })
+      .andWhere('ds.deleted_at IS NULL')
+      .getOne();
+
+    return result as
+      | (DoSuggestion & { move_order_integration?: MoveOrderIntegration | null })
+      | null;
   }
 
   async updateStatus(
