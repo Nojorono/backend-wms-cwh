@@ -6,6 +6,24 @@ import { IsDateString, IsNotEmpty, IsOptional, IsString } from 'class-validator'
 export const onHandAtrDateNowExample = (): string =>
   new Date().toISOString().split('T')[0];
 
+export class InvOnHandQtyWithAtrDto {
+  @ApiProperty({
+    description: 'Organization code (inventory org) to filter',
+    example: 'CWH',
+  })
+  @IsString()
+  @IsNotEmpty()
+  organization_code: string;
+
+  @ApiProperty({
+    description: 'Subinventory code(s) to filter. Single value, comma-separated, or repeated query param',
+    example: 'GOOD-RK-1',
+    isArray: true,
+    type: String,
+  })
+  subinventory_code: string | string[];
+}
+
 export class InvOnHandQtyWithAtrParamsDto {
   @ApiProperty({
     description: 'Organization code (inventory org) to filter',

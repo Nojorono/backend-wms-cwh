@@ -194,6 +194,12 @@ export class OutboundSalesService {
     };
   }
 
+  async findOnHandMeta(
+    query: InvOnHandQtyWithAtrParamsDto,
+  ): Promise<any> {
+    return await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
+  }
+
   async getLocatorSales(params: LocatorSalesParamsDto): Promise<LocatorSalesResponseDto> {
     return await this.integrationOnHandAtrService.getLocatorSales(params);
   }

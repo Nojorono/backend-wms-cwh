@@ -120,6 +120,13 @@ export class DoSuggestionController {
     return this.doSuggestionService.integrateMoveOrder(id);
   }
 
+  @Post(':id/integrate/git')
+  @ApiOperation({ summary: 'Integrate move order by DO suggestion ID v2' })
+  @ApiResponse({ status: 200 })
+  integrateMoveOrderGIT(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
+    return this.doSuggestionService.integrateMoveOrderGIT(id);
+  }
+
   @Post('dms')
   @DmsIntegrationAuth()
   @ApiOperation({
