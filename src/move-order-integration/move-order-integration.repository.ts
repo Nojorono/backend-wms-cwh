@@ -123,13 +123,13 @@ export class MoveOrderIntegrationRepository {
     await this.headerRepo.update(id, dto);
   }
 
-  async replaceLinesByHeaderId(
+  async deleteAndInsertLinesByHeaderId(
     headerId: string,
     lineDtos: CreateMoveOrderIntegrationLineDto[],
   ): Promise<MoveOrderLineIntegration[]> {
     return await this.dataSource.transaction(async (manager) => {
       const lRepo = manager.getRepository(MoveOrderLineIntegration);
-      await lRepo.softDelete({ move_order_integration_id: headerId });
+      await lRepo.delete({ move_order_integration_id: headerId });
 
       const rows: MoveOrderLineIntegration[] = [];
       for (const lineDto of lineDtos) {

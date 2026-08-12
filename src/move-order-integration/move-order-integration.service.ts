@@ -66,6 +66,18 @@ export class MoveOrderIntegrationService {
     payload: CreateMoveOrderIntegrationPayloadDto,
   ): Promise<MoveOrderIntegrationAggregateResult> {
     const { lines = [], ...headerDto } = payload;
+    const sourceHeaderId = headerDto.source_header_id?.trim();
+
+    if (sourceHeaderId) {
+      const existing = await this.repository.findHeaderBySourceHeaderId(sourceHeaderId);
+      if (existing) {
+        return await this.update(existing.id, {
+          ...headerDto,
+          lines,
+        });
+      }
+    }
+
     return await this.repository.createHeaderWithLines(headerDto, lines);
   }
 
@@ -161,7 +173,7 @@ export class MoveOrderIntegrationService {
 
     let resultLines = await this.repository.findLinesByHeaderId(id);
     if (lines) {
-      resultLines = await this.repository.replaceLinesByHeaderId(
+      resultLines = await this.repository.deleteAndInsertLinesByHeaderId(
         id,
         lines as CreateMoveOrderIntegrationLineDto[],
       );
