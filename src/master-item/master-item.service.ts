@@ -75,24 +75,32 @@ export class MasterItemService {
   }
 
   async createOrUpdateFromMetaOracle(item: any): Promise<MasterItem | null> {
-    const existingItem = await this.repository.findByItemNumber(item.ITEM_NUMBER);
-    if (existingItem) {
-      return (
-        (await this.repository.update(existingItem.id, {
-          sku: item.ITEM_CODE,
-          item_number: item.ITEM_NUMBER,
-          description: item.ITEM_DESCRIPTION,
-          inventory_item_id: item.INVENTORY_ITEM_ID,
-        })) || null
-      );
-    } else {
-      return await this.repository.create({
-        sku: item.ITEM_CODE,
-        item_number: item.ITEM_NUMBER,
-        description: item.ITEM_DESCRIPTION,
-        inventory_item_id: item.INVENTORY_ITEM_ID,
-      });
+    const itemNumber = item.item_number ?? item.ITEM_NUMBER;
+    if (!itemNumber) {
+      return null;
     }
+
+    const inventoryItemId = item.inventory_item_id ?? item.INVENTORY_ITEM_ID;
+    const payload = {
+      sku: item.item_code ?? item.ITEM_CODE,
+      item_number: itemNumber,
+      description: item.item_description ?? item.ITEM_DESCRIPTION,
+      inventory_item_id:
+        inventoryItemId !== undefined && inventoryItemId !== null
+          ? String(inventoryItemId)
+          : undefined,
+      bal_per_dus: item.dus_bal ?? item.DUS_BAL,
+      press_per_bal: item.bal_prs ?? item.BAL_PRS,
+      bks_per_press: item.prs_bks ?? item.PRS_BKS,
+      btg_per_bks: item.bks_btg ?? item.BKS_BTG,
+    };
+
+    const existingItem = await this.repository.findByItemNumber(itemNumber);
+    if (existingItem) {
+      return (await this.repository.update(existingItem.id, payload)) || null;
+    }
+
+    return await this.repository.create(payload);
   }
 
   async syncFromMetaOracle(): Promise<ItemListResponseDto> {
