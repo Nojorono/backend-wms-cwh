@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { User } from '../core/domain/entities/user.entity';
+import { UserDetail } from '../core/domain/entities/user-detail.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -10,6 +11,7 @@ export class UserRepository {
   constructor(
     @InjectRepository(User)
     private readonly repository: Repository<User>,
+    private readonly dataSource: DataSource,
   ) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -101,7 +103,11 @@ export class UserRepository {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    await this.repository.softDelete(id);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.softDelete(UserDetail, { userId: id });
+      await manager.softDelete(User, id);
+    });
   }
 
   async restore(id: string): Promise<void> {
@@ -113,6 +119,10 @@ export class UserRepository {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    await this.repository.delete(id);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(UserDetail, { userId: id });
+      await manager.delete(User, id);
+    });
   }
 }
