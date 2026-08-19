@@ -97,9 +97,9 @@ export class CreateDoDmsDto {
     mo_type: string;
 
     @ApiProperty({ example: '2026-06-08' })
-    @IsNotEmpty()
+    @IsOptional()
     @IsDateString()
-    preparation_date: string;
+    preparation_date?: string;
 
     @ApiProperty({ example: 'CP-2026-0001' })
     @IsString()

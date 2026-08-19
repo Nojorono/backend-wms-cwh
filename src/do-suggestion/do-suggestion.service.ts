@@ -264,6 +264,10 @@ export class DoSuggestionService {
       );
     }
 
+    // 105	FPPR Awal	FPPR Awal
+    // 106	FPPR Tambahan	FPPR Tambahan
+    const transactionTypeId = suggestion.mo_type === 'FPPR Awal' ? 105 : 106;
+
     const dateRequired = this.resolveDateForOracle(suggestion.callplan_date_start);
     // find locator to GIT
     const locatorIds = await this.resolveLocatorIdsGIT(suggestion);
@@ -281,7 +285,7 @@ export class DoSuggestionService {
         uom_code: line.item_uom?.trim() || 'BKS',
         quantity,
         date_required: new Date(Date.now()), // date_now
-        transaction_type_id: 105,
+        transaction_type_id: transactionTypeId,
         transaction_source_type_id: 4,
         line_status: 7,
         status_date: new Date(dateRequired), // call_plan_date_start
@@ -321,15 +325,15 @@ export class DoSuggestionService {
     return {
       master_io_id: suggestion.organization_id ?? undefined,
       request_number: suggestion.spb_number?.trim(),
-      transaction_type_id: 105,
+      transaction_type_id: transactionTypeId,
       move_order_type: 1,
       organization_id: Number(organizationId),
       date_required: new Date(Date.now()), // date_now
       from_subinventory_code: 'KECIL',
       to_subinventory_code: 'CANVAS',
       header_status: 7,
-      description: suggestion.sales_name?.trim() || undefined,
-      attribute_category: 'FPPR Awal',
+      description: suggestion.sales_name?.trim(),
+      attribute_category: suggestion.mo_type,
       status_date: new Date(Date.now()),
       attribute7: this.toDateOnly(suggestion.callplan_date_start), // Call Plan Start Date
       attribute8: this.toDateOnly(suggestion.callplan_date_end), // Call Plan End Date

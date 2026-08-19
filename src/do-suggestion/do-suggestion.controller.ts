@@ -127,6 +127,14 @@ export class DoSuggestionController {
     return this.doSuggestionService.integrateMoveOrderGIT(id);
   }
 
+  // revert back to subinventory KECIL
+  @Post(':id/revert/kecil')
+  @ApiOperation({ summary: 'Revert DO suggestion by DO suggestion ID to subinventory KECIL' })
+  @ApiResponse({ status: 200 })
+  // revertToKecil(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
+  //   return this.doSuggestionService.revertToKecil(id);
+  // }
+
   @Post('dms')
   @DmsIntegrationAuth()
   @ApiOperation({
