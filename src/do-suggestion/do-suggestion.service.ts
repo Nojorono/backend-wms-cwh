@@ -90,6 +90,20 @@ export class DoSuggestionService {
     };
   }
 
+  async integrateBackToKecil(id: string): Promise<{ success: boolean; message: string }> {
+    const suggestion = await this.findOne(id);
+    if (suggestion.status !== DoSuggestionStatus.VOID_NEED_ACTION) {
+      throw new BadRequestException(`DO suggestion status is not VOID_NEED_ACTION, current status: ${suggestion.status}`);
+    }
+    const payload = await this.mapDoSuggestionToMoveOrderIntegrationPayloadBackToKecil(suggestion);
+    const queued = await this.moveOrderIntegrationService.createAndIntegrate(payload);
+
+    return {
+      success: true,
+      message: queued.message || `Move order integration queued successfully (id=${queued.move_order_integration_id})`,
+    };
+  }
+
   async integrateMoveOrderGIT(id: string): Promise<{ success: boolean; message: string }> {
     const suggestion = await this.findOne(id);
     const payload = await this.mapDoSuggestionToMoveOrderIntegrationPayloadGIT(suggestion);
@@ -354,6 +368,112 @@ export class DoSuggestionService {
     };
   }
 
+  private async mapDoSuggestionToMoveOrderIntegrationPayloadBackToKecil(
+    suggestion: DoSuggestion,
+  ): Promise<CreateMoveOrderIntegrationPayloadDto> {
+    const organizationId = suggestion.organization?.organization_id;
+    if (organizationId == null) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no mapped organization_id in m_io`,
+      );
+    }
+
+    // 105	FPPR Awal	FPPR Awal
+    // 106	FPPR Tambahan	FPPR Tambahan
+    const transactionTypeId = suggestion.mo_type === 'FPPR Awal' ? 105 : 106;
+
+    const dateRequired = this.resolveDateForOracle(suggestion.callplan_date_start);
+    const locatorIds = await this.resolveLocatorIdsBackToKecil(suggestion);
+
+    // const requestNumber = incrementSpbNumber(suggestion.spb_number);
+    // if (!requestNumber) {
+    //   throw new BadRequestException(
+    //     `DO suggestion ${suggestion.id} has no valid spb_number to increment for VOID request_number`,
+    //   );
+    // }
+
+    const lines = (suggestion.details ?? []).map((line) => {
+      const quantity = this.parseItemQtyFinal(line.item_qty_final);
+      return {
+        line_number: line.line_number,
+        organization_id: Number(organizationId),
+        inventory_item_id: Number(line.inventory_item_id),
+        from_subinventory_code: 'CANVAS',
+        from_locator_id: locatorIds.from_locator_id,
+        to_subinventory_code: 'KECIL',
+        to_locator_id: locatorIds.to_locator_id,
+        uom_code: line.item_uom?.trim() || 'BKS',
+        quantity,
+        date_required: new Date(Date.now()), // date_now
+        transaction_type_id: transactionTypeId,
+        transaction_source_type_id: 4,
+        line_status: 7,
+        status_date: new Date(dateRequired), // call_plan_date_start
+        source_system: 'WMS',
+        source_header_id: suggestion.id + '-V',
+        source_line_id: line.id + '-V',
+        iface_status: 'READY',
+        operation: 'CREATE',
+        db_flag: 'T',
+      };
+    });
+
+    const validLines = lines.filter(
+      (line) => Number.isFinite(line.inventory_item_id) && Number.isFinite(line.quantity) && line.quantity > 0,
+    );
+
+    this.logger.log(
+      `Back to Kecil move-order lines for suggestion ${suggestion.id}: mapped=${lines.length}, valid=${validLines.length}`,
+    );
+    this.logger.log(
+      `Back to Kecil mapped lines: ${JSON.stringify(
+        lines.map((line) => ({
+          source_line_id: line.source_line_id,
+          inventory_item_id: line.inventory_item_id,
+          quantity: line.quantity,
+        })),
+      )}`,
+    );
+    this.logger.log(`GIT validLines: ${JSON.stringify(validLines)}`);
+
+    if (!validLines.length) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no valid detail lines to integrate`,
+      );
+    }
+
+    return {
+      master_io_id: suggestion.organization_id ?? undefined,
+      request_number: suggestion.spb_number?.trim() + '-V',
+      transaction_type_id: transactionTypeId,
+      move_order_type: 1,
+      organization_id: Number(organizationId),
+      date_required: new Date(Date.now()), // date_now
+      from_subinventory_code: 'CANVAS',
+      to_subinventory_code: 'KECIL',
+      header_status: 7,
+      description: suggestion.sales_name?.trim(),
+      attribute_category: suggestion.mo_type,
+      status_date: new Date(Date.now()),
+      attribute7: this.toDateOnly(suggestion.callplan_date_start), // Call Plan Start Date
+      attribute8: this.toDateOnly(suggestion.callplan_date_end), // Call Plan End Date
+      attribute9: suggestion.sales_nik?.trim(), // Sales_Nik
+      attribute10: suggestion.sales_spv_nik?.trim(), // Sales_Spv_Nik
+      attribute11: suggestion.trip_type?.trim(), // trip_type
+      attribute12: 'CVS', // CANVASING HARDCODE
+      attribute13: suggestion.callplan_number?.trim() || undefined, // Call Plan Number
+      attribute14: suggestion.spb_number?.trim(),
+      operation: 'CREATE',
+      db_flag: 'T',
+      source_system: 'WMS',
+      source_header_id: suggestion.id + '-V',
+      iface_status: 'READY',
+      iface_mode: 'CREATE_TRANSACT_MO',
+      total_lines: validLines.length,
+      lines: validLines,
+    };
+  }
+
   private async mapDoSuggestionToMoveOrderIntegrationPayload(
     suggestion: DoSuggestion,
   ): Promise<CreateMoveOrderIntegrationPayloadDto> {
@@ -579,7 +699,63 @@ export class DoSuggestionService {
       to_locator_id: toLocator,
     };
   }
+  private async resolveLocatorIdsBackToKecil(
+    suggestion: DoSuggestion,
+  ): Promise<{ from_locator_id?: number; to_locator_id?: number }> {
+    const organizationId = String(suggestion.organization_id);
+    const rows = await this.onHandAtrRepository
+      .createQueryBuilder('onHandAtr')
+      .select('onHandAtr.subinventory_code', 'subinventory_code')
+      .addSelect('onHandAtr.locator_id', 'locator_id')
+      .where('onHandAtr.organization_id = :organizationId', { organizationId })
+      .andWhere('onHandAtr.locator_id IS NOT NULL')
+      .andWhere('onHandAtr.deleted_at IS NULL')
+      .distinct(true)
+      .getRawMany<{ subinventory_code: string | null; locator_id: number | string | null }>();
 
+    const pickLocator = (subinventory: string): number | undefined => {
+      const found = rows.find(
+        (row) =>
+          (row.subinventory_code ?? '').trim().toUpperCase() === subinventory &&
+          row.locator_id != null,
+      );
+      return found?.locator_id != null ? Number(found.locator_id) : undefined;
+    };
+
+    const fromLocator = pickLocator('KECIL');
+    if (fromLocator == null) {
+      throw new BadRequestException(
+        `From locator not found for organization_id=${organizationId} and subinventory KECIL`,
+      );
+    }
+
+
+    const response = await this.integrationOnHandAtrService.getInventoryLocator({
+      organization_code: suggestion.organization?.organization_name?.trim(),
+      subinventory_code: 'CANVAS',
+      locator: 'GIT',
+    });
+
+    if (!response.status) {
+      throw new BadRequestException(
+        response.message ||
+        `Failed to get inventory locator for organization_code=${suggestion.organization?.organization_name?.trim()}, subinventory_code=CANVAS, locator=GIT`,
+      );
+    }
+
+    const toLocator = this.pickInventoryLocatorId(response.data);
+
+    if (toLocator == null) {
+      throw new BadRequestException(
+        `To locator not found for organization_code=${suggestion.organization?.organization_name?.trim()}, subinventory_code=CANVAS, locator=GIT`,
+      );
+    }
+
+    return {
+      from_locator_id: toLocator,
+      to_locator_id: fromLocator,
+    };
+  }
 
   private async resolveLocatorIdsGIT(
     suggestion: DoSuggestion,

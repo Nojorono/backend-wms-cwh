@@ -83,7 +83,7 @@ export function mapMoveOrderIntegrationToOracle(
     SOURCE_BATCH_ID: payload.source_batch_id,
     IFACE_STATUS: payload.iface_status,
     IFACE_MODE: payload.iface_mode,
-    TOTAL_LINES: payload.total_lines ?? lines.length,
+    TOTAL_LINES: lines.length,
     CREATION_DATE: toDateString(payload.creation_date),
     CREATED_BY: payload.created_by,
     LAST_UPDATE_DATE: toDateString(payload.last_update_date),

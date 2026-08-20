@@ -207,6 +207,12 @@ export class DoSuggestionRepository {
       .createQueryBuilder('ds')
       .leftJoinAndSelect('ds.details', 'details')
       .leftJoinAndSelect('ds.organization', 'organization')
+      .leftJoinAndMapOne(
+        'ds.move_order_integration',
+        MoveOrderIntegration,
+        'move_order_integration',
+        'move_order_integration.source_header_id = CAST(ds.id AS varchar) AND move_order_integration.deleted_at IS NULL',
+      )
       .where('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
       .andWhere('ds.organization_id = :organizationId', { organizationId });
 
