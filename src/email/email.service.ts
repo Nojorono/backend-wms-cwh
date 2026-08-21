@@ -12,6 +12,7 @@ import { SendEmailResponseDto } from './dto/send-email-response.dto';
 import { EmailTemplateService } from './email-template.service';
 import { CallPlanNullAhomTemplateContext } from './template-email/types/call-plan-null-ahom-template.interface';
 import { CallPlanReminderTemplateContext } from './template-email/types/call-plan-reminder-template.interface';
+import { DoSuggestionVoidTemplateContext } from './template-email/types/do-suggestion-void-template.interface';
 
 export interface ResolvedSmtpConfig {
   host: string;
@@ -123,6 +124,24 @@ export class EmailService {
       smtp: dto.smtp,
       to: dto.supervisorEmail,
       cc: dto.ahomEmail?.length ? dto.ahomEmail : undefined,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    });
+  }
+
+  async sendDoSuggestionVoidEmail(
+    to: string[],
+    context: DoSuggestionVoidTemplateContext,
+  ): Promise<SendEmailResponseDto> {
+    if (!to.length) {
+      throw new BadRequestException('At least one recipient email is required');
+    }
+
+    const rendered = this.emailTemplateService.renderDoSuggestionVoid(context);
+
+    return this.sendEmail({
+      to,
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,

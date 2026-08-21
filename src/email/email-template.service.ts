@@ -11,6 +11,11 @@ import {
   CallPlanReminderTemplateContext,
   RenderedCallPlanReminderEmail,
 } from './template-email/types/call-plan-reminder-template.interface';
+import {
+  DoSuggestionVoidTemplateContext,
+  RenderedDoSuggestionVoidEmail,
+} from './template-email/types/do-suggestion-void-template.interface';
+import { renderDoSuggestionVoidEmail } from './template-email/do-suggestion-void.template';
 
 @Injectable()
 export class EmailTemplateService {
@@ -33,6 +38,15 @@ export class EmailTemplateService {
       },
       this.configService,
     );
+  }
+
+  renderDoSuggestionVoid(
+    context: DoSuggestionVoidTemplateContext,
+  ): RenderedDoSuggestionVoidEmail {
+    return renderDoSuggestionVoidEmail({
+      ...context,
+      generatedAt: context.generatedAt || this.formatGeneratedAt(new Date()),
+    });
   }
 
   private formatGeneratedAt(date: Date): string {
