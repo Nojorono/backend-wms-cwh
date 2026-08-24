@@ -254,6 +254,15 @@ export class PalletUpdateRepository {
     await this.repository.softDelete(id);
   }
 
+  async updateStatus(id: string, patch: Partial<PalletUpdate>): Promise<PalletUpdate> {
+    await this.repository.update(id, patch);
+    const updated = await this.findOne(id);
+    if (!updated) {
+      throw new NotFoundException(`Failed to retrieve updated pallet update with ID ${id}`);
+    }
+    return updated;
+  }
+
   // async findByPalletId(palletId: string): Promise<{
   //   scans: PalletUpdateScan[];
   //   items: PalletUpdateItem[];
