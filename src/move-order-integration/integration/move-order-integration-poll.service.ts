@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { MoveOrderIntegration } from '../../core/domain/entities/move-order-integration.entity';
 import { MoveOrderLineIntegration } from '../../core/domain/entities/move-order-integration-lines.entity';
+import { DoSuggestionRepository } from '../../do-suggestion/do-suggestion.repository';
 import {
   MoveOrderIntegrationPollResponseDto,
   MoveOrderIntegrationPollStatus,
@@ -30,6 +31,8 @@ export class MoveOrderIntegrationPollService {
     private readonly syncService: MoveOrderIntegrationSyncService,
     private readonly pollProducer: MoveOrderIntegrationPollProducer,
     private readonly integrationLog: MoveOrderIntegrationLogService,
+    @Inject(forwardRef(() => DoSuggestionRepository))
+    private readonly doSuggestionRepository: DoSuggestionRepository,
   ) {}
 
   async pollByIntegrationId(id: string): Promise<MoveOrderIntegrationPollResponseDto> {
@@ -185,6 +188,7 @@ export class MoveOrderIntegrationPollService {
       iface_status: 'INTEGRATED',
       iface_message: findResult.message || check.reason,
     });
+    await this.completeDoSuggestionVoidIfApplicable(sourceHeaderId);
     this.integrationLog.info('poll', 'Integration completed', {
       move_order_integration_id: moveOrderIntegrationId,
       source_header_id: sourceHeaderId,
@@ -193,6 +197,28 @@ export class MoveOrderIntegrationPollService {
     });
     const record = await this.findHeaderWithLines(moveOrderIntegrationId);
     return this.buildResponse(record, 'INTEGRATED', findResult.message || check.reason);
+  }
+
+  private async completeDoSuggestionVoidIfApplicable(
+    sourceHeaderId: string,
+  ): Promise<void> {
+    try {
+      const updated = await this.doSuggestionRepository.completeVoidAfterBackToKecil(
+        sourceHeaderId,
+      );
+      if (updated?.status) {
+        this.integrationLog.info('poll', 'DO suggestion void finalized after back-to-kecil', {
+          source_header_id: sourceHeaderId,
+          do_suggestion_id: updated.id,
+          status: updated.status,
+        });
+      }
+    } catch (error) {
+      this.integrationLog.error('poll', 'Failed to finalize DO suggestion void status', {
+        source_header_id: sourceHeaderId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private async findHeaderWithLines(

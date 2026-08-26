@@ -3,6 +3,10 @@ import { DataSource, EntityManager, Repository } from 'typeorm'; import { DoSugg
 import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
 import { MoveOrderIntegration } from '../core/domain/entities/move-order-integration.entity';
 import { formatSpbNumber, parseSpbSequence } from './do-suggestion-spb.util';
+import {
+  DO_SUGGESTION_VOID_BACK_TO_KECIL_SUFFIX,
+  parseDoSuggestionIdFromVoidSourceHeaderId,
+} from './do-suggestion-void.util';
 
 const DO_SUGGESTION_RELATIONS = ['details', 'organization'] as const;
 
@@ -417,6 +421,30 @@ export class DoSuggestionRepository {
     });
 
     return (await this.findById(id)) as DoSuggestion;
+  }
+
+  /**
+   * After back-to-kecil move order polling succeeds (`source_header_id` ends with `-V`),
+   * finalize DO suggestion status from VOID_NEED_ACTION to VOID.
+   */
+  async completeVoidAfterBackToKecil(
+    sourceHeaderId: string,
+  ): Promise<DoSuggestion | null> {
+    const doSuggestionId = parseDoSuggestionIdFromVoidSourceHeaderId(sourceHeaderId);
+    if (!doSuggestionId) {
+      return null;
+    }
+
+    const existing = await this.findById(doSuggestionId);
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.status !== DoSuggestionStatus.VOID_NEED_ACTION) {
+      return existing;
+    }
+
+    return await this.updateStatus(doSuggestionId, DoSuggestionStatus.VOID);
   }
 
   async findByOrganizationId(organizationId: string): Promise<DoSuggestion[]> {
