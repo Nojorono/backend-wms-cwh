@@ -7,6 +7,8 @@ import { MasterIO } from '../core/domain/entities/master-io.entity';
 import { MoveOrderIntegrationModule } from '../move-order-integration/move-order-integration.module';
 import { OutboundSalesModule } from '../outbound-sales/outbound-sales.module';
 import { AuthModule } from '../infrastructure/modules/auth.module';
+import { EmailModule } from '../email/email.module';
+import { UserModule } from '../users/user.module';
 import { DoSuggestionController } from './do-suggestion.controller';
 import { DoSuggestionRepository } from './do-suggestion.repository';
 import { DoSuggestionService } from './do-suggestion.service';
@@ -15,6 +17,8 @@ import { DoSuggestionService } from './do-suggestion.service';
   imports: [
     TypeOrmModule.forFeature([DoSuggestion, DoSuggestionDetail, OnHandAtr, MasterIO]),
     AuthModule,
+    EmailModule,
+    UserModule,
     MoveOrderIntegrationModule,
     forwardRef(() => OutboundSalesModule),
   ],

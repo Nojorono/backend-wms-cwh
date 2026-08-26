@@ -17,6 +17,9 @@ import {
 import { CreateDoDmsDto, DoDmsDetailDto } from './dto/create-do-dms.dto';
 import { VoidDoDmsDto } from './dto/void-do-dms.dto';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
+import { UserService } from '../users/user.service';
+import { EmailService } from '../email/email.service';
+import { DoSuggestionVoidTemplateContext } from '../email/template-email/types/do-suggestion-void-template.interface';
 
 @Injectable()
 export class DoSuggestionService {
@@ -30,6 +33,8 @@ export class DoSuggestionService {
     private readonly onHandAtrRepository: Repository<OnHandAtr>,
     @InjectRepository(MasterIO)
     private readonly masterIORepository: Repository<MasterIO>,
+    private readonly userService: UserService,
+    private readonly emailService: EmailService,
   ) { }
 
   async createOrUpdate(dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
@@ -927,7 +932,7 @@ export class DoSuggestionService {
 
   }
 
-  async voidDoDms(dto: VoidDoDmsDto): Promise<any> {
+  async voidDoDms(dto: VoidDoDmsDto): Promise<DoSuggestion> {
     const existing = await this.repository.findBySpbNumber(dto.spb_number);
     if (!existing) {
       throw new NotFoundException(
@@ -941,19 +946,95 @@ export class DoSuggestionService {
       );
     }
 
-    // IF MOVE ORDER INTEGRATION EXISTS, VOID IT
-    if (existing.move_order_integration) {
-      await this.repository.updateStatus(
-        existing.id,
-        DoSuggestionStatus.VOID_NEED_ACTION,
-        dto.updated_by,
+    const nextStatus = existing.move_order_integration
+      ? DoSuggestionStatus.VOID_NEED_ACTION
+      : DoSuggestionStatus.VOID;
+
+    const updated = await this.repository.updateStatus(
+      existing.id,
+      nextStatus,
+      dto.updated_by,
+    );
+
+    await this.sendVoidNotificationEmail(updated, nextStatus, dto.updated_by);
+
+    return updated;
+  }
+
+  private async sendVoidNotificationEmail(
+    suggestion: DoSuggestion,
+    status: DoSuggestionStatus,
+    updatedBy?: string,
+  ): Promise<void> {
+    if (!suggestion.organization_id) {
+      this.logger.warn(
+        `Skip void email for DO suggestion ${suggestion.id}: organization_id is missing`,
       );
-    } else {
-      await this.repository.updateStatus(
-        existing.id,
-        DoSuggestionStatus.VOID,
-        dto.updated_by,
+      return;
+    }
+
+    try {
+      const users = await this.userService.findAllByRoleAndOrganizationId(
+        'WH_ADMIN_CABANG',
+        suggestion.organization_id,
+      );
+
+      const recipients = [
+        ...new Set(
+          users
+            .map((user) => user.userDetail?.email?.trim())
+            .filter((email): email is string => Boolean(email)),
+        ),
+      ];
+
+      if (!recipients.length) {
+        this.logger.warn(
+          `No WH_ADMIN_CABANG email recipients found for organization_id=${suggestion.organization_id}`,
+        );
+        return;
+      }
+
+      const context = this.mapDoSuggestionToVoidEmailContext(suggestion, status, updatedBy);
+      await this.emailService.sendDoSuggestionVoidEmail(recipients, context);
+
+      this.logger.log(
+        `Void notification email sent for DO suggestion ${suggestion.id} to ${recipients.join(', ')}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send void notification email for DO suggestion ${suggestion.id}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
       );
     }
+  }
+
+  private mapDoSuggestionToVoidEmailContext(
+    suggestion: DoSuggestion,
+    status: DoSuggestionStatus,
+    updatedBy?: string,
+  ): DoSuggestionVoidTemplateContext {
+    return {
+      cabang: suggestion.organization?.organization_name?.trim() || '-',
+      spbNumber: suggestion.spb_number?.trim() || '-',
+      callplanNumber: suggestion.callplan_number?.trim() || '-',
+      callplanDateStart: this.toDateOnly(suggestion.callplan_date_start) || '-',
+      callplanDateEnd: this.toDateOnly(suggestion.callplan_date_end) || '-',
+      salesName: suggestion.sales_name?.trim() || '-',
+      salesNik: suggestion.sales_nik?.trim() || '-',
+      salesSpv: suggestion.sales_spv?.trim() || '-',
+      salesSpvNik: suggestion.sales_spv_nik?.trim() || '-',
+      routeNumber: suggestion.route_number?.trim() || '-',
+      tripType: suggestion.trip_type?.trim() || '-',
+      status,
+      updatedBy: updatedBy?.trim() || '-',
+      requiresAction: status === DoSuggestionStatus.VOID_NEED_ACTION,
+      generatedAt: '',
+      details: (suggestion.details ?? []).map((line) => ({
+        lineNumber: line.line_number != null ? String(line.line_number) : '-',
+        itemCode: line.item_code?.trim() || '-',
+        quantityFinal: line.item_qty_final != null ? String(line.item_qty_final) : '-',
+        itemUom: line.item_uom?.trim() || '-',
+      })),
+    };
   }
 }

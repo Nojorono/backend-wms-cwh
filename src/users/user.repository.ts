@@ -42,6 +42,21 @@ export class UserRepository {
     });
   }
 
+  async findAllByRoleAndOrganizationId(
+    roleName: string,
+    organizationId: string,
+  ): Promise<User[]> {
+    return await this.repository
+      .createQueryBuilder('user')
+      .innerJoinAndSelect('user.role', 'role')
+      .innerJoinAndSelect('user.userDetail', 'userDetail')
+      .where('user.is_active = :isActive', { isActive: true })
+      .andWhere('role.name = :roleName', { roleName })
+      .andWhere('userDetail.organization_id = :organizationId', { organizationId })
+      .andWhere('user.deleted_at IS NULL')
+      .getMany();
+  }
+
   async findAllWithDeleted(): Promise<User[]> {
     return await this.repository.find({ withDeleted: true, relations: ['userDetail'] });
   }

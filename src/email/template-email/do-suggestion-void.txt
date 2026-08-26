@@ -1,0 +1,22 @@
+VOID DO SUGGESTION
+==================
+
+Cabang          : {{cabang}}
+SPB Number      : {{spbNumber}}
+Call Plan       : {{callplanNumber}}
+Call Plan Start : {{callplanDateStart}}
+Call Plan End   : {{callplanDateEnd}}
+Sales           : {{salesName}} ({{salesNik}})
+Supervisor      : {{salesSpv}} ({{salesSpvNik}})
+Route           : {{routeNumber}}
+Trip Type       : {{tripType}}
+Status          : {{status}}
+Updated By      : {{updatedBy}}
+
+{{actionMessageText}}
+
+Detail Items:
+{{detailsTextRows}}
+
+---
+Email otomatis dikirim pada {{generatedAt}}.

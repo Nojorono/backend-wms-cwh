@@ -25,6 +25,7 @@ import { PalletUpdateResponseDto } from './dto/pallet-update-response.dto';
 import { CreatePalletUpdateScanDto } from './dto/create-pallet-update-scan.dto';
 import { CreatePalletUpdateItemDto } from './dto/create-pallet-update-item.dto';
 import { UpdatePalletUpdateScanDto } from './dto/update-pallet-update-scan.dto';
+import { UpdatePalletUpdateStatusDto } from './dto/update-pallet-update-status.dto';
 import { PalletUpdateScanResponseDto } from './dto/pallet-update-scan-response.dto';
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
 import { MasterPalletService } from 'src/master-pallet/master-pallet.service';
@@ -52,6 +53,21 @@ export class PalletUpdateService {
       }
       return await manager.getRepository(PalletUpdate).findOne({ where: { id: palletUpdateId } });
     });
+  }
+
+  async updateStatus(
+    id: string,
+    updateStatusDto: UpdatePalletUpdateStatusDto,
+  ): Promise<PalletUpdateResponseDto> {
+    const existing = await this.repository.findOne(id);
+    if (!existing) {
+      throw new NotFoundException(`Pallet update with ID ${id} not found`);
+    }
+
+    const updated = await this.repository.updateStatus(id, {
+      status: updateStatusDto.status,
+    });
+    return this.mapToResponseDto(updated);
   }
 
   // validation in scan and pallet item exist not completed

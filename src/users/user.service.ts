@@ -96,6 +96,13 @@ export class UserService {
     return await this.repository.findAllByOrganizationId(organizationId, departementId);
   }
 
+  async findAllByRoleAndOrganizationId(
+    roleName: string,
+    organizationId: string,
+  ): Promise<User[]> {
+    return await this.repository.findAllByRoleAndOrganizationId(roleName, organizationId);
+  }
+
   async findAllWithDeleted(): Promise<User[]> {
     return await this.repository.findAllWithDeleted();
   }

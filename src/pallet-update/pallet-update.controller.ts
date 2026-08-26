@@ -22,6 +22,7 @@ import { CreateMergePalletDto } from './dto/create-merge-pallet.dto';
 import { CreateSplitPalletDto } from './dto/create-split-pallet.dto';
 import { CreatePalletUpdateScanDto } from './dto/create-pallet-update-scan.dto';
 import { UpdatePalletUpdateScanDto } from './dto/update-pallet-update-scan.dto';
+import { UpdatePalletUpdateStatusDto } from './dto/update-pallet-update-status.dto';
 import { PalletUpdateResponseDto } from './dto/pallet-update-response.dto';
 import { PalletUpdateScanResponseDto } from './dto/pallet-update-scan-response.dto';
 import { PalletUpdatePaginationQueryDto } from './dto/pallet-update-pagination.dto';
@@ -50,6 +51,23 @@ export class PalletUpdateController {
   @ApiResponse({ status: 409, description: 'Pallet update with this update number already exists.' })
   createUpdate(@Body() createPalletUpdateDto: CreatePalletUpdateDto) {
     return this.palletUpdateService.createUpdate(createPalletUpdateDto);
+  }
+
+  // update status
+  @Patch('/status/:id')
+  @ApiOperation({ summary: 'Update the status of a pallet update' })
+  @ApiResponse({
+    status: 200,
+    description: 'The pallet update status has been successfully updated.',
+    type: PalletUpdateResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request.' })
+  @ApiResponse({ status: 404, description: 'Pallet update not found.' })
+  updateStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdatePalletUpdateStatusDto,
+  ): Promise<PalletUpdateResponseDto> {
+    return this.palletUpdateService.updateStatus(id, updateStatusDto);
   }
 
   @Post('/merge')
