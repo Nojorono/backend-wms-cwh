@@ -18,7 +18,7 @@ export class BtbRepository {
     private readonly btbRepo: Repository<Btb>,
     @InjectRepository(BtbDetails)
     private readonly detailRepo: Repository<BtbDetails>,
-  ) {}
+  ) { }
 
   async create(dto: CreateBtbDto): Promise<Btb> {
     const { details, btb_date, ...header } = dto;
@@ -48,6 +48,34 @@ export class BtbRepository {
 
       return (await this.findById(savedHeader.id, manager.getRepository(Btb))) as Btb;
     });
+  }
+
+  async getAllLastDateInsert(): Promise<Btb[]> {
+    const latest = await this.btbRepo.findOne({
+      where: {},
+      order: { createdAt: 'DESC' },
+      select: ['createdAt'],
+    });
+
+    if (!latest?.createdAt) {
+      return [];
+    }
+
+    const lastCreatedAt = new Date(latest.createdAt);
+    const startOfDay = new Date(lastCreatedAt);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(lastCreatedAt);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    return await this.btbRepo
+      .createQueryBuilder('btb')
+      .leftJoinAndSelect('btb.details', 'details')
+      .leftJoinAndSelect('btb.organization', 'organization')
+      .where('btb.deletedAt IS NULL')
+      .andWhere('btb.createdAt >= :startOfDay', { startOfDay })
+      .andWhere('btb.createdAt <= :endOfDay', { endOfDay })
+      .orderBy('btb.createdAt', 'DESC')
+      .getMany();
   }
 
   async findAllPaginated(

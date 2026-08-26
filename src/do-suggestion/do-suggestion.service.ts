@@ -950,7 +950,7 @@ export class DoSuggestionService {
       ? DoSuggestionStatus.VOID_NEED_ACTION
       : DoSuggestionStatus.VOID;
 
-    const updated = await this.repository.updateStatus(
+    const updated = await this.repository.voidWithQuantities(
       existing.id,
       nextStatus,
       dto.updated_by,

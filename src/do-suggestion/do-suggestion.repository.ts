@@ -40,6 +40,7 @@ export type DoSuggestionDetailData = Partial<
     | 'item_qty_revision'
     | 'item_qty_submitted'
     | 'item_qty_final'
+    | 'item_qty_void'
     | 'contribution_percentage'
     | 'item_uom'
     | 'line_number'
@@ -380,6 +381,41 @@ export class DoSuggestionRepository {
     }
 
     await this.headerRepository.update(id, patch);
+    return (await this.findById(id)) as DoSuggestion;
+  }
+
+  /**
+   * Void DO suggestion: update header status and set each detail
+   * item_qty_void = -item_qty_final.
+   */
+  async voidWithQuantities(
+    id: string,
+    status: DoSuggestionStatus,
+    updatedBy?: string,
+  ): Promise<DoSuggestion> {
+    const existing = await this.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`DO suggestion with ID ${id} not found`);
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const headerPatch: Partial<DoSuggestion> = { status };
+      if (updatedBy !== undefined) {
+        headerPatch.updated_by = updatedBy;
+      }
+      await manager.update(DoSuggestion, id, headerPatch);
+
+      await manager
+        .createQueryBuilder()
+        .update(DoSuggestionDetail)
+        .set({
+          item_qty_void: () => '-COALESCE(item_qty_final, 0)',
+        })
+        .where('do_suggestion_uuid = :id', { id })
+        .andWhere('deleted_at IS NULL')
+        .execute();
+    });
+
     return (await this.findById(id)) as DoSuggestion;
   }
 

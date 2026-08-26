@@ -71,6 +71,10 @@ export class BtbService {
     return { success: true, message: 'BTB detail deleted' };
   }
 
+  async getAllLastDateInsert(): Promise<Btb[]> {
+    return await this.repository.getAllLastDateInsert();
+  }
+
   async createDummyDataJat(): Promise<{ success: boolean; message: string }> {
     const doSuggestions = await this.doSuggestionRepository.findByOrganizationId(
       'db72a8e1-0ca6-4353-b157-9b798f703179',
