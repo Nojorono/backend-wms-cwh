@@ -28,6 +28,13 @@ export class BtbController {
     return this.service.findAllPaginated(query);
   }
 
+  @Get('last-date-insert')
+  @ApiOperation({ summary: 'Get last date insert in btb table' })
+  @ApiResponse({ status: 200 })
+  getAllLastDateInsert(): Promise<Btb[]> {
+    return this.service.getAllLastDateInsert();
+  }
+
   @Get('by-number/:btbNumber')
   @ApiOperation({ summary: 'Get BTB by btb_number with details' })
   @ApiResponse({ status: 200, type: Btb })

@@ -19,7 +19,7 @@ import { DoSuggestionService } from './do-suggestion.service';
     AuthModule,
     EmailModule,
     UserModule,
-    MoveOrderIntegrationModule,
+    forwardRef(() => MoveOrderIntegrationModule),
     forwardRef(() => OutboundSalesModule),
   ],
   controllers: [DoSuggestionController],

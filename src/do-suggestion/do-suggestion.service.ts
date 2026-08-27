@@ -20,6 +20,11 @@ import { MasterIO } from '../core/domain/entities/master-io.entity';
 import { UserService } from '../users/user.service';
 import { EmailService } from '../email/email.service';
 import { DoSuggestionVoidTemplateContext } from '../email/template-email/types/do-suggestion-void-template.interface';
+import {
+  buildVoidBackToKecilSourceHeaderId,
+  buildVoidBackToKecilSourceLineId,
+  DO_SUGGESTION_VOID_BACK_TO_KECIL_SUFFIX,
+} from './do-suggestion-void.util';
 
 @Injectable()
 export class DoSuggestionService {
@@ -415,8 +420,8 @@ export class DoSuggestionService {
         line_status: 7,
         status_date: new Date(dateRequired), // call_plan_date_start
         source_system: 'WMS',
-        source_header_id: suggestion.id + '-V',
-        source_line_id: line.id + '-V',
+        source_header_id: buildVoidBackToKecilSourceHeaderId(suggestion.id),
+        source_line_id: buildVoidBackToKecilSourceLineId(line.id),
         iface_status: 'READY',
         operation: 'CREATE',
         db_flag: 'T',
@@ -449,7 +454,7 @@ export class DoSuggestionService {
 
     return {
       master_io_id: suggestion.organization_id ?? undefined,
-      request_number: suggestion.spb_number?.trim() + '-V',
+      request_number: `${suggestion.spb_number?.trim()}${DO_SUGGESTION_VOID_BACK_TO_KECIL_SUFFIX}`,
       transaction_type_id: transactionTypeId,
       move_order_type: 1,
       organization_id: Number(organizationId),
@@ -471,7 +476,7 @@ export class DoSuggestionService {
       operation: 'CREATE',
       db_flag: 'T',
       source_system: 'WMS',
-      source_header_id: suggestion.id + '-V',
+      source_header_id: buildVoidBackToKecilSourceHeaderId(suggestion.id),
       iface_status: 'READY',
       iface_mode: 'CREATE_TRANSACT_MO',
       total_lines: validLines.length,
@@ -950,7 +955,7 @@ export class DoSuggestionService {
       ? DoSuggestionStatus.VOID_NEED_ACTION
       : DoSuggestionStatus.VOID;
 
-    const updated = await this.repository.updateStatus(
+    const updated = await this.repository.voidWithQuantities(
       existing.id,
       nextStatus,
       dto.updated_by,

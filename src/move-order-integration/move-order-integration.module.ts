@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MoveOrderIntegration } from '../core/domain/entities/move-order-integration.entity';
 import { MoveOrderLineIntegration } from '../core/domain/entities/move-order-integration-lines.entity';
+import { DoSuggestionModule } from '../do-suggestion/do-suggestion.module';
 import { MoveOrderIntegrationController } from './move-order-integration.controller';
 import { MoveOrderIntegrationService } from './move-order-integration.service';
 import { MoveOrderIntegrationRepository } from './move-order-integration.repository';
@@ -25,6 +26,7 @@ import { MoveOrderIntegrationLogService } from './integration/move-order-integra
 @Module({
   imports: [
     ConfigModule,
+    forwardRef(() => DoSuggestionModule),
     TypeOrmModule.forFeature([MoveOrderIntegration, MoveOrderLineIntegration]),
     ClientsModule.registerAsync([
       {
