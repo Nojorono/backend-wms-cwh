@@ -50,9 +50,9 @@ export class BtbRepository {
     });
   }
 
-  async getAllLastDateInsert(): Promise<Btb[]> {
+  async getAllLastDateInsert(organizationId: string): Promise<Btb[]> {
     const latest = await this.btbRepo.findOne({
-      where: {},
+      where: { organization_id: organizationId },
       order: { createdAt: 'DESC' },
       select: ['createdAt'],
     });
@@ -72,6 +72,7 @@ export class BtbRepository {
       .leftJoinAndSelect('btb.details', 'details')
       .leftJoinAndSelect('btb.organization', 'organization')
       .where('btb.deletedAt IS NULL')
+      .andWhere('btb.organization_id = :organizationId', { organizationId })
       .andWhere('btb.createdAt >= :startOfDay', { startOfDay })
       .andWhere('btb.createdAt <= :endOfDay', { endOfDay })
       .orderBy('btb.createdAt', 'DESC')
@@ -80,6 +81,7 @@ export class BtbRepository {
 
   async findAllPaginated(
     query: BtbPaginationQueryDto,
+    organizationId: string,
   ): Promise<{ data: Btb[]; total: number }> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
@@ -102,16 +104,11 @@ export class BtbRepository {
       .createQueryBuilder('btb')
       .leftJoinAndSelect('btb.details', 'details')
       .leftJoinAndSelect('btb.organization', 'organization')
-      .where('btb.deletedAt IS NULL');
+      .where('btb.deletedAt IS NULL')
+      .andWhere('btb.organization_id = :organizationId', { organizationId });
 
     if (query.status?.trim()) {
       qb.andWhere('btb.status = :status', { status: query.status.trim() });
-    }
-
-    if (query.organization_id?.trim()) {
-      qb.andWhere('btb.organization_id = :organizationId', {
-        organizationId: query.organization_id.trim(),
-      });
     }
 
     if (query.sales_nik?.trim()) {

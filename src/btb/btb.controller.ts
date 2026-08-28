@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Btb } from '../core/domain/entities/btb.entity';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { OrganizationId } from 'src/core/decorators/organization-id.decorator';
 import { BtbService } from './btb.service';
 import { CreateBtbDto } from './dto/create-btb.dto';
 import { UpdateBtbDto } from './dto/update-btb.dto';
@@ -24,15 +25,18 @@ export class BtbController {
   @Get()
   @ApiOperation({ summary: 'List BTB records (paginated)' })
   @ApiResponse({ status: 200 })
-  findAll(@Query() query: BtbPaginationQueryDto): Promise<PaginatedResponseDto<Btb>> {
-    return this.service.findAllPaginated(query);
+  findAll(
+    @Query() query: BtbPaginationQueryDto,
+    @OrganizationId() organizationId: string,
+  ): Promise<PaginatedResponseDto<Btb>> {
+    return this.service.findAllPaginated(query, organizationId);
   }
 
   @Get('last-date-insert')
   @ApiOperation({ summary: 'Get last date insert in btb table' })
   @ApiResponse({ status: 200 })
-  getAllLastDateInsert(): Promise<Btb[]> {
-    return this.service.getAllLastDateInsert();
+  getAllLastDateInsert(@OrganizationId() organizationId: string): Promise<Btb[]> {
+    return this.service.getAllLastDateInsert(organizationId);
   }
 
   @Get('by-number/:btbNumber')
