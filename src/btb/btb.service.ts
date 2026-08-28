@@ -26,8 +26,9 @@ export class BtbService {
 
   async findAllPaginated(
     query: BtbPaginationQueryDto,
+    organizationId: string,
   ): Promise<PaginatedResponseDto<Btb>> {
-    const { data, total } = await this.repository.findAllPaginated(query);
+    const { data, total } = await this.repository.findAllPaginated(query, organizationId);
     return this.paginationService.createPaginatedResponse(data, query, total);
   }
 
@@ -71,8 +72,8 @@ export class BtbService {
     return { success: true, message: 'BTB detail deleted' };
   }
 
-  async getAllLastDateInsert(): Promise<Btb[]> {
-    return await this.repository.getAllLastDateInsert();
+  async getAllLastDateInsert(organizationId: string): Promise<Btb[]> {
+    return await this.repository.getAllLastDateInsert(organizationId);
   }
 
   async createDummyDataJat(): Promise<{ success: boolean; message: string }> {
