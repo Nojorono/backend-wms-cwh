@@ -183,7 +183,7 @@ export class DoSuggestionService {
       throw new NotFoundException(`Organization with ID ${normalizedOrganizationId} not found`);
     }
 
-    const organizationCode = organization.organization_code?.trim();
+    const organizationCode = organization.organization_name?.trim();
     if (!organizationCode) {
       throw new BadRequestException(
         `Organization ${normalizedOrganizationId} has no organization_code`,
