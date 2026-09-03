@@ -163,6 +163,60 @@ export class DoSuggestionRepository {
 
     return await qb.orderBy('ds.createdAt', 'DESC').getMany();
   }
+
+  async findAllReturn(
+    organizationId: string,
+    callplanDateStart: string,
+  ): Promise<DoSuggestion[]> {
+    return await this.headerRepository
+      .createQueryBuilder('ds')
+      .select([
+        'ds.id',
+        'ds.spb_number',
+        'ds.spb_type',
+        'ds.mo_type',
+        'ds.spb_date',
+        'ds.callplan_number',
+        'ds.callplan_date_start',
+        'ds.callplan_date_end',
+        'ds.sales_nik',
+        'ds.sales_name',
+        'ds.status',
+        'ds.createdAt',
+      ])
+      .innerJoin(
+        'ds.details',
+        'details',
+        'details.deleted_at IS NULL AND (details.item_qty_revision < 0 OR details.item_qty_void < 0)',
+      )
+      .addSelect([
+        'details.id',
+        'details.do_suggestion_uuid',
+        'details.item_code',
+        'details.inventory_item_id',
+        'details.item_qty_final',
+        'details.item_qty_submitted',
+        'details.item_qty_void',
+        'details.item_qty_revision',
+        'details.item_uom',
+        'details.line_number',
+      ])
+      .where('ds.organization_id = :organizationId', { organizationId })
+      .andWhere('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
+      .andWhere('ds.deleted_at IS NULL')
+      .andWhere('ds.status IN (:...statuses)', {
+        statuses: [
+          DoSuggestionStatus.FINAL,
+          DoSuggestionStatus.REVISED,
+          DoSuggestionStatus.VOID,
+          DoSuggestionStatus.VOID_NEED_ACTION,
+        ],
+      })
+      .orderBy('ds.createdAt', 'DESC')
+      .addOrderBy('details.line_number', 'ASC')
+      .getMany();
+  }
+
   async findById(id: string): Promise<DoSuggestion | null> {
     return await this.headerRepository.findOne({
       where: { id },

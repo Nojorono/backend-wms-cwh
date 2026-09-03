@@ -59,6 +59,25 @@ export class DoSuggestionService {
     return await this.repository.create(payload);
   }
 
+  async findAllReturn(
+    organizationId: string,
+    callplanDateStart: string,
+  ): Promise<DoSuggestion[]> {
+    if (!organizationId?.trim()) {
+      throw new BadRequestException('organizationId is required');
+    }
+    if (!callplanDateStart?.trim()) {
+      throw new BadRequestException('call-plan-start is required');
+    }
+
+    const dateOnly = callplanDateStart.trim().split('T')[0];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+      throw new BadRequestException(`Invalid call-plan-start: ${callplanDateStart}`);
+    }
+
+    return await this.repository.findAllReturn(organizationId.trim(), dateOnly);
+  }
+
   async createOrUpdateBatch(
     dto: BatchCreateOrUpdateDoSuggestionDto,
   ): Promise<{ success: boolean; message: string; data: DoSuggestion[] }> {
