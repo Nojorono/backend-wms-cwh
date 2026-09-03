@@ -21,6 +21,7 @@ import {
   CreateAndIntegrateMoveOrderPayloadDto,
   SubmitMoveOrderOraclePayloadDto,
 } from './dto/submit-move-order-oracle-payload.dto';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Move Order Integration')
 @ApiBearerAuth('JWT-auth')
@@ -32,9 +33,10 @@ export class MoveOrderIntegrationController {
   @ApiOperation({ summary: 'List move order integration headers with lines (paginated)' })
   @ApiResponse({ status: 200 })
   findAllHeaders(
+    @OrganizationId() organizationId: string,
     @Query() query: MoveOrderIntegrationPaginationQueryDto,
   ): Promise<PaginatedResponseDto<MoveOrderIntegrationHeaderWithLines>> {
-    return this.service.findAllHeadersPaginated(query);
+    return this.service.findAllHeadersPaginated(organizationId, query);
   }
 
   @Post('submit-oracle')
