@@ -56,6 +56,7 @@
     "@types/uuid": "^10.0.0",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.9",
+    "axios": "^1.20.0",
     "bcrypt": "^6.0.0",
     "bwip-js": "^4.7.0",
     "class-transformer": "^0.5.1",

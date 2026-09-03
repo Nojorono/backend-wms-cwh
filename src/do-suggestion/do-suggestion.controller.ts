@@ -21,6 +21,9 @@ import {
 } from './dto/do-suggestion-filter-query.dto';
 import { CreateDoDmsDto } from './dto/create-do-dms.dto';
 import { VoidDoDmsDto } from './dto/void-do-dms.dto';
+import { CreateDummyDataDoSuggestionQueryDto } from './dto/create-dummy-data-do-suggestion-query.dto';
+import { HitDmsBkbDto } from './dto/hit-dms-bkb.dto';
+import { HitDmsBkbResult } from './dto/dms-bkb-payload.dto';
 import { DmsIntegrationAuth } from '../core/decorators/dms-integration-auth.decorator';
 
 @ApiTags('DO Suggestion')
@@ -92,6 +95,17 @@ export class DoSuggestionController {
     );
   }
 
+  // create dummy data do suggestion
+  @Post('dummy-data/:organizationId')
+  @ApiOperation({ summary: 'Create dummy data do suggestion' })
+  @ApiResponse({ status: 200 })
+  createDummyDataDoSuggestion(
+    @Param('organizationId') organizationId: string,
+    @Query() query: CreateDummyDataDoSuggestionQueryDto,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.doSuggestionService.createDummyDataDoSuggestion(organizationId, query.mo_type);
+  }
+
   @Post('callplan/find')
   @ApiOperation({ summary: 'Get DO suggestions by callplan number (request body)' })
   @ApiResponse({ status: 200, type: [DoSuggestion] })
@@ -133,6 +147,14 @@ export class DoSuggestionController {
   @ApiResponse({ status: 200 })
   integrateBackToKecil(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
     return this.doSuggestionService.integrateBackToKecil(id);
+  }
+
+  // hit to dms /api/wms/v1/bkb
+  @Post('dms/bkb')
+  @ApiOperation({ summary: 'Send DO suggestion BKB to DMS by SPB number' })
+  @ApiResponse({ status: 200 })
+  hitToDmsBkb(@Body() dto: HitDmsBkbDto): Promise<HitDmsBkbResult> {
+    return this.doSuggestionService.hitToDmsBkb(dto.spb_number);
   }
 
   @Post('dms')

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { DataSource, EntityManager, Repository } from 'typeorm'; import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
 import { MoveOrderIntegration } from '../core/domain/entities/move-order-integration.entity';
-import { formatSpbNumber, parseSpbSequence } from './do-suggestion-spb.util';
+import { formatSpbNumber, parseSpbSequence, formatOrganizationCallplanNumber, buildOrganizationCallplanPrefix, parseOrganizationCallplanSequence } from './do-suggestion-spb.util';
 import {
   DO_SUGGESTION_VOID_BACK_TO_KECIL_SUFFIX,
   parseDoSuggestionIdFromVoidSourceHeaderId,
@@ -262,6 +262,35 @@ export class DoSuggestionRepository {
     }
 
     return formatSpbNumber(callplanNumber, maxSequence + 1);
+  }
+
+  async generateNextOrganizationCallplanNumber(
+    organizationId: string,
+    organizationCode: string,
+    callplanDateStart: Date,
+  ): Promise<string> {
+    const prefix = buildOrganizationCallplanPrefix(organizationCode, callplanDateStart);
+    const rows = await this.headerRepository
+      .createQueryBuilder('ds')
+      .select('ds.callplan_number', 'callplan_number')
+      .where('ds.organization_id = :organizationId', { organizationId })
+      .andWhere('ds.callplan_number LIKE :prefix', { prefix: `${prefix}/%` })
+      .andWhere('ds.deleted_at IS NULL')
+      .getRawMany<{ callplan_number: string }>();
+
+    let maxSequence = 0;
+    for (const row of rows) {
+      const sequence = parseOrganizationCallplanSequence(row.callplan_number, prefix);
+      if (sequence != null && sequence > maxSequence) {
+        maxSequence = sequence;
+      }
+    }
+
+    return formatOrganizationCallplanNumber(
+      organizationCode,
+      callplanDateStart,
+      maxSequence + 1,
+    );
   }
 
   async findByOrganizationIdAndItemCodeAndDate(

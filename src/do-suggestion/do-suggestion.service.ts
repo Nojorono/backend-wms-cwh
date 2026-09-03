@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios, { AxiosError, isAxiosError } from 'axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
@@ -25,6 +27,10 @@ import {
   buildVoidBackToKecilSourceLineId,
   DO_SUGGESTION_VOID_BACK_TO_KECIL_SUFFIX,
 } from './do-suggestion-void.util';
+import { DoSuggestionMoType } from './dto/create-dummy-data-do-suggestion-query.dto';
+import { DmsBkbPayload, DmsBkbErrorResponse, HitDmsBkbResult } from './dto/dms-bkb-payload.dto';
+import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
+import { toDmsCallplanNumber, toDmsSpbNumber } from './do-suggestion-dms-bkb.util';
 
 @Injectable()
 export class DoSuggestionService {
@@ -40,6 +46,7 @@ export class DoSuggestionService {
     private readonly masterIORepository: Repository<MasterIO>,
     private readonly userService: UserService,
     private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
   ) { }
 
   async createOrUpdate(dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
@@ -159,6 +166,184 @@ export class DoSuggestionService {
       status,
     );
   }
+
+  async createDummyDataDoSuggestion(
+    organizationId: string,
+    moType: DoSuggestionMoType,
+  ): Promise<{ success: boolean; message: string }> {
+    if (!organizationId?.trim()) {
+      throw new BadRequestException('organizationId is required');
+    }
+
+    const normalizedOrganizationId = organizationId.trim();
+    const organization = await this.masterIORepository.findOne({
+      where: { id: normalizedOrganizationId },
+    });
+    if (!organization) {
+      throw new NotFoundException(`Organization with ID ${normalizedOrganizationId} not found`);
+    }
+
+    const organizationCode = organization.organization_name?.trim();
+    if (!organizationCode) {
+      throw new BadRequestException(
+        `Organization ${normalizedOrganizationId} has no organization_code`,
+      );
+    }
+
+    const onHandItems = await this.fetchDummyOnHandItems(normalizedOrganizationId);
+    if (!onHandItems.length) {
+      throw new BadRequestException(
+        `No on-hand items found for organization ${normalizedOrganizationId}`,
+      );
+    }
+
+    const callplanDateStart = this.startOfToday();
+    const callplanDateEnd = new Date(callplanDateStart);
+    callplanDateEnd.setDate(callplanDateEnd.getDate() + 2);
+    const spbDate = new Date(callplanDateStart);
+
+    const salesTemplates = [
+      {
+        sales_nik: '10000001',
+        sales_name: 'Dummy Sales 1',
+        sales_spv_nik: '20000001',
+        sales_spv: 'Dummy SPV 1',
+      },
+      {
+        sales_nik: '10000002',
+        sales_name: 'Dummy Sales 2',
+        sales_spv_nik: '20000001',
+        sales_spv: 'Dummy SPV 1',
+      },
+      {
+        sales_nik: '10000003',
+        sales_name: 'Dummy Sales 3',
+        sales_spv_nik: '20000002',
+        sales_spv: 'Dummy SPV 2',
+      },
+      {
+        sales_nik: '10000004',
+        sales_name: 'Dummy Sales 4',
+        sales_spv_nik: '20000002',
+        sales_spv: 'Dummy SPV 2',
+      },
+      {
+        sales_nik: '10000005',
+        sales_name: 'Dummy Sales 5',
+        sales_spv_nik: '20000003',
+        sales_spv: 'Dummy SPV 3',
+      },
+    ];
+
+    let created = 0;
+    let skipped = 0;
+
+    for (let index = 0; index < salesTemplates.length; index += 1) {
+      const sales = salesTemplates[index];
+      const callplanNumber = await this.repository.generateNextOrganizationCallplanNumber(
+        normalizedOrganizationId,
+        organizationCode,
+        callplanDateStart,
+      );
+      const existing = await this.repository.findByCallplanNumber(callplanNumber);
+      if (existing.some((row) => row.organization_id === normalizedOrganizationId)) {
+        skipped += 1;
+        continue;
+      }
+
+      const lineCount = Math.min(5, onHandItems.length);
+      const selectedItems = this.pickRandomItems(onHandItems, lineCount);
+
+      const lines: DoSuggestionDetailData[] = selectedItems.map((item, lineIndex) => {
+        const quantity = Math.floor(Math.random() * 10) + 1;
+        return {
+          item_code: item.item_code,
+          inventory_item_id: item.inventory_item_id,
+          item_qty_suggestion: quantity,
+          item_uom: 'BKS',
+          line_number: lineIndex + 1,
+        };
+      });
+
+      const spbNumber = await this.repository.generateNextSpbNumber(
+        callplanNumber,
+        callplanDateStart,
+      );
+
+      await this.repository.create({
+        organization_id: normalizedOrganizationId,
+        callplan_number: callplanNumber,
+        callplan_date_start: callplanDateStart,
+        callplan_date_end: callplanDateEnd,
+        route_number: `RT-DUMMY-${String(index + 1).padStart(3, '0')}`,
+        trip_type: 'REGULAR',
+        sales_nik: sales.sales_nik,
+        sales_name: sales.sales_name,
+        sales_spv: sales.sales_spv,
+        sales_spv_nik: sales.sales_spv_nik,
+        status: DoSuggestionStatus.SUBMITTED,
+        created_by: 'SYSTEM',
+        spb_date: spbDate,
+        spb_number: spbNumber,
+        spb_type: 1,
+        mo_type: moType,
+        preparation_date: spbDate,
+        lines,
+      });
+
+      created += 1;
+    }
+
+    return {
+      success: true,
+      message: `Dummy DO suggestion data created: ${created} created, ${skipped} skipped`,
+    };
+  }
+
+  private async fetchDummyOnHandItems(
+    organizationId: string,
+  ): Promise<Array<{ item_code: string; inventory_item_id: number }>> {
+    const rows = await this.onHandAtrRepository
+      .createQueryBuilder('onHandAtr')
+      .select('onHandAtr.item_code', 'item_code')
+      .addSelect('onHandAtr.inventory_item_id', 'inventory_item_id')
+      .where('onHandAtr.organization_id = :organizationId', { organizationId })
+      .andWhere('onHandAtr.item_code IS NOT NULL')
+      .andWhere("TRIM(onHandAtr.item_code) <> ''")
+      .andWhere('onHandAtr.inventory_item_id IS NOT NULL')
+      .andWhere('onHandAtr.deleted_at IS NULL')
+      .groupBy('onHandAtr.item_code')
+      .addGroupBy('onHandAtr.inventory_item_id')
+      .orderBy('onHandAtr.item_code', 'ASC')
+      .limit(50)
+      .getRawMany<{ item_code: string; inventory_item_id: string | number }>();
+
+    return rows
+      .map((row) => ({
+        item_code: row.item_code?.trim() ?? '',
+        inventory_item_id: Number(row.inventory_item_id),
+      }))
+      .filter((row) => row.item_code && Number.isFinite(row.inventory_item_id));
+  }
+
+  private pickRandomItems<T>(items: T[], count: number): T[] {
+    const pool = [...items];
+    const selected: T[] = [];
+
+    while (selected.length < count && pool.length > 0) {
+      const index = Math.floor(Math.random() * pool.length);
+      selected.push(pool.splice(index, 1)[0]);
+    }
+
+    return selected;
+  }
+
+  private startOfToday(): Date {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }
+
   private async mapDtoToCreateData(
     dto: CreateOrUpdateDoSuggestionDto,
   ): Promise<DoSuggestionPersistData> {
@@ -583,6 +768,47 @@ export class DoSuggestionService {
     return Number(value);
   }
 
+  /** DMS expects `YYYY-MM-DD` (e.g. 2026-08-31); zod rejects other formats as invalid_string. */
+  private toDmsDateOnly(value?: Date | string | null): string | undefined {
+    if (value == null) {
+      return undefined;
+    }
+
+    let year: number;
+    let month: number;
+    let day: number;
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+
+      const datePart = trimmed.split('T')[0];
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(datePart);
+      if (match) {
+        return datePart;
+      }
+
+      const parsed = new Date(trimmed);
+      if (Number.isNaN(parsed.getTime())) {
+        return undefined;
+      }
+      year = parsed.getUTCFullYear();
+      month = parsed.getUTCMonth() + 1;
+      day = parsed.getUTCDate();
+    } else {
+      if (Number.isNaN(value.getTime())) {
+        return undefined;
+      }
+      year = value.getUTCFullYear();
+      month = value.getUTCMonth() + 1;
+      day = value.getUTCDate();
+    }
+
+    return `${String(year)}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
   private toDateOnly(value?: Date | string | null): string | undefined {
     if (value == null) {
       return undefined;
@@ -935,6 +1161,282 @@ export class DoSuggestionService {
     const payload = await this.mapDtoToCreateDataDoDms(dto);
     return await this.repository.create(payload);
 
+  }
+
+  async hitToDmsBkb(spbNumber: string): Promise<HitDmsBkbResult> {
+    const normalizedSpbNumber = spbNumber?.trim();
+    if (!normalizedSpbNumber) {
+      throw new BadRequestException('spb_number is required');
+    }
+
+    const suggestion = await this.repository.findBySpbNumber(normalizedSpbNumber);
+    if (!suggestion) {
+      throw new NotFoundException(
+        `DO suggestion with SPB number ${normalizedSpbNumber} not found`,
+      );
+    }
+
+    const payload = this.mapDoSuggestionToDmsBkbPayload(suggestion);
+    const apiUrl = this.getDmsBkbApiUrl();
+    const appId = this.getRequiredConfig('DMS_BKB_APP_ID');
+    const appSecret = this.getRequiredConfig('DMS_BKB_APP_SECRET');
+
+    this.logger.log(
+      `Sending DMS BKB for SPB ${normalizedSpbNumber}: ${JSON.stringify(payload)}`,
+    );
+
+    try {
+      const response = await axios.post(apiUrl, payload, {
+        headers: {
+          'x-dms-app-id': appId,
+          'x-dms-app-secret': appSecret,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        timeout: 30_000,
+      });
+
+      this.logger.log(
+        `DMS BKB created for SPB ${normalizedSpbNumber} (status=${response.status})`,
+      );
+
+      return {
+        success: true,
+        message: 'DMS BKB request completed successfully',
+        spb_number: normalizedSpbNumber,
+        payload,
+        dms_response: response.data,
+      };
+    } catch (error) {
+      const message = this.extractDmsBkbErrorMessage(error);
+      const dmsResponse = isAxiosError(error) ? error.response?.data : undefined;
+      this.logger.error(
+        `Failed to send DMS BKB for SPB ${normalizedSpbNumber}: ${message} | response=${JSON.stringify(dmsResponse)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new BadGatewayException({
+        message,
+        dms_response: dmsResponse,
+        payload,
+      });
+    }
+  }
+
+  private mapDoSuggestionToDmsBkbPayload(suggestion: DoSuggestion): DmsBkbPayload {
+    const organizationCode = suggestion.organization?.organization_name?.trim();
+    if (!organizationCode) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no organization_code`,
+      );
+    }
+
+    const moType = suggestion.mo_type?.trim();
+    if (!moType) {
+      throw new BadRequestException(`DO suggestion ${suggestion.id} has no mo_type`);
+    }
+
+    const callplanNumber = suggestion.callplan_number?.trim();
+    if (!callplanNumber) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no callplan_number`,
+      );
+    }
+
+    const spbNumber = suggestion.spb_number?.trim();
+    if (!spbNumber) {
+      throw new BadRequestException(`DO suggestion ${suggestion.id} has no spb_number`);
+    }
+
+    const preparationDate = this.toDmsDateOnly(suggestion.preparation_date);
+    const callplanDateStart = this.toDmsDateOnly(suggestion.callplan_date_start);
+    const callplanDateEnd = this.toDmsDateOnly(suggestion.callplan_date_end);
+    const spbDate = this.toDmsDateOnly(suggestion.spb_date);
+
+    if (!callplanDateStart || !callplanDateEnd || !spbDate) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} is missing required date fields for DMS BKB`,
+      );
+    }
+
+    const lines = (suggestion.details ?? [])
+      .map((line, index) => this.mapDoSuggestionDetailToDmsBkbLine(line, index + 1))
+      .filter((line): line is NonNullable<typeof line> => line != null);
+
+    if (!lines.length) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestion.id} has no valid detail lines for DMS BKB`,
+      );
+    }
+
+    const dmsCallplanNumber = toDmsCallplanNumber(callplanNumber);
+    const dmsSpbNumber = toDmsSpbNumber(spbNumber);
+    const routeNumber = this.requireNonEmptyField(suggestion.route_number, 'route_number', suggestion.id);
+    const tripType = this.requireNonEmptyField(suggestion.trip_type, 'trip_type', suggestion.id);
+    const salesNik = this.requireNonEmptyField(suggestion.sales_nik, 'sales_nik', suggestion.id);
+    const salesName = this.requireNonEmptyField(suggestion.sales_name, 'sales_name', suggestion.id);
+    const salesSpv = this.requireNonEmptyField(suggestion.sales_spv, 'sales_spv', suggestion.id);
+    const salesSpvNik = this.requireNonEmptyField(suggestion.sales_spv_nik, 'sales_spv_nik', suggestion.id);
+
+    return {
+      organization_code: organizationCode,
+      spb_type: this.resolveDmsSpbType(moType),
+      mo_type: moType,
+      preparation_date: preparationDate ?? spbDate,
+      callplan_number: dmsCallplanNumber,
+      callplan_date_start: callplanDateStart,
+      callplan_date_end: callplanDateEnd,
+      route_number: routeNumber,
+      trip_type: tripType,
+      sales_nik: salesNik,
+      sales_name: salesName,
+      sales_spv: salesSpv,
+      sales_spv_nik: salesSpvNik,
+      spb_date: spbDate,
+      spb_number: dmsSpbNumber,
+      lines,
+    };
+  }
+
+  private requireNonEmptyField(
+    value: string | null | undefined,
+    fieldName: string,
+    suggestionId: string,
+  ): string {
+    const normalized = value?.trim();
+    if (!normalized) {
+      throw new BadRequestException(
+        `DO suggestion ${suggestionId} is missing required field ${fieldName} for DMS BKB`,
+      );
+    }
+
+    return normalized;
+  }
+
+  private mapDoSuggestionDetailToDmsBkbLine(
+    line: DoSuggestionDetail,
+    fallbackLineNumber: number,
+  ): DmsBkbPayload['lines'][number] | null {
+    const itemCode = line.item_code?.trim();
+    const inventoryItemId = Number(line.inventory_item_id);
+    const itemQtyFinal = this.resolveDmsBkbQty(line);
+    const itemUom = line.item_uom?.trim() || 'BKS';
+    const lineNumber = Number(line.line_number);
+
+    if (!itemCode || !Number.isFinite(inventoryItemId) || !Number.isFinite(itemQtyFinal) || itemQtyFinal <= 0) {
+      return null;
+    }
+
+    return {
+      item_code: itemCode,
+      inventory_item_id: inventoryItemId,
+      item_qty_final: itemQtyFinal,
+      item_uom: itemUom,
+      line_number: Number.isFinite(lineNumber) && lineNumber > 0 ? lineNumber : fallbackLineNumber,
+    };
+  }
+
+  private resolveDmsBkbQty(line: DoSuggestionDetail): number {
+    const candidates = [
+      line.item_qty_final,
+      line.item_qty_submitted,
+      line.item_qty_revision,
+      line.item_qty_suggestion,
+    ];
+
+    for (const candidate of candidates) {
+      const qty = this.parseItemQtyFinal(candidate);
+      if (Number.isFinite(qty) && qty > 0) {
+        return qty;
+      }
+    }
+
+    return Number.NaN;
+  }
+
+  private resolveDmsSpbType(moType: string): number {
+    if (moType === 'FPPR Awal') {
+      return 105;
+    }
+
+    if (moType === 'FPPR Tambahan') {
+      return 106;
+    }
+
+    return 105;
+  }
+
+  private getDmsBkbApiUrl(): string {
+    return (
+      this.configService.get<string>('DMS_BKB_API_URL')?.trim() ||
+      'https://staging-api.nna-id.com/api/wms/v1/bkb'
+    );
+  }
+
+  private getRequiredConfig(key: string): string {
+    const value = this.configService.get<string>(key)?.trim();
+    if (!value) {
+      throw new BadRequestException(`${key} is not configured`);
+    }
+
+    return value;
+  }
+
+  private extractDmsBkbErrorMessage(error: unknown): string {
+    if (isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      const data = axiosError.response?.data as DmsBkbErrorResponse | string | undefined;
+
+      if (typeof data === 'string' && data.trim()) {
+        return data.trim();
+      }
+
+      if (data && typeof data === 'object') {
+        const validationDetails = this.formatDmsValidationErrors(data.errors);
+        if (validationDetails) {
+          return `${data.message?.trim() || 'Validation failed'}: ${validationDetails}`;
+        }
+
+        if (data.message?.trim()) {
+          return data.message.trim();
+        }
+
+        if (data.error?.trim()) {
+          return data.error.trim();
+        }
+      }
+
+      if (axiosError.response?.status) {
+        return `DMS BKB request failed with status ${axiosError.response.status}`;
+      }
+
+      if (axiosError.code === 'ECONNABORTED') {
+        return 'DMS BKB request timed out';
+      }
+
+      return axiosError.message;
+    }
+
+    return error instanceof Error ? error.message : 'DMS BKB request failed';
+  }
+
+  private formatDmsValidationErrors(
+    errors?: DmsBkbErrorResponse['errors'],
+  ): string | null {
+    if (!errors?.length) {
+      return null;
+    }
+
+    return errors
+      .map((entry) => {
+        if (typeof entry === 'string') {
+          return entry;
+        }
+
+        const field = entry.field?.trim() || 'field';
+        const message = entry.message?.trim() || 'invalid';
+        return `${field}: ${message}`;
+      })
+      .join('; ');
   }
 
   async voidDoDms(dto: VoidDoDmsDto): Promise<DoSuggestion> {
