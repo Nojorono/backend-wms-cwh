@@ -22,10 +22,12 @@ import { MoveOrderIntegrationPollService } from './integration/move-order-integr
 import { MoveOrderIntegrationPollWorker } from './integration/move-order-integration-poll.worker';
 import { MoveOrderIntegrationSyncService } from './integration/move-order-integration-sync.service';
 import { MoveOrderIntegrationLogService } from './integration/move-order-integration-log.service';
+import { MasterIOModule } from 'src/master-io/master-io.module';
 
 @Module({
   imports: [
     ConfigModule,
+    forwardRef(() => MasterIOModule),
     forwardRef(() => DoSuggestionModule),
     TypeOrmModule.forFeature([MoveOrderIntegration, MoveOrderLineIntegration]),
     ClientsModule.registerAsync([
@@ -70,4 +72,4 @@ import { MoveOrderIntegrationLogService } from './integration/move-order-integra
     MoveOrderIntegrationPollProducer,
   ],
 })
-export class MoveOrderIntegrationModule {}
+export class MoveOrderIntegrationModule { }

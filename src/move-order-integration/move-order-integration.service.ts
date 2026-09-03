@@ -20,6 +20,7 @@ import { PaginationService } from '../core/services/pagination.service';
 import {
   mapMoveOrderIntegrationEntityToOracle,
 } from './integration/move-order-integration.mapper';
+import { MasterIOService } from '../master-io/master-io.service';
 
 export type MoveOrderIntegrationAggregateResult = {
   header: MoveOrderIntegration;
@@ -52,6 +53,7 @@ export type MoveOrderIntegrationQueuedBatchResult = {
 export class MoveOrderIntegrationService {
   constructor(
     private readonly repository: MoveOrderIntegrationRepository,
+    private readonly masterIoService: MasterIOService,
     private readonly integrationMoveOrderService: IntegrationMoveOrderService,
     private readonly queueProducer: MoveOrderIntegrationQueueProducer,
     private readonly pollService: MoveOrderIntegrationPollService,
@@ -90,7 +92,11 @@ export class MoveOrderIntegrationService {
     organizationId: string,
     query: MoveOrderIntegrationPaginationQueryDto,
   ): Promise<PaginatedResponseDto<MoveOrderIntegrationHeaderWithLines>> {
-    const { data, total } = await this.repository.findAllHeadersPaginated(organizationId, query);
+    const findOrgId = await this.masterIoService.findOne(organizationId);
+    if (!findOrgId) {
+      throw new NotFoundException(`Master IO with organizationId ${organizationId} not found`);
+    }
+    const { data, total } = await this.repository.findAllHeadersPaginated(findOrgId.organization_id, query);
     const headersWithLines = await this.attachLinesToHeaders(data);
     return this.paginationService.createPaginatedResponse(headersWithLines, query, total);
   }

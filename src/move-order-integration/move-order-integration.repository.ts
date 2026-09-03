@@ -53,7 +53,7 @@ export class MoveOrderIntegrationRepository {
   }
 
   async findAllHeadersPaginated(
-    organizationId: string,
+    organizationId: number,
     query: MoveOrderIntegrationPaginationQueryDto,
   ): Promise<{ data: MoveOrderIntegration[]; total: number }> {
     const page = query.page ?? 1;
