@@ -52,7 +52,7 @@ export class BtbRepository {
 
   async getAllLastDateInsert(organizationId: string): Promise<Btb[]> {
     const latest = await this.btbRepo.findOne({
-      where: { organization_id: organizationId },
+      where: { organization_id: organizationId, status: 'APPLIED' },
       order: { createdAt: 'DESC' },
       select: ['createdAt'],
     });

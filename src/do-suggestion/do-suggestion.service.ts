@@ -228,30 +228,30 @@ export class DoSuggestionService {
         sales_spv_nik: '20000001',
         sales_spv: 'Dummy SPV 1',
       },
-      {
-        sales_nik: '10000002',
-        sales_name: 'Dummy Sales 2',
-        sales_spv_nik: '20000001',
-        sales_spv: 'Dummy SPV 1',
-      },
-      {
-        sales_nik: '10000003',
-        sales_name: 'Dummy Sales 3',
-        sales_spv_nik: '20000002',
-        sales_spv: 'Dummy SPV 2',
-      },
-      {
-        sales_nik: '10000004',
-        sales_name: 'Dummy Sales 4',
-        sales_spv_nik: '20000002',
-        sales_spv: 'Dummy SPV 2',
-      },
-      {
-        sales_nik: '10000005',
-        sales_name: 'Dummy Sales 5',
-        sales_spv_nik: '20000003',
-        sales_spv: 'Dummy SPV 3',
-      },
+      // {
+      //   sales_nik: '10000002',
+      //   sales_name: 'Dummy Sales 2',
+      //   sales_spv_nik: '20000001',
+      //   sales_spv: 'Dummy SPV 1',
+      // },
+      // {
+      //   sales_nik: '10000003',
+      //   sales_name: 'Dummy Sales 3',
+      //   sales_spv_nik: '20000002',
+      //   sales_spv: 'Dummy SPV 2',
+      // },
+      // {
+      //   sales_nik: '10000004',
+      //   sales_name: 'Dummy Sales 4',
+      //   sales_spv_nik: '20000002',
+      //   sales_spv: 'Dummy SPV 2',
+      // },
+      // {
+      //   sales_nik: '10000005',
+      //   sales_name: 'Dummy Sales 5',
+      //   sales_spv_nik: '20000003',
+      //   sales_spv: 'Dummy SPV 3',
+      // },
     ];
 
     let created = 0;
