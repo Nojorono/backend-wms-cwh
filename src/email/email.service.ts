@@ -225,7 +225,9 @@ export class EmailService {
     return nodemailer.createTransport({
       host: config.host,
       port: config.port,
+      // 465 = implicit TLS; 587 = plain connect then STARTTLS.
       secure: config.secure,
+      requireTLS: !config.secure && config.port === 587,
       auth: hasAuth
         ? {
             user: config.user!.trim(),
@@ -291,16 +293,32 @@ export class EmailService {
     };
   }
 
-  /** Port 465 (NNA mail.nna-id.com) defaults to SSL/TLS when SMTP_SECURE is unset. */
+  /**
+   * Implicit TLS (`secure: true`) is only valid on port 465.
+   * Port 587 speaks plain SMTP then STARTTLS — using implicit TLS causes
+   * `ssl3_get_record:wrong version number`.
+   */
   private resolveSmtpSecure(override: boolean | undefined, port: number): boolean {
+    let secure: boolean;
     if (override !== undefined) {
-      return override;
+      secure = override;
+    } else {
+      const envSecure = this.configService.get<string>('SMTP_SECURE');
+      if (envSecure != null && String(envSecure).trim() !== '') {
+        secure = this.parseBoolean(String(envSecure), port === 465);
+      } else {
+        secure = port === 465;
+      }
     }
-    const envSecure = this.configService.get<string>('SMTP_SECURE');
-    if (envSecure != null && envSecure.trim() !== '') {
-      return this.parseBoolean(envSecure, port === 465);
+
+    if (port === 587 && secure) {
+      this.logger.warn(
+        'SMTP_SECURE=true is incompatible with port 587 (STARTTLS). Using secure=false.',
+      );
+      return false;
     }
-    return port === 465;
+
+    return secure;
   }
 
   private parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
