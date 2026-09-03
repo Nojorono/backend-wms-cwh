@@ -87,9 +87,10 @@ export class MoveOrderIntegrationService {
   }
 
   async findAllHeadersPaginated(
+    organizationId: string,
     query: MoveOrderIntegrationPaginationQueryDto,
   ): Promise<PaginatedResponseDto<MoveOrderIntegrationHeaderWithLines>> {
-    const { data, total } = await this.repository.findAllHeadersPaginated(query);
+    const { data, total } = await this.repository.findAllHeadersPaginated(organizationId, query);
     const headersWithLines = await this.attachLinesToHeaders(data);
     return this.paginationService.createPaginatedResponse(headersWithLines, query, total);
   }

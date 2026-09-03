@@ -17,7 +17,7 @@ export class MoveOrderIntegrationRepository {
     private readonly headerRepo: Repository<MoveOrderIntegration>,
     @InjectRepository(MoveOrderLineIntegration)
     private readonly lineRepo: Repository<MoveOrderLineIntegration>,
-  ) {}
+  ) { }
 
   async createHeader(dto: CreateMoveOrderIntegrationDto): Promise<MoveOrderIntegration> {
     const entity = this.headerRepo.create(dto);
@@ -53,6 +53,7 @@ export class MoveOrderIntegrationRepository {
   }
 
   async findAllHeadersPaginated(
+    organizationId: string,
     query: MoveOrderIntegrationPaginationQueryDto,
   ): Promise<{ data: MoveOrderIntegration[]; total: number }> {
     const page = query.page ?? 1;
@@ -67,6 +68,11 @@ export class MoveOrderIntegrationRepository {
       .createQueryBuilder('header')
       .where('header.deletedAt IS NULL');
 
+    if (organizationId) {
+      qb.andWhere('header.organization_id = :organizationId', {
+        organizationId,
+      });
+    }
     if (query.iface_status?.trim()) {
       qb.andWhere('header.iface_status = :ifaceStatus', {
         ifaceStatus: query.iface_status.trim(),

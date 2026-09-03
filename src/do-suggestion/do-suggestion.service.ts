@@ -1482,7 +1482,7 @@ export class DoSuggestionService {
       dto.updated_by,
     );
 
-    await this.sendVoidNotificationEmail(updated, nextStatus, dto.updated_by);
+    void this.sendVoidNotificationEmail(updated, nextStatus, dto.updated_by);
 
     return updated;
   }
