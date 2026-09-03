@@ -29,8 +29,8 @@ export class SmtpConfigDto {
 
   @ApiPropertyOptional({
     example: true,
-    description: 'SSL/TLS — true for port 465 (NNA), false for STARTTLS on 587',
-    default: true,
+    description:
+      'Implicit TLS. true for port 465, false for STARTTLS on 587. Port 587 with true causes SSL wrong version number.',
   })
   @IsOptional()
   @IsBoolean()
