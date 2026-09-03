@@ -18,6 +18,7 @@ import { FindDoSuggestionByCallplanDto } from './dto/find-do-suggestion-by-callp
 import {
   DoSuggestionCallplanFilterQueryDto,
   DoSuggestionFilterQueryDto,
+  DoSuggestionReturnQueryDto,
 } from './dto/do-suggestion-filter-query.dto';
 import { CreateDoDmsDto } from './dto/create-do-dms.dto';
 import { VoidDoDmsDto } from './dto/void-do-dms.dto';
@@ -25,6 +26,7 @@ import { CreateDummyDataDoSuggestionQueryDto } from './dto/create-dummy-data-do-
 import { HitDmsBkbDto } from './dto/hit-dms-bkb.dto';
 import { HitDmsBkbResult } from './dto/dms-bkb-payload.dto';
 import { DmsIntegrationAuth } from '../core/decorators/dms-integration-auth.decorator';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('DO Suggestion')
 @Controller('do-suggestion')
@@ -73,6 +75,16 @@ export class DoSuggestionController {
   @ApiResponse({ status: 200, type: [DoSuggestion] })
   findAll(@Query() query: DoSuggestionFilterQueryDto): Promise<DoSuggestion[]> {
     return this.doSuggestionService.findAll(query.status);
+  }
+
+  @Get('report/retur')
+  @ApiOperation({ summary: 'List all return DO suggestions with details' })
+  @ApiResponse({ status: 200, type: [DoSuggestion] })
+  findAllReturn(
+    @OrganizationId() organizationId: string,
+    @Query() query: DoSuggestionReturnQueryDto,
+  ): Promise<DoSuggestion[]> {
+    return this.doSuggestionService.findAllReturn(organizationId, query.callplanDateStart);
   }
 
   @Get('callplan/date-start/:callplanDateStart/organization/:organizationId')

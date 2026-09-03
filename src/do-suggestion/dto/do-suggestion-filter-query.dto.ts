@@ -1,5 +1,5 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { DoSuggestionStatus } from '../../core/domain/entities/do-suggestion.entity';
 
 export class DoSuggestionFilterQueryDto {
@@ -15,4 +15,16 @@ export class DoSuggestionCallplanFilterQueryDto extends DoSuggestionFilterQueryD
   @IsString()
   @MaxLength(50)
   sales_spv_nik?: string;
+}
+
+export class DoSuggestionReturnQueryDto {
+  @ApiProperty({
+    name: 'callplanDateStart',
+    example: '2026-09-01',
+    description: 'Filter by callplan_date_start (YYYY-MM-DD)',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsDateString()
+  callplanDateStart: string;
 }
