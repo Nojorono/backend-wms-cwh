@@ -187,7 +187,7 @@ export class DoSuggestionRepository {
       .innerJoin(
         'ds.details',
         'details',
-        'details.deleted_at IS NULL AND (details.item_qty_revision < 0 OR details.item_qty_void < 0)',
+        'details.deleted_at IS NULL AND details.item_qty_final <> 0 AND (details.item_qty_revision < 0 OR details.item_qty_void < 0)',
       )
       .addSelect([
         'details.id',
