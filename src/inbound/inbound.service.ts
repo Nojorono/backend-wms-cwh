@@ -675,6 +675,8 @@ export class InboundService {
         : existingItems.filter((item) => item.inbound_do_id === inboundDoId);
 
     const existingById = new Map(items.map((i) => [i.id, i]));
+    // When inbound_items is provided, treat it as the full line set for this DO.
+    const retainedIds = new Set<string>();
 
     for (const itemDto of itemDtos) {
       let matched = itemDto.id ? existingById.get(itemDto.id) : undefined;
@@ -693,7 +695,10 @@ export class InboundService {
           const looksLikeMasterItemId =
             !!itemDto.item_id && itemDto.id === itemDto.item_id;
 
-          const fallback = this.findExistingInboundItemByBusinessKey(items, itemDto);
+          const fallback = this.findExistingInboundItemByBusinessKey(
+            items.filter((item) => !retainedIds.has(item.id)),
+            itemDto,
+          );
           if (fallback) {
             matched = fallback;
           } else if (looksLikeMasterItemId) {
@@ -713,10 +718,15 @@ export class InboundService {
       }
 
       if (!matched && itemDto.item_id) {
-        matched = this.findExistingInboundItemByBusinessKey(items, itemDto);
+        matched = this.findExistingInboundItemByBusinessKey(
+          items.filter((item) => !retainedIds.has(item.id)),
+          itemDto,
+        );
       }
 
       if (matched) {
+        retainedIds.add(matched.id);
+
         const itemUpdate: Partial<InboundItem> = {};
         if (itemDto.item_id !== undefined) itemUpdate.item_id = itemDto.item_id;
         if (itemDto.quantity !== undefined) itemUpdate.quantity = itemDto.quantity;
@@ -755,8 +765,15 @@ export class InboundService {
         uom: itemDto.uom,
         line_number: itemDto.line_number,
       });
+      retainedIds.add(created.id);
       existingById.set(created.id, created);
       items.push(created);
+    }
+
+    // Soft-delete lines that exist on the DO but were omitted from the payload.
+    const removedItems = items.filter((item) => !retainedIds.has(item.id));
+    for (const item of removedItems) {
+      await this.inboundItemRepo.remove(item.id);
     }
   }
 
