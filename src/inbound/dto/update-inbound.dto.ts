@@ -34,6 +34,8 @@ export class UpdateInboundDoDto extends PartialType(
   @ApiPropertyOptional({
     type: () => UpdateInboundItemDto,
     isArray: true,
+    description:
+      'Full line set for this DO. Existing lines omitted from the array are soft-deleted.',
   })
   @IsOptional()
   @IsArray({ message: 'inbound_items must be an array' })
