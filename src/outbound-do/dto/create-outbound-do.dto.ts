@@ -10,7 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OutboundDoStatus, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
+import { OutboundDoDeliveryCategory, OutboundDoStatus, OutboundDoTypeCalculation, OutboundDoType } from '../../core/domain/entities/outbound-do.entity';
 
 export class OutboundMemoItemDto {
   @ApiProperty({ example: 'b3a2d84c-7d29-4f47-bfb9-8158b17c5b8b' })
@@ -24,6 +24,16 @@ export class OutboundMemoItemDto {
 }
 
 export class CreateOutboundDoDto {
+  @ApiPropertyOptional({ example: 'uuid-organization-123' })
+  @IsOptional()
+  @IsUUID(4, { message: 'organization_id must be a valid UUID' })
+  organization_id?: string;
+
+  @ApiPropertyOptional({ example: 'document.pdf' })
+  @IsOptional()
+  @IsString()
+  subdist_document?: string;
+
   @ApiPropertyOptional({ example: 'DO-2025-001', description: 'Auto-generated if not provided' })
   @IsOptional()
   @IsString()
@@ -32,7 +42,6 @@ export class CreateOutboundDoDto {
   @ApiProperty({ example: 'JNE Express' })
   @IsString()
   expedition: string;
-
   @ApiProperty({ example: 'Jakarta' })
   @IsString()
   origin: string;
@@ -60,6 +69,36 @@ export class CreateOutboundDoDto {
   @IsOptional()
   @IsString()
   driver_phone: string;
+
+  @ApiProperty({ example: '1234567890' })
+  @IsOptional()
+  @IsString()
+  vendor_id: string;
+
+  @ApiProperty({ example: 'PO-2025-001' })
+  @IsOptional()
+  @IsString()
+  vendor_po_number: string;
+
+  @ApiProperty({ example: 'Truck Utilitas' })
+  @IsOptional()
+  @IsString()
+  truck_utilitas?: string;
+
+  @ApiProperty({ example: 'Ekspedisi Eksternal' })
+  @IsOptional()
+  @IsString()
+  delivery_category?: OutboundDoDeliveryCategory;
+
+  @ApiProperty({ example: 'MULTIDROP' })
+  @IsOptional()
+  @IsString()
+  type_calculation?: OutboundDoTypeCalculation;
+
+  @ApiProperty({ example: 100 })
+  @IsOptional()
+  @IsNumber()
+  qty_utilitas?: number;
 
   @ApiPropertyOptional({ enum: OutboundDoStatus, example: OutboundDoStatus.PENDING })
   @IsOptional()

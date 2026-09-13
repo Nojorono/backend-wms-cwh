@@ -26,12 +26,30 @@ import {
   BulkMarkAsReadDto,
   NotificationStatsDto,
 } from './dto/notification-history.dto';
+import {
+  NotificationHistoryListResponseDto,
+  NotificationStatsResponseDto,
+  UnreadCountResponseDto,
+  NotificationDetailResponseDto,
+  MarkAsReadResponseDto,
+  BulkMarkAsReadResponseDto,
+  CleanupResponseDto,
+} from './dto/notification-history-response.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
-import { PaginatedResponseDto } from '../core/dto/pagination.dto';
+import { ApiExtraModels } from '@nestjs/swagger';
 
 @ApiTags('Notification History')
 @Controller('notification-history')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(
+  NotificationHistoryListResponseDto,
+  NotificationStatsResponseDto,
+  UnreadCountResponseDto,
+  NotificationDetailResponseDto,
+  MarkAsReadResponseDto,
+  BulkMarkAsReadResponseDto,
+  CleanupResponseDto,
+)
 export class NotificationHistoryController {
   constructor(private readonly service: NotificationHistoryService) {}
 
@@ -108,7 +126,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Notification history retrieved successfully',
-    type: PaginatedResponseDto<NotificationHistoryResponseDto>,
+    type: NotificationHistoryListResponseDto,
   })
   async findAll(@Query() query: NotificationHistoryQueryDto) {
     const result = await this.service.findAll(query);
@@ -128,7 +146,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Statistics retrieved successfully',
-    type: NotificationStatsDto,
+    type: NotificationStatsResponseDto,
   })
   async getStats(
     @Query('userId') userId?: string,
@@ -149,6 +167,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Unread count retrieved successfully',
+    type: UnreadCountResponseDto,
   })
   async getUnreadCount(@Param('userId') userId: string) {
     const count = await this.service.getUnreadCount(userId);
@@ -173,7 +192,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Notifications retrieved successfully',
-    type: PaginatedResponseDto<NotificationHistoryResponseDto>,
+    type: NotificationHistoryListResponseDto,
   })
   async findByRecipient(
     @Param('userId') userId: string,
@@ -196,7 +215,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Notification detail retrieved successfully',
-    type: NotificationHistoryResponseDto,
+    type: NotificationDetailResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Notification not found' })
   async findOne(@Param('id') id: string) {
@@ -213,7 +232,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Notification marked as read successfully',
-    type: NotificationHistoryResponseDto,
+    type: MarkAsReadResponseDto,
   })
   async markAsRead(@Body() dto: MarkAsReadDto) {
     const notification = await this.service.markAsRead(dto.notificationId, dto.userId, dto.username);
@@ -229,6 +248,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Notifications marked as read successfully',
+    type: BulkMarkAsReadResponseDto,
   })
   async bulkMarkAsRead(@Body() dto: BulkMarkAsReadDto) {
     await this.service.bulkMarkAsRead(dto.notificationIds, dto.userId, dto.username);
@@ -249,6 +269,7 @@ export class NotificationHistoryController {
   @ApiResponse({
     status: 200,
     description: 'Old notifications cleaned up successfully',
+    type: CleanupResponseDto,
   })
   async cleanup(@Param('days') days: string) {
     const deleted = await this.service.deleteOldNotifications(parseInt(days, 10));

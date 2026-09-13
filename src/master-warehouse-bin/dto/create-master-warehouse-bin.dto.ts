@@ -2,11 +2,6 @@ import { IsString, IsOptional, IsNumber, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateMasterWarehouseBinDto {
-  @ApiProperty({ example: 1, required: false })
-  @IsNumber()
-  @IsOptional()
-  organization_id?: number;
-
   @ApiProperty({ example: '1234567890', required: false })
   @IsUUID()
   @IsOptional()
@@ -38,8 +33,13 @@ export class CreateMasterWarehouseBinDto {
   @IsOptional()
   capacity_pallet?: number;
 
-  @ApiProperty({ example: 'https://example.com/barcode.png', required: false })
+  @ApiProperty({ example: 1, required: false })
+  @IsNumber()
+  @IsOptional()
+  locator_id?: number;
+
+  @ApiProperty({ example: 'Locator Name', required: false })
   @IsString()
   @IsOptional()
-  barcode_image_url?: string;
+  locator_name?: string;
 }

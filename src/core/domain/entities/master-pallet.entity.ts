@@ -3,10 +3,15 @@ import { BaseEntity } from './base.entity';
 import { PalletTransactionHistory } from './transaction-pallet-history.entity';
 import { InventoryTracking } from './inventory-tracking.entity';
 import { OutboundMemo } from './outbound-memo.entity';
+import { MasterIO } from './master-io.entity';
 @Entity('m_pallet')
 export class MasterPallet extends BaseEntity {
-  @Column({ nullable: true })
-  organization_id: number;
+  @Column({ name: 'organization_id', nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
 
   @Column({ nullable: true })
   pallet_code: string;

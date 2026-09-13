@@ -1,6 +1,7 @@
-import { Entity, Column, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, Column, ManyToMany, JoinTable, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OutboundMemo } from './outbound-memo.entity';
+import { MasterIO } from './master-io.entity';
 
 export enum OutboundDoStatus {
   PENDING = 'PENDING',
@@ -16,8 +17,26 @@ export enum OutboundDoType {
   AMO = 'AMO',
 }
 
+export enum OutboundDoTypeCalculation {
+  MULTIDROP = 'MULTIDROP',
+  SINGLEDROP = 'SINGLEDROP',
+}
+
+export enum OutboundDoDeliveryCategory {
+  EKSPEDISI_EKSTERNAL = 'Ekspedisi Eksternal',
+  EKSPEDISI_INTERNAL = 'Ekspedisi Internal',
+  EKSPEDISI_VENDOR = 'Ekspedisi Vendor',
+}
+
 @Entity('outbound_do')
 export class OutboundDo extends BaseEntity {
+  @Column({ nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
   @Column({ nullable: true, unique: true })
   outbound_do_number: string;
 
@@ -41,6 +60,24 @@ export class OutboundDo extends BaseEntity {
 
   @Column({ nullable: true })
   driver_phone: string;
+
+  @Column({ nullable: true })
+  vendor_id: string;
+
+  @Column({ nullable: true })
+  vendor_po_number: string;
+
+  @Column({ nullable: true, type: 'bigint' })
+  qty_utilitas: number;
+
+  @Column({ nullable: true, type: 'varchar', length: 150 })
+  truck_utilitas: string;
+
+  @Column({ nullable: true, type: 'enum', enum: OutboundDoTypeCalculation })
+  type_calculation: OutboundDoTypeCalculation;
+
+  @Column({ nullable: true, type: 'enum', enum: OutboundDoDeliveryCategory })
+  delivery_category: OutboundDoDeliveryCategory;
 
   @Column({
     nullable: true,
@@ -69,4 +106,7 @@ export class OutboundDo extends BaseEntity {
     inverseJoinColumn: { name: 'outbound_memo_id', referencedColumnName: 'id' },
   })
   outbound_memos: OutboundMemo[];
+
+  @Column({ nullable: true })
+  subdist_document: string;
 }

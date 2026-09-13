@@ -3,6 +3,11 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Status } from 'src/core/domain/entities/transaction-put-away.entity';
 
 export class CreatePutAwayDto {
+  @ApiProperty({ example: 'organization-uuid', required: false })
+  @IsUUID()
+  @IsOptional()
+  organization_id?: string;
+
   @ApiProperty({ example: 'inventory-tracking-uuid', required: false })
   @IsUUID()
   @IsOptional()
@@ -64,4 +69,4 @@ export class CreatePutAwayDto {
   inbound_id?: string;
 }
 
-export class UpdatePutAwayDto extends PartialType(CreatePutAwayDto) {}
+export class UpdatePutAwayDto extends PartialType(CreatePutAwayDto) { }

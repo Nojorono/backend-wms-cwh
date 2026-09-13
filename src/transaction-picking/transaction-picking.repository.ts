@@ -251,15 +251,17 @@ export class TransactionPickingRepository {
 
   /**
    * Find active transaction pickings (PENDING or COMPLETED) that use a specific pallet
-   * by checking transaction_scan_picking records
+   * by checking transaction_scan_picking records.
+   * Excludes soft-deleted scan records and returns distinct transactions.
    */
   async findActiveByPalletId(palletId: string, excludeTransactionPickingId?: string): Promise<PickingTransaction[]> {
     const queryBuilder = this.repository
       .createQueryBuilder('transaction')
+      .distinct(true)
       .innerJoin(
         'transaction_scan_picking',
         'scan',
-        'scan.transaction_picking_id = transaction.id AND scan.pallet_use_id = :palletId',
+        `scan.transaction_picking_id = transaction.id AND scan.pallet_use_id = :palletId AND scan.deleted_at IS NULL`,
         { palletId },
       )
       .where('transaction.deletedAt IS NULL')

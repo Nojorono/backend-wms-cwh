@@ -1,46 +1,30 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MasterWarehouseSubRepository } from './master-warehouse-sub.repository';
+import {
+  MasterWarehouseSubRepository,
+  WarehouseSubWithBinsAndPalletCount,
+  WarehouseSubWithBinsFilters,
+} from './master-warehouse-sub.repository';
 import { CreateMasterWarehouseSubDto } from './dto/create-master-warehouse-sub.dto';
 import { UpdateMasterWarehouseSubDto } from './dto/update-master-warehouse-sub.dto';
 import {
   MasterWarehouseSub,
   WarehouseSubStagingType,
 } from 'src/core/domain/entities/master-warehouse-sub.entity';
-import { BarcodeService } from 'src/infrastructure/services/barcode.service';
 
 @Injectable()
 export class MasterWarehouseSubService {
   constructor(
     private readonly repository: MasterWarehouseSubRepository,
-    private readonly barcodeService: BarcodeService,
-  ) {}
+  ) { }
 
   async create(
     createMasterWarehouseSubDto: CreateMasterWarehouseSubDto,
   ): Promise<MasterWarehouseSub> {
-    // const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
-    //   bcid: 'code128',
-    //   text: createMasterWarehouseSubDto.code || '',
-    //   scale: 3,
-    //   height: 100,
-    //   width: 200,
-    //   bucket: 'wms',
-    //   prefix: 'warehouse-sub',
-    //   extension: 'png',
-    //   acl: 'public-read',
-    //   metadata: {
-    //     organization_id: createMasterWarehouseSubDto.organization_id?.toString() || '',
-    //     warehouse_sub_id: createMasterWarehouseSubDto.code || '',
-    //     warehouse_sub_name: createMasterWarehouseSubDto.name || '',
-    //     warehouse_sub_capacity_bin: createMasterWarehouseSubDto.capacity_bin?.toString() || '',
-    //   },
-    // });
-    // createMasterWarehouseSubDto.barcode_image_url = barcodeImageUrl.url;
     return await this.repository.create(createMasterWarehouseSubDto);
   }
 
-  async findAll(): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findAll();
+  async findAll(organizationId: string): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findAll(organizationId);
   }
 
   async findOne(id: string): Promise<MasterWarehouseSub> {
@@ -49,10 +33,6 @@ export class MasterWarehouseSubService {
       throw new NotFoundException(`Warehouse with ID ${id} not found`);
     }
     return warehouseSub;
-  }
-
-  async findByOrganizationId(organization_id: number): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findByOrganizationId(organization_id);
   }
 
   async findByWarehouseId(warehouse_id: string): Promise<MasterWarehouseSub[]> {
@@ -67,31 +47,6 @@ export class MasterWarehouseSubService {
     if (!warehouseSub) {
       throw new NotFoundException(`Warehouse with ID ${id} not found`);
     }
-    // if (
-    //   updateMasterWarehouseSubDto.code ||
-    //   updateMasterWarehouseSubDto.name ||
-    //   updateMasterWarehouseSubDto.capacity_bin
-    // ) {
-    //   await this.barcodeService.deleteBarcodeImage(warehouseSub.barcode_image_url);
-    //   const barcodeImageUrl = await this.barcodeService.generateAndStoreBarcode({
-    //     bcid: 'code128',
-    //     text: updateMasterWarehouseSubDto.code || '',
-    //     scale: 3,
-    //     height: 100,
-    //     width: 200,
-    //     bucket: 'wms',
-    //     prefix: 'warehouse-sub',
-    //     extension: 'png',
-    //     acl: 'public-read',
-    //     metadata: {
-    //       organization_id: updateMasterWarehouseSubDto.organization_id?.toString() || '',
-    //       warehouse_sub_id: updateMasterWarehouseSubDto.code || '',
-    //       warehouse_sub_name: updateMasterWarehouseSubDto.name || '',
-    //       warehouse_sub_capacity_bin: updateMasterWarehouseSubDto.capacity_bin?.toString() || '',
-    //     },
-    //   });
-    //   updateMasterWarehouseSubDto.barcode_image_url = barcodeImageUrl.url;
-    // }
     const updatedWarehouseSub = await this.repository.update(id, updateMasterWarehouseSubDto);
     if (!updatedWarehouseSub) {
       throw new NotFoundException(`Warehouse with ID ${id} not found`);
@@ -104,12 +59,15 @@ export class MasterWarehouseSubService {
     await this.repository.remove(id);
   }
 
-  async findByIsStaging(is_staging: WarehouseSubStagingType): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findByIsStaging(is_staging);
+  async findByIsStaging(
+    is_staging: WarehouseSubStagingType,
+    organizationId: string,
+  ): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByIsStaging(is_staging, organizationId);
   }
 
-  async findByIsStagingNull(): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findByIsStagingNull();
+  async findByIsStagingNull(organizationId: string): Promise<MasterWarehouseSub[]> {
+    return await this.repository.findByIsStagingNull(organizationId);
   }
 
   async findByIsGate(is_gate: boolean): Promise<MasterWarehouseSub[]> {
@@ -117,9 +75,17 @@ export class MasterWarehouseSubService {
   }
 
   async findByFilters(
+    organizationId: string,
     is_staging?: WarehouseSubStagingType,
     is_gate?: boolean,
   ): Promise<MasterWarehouseSub[]> {
-    return await this.repository.findByFilters(is_staging, is_gate);
+    return await this.repository.findByFilters(organizationId, is_staging, is_gate);
+  }
+
+  async findAllWithBinsAndPalletCount(
+    organizationId: string,
+    filters: WarehouseSubWithBinsFilters = {},
+  ): Promise<WarehouseSubWithBinsAndPalletCount[]> {
+    return await this.repository.findAllWithBinsAndPalletCount(organizationId, filters);
   }
 }

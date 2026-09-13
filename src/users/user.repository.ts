@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { User } from '../core/domain/entities/user.entity';
+import { UserDetail } from '../core/domain/entities/user-detail.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -10,6 +11,7 @@ export class UserRepository {
   constructor(
     @InjectRepository(User)
     private readonly repository: Repository<User>,
+    private readonly dataSource: DataSource,
   ) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -18,15 +20,53 @@ export class UserRepository {
   }
 
   async findAll(): Promise<User[]> {
-    return await this.repository.find();
+    return await this.repository.find({ relations: ['userDetail'] });
+  }
+
+  async findAllByOrganizationId(
+    organizationId: string,
+    departementId?: string,
+  ): Promise<User[]> {
+    const userDetailWhere: {
+      organizationId: string;
+      departementId?: string;
+    } = { organizationId };
+
+    if (departementId) {
+      userDetailWhere.departementId = departementId;
+    }
+
+    return await this.repository.find({
+      where: { userDetail: userDetailWhere },
+      relations: ['userDetail'],
+    });
+  }
+
+  async findAllByRoleAndOrganizationId(
+    roleName: string,
+    organizationId: string,
+  ): Promise<User[]> {
+    return await this.repository
+      .createQueryBuilder('user')
+      .innerJoinAndSelect('user.role', 'role')
+      .innerJoinAndSelect('user.userDetail', 'userDetail')
+      .where('user.is_active = :isActive', { isActive: true })
+      .andWhere('role.name = :roleName', { roleName })
+      .andWhere('userDetail.organization_id = :organizationId', { organizationId })
+      .andWhere('user.deleted_at IS NULL')
+      .getMany();
   }
 
   async findAllWithDeleted(): Promise<User[]> {
-    return await this.repository.find({ withDeleted: true });
+    return await this.repository.find({ withDeleted: true, relations: ['userDetail'] });
   }
 
-  async findByUsername(username: string): Promise<User | null> {
-    const user = await this.repository.findOne({ where: { username } });
+  async findByUsername(username: string, includeDeleted: boolean = false): Promise<User | null> {
+    const options: any = { where: { username } };
+    if (includeDeleted) {
+      options.withDeleted = true;
+    }
+    const user = await this.repository.findOne(options);
     if (!user) {
       return null;
     }
@@ -78,7 +118,11 @@ export class UserRepository {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    await this.repository.softDelete(id);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.softDelete(UserDetail, { userId: id });
+      await manager.softDelete(User, id);
+    });
   }
 
   async restore(id: string): Promise<void> {
@@ -90,6 +134,10 @@ export class UserRepository {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    await this.repository.delete(id);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(UserDetail, { userId: id });
+      await manager.delete(User, id);
+    });
   }
 }

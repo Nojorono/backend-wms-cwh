@@ -7,6 +7,7 @@ import {
   ApiBody,
   ApiQuery,
   ApiParam,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
@@ -15,70 +16,56 @@ import {
   ProgressionStatus,
 } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingService } from './inventory-tracking.service';
-import { InventoryAutoSuggestionService } from './auto-suggestion.service';
 import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import {
+  VisibilityDashboardResponseDto,
+  VisibilityDashboardDataDto,
+  VisibilityDashboardSummaryDto,
+  VisibilityDashboardItemDto,
+  PalletDetailDto,
+  BookingDetailDto,
+} from './dto/visibility-dashboard-response.dto';
+import { UpdateProgressionStatusDto } from './dto/update-progression-status.dto';
+import { CreateOrUpdateInventoryTrackingDto } from './dto/create-or-update-inventory-tracking.dto';
+import {
+  ValidatePalletResponseDto,
+  ValidatePalletErrorResponseDto,
+} from './dto/validate-pallet-response.dto';
+import { ItemInventoryTrackingDto } from './dto/item-inventory-tracking-response.dto';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
+import {
+  InvOnHandMappingDetailItemDto,
+  InvOnHandMappingDetailQueryDto,
+} from './dto/inv-on-hand-mapping.dto';
 
 @ApiTags('Inventory Tracking')
 @Controller('inventory-tracking')
 @ApiBearerAuth('JWT-auth')
+@ApiExtraModels(
+  VisibilityDashboardResponseDto,
+  VisibilityDashboardDataDto,
+  VisibilityDashboardSummaryDto,
+  VisibilityDashboardItemDto,
+  PalletDetailDto,
+  BookingDetailDto,
+  UpdateProgressionStatusDto,
+  CreateOrUpdateInventoryTrackingDto,
+  ValidatePalletResponseDto,
+  ValidatePalletErrorResponseDto,
+  ItemInventoryTrackingDto,
+)
 export class InventoryTrackingController {
   constructor(
     private readonly service: InventoryTrackingService,
-    private readonly autoSuggestionService: InventoryAutoSuggestionService,
-  ) {}
+  ) {
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create an inventory tracking record' })
   @ApiResponse({ status: 201, description: 'Created', type: InventoryTracking })
   create(@Body() dto: CreateInventoryTrackingDto) {
     return this.service.create(dto);
-  }
-
-  @Post('with-inbound-check')
-  @ApiOperation({ summary: 'Create inventory tracking with inbound_id duplication check' })
-  @ApiResponse({ status: 201, description: 'Created', type: InventoryTracking })
-  @ApiResponse({ status: 400, description: 'Bad Request - Duplicate inbound_id found' })
-  createWithInboundCheck(@Body() dto: CreateInventoryTrackingDto) {
-    return this.service.createWithInboundCheck(dto);
-  }
-
-  @Post('create-or-update-with-inbound-check')
-  @ApiOperation({
-    summary: 'Create or update inventory tracking with inbound_id duplication check',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        pallet_id: { type: 'string', example: 'pallet-uuid' },
-        warehouse_sub_id: { type: 'string', example: 'warehouse-sub-uuid' },
-        warehouse_id: { type: 'string', example: 'warehouse-uuid' },
-        inventory_status: { type: 'string', example: 'CHECKED' },
-        inbound_id: { type: 'string', example: 'inbound-uuid' },
-      },
-      required: ['pallet_id', 'warehouse_sub_id', 'warehouse_id', 'inventory_status'],
-    },
-  })
-  @ApiResponse({ status: 201, description: 'Created or Updated', type: InventoryTracking })
-  @ApiResponse({ status: 400, description: 'Bad Request - Duplicate inbound_id found' })
-  createOrUpdateWithInboundCheck(
-    @Body()
-    body: {
-      pallet_id: string;
-      warehouse_sub_id: string;
-      warehouse_id: string;
-      inventory_status: string;
-      inbound_id?: string;
-    },
-  ) {
-    return this.service.createOrUpdateInventoryTrackingWithInboundCheck(
-      body.pallet_id,
-      body.warehouse_sub_id,
-      body.warehouse_id,
-      body.inventory_status,
-      body.inbound_id,
-    );
   }
 
   @Get()
@@ -133,7 +120,7 @@ export class InventoryTrackingController {
       ],
     },
   })
-  findAll(@Query() paginationQuery: InventoryTrackingPaginationQueryDto) {
+  findAll(@OrganizationId() organizationId: string, @Query() paginationQuery: InventoryTrackingPaginationQueryDto) {
     // Check if any pagination parameters are provided
     const hasPaginationParams =
       paginationQuery.search ||
@@ -150,10 +137,10 @@ export class InventoryTrackingController {
       paginationQuery.item_id;
 
     if (hasPaginationParams) {
-      return this.service.findAllPaginated(paginationQuery);
+      return this.service.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.service.findAll();
+    return this.service.findAll(organizationId);
   }
 
   @Get('warehouse')
@@ -162,10 +149,11 @@ export class InventoryTrackingController {
   @ApiQuery({ name: 'warehouse_bin_id', required: false, type: String })
   @ApiResponse({ status: 200, description: 'OK', type: [InventoryTracking] })
   findAllByWarehouse(
+    @OrganizationId() organizationId: string,
     @Query('warehouse_sub_id') warehouse_sub_id?: string,
     @Query('warehouse_bin_id') warehouse_bin_id?: string,
   ) {
-    return this.service.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+    return this.service.findAllByWarehouse(organizationId, warehouse_sub_id, warehouse_bin_id);
   }
 
   @Get('history/:pallet_id')
@@ -208,118 +196,67 @@ export class InventoryTrackingController {
   @ApiResponse({
     status: 200,
     description: 'Validation result',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        message: { type: 'string', example: 'Operation successful' },
-        data: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean', example: true },
-            message: {
-              type: 'string',
-              example: 'Pallet dapat digunakan untuk inventory tracking.',
-            },
-            pallet_code: { type: 'string', example: 'PAL-001' },
-            pallet_id: { type: 'string', example: 'pallet-uuid' },
-            is_available: { type: 'boolean', example: true },
-            can_use: { type: 'boolean', example: true },
-            pallet_status: {
-              type: 'object',
-              properties: {
-                exists: { type: 'boolean', example: true },
-                is_active: { type: 'boolean', example: true },
-                is_full: { type: 'boolean', example: false },
-                current_quantity: { type: 'number', example: 0 },
-                capacity: { type: 'number', example: 100 },
-              },
-            },
-            existing_tracking: { type: 'object', nullable: true },
-            can_create: { type: 'boolean', example: true },
-            reasons: { type: 'array', items: { type: 'string' }, example: [] },
-            items: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  item_id: { type: 'string', example: 'uuid-item-123' },
-                  item_name: { type: 'string', example: 'JAZY-KRETEK' },
-                  current_quantity: { type: 'number', example: 50 },
-                  uom: { type: 'string', example: 'PCS' },
-                  production_date: { type: 'string', example: '2025-01-01' },
-                  week_number: { type: 'number', example: 1 },
-                  status_inventory: { type: 'string', example: 'READY' },
-                },
-              },
-              example: [],
-            },
-          },
-        },
-        timestamp: { type: 'string', example: '2025-10-15T03:01:44.715Z' },
-        path: { type: 'string', example: '/inventory-tracking/validate-pallet/PAL-001' },
-      },
-    },
+    type: ValidatePalletResponseDto,
   })
   @ApiResponse({
     status: 400,
     description: 'Bad Request - Pallet cannot be used',
+    type: ValidatePalletErrorResponseDto,
+  })
+  async validatePallet(@Param('pallet_code') pallet_code: string) {
+    return this.service.validatePallet(pallet_code);
+  }
+
+  @Get('on-hand-mapping-detail')
+  @ApiOperation({
+    summary: 'Get Oracle on-hand mapping detail (organization_code, subinventory_code)',
+  })
+  @ApiResponse({ status: 200, description: 'OK', type: [InvOnHandMappingDetailItemDto] })
+  async getOnHandMappingDetail(
+    @Query() query: InvOnHandMappingDetailQueryDto,
+  ): Promise<InvOnHandMappingDetailItemDto[]> {
+    const response = await this.service.getOnHandMappingDetail(query);
+    // Return list only; global ResponseInterceptor wraps it in top-level `data`.
+    return response.data ?? [];
+  }
+
+  @Get('item/:item_id')
+  @ApiOperation({ summary: 'Get inventory tracking by item ID' })
+  @ApiParam({ name: 'item_id', description: 'Item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory tracking records for specific item',
+    type: [ItemInventoryTrackingDto],
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No inventory tracking found for this item',
     schema: {
       type: 'object',
       properties: {
         success: { type: 'boolean', example: false },
-        message: {
-          type: 'string',
-          example: 'Pallet tidak dapat digunakan: Pallet tidak aktif, Pallet sudah penuh',
-        },
-        statusCode: { type: 'number', example: 400 },
-        data: {
-          type: 'object',
-          properties: {
-            pallet_code: { type: 'string', example: 'PAL-001' },
-            pallet_id: { type: 'string', example: 'pallet-uuid' },
-            is_available: { type: 'boolean', example: false },
-            can_use: { type: 'boolean', example: false },
-            pallet_status: {
-              type: 'object',
-              properties: {
-                exists: { type: 'boolean', example: true },
-                is_active: { type: 'boolean', example: false },
-                is_full: { type: 'boolean', example: true },
-                current_quantity: { type: 'number', example: 100 },
-                capacity: { type: 'number', example: 100 },
-              },
-            },
-            existing_tracking: { type: 'object', nullable: true },
-            can_create: { type: 'boolean', example: false },
-            reasons: {
-              type: 'array',
-              items: { type: 'string' },
-              example: ['Pallet tidak aktif', 'Pallet sudah penuh'],
-            },
-            items: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  item_id: { type: 'string', example: 'uuid-item-123' },
-                  item_name: { type: 'string', example: 'JAZY-KRETEK' },
-                  current_quantity: { type: 'number', example: 50 },
-                  uom: { type: 'string', example: 'PCS' },
-                  production_date: { type: 'string', example: '2025-01-01' },
-                  week_number: { type: 'number', example: 1 },
-                  status_inventory: { type: 'string', example: 'READY' },
-                },
-              },
-              example: [],
-            },
-          },
-        },
+        message: { type: 'string', example: 'No inventory tracking found for this item' },
+        statusCode: { type: 'number', example: 404 },
       },
     },
   })
-  async validatePallet(@Param('pallet_code') pallet_code: string) {
-    return this.service.validatePallet(pallet_code);
+  async findByItemId(
+    @Param('item_id') item_id: string,
+    @OrganizationId() organizationId: string,
+  ) {
+    return this.service.findByItemId(item_id, organizationId);
+  }
+
+  @Get('visibility/warehouse')
+  @ApiOperation({ summary: 'Get dashboard visibility for all items in warehouse with pending booking status' })
+  @ApiQuery({ name: 'item_id', required: false, type: String, description: 'Filter by specific item ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard visibility data with item quantities and pending bookings',
+    type: VisibilityDashboardResponseDto,
+  })
+  async getVisibilityInventoryTrackingAllItemInWarehouse(@OrganizationId() organizationId: string, @Query('item_id') item_id?: string) {
+    return await this.service.getVisibilityInventoryTrackingAllItemInWarehouse(organizationId, item_id);
   }
 
   @Get(':id')
@@ -340,25 +277,10 @@ export class InventoryTrackingController {
 
   @Patch(':id/progression-status')
   @ApiOperation({ summary: 'Update progression status for inventory tracking' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        progression_status: {
-          type: 'string',
-          enum: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'],
-          example: 'IN_PROGRESS',
-        },
-      },
-      required: ['progression_status'],
-    },
-  })
+  @ApiBody({ type: UpdateProgressionStatusDto })
   @ApiResponse({ status: 200, description: 'Progression status updated', type: InventoryTracking })
   @ApiResponse({ status: 404, description: 'Inventory tracking not found' })
-  updateProgressionStatus(
-    @Param('id') id: string,
-    @Body() body: { progression_status: ProgressionStatus },
-  ) {
+  updateProgressionStatus(@Param('id') id: string, @Body() body: UpdateProgressionStatusDto) {
     return this.service.updateProgressionStatus(id, body.progression_status);
   }
 
@@ -368,70 +290,5 @@ export class InventoryTrackingController {
   @ApiResponse({ status: 404, description: 'Not found' })
   remove(@Param('id') id: string) {
     return this.service.remove(id);
-  }
-
-  @Get('auto-suggestion/in/:pallet_id')
-  @ApiOperation({ summary: 'Get auto suggestions for IN operations' })
-  @ApiResponse({ status: 200, description: 'Auto suggestions for IN operations' })
-  getInSuggestions(@Param('pallet_id') pallet_id: string) {
-    return this.autoSuggestionService.getInSuggestions(pallet_id);
-  }
-
-  @Get('auto-suggestion/out/:item_id')
-  @ApiOperation({ summary: 'Get auto suggestions for OUT operations by item ID' })
-  @ApiParam({ name: 'item_id', description: 'Item ID to get outbound suggestions for' })
-  @ApiResponse({ status: 200, description: 'Auto suggestions for OUT operations' })
-  getOutSuggestions(@Param('item_id') item_id: string) {
-    return this.autoSuggestionService.getOutSuggestions(item_id);
-  }
-
-  @Get('item/:item_id')
-  @ApiOperation({ summary: 'Get inventory tracking by item ID' })
-  @ApiParam({ name: 'item_id', description: 'Item ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Inventory tracking records for specific item',
-    schema: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          inventory_tracking_id: { type: 'string' },
-          pallet_id: { type: 'string' },
-          pallet_code: { type: 'string' },
-          warehouse_id: { type: 'string' },
-          warehouse_sub_id: { type: 'string' },
-          warehouse_bin_id: { type: 'string' },
-          inventory_date: { type: 'string', format: 'date-time' },
-          inventory_status: { type: 'string' },
-          inventory_note: { type: 'string' },
-          week_number: { type: 'number' },
-          production_date: { type: 'string', format: 'date-time' },
-          item_id: { type: 'string' },
-          quantity: { type: 'number' },
-          uom: { type: 'string' },
-          warehouse_name: { type: 'string' },
-          warehouse_sub_name: { type: 'string' },
-          bin_name: { type: 'string' },
-          bin_code: { type: 'string' },
-          pallet_utilization: { type: 'number' },
-        },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'No inventory tracking found for this item',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'No inventory tracking found for this item' },
-        statusCode: { type: 'number', example: 404 },
-      },
-    },
-  })
-  async findByItemId(@Param('item_id') item_id: string) {
-    return this.service.findByItemId(item_id);
   }
 }

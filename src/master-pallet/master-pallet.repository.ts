@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
 import { MasterPallet } from '../core/domain/entities/master-pallet.entity';
@@ -21,6 +21,12 @@ export class MasterPalletRepository {
     return await this.repository.find();
   }
 
+  async findAllByOrganizationId(organizationId: string): Promise<MasterPallet[]> {
+    return this.repository.find({
+      where: { organization_id: organizationId },
+    });
+  }
+
   async findOne(id: string): Promise<MasterPallet | null> {
     const pallet = await this.repository.findOne({ where: { id } });
     if (!pallet) {
@@ -31,7 +37,7 @@ export class MasterPalletRepository {
 
   async findByPalletCode(palletCode: string): Promise<MasterPallet | null> {
     const pallet = await this.repository.findOne({
-      where: { pallet_code: palletCode },
+      where: { pallet_code: palletCode, isActive: true },
     });
     if (!pallet) {
       return null;
@@ -61,5 +67,22 @@ export class MasterPalletRepository {
 
   async remove(id: string): Promise<void> {
     await this.repository.delete(id);
+  }
+
+  async findByPalletCodes(palletCodes: string[]): Promise<MasterPallet[]> {
+    if (!palletCodes.length) {
+      return [];
+    }
+    return this.repository.find({
+      where: { pallet_code: In(palletCodes) },
+    });
+  }
+
+  async createMany(payloads: CreateMasterPalletDto[]): Promise<MasterPallet[]> {
+    if (!payloads.length) {
+      return [];
+    }
+    const entities = this.repository.create(payloads);
+    return this.repository.save(entities);
   }
 }

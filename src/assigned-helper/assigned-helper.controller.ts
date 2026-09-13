@@ -81,8 +81,9 @@ export class AssignedHelperController {
     },
   })
   findAll(@Query('inbound_id') inboundId?: string) {
-    if (inboundId) {
-      return this.assignedHelperService.findAllByInbound(inboundId);
+    const trimmedInboundId = inboundId?.trim();
+    if (trimmedInboundId) {
+      return this.assignedHelperService.findAllByInbound(trimmedInboundId);
     }
     return this.assignedHelperService.findAll();
   }

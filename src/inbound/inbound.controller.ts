@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, BadRequestException } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -7,6 +7,7 @@ import {
   ApiExtraModels,
   ApiBody,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { InboundService } from './inbound.service';
 import {
@@ -20,8 +21,12 @@ import { AssignedHelper } from '../core/domain/entities/assigned-helper.entity';
 import { InboundPaginationQueryDto } from './dto/inbound-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
+import { SalesOrderIntegrationService } from './integration/sales-order.integration';
+import { PurchaseOrderIntegrationService } from './integration/purchase-order.integration';
 import { BulkUpdateSaldoInspectionDto } from './dto/bulk-update-saldo-inspection.dto';
 import { InboundItem } from '../core/domain/entities/inbound-item.entity';
+import { OrganizationId } from 'src/core/decorators/organization-id.decorator';
+import { InboundDo } from '../core/domain/entities/inbound-do.entity';
 
 @ApiTags('Inbound')
 @Controller('inbound')
@@ -31,7 +36,9 @@ export class InboundController {
   constructor(
     private readonly service: InboundService,
     private readonly doValidationIntegrationService: DoValidationIntegrationService,
-  ) {}
+    private readonly salesOrderIntegrationService: SalesOrderIntegrationService,
+    private readonly purchaseOrderIntegrationService: PurchaseOrderIntegrationService,
+  ) { }
 
   @Post()
   @ApiOperation({ summary: 'Create inbound with optional DOs and Items' })
@@ -63,16 +70,16 @@ export class InboundController {
       ]
     }
   })
-  findAll(@Query() paginationQuery: InboundPaginationQueryDto) {
+  findAll(@Query() paginationQuery: InboundPaginationQueryDto, @OrganizationId() organizationId: string | number | null) {
     // Check if any pagination parameters are provided
-    const hasPaginationParams = paginationQuery.search || paginationQuery.page || paginationQuery.limit || 
-                               paginationQuery.sortBy || paginationQuery.sortOrder || paginationQuery.status;
-    
+    const hasPaginationParams = paginationQuery.search || paginationQuery.page || paginationQuery.limit ||
+      paginationQuery.sortBy || paginationQuery.sortOrder || paginationQuery.status;
+
     if (hasPaginationParams) {
-      return this.service.findAllPaginated(paginationQuery);
+      return this.service.findAllPaginated(paginationQuery, organizationId);
     }
-    
-    return this.service.findAll();
+
+    return this.service.findAll(organizationId);
   }
 
   @Get('all')
@@ -82,8 +89,8 @@ export class InboundController {
     description: 'Return all inbounds.',
     type: [Inbound],
   })
-  findAllInbounds() {
-    return this.service.findAll();
+  findAllInbounds(@OrganizationId() organizationId: string | number | null) {
+    return this.service.findAll(organizationId);
   }
 
   @Get('inspection')
@@ -92,6 +99,44 @@ export class InboundController {
   @ApiResponse({ status: 200, type: [Inbound] })
   findAllInspection(@Query('status') status: string) {
     return this.service.findAllTransactionScanInbound(status);
+  }
+
+  @Get('sales-order')
+  @ApiOperation({ summary: 'Find sales order by order number' })
+  @ApiQuery({
+    name: 'orderNumber',
+    required: true,
+    type: String,
+    description: 'Sales order number',
+    example: 'SO-2026-00100',
+  })
+  @ApiResponse({ status: 200, description: 'Sales order data from meta service' })
+  findSalesOrder(@Query('orderNumber') orderNumber: string) {
+    const trimmedOrderNumber = orderNumber?.trim();
+    if (!trimmedOrderNumber) {
+      throw new BadRequestException('orderNumber is required');
+    }
+
+    return this.salesOrderIntegrationService.findByOrderNumber(trimmedOrderNumber);
+  }
+
+  @Get('purchase-order')
+  @ApiOperation({ summary: 'Find purchase order by nomor PO' })
+  @ApiQuery({
+    name: 'nomorPO',
+    required: true,
+    type: String,
+    description: 'Purchase order number (same as inbound_do.inbound_po_number)',
+    example: 'PO-2026-00100',
+  })
+  @ApiResponse({ status: 200, description: 'Purchase order data from meta service' })
+  findPurchaseOrder(@Query('nomorPO') nomorPO: string) {
+    const trimmedNomorPO = nomorPO?.trim();
+    if (!trimmedNomorPO) {
+      throw new BadRequestException('nomorPO is required');
+    }
+
+    return this.purchaseOrderIntegrationService.findByOrderNumber(trimmedNomorPO);
   }
 
   @Get(':id')
@@ -133,12 +178,49 @@ export class InboundController {
     return this.service.findByAssignedHelperId(id);
   }
 
-  // find by surat jalan
-  @Get('do-validation/:suratJalan')
-  @ApiOperation({ summary: 'Find inbound by do validation surat jalan' })
+  // find by surat jalan (query param friendly, supports "/" safely)
+  @Get('do-validation/:type')
+  @ApiOperation({ summary: 'Find inbound by do validation surat jalan (via query param)' })
+  @ApiParam({
+    name: 'type',
+    required: true,
+    type: String,
+    description: 'Validation type',
+    example: 'SO',
+    enum: ['SO', 'PO'],
+  })
+  @ApiQuery({
+    name: 'suratJalan',
+    required: true,
+    type: String,
+    description: 'Delivery order number / surat jalan',
+    example: 'DO-SHP-SMD2026/03/00100',
+  })
   @ApiResponse({ status: 200, type: Inbound })
-  findByDoValidationSuratJalan(@Param('suratJalan') suratJalan: string) {
-    return this.doValidationIntegrationService.getDoValidationBySuratJalan(suratJalan);
+  findByDoValidationSuratJalan(
+    @Param('type') type: 'SO' | 'PO',
+    @Query('suratJalan') suratJalan: string,
+  ) {
+    return this.doValidationIntegrationService.getDoValidation(suratJalan, type);
+  }
+
+  // legacy path param route kept for backward compatibility
+  @Get('do-validation/:type/:suratJalan')
+  @ApiOperation({ summary: 'Find inbound by do validation surat jalan (legacy path param)' })
+  @ApiParam({
+    name: 'type',
+    required: true,
+    type: String,
+    description: 'Validation type',
+    example: 'SO',
+    enum: ['SO', 'PO'],
+  })
+  @ApiResponse({ status: 200, type: Inbound })
+  findByDoValidationSuratJalanLegacy(
+    @Param('type') type: 'SO' | 'PO',
+    @Param('suratJalan') suratJalan: string,
+  ) {
+    return this.doValidationIntegrationService.getDoValidation(suratJalan, type);
   }
 
   // bulk update saldo inspection
@@ -150,19 +232,21 @@ export class InboundController {
     return this.service.bulkUpdateInboundItemSaldoInspection(dto);
   }
 
-  // sequential status
-  @Patch('sequential-status/:id')
-  @ApiOperation({ summary: 'Sequential status inbound' })
-  @ApiResponse({ status: 200, type: Inbound })
-  sequentialStatus(@Param('id') id: string) {
-    return this.service.sequentialStatus(id);
-  }
-
   // integration to oracle by inbound id
+  // need tracing for this endpoint with issue still include inbound_do that is cancelled
   @Post('integration-to-oracle/:id')
   @ApiOperation({ summary: 'Integration to oracle by inbound id' })
   @ApiResponse({ status: 200, type: Inbound })
   integrationToOracle(@Param('id') id: string) {
     return this.service.integrationToOracle(id);
+  }
+
+  // cancel inbound-do
+  @Patch('cancel-inbound-do/:id')
+  @ApiOperation({ summary: 'Cancel inbound-do' })
+  @ApiResponse({ status: 200, type: InboundDo })
+  @ApiParam({ name: 'id', description: 'ID inbound-do' })
+  cancelInboundDo(@Param('id') id: string) {
+    return this.service.cancelInboundDo(id);
   }
 }

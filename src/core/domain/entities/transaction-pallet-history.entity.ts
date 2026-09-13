@@ -8,11 +8,15 @@ export enum QuantityOperationType {
   REMOVE = 'REMOVE',
   ADJUST = 'ADJUST',
   RESET = 'RESET',
+  SPLIT = 'SPLIT',
+  MERGE = 'MERGE',
 }
 
 export enum StatusInventory {
   READY = 'READY',
   PENDING = 'PENDING',
+  /** Set when the history row was superseded by a production-date update. */
+  UPDATED_PROD_DATE = 'UPDATED_PROD_DATE',
 }
 
 @Entity('transaction_pallet_history')

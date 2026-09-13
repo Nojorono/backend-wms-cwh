@@ -41,8 +41,9 @@ export class OutboundMemoRepository {
     return this.findOne(savedOutboundMemo.id);
   }
 
-  async findAll(): Promise<OutboundMemo[]> {
+  async findAll(organizationId: string): Promise<OutboundMemo[]> {
     return await this.outboundMemoRepository.find({
+      where: { organization_id: organizationId as any },
       relations: ['outbound_memo_items', 'outbound_memo_items.item'],
       order: { createdAt: 'DESC' },
     });
@@ -59,6 +60,8 @@ export class OutboundMemoRepository {
 
   async update(id: string, data: UpdateOutboundMemoDto): Promise<OutboundMemo> {
     const existing = await this.findOne(id);
+
+    if (!existing) throw new NotFoundException('Outbound memo not found');
 
     const { outbound_memo_items, ...outboundMemoData } = data;
 
@@ -90,12 +93,11 @@ export class OutboundMemoRepository {
     await this.outboundMemoRepository.delete(id);
   }
 
-  async findByStatus(status: string): Promise<OutboundMemo[]> {
-    const where: Partial<OutboundMemo> = { status: status as OutboundMemoStatus };
-
-    if (status === OutboundMemoStatus.APPROVED) {
-      where.has_do = false;
-    }
+  async findByStatus(status: string, organizationId: string): Promise<OutboundMemo[]> {
+    const where: Partial<OutboundMemo> = {
+      status: status as OutboundMemoStatus,
+      organization_id: organizationId,
+    };
 
     return await this.outboundMemoRepository.find({
       where,
@@ -106,6 +108,7 @@ export class OutboundMemoRepository {
 
   async findAllPaginated(
     paginationDto: OutboundMemoPaginationDto,
+    organizationId: string,
   ): Promise<{ data: OutboundMemo[]; total: number }> {
     const {
       page = 1,
@@ -138,15 +141,18 @@ export class OutboundMemoRepository {
       .leftJoinAndSelect('memo.transaction_pickings', 'transaction_pickings')
       .leftJoinAndSelect('transaction_pickings.transactionScanPicking', 'transaction_scan_picking');
 
+    qb.andWhere('memo.organization_id = :organizationId::uuid', { organizationId });
+
     if (status) {
       qb.andWhere('memo.status = :status', { status });
-      if (status === OutboundMemoStatus.APPROVED) {
-        qb.andWhere('memo.has_do = false');
-      }
     }
 
     if (has_do !== undefined) {
-      qb.andWhere('memo.has_do = :has_do', { has_do });
+      if (has_do === false) {
+        qb.andWhere('(memo.has_do = :has_do OR memo.has_do IS NULL)', { has_do: false });
+      } else {
+        qb.andWhere('memo.has_do = :has_do', { has_do: true });
+      }
     }
 
     if (type) {

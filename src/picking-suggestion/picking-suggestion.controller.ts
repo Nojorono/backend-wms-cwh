@@ -1,13 +1,22 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  HttpException,
+  InternalServerErrorException,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { PickingSuggestionService } from './picking-suggestion.service';
 import { PickingSuggestionDto } from './dto/picking-suggestion.dto';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Picking Suggestion')
 @Controller('picking-suggestion')
 @ApiBearerAuth('JWT-auth')
 export class PickingSuggestionController {
-  constructor(private readonly pickingSuggestionService: PickingSuggestionService) {}
+  constructor(private readonly pickingSuggestionService: PickingSuggestionService) { }
 
   @Get('memo/:memoId')
   @ApiOperation({ summary: 'Get picking suggestions for a memo' })
@@ -31,8 +40,13 @@ export class PickingSuggestionController {
   async getPickingSuggestionsByMemo(
     @Param('memoId') memoId: string,
     @Query('sortMethod') sortMethod?: 'FIFO' | 'LIFO',
+    @OrganizationId() organizationId?: string,
   ) {
-    return this.pickingSuggestionService.getPickingSuggestionsByMemo(memoId, sortMethod);
+    return this.pickingSuggestionService.getPickingSuggestionsByMemo(
+      memoId,
+      sortMethod,
+      organizationId,
+    );
   }
 
   @Get('item/:itemId')
@@ -63,8 +77,18 @@ export class PickingSuggestionController {
     @Param('itemId') itemId: string,
     @Query('uom') uom?: string,
     @Query('sortMethod') sortMethod?: 'FIFO' | 'LIFO',
+    @OrganizationId() organizationId?: string,
   ) {
-    return this.pickingSuggestionService.getPickingSuggestionsByItemId(itemId, uom, sortMethod);
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
+    return this.pickingSuggestionService.getPickingSuggestionsByItemId(
+      itemId,
+      uom,
+      sortMethod,
+      organizationId,
+    );
   }
 
   @Get('put-away')
@@ -109,8 +133,20 @@ export class PickingSuggestionController {
       },
     },
   })
-  async getPutAwaySuggestions() {
-    return this.pickingSuggestionService.getPutAwaySuggestions();
+  async getPutAwaySuggestions(@OrganizationId() organizationId: string) {
+    try {
+      return await this.pickingSuggestionService.getPutAwaySuggestions(organizationId);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (error instanceof Error) {
+        throw new BadRequestException(error.message);
+      }
+
+      throw new InternalServerErrorException('Failed to get put away suggestions');
+    }
   }
 }
 

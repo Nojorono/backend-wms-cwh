@@ -6,31 +6,31 @@ import { InventoryTracking } from './inventory-tracking.entity';
 
 @Entity('inventory_movement_pallet')
 export class InventoryMovementPallet extends BaseEntity {
-  @Column({ nullable: true })
+  @Column({ name: 'inventory_movement_id', nullable: true })
   inventory_movement_id: string;
 
   @ManyToOne(() => InventoryMovement, (movement) => movement.pallets, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'inventory_movement_id' })
   inventoryMovement: InventoryMovement;
 
-  @Column({ nullable: true })
+  @Column({ name: 'pallet_id', nullable: true })
   pallet_id: string;
 
   @ManyToOne(() => MasterPallet, (pallet) => pallet.id)
   @JoinColumn({ name: 'pallet_id' })
   pallet: MasterPallet;
 
-  @Column({ nullable: true })
+  @Column({ name: 'inventory_tracking_id', nullable: true })
   inventory_tracking_id: string;
 
   @ManyToOne(() => InventoryTracking, (tracking) => tracking.id)
   @JoinColumn({ name: 'inventory_tracking_id' })
   inventoryTracking: InventoryTracking;
 
-  @Column({ nullable: true, default: false })
+  @Column({ name: 'is_completed', nullable: true, default: false })
   is_completed: boolean;
 
-  @Column({ nullable: true })
+  @Column({ name: 'completed_at', nullable: true })
   completed_at: Date;
 }
 

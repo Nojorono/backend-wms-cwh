@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Inbound } from 'src/core/domain/entities/inbound.entity';
 import { InboundDo } from 'src/core/domain/entities/inbound-do.entity';
@@ -13,10 +13,23 @@ import { ClientsModule } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Transport } from '@nestjs/microservices';
 import { DoValidationIntegrationService } from './integration/do-validation.integration';
+import { InboundMappingIntegrationService } from './integration/inbound-mapping-integration.service';
+import { SalesOrderIntegrationService } from './integration/sales-order.integration';
+import { RcvReceiptIntegrationService } from './integration/rcv-receipt.integration';
+import { PurchaseOrderIntegrationService } from 'src/inbound/integration/purchase-order.integration';
+import { InboundIntegrationModule } from 'src/inbound-integration/inbound-integration.module';
+import { InboundIntegrationQueueProducer } from './integration/inbound-integration-queue.producer';
+import { InboundIntegrationQueueConsumer } from './integration/inbound-integration-queue.consumer';
+import { OracleInboundStatusCheckerService } from './integration/oracle-inbound-status-checker.service';
+import { InboundIntegrationQueueWorker } from './integration/inbound-integration-queue.worker';
+import { getInboundIntegrationRmqOptions } from './integration/inbound-integration-rmq.config';
+import { TransactionScanInboundModule } from 'src/transaction-scan-inbound/transaction-scan-inbound.module';
 
 @Module({
   imports: [
     ConfigModule,
+    forwardRef(() => InboundIntegrationModule),
+    TransactionScanInboundModule,
     TypeOrmModule.forFeature([Inbound, InboundDo, InboundItem, PalletTransactionHistory]),
     ClientsModule.registerAsync([
       {
@@ -33,6 +46,56 @@ import { DoValidationIntegrationService } from './integration/do-validation.inte
         }),
         inject: [ConfigService],
       },
+      {
+        name: 'RCV_RECEIPT_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.rcvReceipt', 'rcv_receipt_queue'),
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'PURCHASE_ORDER_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.purchaseOrder') || 'purchase_order_queue',
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'SALES_ORDER_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: {
+            urls: [configService.get('RABBITMQ_URL', 'amqp://localhost:5672') as string],
+            queue: configService.get('rmq.salesOrder', 'sales_order_queue'),
+            queueOptions: {
+              durable: false,
+            },
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'INBOUND_INTEGRATION_QUEUE_CLIENT',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.RMQ,
+          options: getInboundIntegrationRmqOptions(configService),
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [InboundController],
@@ -42,7 +105,15 @@ import { DoValidationIntegrationService } from './integration/do-validation.inte
     InboundDoRepository,
     InboundItemRepository,
     DoValidationIntegrationService,
+    RcvReceiptIntegrationService,
+    PurchaseOrderIntegrationService,
+    SalesOrderIntegrationService,
+    InboundMappingIntegrationService,
+    InboundIntegrationQueueProducer,
+    InboundIntegrationQueueConsumer,
+    InboundIntegrationQueueWorker,
+    OracleInboundStatusCheckerService,
   ],
-  exports: [InboundService],
+  exports: [InboundService, OracleInboundStatusCheckerService],
 })
-export class InboundModule {}
+export class InboundModule { }

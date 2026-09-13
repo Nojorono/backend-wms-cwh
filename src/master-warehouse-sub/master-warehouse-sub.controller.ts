@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -6,7 +7,6 @@ import {
   Patch,
   Param,
   Delete,
-  ParseIntPipe,
   Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
@@ -17,12 +17,13 @@ import {
   MasterWarehouseSub,
   WarehouseSubStagingType,
 } from '../core/domain/entities/master-warehouse-sub.entity';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Master Warehouse Sub')
 @Controller('master-warehouse-sub')
 @ApiBearerAuth('JWT-auth')
 export class MasterWarehouseSubController {
-  constructor(private readonly masterWarehouseSubService: MasterWarehouseSubService) {}
+  constructor(private readonly masterWarehouseSubService: MasterWarehouseSubService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new Warehouse Sub' })
@@ -48,13 +49,21 @@ export class MasterWarehouseSubController {
   })
   @ApiQuery({ name: 'is_staging', required: false, enum: WarehouseSubStagingType })
   @ApiQuery({ name: 'is_gate', required: false, type: Boolean })
-  findAll(@Query('is_staging') is_staging?: WarehouseSubStagingType, @Query('is_gate') is_gate?: string) {
+  findAll(
+    @Query('is_staging') is_staging?: WarehouseSubStagingType,
+    @Query('is_gate') is_gate?: string,
+    @OrganizationId() organizationId?: string,
+  ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     const isGateBoolean = is_gate !== undefined ? is_gate === 'true' : undefined;
-    
+
     if (is_staging !== undefined || isGateBoolean !== undefined) {
-      return this.masterWarehouseSubService.findByFilters(is_staging, isGateBoolean);
+      return this.masterWarehouseSubService.findByFilters(organizationId, is_staging, isGateBoolean);
     } else {
-      return this.masterWarehouseSubService.findAll();
+      return this.masterWarehouseSubService.findAll(organizationId);
     }
   }
 
@@ -66,38 +75,61 @@ export class MasterWarehouseSubController {
     type: [MasterWarehouseSub],
   })
   @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findByIsStaging(@Query('is_staging') is_staging: string) {
+  findByIsStaging(@Query('is_staging') is_staging: string, @OrganizationId() organizationId?: string) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     if (is_staging === 'null') {
-      return this.masterWarehouseSubService.findByIsStagingNull();
+      return this.masterWarehouseSubService.findByIsStagingNull(organizationId);
     } else if (is_staging && is_staging !== 'null') {
-      return this.masterWarehouseSubService.findByIsStaging(is_staging as WarehouseSubStagingType);
+      return this.masterWarehouseSubService.findByIsStaging(
+        is_staging as WarehouseSubStagingType,
+        organizationId,
+      );
     } else {
-      return this.masterWarehouseSubService.findAll();
+      return this.masterWarehouseSubService.findAll(organizationId);
     }
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a Warehouse Sub by id' })
+  @Get('with-bins')
+  @ApiOperation({
+    summary: 'Get all warehouse subs with bins and current pallet count per bin',
+  })
+  @ApiQuery({
+    name: 'is_staging',
+    required: false,
+    description: 'Use null to filter warehouse subs without staging type',
+    enum: [...Object.values(WarehouseSubStagingType), 'null'],
+  })
+  @ApiQuery({ name: 'is_good_stock', required: false, type: Boolean })
+  @ApiQuery({ name: 'is_gate', required: false, type: Boolean })
   @ApiResponse({
     status: 200,
-    description: 'Return the Warehouse Sub.',
-    type: MasterWarehouseSub,
+    description: 'Return warehouse subs populated with bins and pallet counts.',
   })
-  @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findOne(@Param('id') id: string) {
-    return this.masterWarehouseSubService.findOne(id);
-  }
+  findAllWithBinsAndPalletCount(
+    @OrganizationId() organizationId?: string,
+    @Query('is_staging') is_staging?: string,
+    @Query('is_good_stock') is_good_stock?: string,
+    @Query('is_gate') is_gate?: string,
+  ) {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
 
-  @Get('organization/:organization_id')
-  @ApiOperation({ summary: 'Get a Warehouse Sub by organization ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Return the Warehouse Sub.',
-    type: [MasterWarehouseSub],
-  })
-  @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
-  findByOrganizationId(@Param('organization_id', ParseIntPipe) organization_id: number) {
-    return this.masterWarehouseSubService.findByOrganizationId(organization_id);
+    const filters = {
+      is_staging:
+        is_staging === 'null'
+          ? null
+          : is_staging
+            ? (is_staging as WarehouseSubStagingType)
+            : undefined,
+      is_good_stock: is_good_stock !== undefined ? is_good_stock === 'true' : undefined,
+      is_gate: is_gate !== undefined ? is_gate === 'true' : undefined,
+    };
+
+    return this.masterWarehouseSubService.findAllWithBinsAndPalletCount(organizationId, filters);
   }
 
   @Get('warehouse/:warehouse_id')
@@ -110,6 +142,18 @@ export class MasterWarehouseSubController {
   @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
   findByWarehouseId(@Param('warehouse_id') warehouse_id: string) {
     return this.masterWarehouseSubService.findByWarehouseId(warehouse_id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a Warehouse Sub by id' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return the Warehouse Sub.',
+    type: MasterWarehouseSub,
+  })
+  @ApiResponse({ status: 404, description: 'Warehouse Sub not found.' })
+  findOne(@Param('id') id: string) {
+    return this.masterWarehouseSubService.findOne(id);
   }
 
   @Patch(':id')

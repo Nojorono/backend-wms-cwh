@@ -1,0 +1,46 @@
+# Main CI: lint, test, build
+# Aligns with OWASP ASVS (e.g. secure SDLC, build integrity)
+#
+# DISABLED - setup not ready. To re-enable: uncomment push/pull_request under 'on:', and remove 'if: false' from the job.
+name: CI
+
+on:
+  workflow_dispatch: {} # run manually from Actions tab when needed
+  # push:
+  #   branches: [development, main, master]
+  # pull_request:
+  #   branches: [development, main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    if: false # DISABLED - remove this line to re-enable
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Run tests
+        run: npm run test -- --passWithNoTests
+
+      - name: Build
+        run: npm run build

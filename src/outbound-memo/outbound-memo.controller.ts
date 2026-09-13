@@ -25,6 +25,7 @@ import { OutboundMemoResponseDto } from './dto/outbound-memo-response.dto';
 import { OutboundMemoStatus } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundMemoPaginationDto } from './dto/outbound-memo-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Outbound Memo')
 @Controller('outbound-memo')
@@ -67,7 +68,8 @@ export class OutboundMemoController {
     },
     {
       name: 'has_do',
-      description: 'Filter outbound memo berdasarkan apakah sudah memiliki outbound DO',
+      description:
+        'Filter apakah sudah memiliki outbound DO (true/false). Gunakan false untuk memo APPROVED yang siap dibuatkan DO.',
       example: false,
       type: Boolean,
     },
@@ -89,28 +91,27 @@ export class OutboundMemoController {
     description: 'Daftar outbound memo',
     type: [OutboundMemoResponseDto],
   })
-  async findAll(@Query() paginationQuery: OutboundMemoPaginationDto) {
-    const hasPaginationParams =
-      paginationQuery.page ||
-      paginationQuery.limit ||
-      paginationQuery.search ||
-      paginationQuery.sortBy ||
-      paginationQuery.sortOrder ||
-      paginationQuery.status ||
+  async findAll(
+    @Query() paginationQuery: OutboundMemoPaginationDto,
+    @OrganizationId() organizationId: string,
+  ) {
+    const hasQueryParams =
+      paginationQuery.page !== undefined ||
+      paginationQuery.limit !== undefined ||
+      paginationQuery.search !== undefined ||
+      paginationQuery.sortBy !== undefined ||
+      paginationQuery.sortOrder !== undefined ||
+      paginationQuery.status !== undefined ||
       paginationQuery.has_do !== undefined ||
       paginationQuery.type !== undefined ||
       paginationQuery.has_transaction_picking !== undefined ||
       paginationQuery.item_id !== undefined;
 
-    if (hasPaginationParams) {
-      return this.outboundMemoService.findAllPaginated(paginationQuery);
+    if (hasQueryParams) {
+      return this.outboundMemoService.findAllPaginated(paginationQuery, organizationId);
     }
 
-    if (paginationQuery.status) {
-      return this.outboundMemoService.findByStatus(paginationQuery.status);
-    }
-
-    return this.outboundMemoService.findAll();
+    return this.outboundMemoService.findAll(organizationId);
   }
 
   @Get(':id')

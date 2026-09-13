@@ -5,16 +5,29 @@ import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
 import { InventoryMovementPallet } from './inventory-movement-pallet.entity';
 import { InventoryMovementUser } from './inventory-movment-user.entity';
+import { MasterIO } from './master-io.entity';
 
 export enum MovementStatus {
   PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
+  APPROVED = 'APPROVED',
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
 
+export enum MovementType {
+  GOOD_STOCK = 'GOOD_STOCK',
+  BAD_STOCK = 'BAD_STOCK',
+}
+
 @Entity('inventory_movement')
 export class InventoryMovement extends BaseEntity {
+  @Column({ nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
   @Column({ nullable: true })
   movement_number: string;
 
@@ -27,6 +40,9 @@ export class InventoryMovement extends BaseEntity {
     cascade: true,
   })
   users: InventoryMovementUser[];
+
+  @Column({ nullable: true, type: 'enum', enum: MovementType })
+  movement_type: MovementType;
 
   @Column({ nullable: true })
   source_warehouse_id: string;

@@ -10,6 +10,7 @@ import {
 } from '../core/domain/entities/inventory-tracking.entity';
 import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
 import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
+import { MasterWarehouse } from '../core/domain/entities/master-warehouse.entity';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import { PalletItemQuantityDto } from '../master-pallet/dto/pallet-quantity.dto';
 import { TransactionScanInbound } from '../core/domain/entities/transaction-scan-inbound.entity';
@@ -139,6 +140,7 @@ export class PickingSuggestionService {
   private async generatePickingSuggestionsForMemo(
     memo: any,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<PickingSuggestionDto[]> {
     const suggestions: PickingSuggestionDto[] = [];
 
@@ -158,7 +160,7 @@ export class PickingSuggestionService {
       }
 
       // Calculate how much is already assigned to transaction-picking for this memo item
-      const alreadyPicked = await this.getAlreadyPickedQuantity(memo.id, item.item_id);
+      const alreadyPicked = await this.getAlreadyPickedQuantity(item.item_id, memo.id);
       const remainingRequired = Math.max(0, item.quantity_plan - alreadyPicked);
 
       // Find available inventory for this item
@@ -167,9 +169,28 @@ export class PickingSuggestionService {
         remainingRequired,
         item.uom,
         sortMethod,
+        organizationId,
       );
 
       if (availableInventory.length > 0) {
+        const pendingBookings = organizationId
+          ? await this.repository.getPendingBookedByWeek(item.item_id, item.uom, organizationId)
+          : { byWeek: [], unscoped: 0 };
+
+        const suggestedLocations = this.getAllAvailableInventory(
+          availableInventory,
+          remainingRequired,
+          sortMethod,
+          pendingBookings,
+        );
+        const totalSuggested = suggestedLocations.reduce(
+          (sum, s) => sum + s.quantity_ready_to_pick, 0,
+        );
+        const netAvailable = suggestedLocations.reduce(
+          (sum, s) => sum + s.available_quantity,
+          0,
+        );
+
         const suggestion = {
           memo_id: memo.id,
           item_id: item.item_id,
@@ -178,18 +199,13 @@ export class PickingSuggestionService {
           required_quantity: item.quantity_plan,
           already_picked_quantity: alreadyPicked,
           remaining_quantity_needed: remainingRequired,
-          suggested_locations: this.getAllAvailableInventory(
-            availableInventory,
-            remainingRequired,
-            sortMethod,
-          ),
-          total_suggested_quantity: this.calculateTotalSuggestedQuantity(
-            availableInventory,
-            remainingRequired,
-            sortMethod,
-          ),
+          available_quantity: netAvailable,
+          suggested_locations: suggestedLocations,
+          total_suggested_quantity: totalSuggested,
           priority: item.priority,
-          notes: this.generateNotes(item, memo, availableInventory, alreadyPicked, sortMethod),
+          notes: this.generateNotesFromSuggestions(
+            item, alreadyPicked, remainingRequired, suggestedLocations, netAvailable,
+          ),
         };
         suggestions.push(suggestion as any);
       } else {
@@ -223,6 +239,7 @@ export class PickingSuggestionService {
     requiredQuantity: number,
     uom?: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<any[]> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
@@ -238,7 +255,9 @@ export class PickingSuggestionService {
 
     try {
       // Try multiple search strategies in order of preference
-      const searchStrategies = [() => this.searchInventoryWithPalletHistory(itemId, uom, sortMethod)];
+      const searchStrategies = [
+        () => this.searchInventoryWithPalletHistory(itemId, uom, sortMethod, organizationId),
+      ];
 
       let results: any[] = [];
 
@@ -273,11 +292,17 @@ export class PickingSuggestionService {
     itemId: string,
     uom?: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<any[]> {
     try {
-      return await this.repository.searchInventoryWithPalletHistory(itemId, uom, sortMethod);
+      return await this.repository.searchInventoryWithPalletHistory(
+        itemId,
+        uom,
+        sortMethod,
+        organizationId,
+      );
     } catch (error) {
-      console.warn('searchInventoryWithPalletHistory failed:', error.message);
+      console.warn('searchInventoryWithPalletHistory failed:', (error as Error).message);
       return [];
     }
   }
@@ -291,7 +316,7 @@ export class PickingSuggestionService {
         await this.repository.debugInventoryWithJoins();
       }
     } catch (error) {
-      console.warn('debugInventorySearch failed:', error.message);
+      console.warn('debugInventorySearch failed:', (error as Error).message);
     }
   }
 
@@ -308,51 +333,50 @@ export class PickingSuggestionService {
   ): any[] {
     return inventory
       .filter((inv) => {
-        // Filter based on quantity and utilization
-        const hasEnoughQuantity = inv.quantity >= requiredQuantity;
-        const hasPartialQuantity = inv.quantity > 0 && inv.pallet_utilization < 100;
+        const qty = parseFloat(inv.quantity) || 0;
+        if (qty <= 0) return false;
+        // If no specific quantity required, include all positive-quantity rows
+        if (!requiredQuantity || requiredQuantity <= 0) return true;
+        const hasEnoughQuantity = qty >= requiredQuantity;
+        const hasPartialQuantity = inv.pallet_utilization == null || parseFloat(inv.pallet_utilization) < 100;
         return hasEnoughQuantity || hasPartialQuantity;
       })
       .sort((a, b) => {
-        // Primary sort: Location priority (bin > sub > warehouse)
-        if (a.location_priority !== b.location_priority) {
-          return a.location_priority - b.location_priority;
-        }
-
-        // Secondary sort: Week number (FIFO = ASC, LIFO = DESC)
+        // Primary: Week number (FIFO = ASC oldest first, LIFO = DESC newest first)
         if (a.week_number !== b.week_number) {
           const weekA = a.week_number || 0;
           const weekB = b.week_number || 0;
           if (sortMethod === 'LIFO') {
-            return weekB - weekA; // DESC: highest week number first
-          } else {
-            return weekA - weekB; // ASC: lowest week number first
+            return weekB - weekA;
           }
+          return weekA - weekB;
         }
 
-        // Tertiary sort: Production date (FIFO = ASC, LIFO = DESC)
+        // Secondary: Production date
         if (a.production_date !== b.production_date) {
           const prodDateA = a.production_date ? new Date(a.production_date).getTime() : 0;
           const prodDateB = b.production_date ? new Date(b.production_date).getTime() : 0;
           if (sortMethod === 'LIFO') {
-            return prodDateB - prodDateA; // DESC: most recent first
-          } else {
-            return prodDateA - prodDateB; // ASC: oldest first
+            return prodDateB - prodDateA;
           }
+          return prodDateA - prodDateB;
         }
 
-        // Quaternary sort: Inventory date (FIFO = ASC, LIFO = DESC)
+        // Tertiary: Location priority (staging preference within same week/batch)
+        if (a.location_priority !== b.location_priority) {
+          return a.location_priority - b.location_priority;
+        }
+
+        // Quaternary: Inventory date
         const dateA = a.inventory_date ? new Date(a.inventory_date).getTime() : 0;
         const dateB = b.inventory_date ? new Date(b.inventory_date).getTime() : 0;
         if (dateA !== dateB) {
           if (sortMethod === 'LIFO') {
-            return dateB - dateA; // DESC: most recent first
-          } else {
-            return dateA - dateB; // ASC: oldest first
+            return dateB - dateA;
           }
+          return dateA - dateB;
         }
 
-        // Final sort: Quantity (higher first for same date/week)
         return b.quantity - a.quantity;
       });
   }
@@ -498,6 +522,7 @@ export class PickingSuggestionService {
   async getPickingSuggestionsByMemo(
     memoId: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<PickingSuggestionDto[]> {
     // Validate memoId before proceeding
     if (!memoId || memoId.trim() === '') {
@@ -530,7 +555,8 @@ export class PickingSuggestionService {
           })),
       };
 
-      return await this.generatePickingSuggestionsForMemo(memo, sortMethod);
+
+      return await this.generatePickingSuggestionsForMemo(memo, sortMethod, organizationId);
     } catch (error) {
       console.error('Error in getPickingSuggestionsByMemo:', error);
       console.error('Query parameters:', { memoId, sortMethod });
@@ -549,23 +575,34 @@ export class PickingSuggestionService {
     }
   }
 
+  private getInventoryGroupKey(inv: any): string {
+    const subId = inv.warehouse_sub_id || 'none';
+    const binId = inv.warehouse_bin_id || 'none';
+    const weekNumber = inv.week_number ?? 'null';
+    const productionDate = inv.production_date
+      ? new Date(inv.production_date).toISOString()
+      : 'null';
+
+    return `${subId}_${binId}_${weekNumber}_${productionDate}`;
+  }
+
   private getAllAvailableInventory(
     availableInventory: any[],
     requiredQuantity: number,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    pendingBookings?: {
+      byWeek: Array<{ week_number: number; booked_quantity: number }>;
+      unscoped: number;
+    },
   ): PickingSuggestionLocationDto[] {
-    // Group inventory by bin AND week_number to preserve week information
-    const binGroups = new Map();
+    // Group by physical location + week/production batch so different weeks are not merged.
+    const locationGroups = new Map<string, any>();
 
-    // Group inventory by bin (warehouse_bin_id) or sub-warehouse (warehouse_sub_id) if no bin, AND week_number
     for (const inv of availableInventory) {
-      const binKey = inv.warehouse_bin_id || `sub_${inv.warehouse_sub_id}`;
-      const weekNumber = inv.week_number || 0;
-      // Create a unique key combining bin and week_number
-      const groupKey = `${binKey}_week_${weekNumber}`;
+      const groupKey = this.getInventoryGroupKey(inv);
 
-      if (!binGroups.has(groupKey)) {
-        binGroups.set(groupKey, {
+      if (!locationGroups.has(groupKey)) {
+        locationGroups.set(groupKey, {
           warehouse_name: inv.warehouse_name,
           warehouse_sub_name: inv.warehouse_sub_name,
           warehouse_sub_code: inv.warehouse_sub_code,
@@ -577,91 +614,85 @@ export class PickingSuggestionService {
           location_type: inv.location_type,
           location_priority: inv.location_priority,
           place: this.getLocationPlace(inv),
-          week_number: weekNumber,
+          week_number: inv.week_number ?? 0,
           production_date: inv.production_date,
           total_quantity: 0,
           reserved_quantity: 0,
-          available_quantity: 0,
+          net_available: 0,
           items: [],
         });
       }
 
-      const group = binGroups.get(groupKey);
-      group.total_quantity += parseFloat(inv.quantity || 0);
-      group.reserved_quantity += parseFloat(inv.reserved_quantity || 0);
-      group.available_quantity += parseFloat(inv.available_quantity || 0);
+      const group = locationGroups.get(groupKey)!;
+      const quantity = parseFloat(inv.quantity || 0);
+
+      group.total_quantity += quantity;
       group.items.push(inv);
     }
 
-    // Convert to array and sort by priority
-    const sortedBins = Array.from(binGroups.values()).sort((a, b) => {
-      // 1. Location priority (bin > sub > warehouse)
+    const sortedGroups = Array.from(locationGroups.values()).sort((a, b) => {
+      // Primary: Week number (FIFO = ASC, LIFO = DESC) — must match inventory visibility
+      if (a.week_number !== b.week_number) {
+        return sortMethod === 'LIFO'
+          ? b.week_number - a.week_number
+          : a.week_number - b.week_number;
+      }
+
+      const productionDateA = a.production_date ? new Date(a.production_date).getTime() : 0;
+      const productionDateB = b.production_date ? new Date(b.production_date).getTime() : 0;
+      if (productionDateA !== productionDateB) {
+        return sortMethod === 'LIFO'
+          ? productionDateB - productionDateA
+          : productionDateA - productionDateB;
+      }
+
+      // Secondary: location priority within same week/batch
       if (a.location_priority !== b.location_priority) {
         return a.location_priority - b.location_priority;
       }
 
-      // 2. Week number (FIFO = ASC, LIFO = DESC)
-      if (a.week_number !== b.week_number) {
-        const weekA = a.week_number || 0;
-        const weekB = b.week_number || 0;
-        if (sortMethod === 'LIFO') {
-          return weekB - weekA; // DESC: highest week number first (LIFO)
-        } else {
-          return weekA - weekB; // ASC: lowest week number first (FIFO)
-        }
-      }
-
-      // 3. Production date (FIFO = ASC, LIFO = DESC)
-      if (a.production_date !== b.production_date) {
-        const prodDateA = a.production_date ? new Date(a.production_date).getTime() : 0;
-        const prodDateB = b.production_date ? new Date(b.production_date).getTime() : 0;
-        if (sortMethod === 'LIFO') {
-          return prodDateB - prodDateA; // DESC: most recent first (LIFO)
-        } else {
-          return prodDateA - prodDateB; // ASC: oldest first (FIFO)
-        }
-      }
-
-      // 4. Total quantity (higher first)
       return b.total_quantity - a.total_quantity;
     });
 
-    // Generate suggestions for each bin
+    this.applyPendingReservationsToGroups(sortedGroups, pendingBookings);
+
+    const showAll = requiredQuantity <= 0;
     const allSuggestions: any[] = [];
     let remainingQuantity = requiredQuantity;
 
-    for (const bin of sortedBins) {
-      if (remainingQuantity <= 0) break;
+    for (const group of sortedGroups) {
+      if (!showAll && remainingQuantity <= 0) break;
 
-      // Use available_quantity (after reservations) instead of total_quantity
-      const quantityToTake = Math.min(bin.available_quantity, remainingQuantity);
+      const netAvailable = Math.max(0, group.net_available);
+      const quantityToTake = showAll
+        ? netAvailable
+        : Math.min(netAvailable, remainingQuantity);
 
-      // Skip if no available quantity after reservations
-      if (quantityToTake <= 0) continue;
+      if (!showAll && quantityToTake <= 0) continue;
+      if (showAll && group.total_quantity <= 0) continue;
 
-      // Find the most representative item for status and other details
-      const representativeItem = bin.items[0];
+      const representativeItem = group.items[0];
 
       allSuggestions.push({
-        total_quantity: bin.total_quantity,
-        reserved_quantity: bin.reserved_quantity,
-        available_quantity: bin.available_quantity,
+        total_quantity: group.total_quantity,
+        reserved_quantity: group.reserved_quantity,
+        available_quantity: netAvailable,
         quantity_ready_to_pick: quantityToTake,
-        uom: representativeItem.uom || representativeItem.pth_uom || 'DUS',
-        warehouse_name: bin.warehouse_name,
-        warehouse_sub_name: bin.warehouse_sub_name,
-        warehouse_sub_code: bin.warehouse_sub_code,
-        warehouse_sub_id: bin.warehouse_sub_id,
-        warehouse_bin_id: bin.warehouse_bin_id,
-        bin_id: bin.bin_id,
-        bin_name: bin.bin_name,
-        bin_code: bin.bin_code,
-        search_level: bin.search_level,
-        location_type: bin.location_type,
-        location_priority: bin.location_priority,
-        week_number: bin.week_number,
-        production_date: bin.production_date,
-        place: bin.place,
+        uom: representativeItem.uom || 'N/A',
+        warehouse_name: group.warehouse_name,
+        warehouse_sub_name: group.warehouse_sub_name,
+        warehouse_sub_code: group.warehouse_sub_code,
+        warehouse_sub_id: group.warehouse_sub_id,
+        warehouse_bin_id: group.bin_id !== 'N/A' ? group.bin_id : null,
+        bin_id: group.bin_id,
+        bin_name: group.bin_name,
+        bin_code: group.bin_code,
+        search_level: group.search_level,
+        location_type: group.location_type,
+        location_priority: group.location_priority,
+        week_number: group.week_number,
+        production_date: group.production_date,
+        place: group.place,
       });
 
       remainingQuantity -= quantityToTake;
@@ -670,68 +701,185 @@ export class PickingSuggestionService {
     return allSuggestions;
   }
 
-  private calculateTotalSuggestedQuantity(
-    availableInventory: any[],
-    requiredQuantity: number,
-    sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
-  ): number {
-    const allSuggestions = this.getAllAvailableInventory(availableInventory, requiredQuantity, sortMethod);
-    return allSuggestions.reduce((sum, suggestion) => sum + suggestion.quantity_ready_to_pick, 0);
+  /**
+   * Deduct pending transaction_picking reservations.
+   * Prefer booking source location (sub + bin) within the same week, then any same-week
+   * location, then unscoped bookings in sort order — matches visibility totals.
+   */
+  private applyPendingReservationsToGroups(
+    groups: Array<{
+      week_number: number;
+      warehouse_sub_id?: string | null;
+      bin_id?: string | null;
+      total_quantity: number;
+      reserved_quantity: number;
+      net_available: number;
+    }>,
+    pendingBookings?: {
+      byWeek: Array<{
+        week_number: number;
+        booked_quantity: number;
+        source_warehouse_sub_id?: string | null;
+        source_bin_id?: string | null;
+      }>;
+      unscoped: number;
+    },
+  ): void {
+    for (const group of groups) {
+      group.reserved_quantity = 0;
+      group.net_available = Math.max(0, group.total_quantity);
+    }
+
+    if (!pendingBookings) {
+      return;
+    }
+
+    const normalizeBin = (binId?: string | null): string | null => {
+      if (!binId || binId === 'N/A' || binId === 'none') {
+        return null;
+      }
+      return binId;
+    };
+
+    const matchesSourceLocation = (
+      group: (typeof groups)[number],
+      booking: (typeof pendingBookings.byWeek)[number],
+    ): boolean => {
+      if (!booking.source_warehouse_sub_id) {
+        return false;
+      }
+      if (group.warehouse_sub_id !== booking.source_warehouse_sub_id) {
+        return false;
+      }
+      const bookingBin = normalizeBin(booking.source_bin_id);
+      if (!bookingBin) {
+        return true;
+      }
+      return normalizeBin(group.bin_id) === bookingBin;
+    };
+
+    // Pass 1: allocate each booking to matching source location + week first.
+    for (const booking of pendingBookings.byWeek) {
+      let remaining = booking.booked_quantity;
+      if (remaining <= 0) {
+        continue;
+      }
+
+      for (const group of groups) {
+        if (remaining <= 0) {
+          break;
+        }
+        if (group.week_number !== booking.week_number) {
+          continue;
+        }
+        if (!matchesSourceLocation(group, booking)) {
+          continue;
+        }
+        const allocatable = group.net_available;
+        if (allocatable <= 0) {
+          continue;
+        }
+        const allocated = Math.min(allocatable, remaining);
+        group.reserved_quantity += allocated;
+        group.net_available -= allocated;
+        remaining -= allocated;
+      }
+
+      // Pass 2 for this booking: leftover to any same-week location.
+      for (const group of groups) {
+        if (remaining <= 0) {
+          break;
+        }
+        if (group.week_number !== booking.week_number) {
+          continue;
+        }
+        const allocatable = group.net_available;
+        if (allocatable <= 0) {
+          continue;
+        }
+        const allocated = Math.min(allocatable, remaining);
+        group.reserved_quantity += allocated;
+        group.net_available -= allocated;
+        remaining -= allocated;
+      }
+    }
+
+    // Pass 3: unscoped bookings (no week) in current sort order.
+    let unscopedRemaining = pendingBookings.unscoped;
+    for (const group of groups) {
+      if (unscopedRemaining <= 0) {
+        break;
+      }
+      const allocatable = group.net_available;
+      if (allocatable <= 0) {
+        continue;
+      }
+      const allocated = Math.min(allocatable, unscopedRemaining);
+      group.reserved_quantity += allocated;
+      group.net_available -= allocated;
+      unscopedRemaining -= allocated;
+    }
   }
 
-  private async getAlreadyPickedQuantity(memoId: string, itemId: string): Promise<number> {
-    return await this.repository.getAlreadyPickedQuantityForMemoItem(memoId, itemId);
+  /**
+   * @deprecated Use sum of getAllAvailableInventory available_quantity after pending reservations.
+   */
+  private computeNetAvailable(availableInventory: any[]): number {
+    const seen = new Set<string>();
+    let total = 0;
+    for (const inv of availableInventory) {
+      const locKey = `${inv.warehouse_sub_id}_${inv.warehouse_bin_id || 'none'}`;
+      if (!seen.has(locKey)) {
+        seen.add(locKey);
+        total += Math.max(0, parseFloat(inv.location_net_available || 0));
+      }
+    }
+    return total;
   }
 
-  private generateNotes(item: any, memo: any, availableInventory: any[], alreadyPicked: number = 0, sortMethod: 'FIFO' | 'LIFO' = 'FIFO'): string {
-    const remainingRequired = Math.max(0, item.quantity_plan - alreadyPicked);
-    const allSuggestions = this.getAllAvailableInventory(availableInventory, remainingRequired, sortMethod);
-    const totalFulfillable = allSuggestions.reduce(
-      (sum, suggestion) => sum + suggestion.quantity_ready_to_pick,
-      0,
-    );
-    const totalAvailable = allSuggestions.reduce(
-      (sum, suggestion) => sum + suggestion.available_quantity,
-      0,
+  private async getAlreadyPickedQuantity(itemId: string, memoId?: string): Promise<number> {
+    return await this.repository.getAlreadyPickedQuantityForMemoItem(itemId, memoId);
+  }
+
+  private generateNotesFromSuggestions(
+    item: any,
+    alreadyPicked: number,
+    remainingRequired: number,
+    suggestedLocations: any[],
+    netAvailable: number,
+  ): string {
+    const totalFulfillable = suggestedLocations.reduce(
+      (sum, s) => sum + s.quantity_ready_to_pick, 0,
     );
 
-    // Build note with context about existing pickings
     let note = '';
 
     if (alreadyPicked > 0) {
       note = `Sudah di-pick: ${alreadyPicked} ${item.uom}. Sisa: ${remainingRequired} ${item.uom}. `;
     }
 
-    // Check for partial pick scenario
-    const hasPartialPick = allSuggestions.some(
-      (suggestion) => suggestion.available_quantity > suggestion.quantity_ready_to_pick,
-    );
+    const hasPartialPick = netAvailable > totalFulfillable;
 
-    // Partial pick scenario - inventory available but only partially ready (CHECK FIRST)
     if (hasPartialPick) {
-      note += `Item tersedia dengan partial pick. Tersedia: ${totalAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}`;
-    }
-    // Exact match - perfect fulfillment
-    else if (totalFulfillable === remainingRequired) {
+      note += `Item tersedia dengan partial pick. Tersedia: ${netAvailable} ${item.uom}, Siap di-pick: ${totalFulfillable} ${item.uom}`;
+    } else if (totalFulfillable === remainingRequired) {
       note += `Item tersedia dengan jumlah yang tepat. Total tersedia: ${totalFulfillable} ${item.uom}`;
-    }
-    // More than required available
-    else if (totalFulfillable > remainingRequired) {
+    } else if (totalFulfillable > remainingRequired) {
       note += `Item tersedia dengan jumlah berlebih. Total tersedia: ${totalFulfillable} ${item.uom}`;
-    }
-    // Partial availability
-    else if (totalFulfillable > 0) {
+    } else if (totalFulfillable > 0) {
       note += `Item tersedia sebagian. Tersedia: ${totalFulfillable} ${item.uom}, Masih kurang: ${remainingRequired - totalFulfillable} ${item.uom}`;
-    }
-    // No inventory available
-    else {
+    } else {
       note += `Item tidak tersedia di inventory`;
     }
 
     return note;
   }
-
-  async getPickingSuggestionsByItemId(itemId: string, uom?: string, sortMethod?: 'FIFO' | 'LIFO'): Promise<any> {
+  async getPickingSuggestionsByItemId(
+    itemId: string,
+    uom?: string,
+    sortMethod?: 'FIFO' | 'LIFO',
+    organizationId?: string,
+  ): Promise<any> {
     // Validate itemId before proceeding
     if (!itemId || itemId.trim() === '') {
       throw new Error('Item ID is required');
@@ -739,6 +887,14 @@ export class PickingSuggestionService {
 
     if (!this.isValidUUID(itemId)) {
       throw new Error('Item ID is not a valid UUID');
+    }
+
+    if (!organizationId || organizationId.trim() === '') {
+      throw new Error('Organization ID is required');
+    }
+
+    if (!this.isValidUUID(organizationId)) {
+      throw new Error('Organization ID is not a valid UUID');
     }
 
     // Get item details
@@ -749,7 +905,13 @@ export class PickingSuggestionService {
 
     // Find all available inventory for this item
     const preferredUom = uom || undefined;
-    const availableInventory = await this.findAvailableInventoryForItem(itemId, 0, preferredUom, sortMethod);
+    const availableInventory = await this.findAvailableInventoryForItem(
+      itemId,
+      0,
+      preferredUom,
+      sortMethod,
+      organizationId,
+    );
 
     if (availableInventory.length === 0) {
       return {
@@ -764,23 +926,39 @@ export class PickingSuggestionService {
       };
     }
 
-    // Get all available inventory grouped by location
-    const totalQuantity = availableInventory.reduce((sum, inv) => sum + inv.quantity, 0);
-    const locations = this.getAllAvailableInventory(availableInventory, totalQuantity, sortMethod || 'FIFO');
+    // Net available after pending bookings (aligned with visibility dashboard)
+    const pendingBookings = await this.repository.getPendingBookedByWeek(
+      itemId,
+      preferredUom,
+      organizationId,
+    );
+
+    const locations = this.getAllAvailableInventory(
+      availableInventory,
+      0,
+      sortMethod || 'FIFO',
+      pendingBookings,
+    );
+
+    const totalReadyQuantity = locations.reduce((sum, loc) => sum + loc.total_quantity, 0);
+    const totalBookedQuantity = locations.reduce((sum, loc) => sum + loc.reserved_quantity, 0);
+    const totalQuantity = locations.reduce((sum, loc) => sum + loc.available_quantity, 0);
 
     return {
       item_id: itemId,
       item_name: item.description,
       item_code: item.item_number,
+      total_ready_quantity: totalReadyQuantity,
+      total_booked_quantity: totalBookedQuantity,
       total_available_quantity: totalQuantity,
       suggested_locations: locations,
       notes: preferredUom
-        ? `Item tersedia dengan total ${totalQuantity} ${preferredUom} di ${locations.length} lokasi`
-        : `Item tersedia dengan total ${totalQuantity} unit di ${locations.length} lokasi`,
+        ? `Item tersedia: ${totalQuantity} ${preferredUom} siap pick (${totalReadyQuantity} READY - ${totalBookedQuantity} booked) di ${locations.length} lokasi`
+        : `Item tersedia: ${totalQuantity} unit siap pick (${totalReadyQuantity} READY - ${totalBookedQuantity} booked) di ${locations.length} lokasi`,
     };
   }
 
-  async getPutAwaySuggestions(): Promise<{
+  async getPutAwaySuggestions(organizationId: string): Promise<{
     palletSuggestions: Array<{
       stagingPallet: InventoryTracking;
       suggestedBin: MasterWarehouseBin | null;
@@ -788,6 +966,14 @@ export class PickingSuggestionService {
       palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
     }>;
   }> {
+    if (!organizationId || organizationId.trim() === '') {
+      throw new Error('Organization ID is required');
+    }
+
+    if (!this.isValidUUID(organizationId)) {
+      throw new Error('Organization ID is not a valid UUID');
+    }
+
     const stagingPallets = await this.inventoryTrackingRepository
       .createQueryBuilder('tracking')
       .leftJoinAndSelect('tracking.pallet', 'pallet')
@@ -795,11 +981,12 @@ export class PickingSuggestionService {
       .leftJoinAndSelect('tracking.warehouse', 'warehouse')
       .leftJoinAndSelect('tracking.warehouseBin', 'warehouseBin')
       .where('warehouseSub.is_staging = :staging', { staging: 'INBOUND' })
+      .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
       .andWhere('tracking.progression_status = :progression_status', {
         progression_status: ProgressionStatus.NOT_STARTED,
       })
-      .andWhere('tracking.inventory_status = :inventory_status', {
-        inventory_status: 'INSPECTION_COMPLETED',
+      .andWhere('tracking.inventory_status IN (:...inventory_statuses)', {
+        inventory_statuses: ['INSPECTION_COMPLETED', 'IN_INVENTORY'],
       })
       .getMany();
 
@@ -820,16 +1007,21 @@ export class PickingSuggestionService {
         }));
         allPalletItems.push(...itemsWithPalletId);
       } catch (error) {
-        console.warn(`Failed to fetch items for pallet ${palletId}:`, error.message);
+        console.warn(`Failed to fetch items for pallet ${palletId}:`, (error as Error).message);
       }
     }
+
+    const binPalletUsage = await this.loadBinPalletUsageByOrganization(organizationId);
+    const binPendingAssignments = new Map<string, number>();
 
     const availableBins = await this.masterWarehouseBinRepository
       .createQueryBuilder('bin')
       .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
+      .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
       .leftJoin('bin.inventory_trackings', 'tracking')
       .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
       .where('warehouseSub.is_staging IS NULL')
+      .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
       .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
         status: 'IN_INVENTORY',
       })
@@ -842,8 +1034,10 @@ export class PickingSuggestionService {
 
     const availableZones = await this.masterWarehouseSubRepository
       .createQueryBuilder('zone')
+      .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = zone.warehouse_id')
       .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
       .where('zone.is_staging IS NULL')
+      .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
       .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
       .having('COUNT(bin.id) > 0')
       .orderBy('zone.name', 'ASC')
@@ -856,7 +1050,6 @@ export class PickingSuggestionService {
       palletItems: Array<PalletItemQuantityDto & { pallet_id: string }>;
     }> = [];
 
-    const usedBinIds = new Set<string>();
     const usedZoneIds = new Set<string>();
 
     for (const stagingPallet of stagingPallets) {
@@ -877,7 +1070,15 @@ export class PickingSuggestionService {
         return suggestionGroupKey === groupKey;
       });
 
-      if (existingSuggestion) {
+      if (
+        existingSuggestion?.suggestedBin &&
+        this.canAssignPalletToBin(
+          existingSuggestion.suggestedBin,
+          binPalletUsage,
+          binPendingAssignments,
+        )
+      ) {
+        this.reserveBinPalletSlot(existingSuggestion.suggestedBin, binPendingAssignments);
         palletSuggestions.push({
           stagingPallet,
           suggestedBin: existingSuggestion.suggestedBin,
@@ -896,9 +1097,11 @@ export class PickingSuggestionService {
           .leftJoin('tracking.pallet', 'pallet')
           .leftJoin(TransactionScanInbound, 'scan', 'scan.pallet_id = pallet.id')
           .leftJoin('bin.warehouseSub', 'warehouseSub')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .addSelect('COUNT(scan.id)', 'matching_items_count')
           .where('warehouseSub.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
             status: 'IN_INVENTORY',
           })
@@ -929,7 +1132,11 @@ export class PickingSuggestionService {
       let suggestedZone: MasterWarehouseSub | undefined;
 
       if (matchingBinsForSameItem.length > 0) {
-        suggestedBin = matchingBinsForSameItem.find((bin) => !usedBinIds.has(bin.id));
+        suggestedBin = this.findFirstBinWithCapacity(
+          matchingBinsForSameItem,
+          binPalletUsage,
+          binPendingAssignments,
+        );
         if (suggestedBin) {
           suggestedZone = availableZones.find(
             (zone) => zone.id === suggestedBin?.warehouse_sub_id,
@@ -941,10 +1148,12 @@ export class PickingSuggestionService {
         const emptyBins = await this.masterWarehouseBinRepository
           .createQueryBuilder('bin')
           .leftJoin('bin.warehouseSub', 'warehouseSub')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
           .leftJoin('bin.inventory_trackings', 'tracking')
           .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'calculated_current_pallet')
           .where('bin.capacity_pallet > 0')
           .andWhere('warehouseSub.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('(tracking.inventory_status = :status OR tracking.inventory_status IS NULL)', {
             status: 'IN_INVENTORY',
           })
@@ -956,7 +1165,11 @@ export class PickingSuggestionService {
           .limit(5)
           .getMany();
 
-        suggestedBin = emptyBins.find((bin) => !usedBinIds.has(bin.id));
+        suggestedBin = this.findFirstBinWithCapacity(
+          emptyBins,
+          binPalletUsage,
+          binPendingAssignments,
+        );
         if (suggestedBin) {
           suggestedZone = availableZones.find(
             (zone) => zone.id === suggestedBin?.warehouse_sub_id,
@@ -965,7 +1178,11 @@ export class PickingSuggestionService {
       }
 
       if (!suggestedBin) {
-        suggestedBin = availableBins.find((bin) => !usedBinIds.has(bin.id));
+        suggestedBin = this.findFirstBinWithCapacity(
+          availableBins,
+          binPalletUsage,
+          binPendingAssignments,
+        );
         if (suggestedBin) {
           suggestedZone = availableZones.find(
             (zone) => zone.id === suggestedBin?.warehouse_sub_id,
@@ -981,19 +1198,25 @@ export class PickingSuggestionService {
 
       // Final fallback: Get any regular warehouse bin/zone if still not found
       if (!suggestedBin) {
-        const anyBin = await this.masterWarehouseBinRepository
+        const fallbackBins = await this.masterWarehouseBinRepository
           .createQueryBuilder('bin')
           .leftJoinAndSelect('bin.warehouseSub', 'warehouseSub')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
           .where('warehouseSub.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('bin.capacity_pallet > 0')
           .orderBy('bin.capacity_pallet', 'DESC')
-          .limit(1)
-          .getOne();
+          .limit(10)
+          .getMany();
 
-        if (anyBin) {
-          suggestedBin = anyBin;
+        suggestedBin = this.findFirstBinWithCapacity(
+          fallbackBins,
+          binPalletUsage,
+          binPendingAssignments,
+        );
+        if (suggestedBin) {
           suggestedZone = availableZones.find(
-            (zone) => zone.id === anyBin.warehouse_sub_id,
+            (zone) => zone.id === suggestedBin?.warehouse_sub_id,
           ) as MasterWarehouseSub;
         }
       }
@@ -1012,8 +1235,10 @@ export class PickingSuggestionService {
         // Final fallback: Get any regular warehouse zone
         const anyZone = await this.masterWarehouseSubRepository
           .createQueryBuilder('zone')
+          .leftJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = zone.warehouse_id')
           .leftJoin(MasterWarehouseBin, 'bin', 'bin.warehouse_sub_id = zone.id')
           .where('zone.is_staging IS NULL')
+          .andWhere('warehouse.organization_id::uuid = :organizationId', { organizationId })
           .andWhere('bin.id IS NOT NULL')
           .groupBy('zone.id, zone.name, zone.code, zone.warehouse_id, zone.capacity_bin')
           .limit(1)
@@ -1023,22 +1248,27 @@ export class PickingSuggestionService {
           suggestedZone = anyZone;
           // Try to find a bin in this zone
           if (!suggestedBin) {
-            const binInZone = await this.masterWarehouseBinRepository
+            const binsInZone = await this.masterWarehouseBinRepository
               .createQueryBuilder('bin')
               .where('bin.warehouse_sub_id = :zoneId', { zoneId: anyZone.id })
               .andWhere('bin.capacity_pallet > 0')
               .orderBy('bin.capacity_pallet', 'DESC')
-              .limit(1)
-              .getOne();
+              .limit(10)
+              .getMany();
 
-            if (binInZone) {
-              suggestedBin = binInZone;
-            }
+            suggestedBin = this.findFirstBinWithCapacity(
+              binsInZone,
+              binPalletUsage,
+              binPendingAssignments,
+            );
           }
         }
       }
 
-      // Always add pallet to suggestions, even if bin/zone suggestions are not available
+      if (suggestedBin) {
+        this.reserveBinPalletSlot(suggestedBin, binPendingAssignments);
+      }
+
       palletSuggestions.push({
         stagingPallet,
         suggestedBin: suggestedBin || null,
@@ -1046,14 +1276,67 @@ export class PickingSuggestionService {
         palletItems,
       });
 
-      // Only mark as used if both bin and zone are found
-      if (suggestedBin && suggestedZone) {
-        usedBinIds.add(suggestedBin.id);
+      if (suggestedZone) {
         usedZoneIds.add(suggestedZone.id);
       }
     }
 
     return { palletSuggestions };
+  }
+
+  private async loadBinPalletUsageByOrganization(
+    organizationId: string,
+  ): Promise<Map<string, number>> {
+    const rows = await this.inventoryTrackingRepository
+      .createQueryBuilder('tracking')
+      .innerJoin('tracking.warehouseBin', 'bin')
+      .innerJoin('bin.warehouseSub', 'warehouseSub')
+      .innerJoin(MasterWarehouse, 'warehouse', 'warehouse.id::varchar = warehouseSub.warehouse_id')
+      .select('tracking.warehouse_bin_id', 'binId')
+      .addSelect('COUNT(DISTINCT tracking.pallet_id)', 'palletCount')
+      .where('warehouse.organization_id::uuid = :organizationId', { organizationId })
+      .andWhere('tracking.inventory_status = :status', { status: 'IN_INVENTORY' })
+      .andWhere('tracking.warehouse_bin_id IS NOT NULL')
+      .groupBy('tracking.warehouse_bin_id')
+      .getRawMany<{ binId: string; palletCount: string }>();
+
+    return new Map(rows.map((row) => [row.binId, Number(row.palletCount) || 0]));
+  }
+
+  private canAssignPalletToBin(
+    bin: MasterWarehouseBin | null | undefined,
+    binPalletUsage: Map<string, number>,
+    binPendingAssignments: Map<string, number>,
+  ): boolean {
+    if (!bin?.id) {
+      return false;
+    }
+
+    const capacity = bin.capacity_pallet;
+    if (capacity == null || capacity <= 0) {
+      return false;
+    }
+
+    const dbCount = binPalletUsage.get(bin.id) ?? 0;
+    const pendingCount = binPendingAssignments.get(bin.id) ?? 0;
+    return dbCount + pendingCount < capacity;
+  }
+
+  private reserveBinPalletSlot(
+    bin: MasterWarehouseBin,
+    binPendingAssignments: Map<string, number>,
+  ): void {
+    binPendingAssignments.set(bin.id, (binPendingAssignments.get(bin.id) ?? 0) + 1);
+  }
+
+  private findFirstBinWithCapacity(
+    bins: MasterWarehouseBin[],
+    binPalletUsage: Map<string, number>,
+    binPendingAssignments: Map<string, number>,
+  ): MasterWarehouseBin | undefined {
+    return bins.find((bin) =>
+      this.canAssignPalletToBin(bin, binPalletUsage, binPendingAssignments),
+    );
   }
 }
 

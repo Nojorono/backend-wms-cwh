@@ -64,16 +64,17 @@ export class PutAwayService {
     return putAwayTransactions;
   }
 
-  async findAll(): Promise<PutAwayTransaction[]> {
-    const entities = await this.repository.findAll();
+  async findAll(organizationId: string): Promise<PutAwayTransaction[]> {
+    const entities = await this.repository.findAll(organizationId);
     await this.populatePalletItems(entities);
     return entities;
   }
 
   async findAllPaginated(
     paginationDto: PutAwayPaginationDto,
+    organizationId: string,
   ): Promise<PaginatedResponseDto<PutAwayTransaction>> {
-    const result = await this.repository.findAllPaginated(paginationDto);
+    const result = await this.repository.findAllPaginated(paginationDto, organizationId);
     await this.populatePalletItems(result.data);
     return this.paginationService.createPaginatedResponse(result.data, paginationDto, result.total);
   }

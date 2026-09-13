@@ -2,30 +2,48 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AssignedHelper } from '../../core/domain/entities/assigned-helper.entity';
+import { User } from '../../core/domain/entities/user.entity';
 
 @Injectable()
 export class AssignedHelperRepository {
   constructor(
     @InjectRepository(AssignedHelper)
     private readonly repository: Repository<AssignedHelper>,
-  ) {}
+  ) { }
 
   async create(data: Partial<AssignedHelper>): Promise<AssignedHelper> {
     const entity = this.repository.create(data);
     return await this.repository.save(entity);
   }
 
+  private readonly userJoinCondition =
+    'helper.helper_user_id IS NOT NULL AND helper.helper_user_id <> \'\' AND "user"."id" = helper.helper_user_id::uuid';
+
   async findAll(): Promise<AssignedHelper[]> {
-    return await this.repository.find({
-      relations: ['inbound'],
-    });
+    return await this.repository
+      .createQueryBuilder('helper')
+      .leftJoinAndSelect('helper.inbound', 'inbound')
+      .leftJoinAndMapOne(
+        'helper.user',
+        User,
+        'user',
+        this.userJoinCondition,
+      )
+      .getMany();
   }
 
   async findAllByInbound(inboundId: string): Promise<AssignedHelper[]> {
-    return await this.repository.find({
-      where: { inbound_id: inboundId },
-      relations: ['inbound'],
-    });
+    return await this.repository
+      .createQueryBuilder('helper')
+      .leftJoinAndSelect('helper.inbound', 'inbound')
+      .leftJoinAndMapOne(
+        'helper.user',
+        User,
+        'user',
+        this.userJoinCondition,
+      )
+      .where('helper.inbound_id = :inboundId', { inboundId })
+      .getMany();
   }
 
   async findOne(id: string): Promise<AssignedHelper | null> {

@@ -28,6 +28,10 @@ import { OutboundDoStatus, OutboundDoType } from '../core/domain/entities/outbou
 import { Status as TransactionPickingStatus } from '../core/domain/entities/transaction-picking.entity';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
+import { CreateShipConfirmInternalDto } from './dto/create-ship-confirm-internal.dto';
+import { CreateOutboundIntegrationDeliveriesDto } from 'src/outbound-integration-deliveries/dto/create-outbound-integration-deliveries.dto';
+import { CreateShipConfirmSubdistPayloadDto } from './dto/create-ship-confirm-subdist.dto';
 
 @ApiTags('Outbound DO')
 @Controller('outbound-do')
@@ -106,7 +110,10 @@ export class OutboundDoController {
     description: 'Daftar outbound DO',
     type: [OutboundDoResponseDto],
   })
-  async findAll(@Query() paginationQuery: OutboundDoPaginationDto) {
+  async findAll(
+    @Query() paginationQuery: OutboundDoPaginationDto,
+    @OrganizationId() organizationId: string,
+  ) {
     const hasPaginationParams =
       paginationQuery.page ||
       paginationQuery.limit ||
@@ -119,10 +126,10 @@ export class OutboundDoController {
       paginationQuery.transaction_picking_status;
 
     if (hasPaginationParams) {
-      return this.outboundDoService.findAllPaginated(paginationQuery);
+      return this.outboundDoService.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.outboundDoService.findAll();
+    return this.outboundDoService.findAll(organizationId);
   }
 
   @Get(':id')
@@ -383,5 +390,61 @@ export class OutboundDoController {
   })
   async cancel(@Param('id') id: string) {
     return this.outboundDoService.cancel(id);
+  }
+
+  // integration by outbound do id
+  @Post('integration/:id')
+  @ApiOperation({ summary: 'Integration by outbound do id' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiResponse({
+    status: 200,
+    description: 'Integration by outbound do id',
+  })
+  async integration(@Param('id') id: string) {
+    return this.outboundDoService.integration(id);
+  }
+
+  // ship confirm internal
+  @Post('ship-confirm-internal/:id')
+  @ApiOperation({ summary: 'Ship confirm internal' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ship confirm internal',
+  })
+  async shipConfirmInternal(
+    @Param('id') id: string,
+  ) {
+    return this.outboundDoService.shipConfirmInternal(id);
+  }
+
+  // pick release subdist
+  @Post('pick-release-subdist/:id')
+  @ApiOperation({ summary: 'Pick release subdist' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pick release subdist',
+  })
+  async pickReleaseSubdist(
+    @Param('id') id: string,
+  ) {
+    return this.outboundDoService.pickReleaseSubdist(id);
+  }
+
+  // ship confirm subdist
+  @Post('ship-confirm-subdist/:id')
+  @ApiOperation({ summary: 'Ship confirm subdist' })
+  @ApiParam({ name: 'id', description: 'ID outbound DO' })
+  @ApiBody({ type: CreateShipConfirmSubdistPayloadDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Ship confirm subdist',
+  })
+  async shipConfirmSubdist(
+    @Param('id') id: string,
+    @Body() payload: CreateShipConfirmSubdistPayloadDto,
+  ) {
+    return this.outboundDoService.shipConfirmSubdist(id, payload);
   }
 }

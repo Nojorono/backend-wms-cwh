@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
 import { AssignedGate, AssignedGateStatus } from '../core/domain/entities/assigned-gate.entity';
 import { AssignedGateUser } from '../core/domain/entities/assigned-gate-user.entity';
 import { AssignedGatePallet } from '../core/domain/entities/assigned-gate-pallet.entity';
@@ -37,6 +38,7 @@ export class AssignedGateService {
     private readonly masterWarehouseSubService: MasterWarehouseSubService,
     private readonly outboundDoService: OutboundDoService,
     private readonly transactionPickingService: TransactionPickingService,
+    private readonly dataSource: DataSource,
   ) { }
 
   // AssignedGate CRUD operations
@@ -657,60 +659,216 @@ export class AssignedGateService {
   }
 
   async approve(id: string): Promise<AssignedGate> {
-    const assignedGate = await this.findOne(id);
-    if (!assignedGate) {
-      throw new NotFoundException('Assigned gate not found');
-    }
+    try {
+      return await this.dataSource.transaction(async (manager: EntityManager) => {
+        const assignedGate = await this.findOne(id);
+        if (!assignedGate) {
+          throw new NotFoundException('Assigned gate not found');
+        }
 
-    if (assignedGate.status !== AssignedGateStatus.DONE) {
-      throw new BadRequestException('Assigned gate is not done');
-    }
+        if (assignedGate.status !== AssignedGateStatus.DONE) {
+          throw new BadRequestException('Assigned gate is not done');
+        }
 
-    // find all assigned gate load
-    const assignedGateLoads = await this.assignedGateLoadRepo.findAllByAssignedGate(id);
-    for (const assignedGateLoad of assignedGateLoads) {
-      // clear memo_id in pallet
-      await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: null });
-      // update pallet quantity
-      await this.masterPalletService.updateQuantity(assignedGateLoad.pallet_id, {
-        item_id: assignedGateLoad.item_id,
-        quantity: assignedGateLoad.quantity_loaded,
-        operation_type: QuantityOperationType.REMOVE,
-        outbound_do_id: assignedGateLoad.outbound_memo_id,
-        notes: `Loaded quantity ${assignedGateLoad.quantity_loaded} to gate ${assignedGate.gate.name || assignedGate.gate.code}`,
-        uom: assignedGateLoad.uom,
-        week_number: assignedGateLoad.week_number,
-        production_date: assignedGateLoad.production_date,
-        reference_id: assignedGateLoad.id,
-        reference_type: 'ASSIGNED_GATE_LOAD',
-        status_inventory: StatusInventory.READY,
+        // find all assigned gate load
+        const assignedGateLoads = await this.assignedGateLoadRepo.findAllByAssignedGate(id);
+        for (const assignedGateLoad of assignedGateLoads) {
+          if (assignedGateLoad.status === AssignedGateLoadStatus.APPROVED) {
+            continue;
+          }
+
+          const quantityLoaded = assignedGateLoad.quantity_loaded || 0;
+          if (quantityLoaded <= 0) {
+            await this.assignedGateLoadRepo.update(assignedGateLoad.id, {
+              status: AssignedGateLoadStatus.APPROVED,
+            });
+            continue;
+          }
+
+          if (!assignedGateLoad.pallet_id || !assignedGateLoad.item_id || !assignedGateLoad.uom) {
+            throw new BadRequestException(
+              `Assigned gate load ${assignedGateLoad.id} is missing pallet_id, item_id, or uom`,
+            );
+          }
+
+          // clear memo_id in pallet
+          await this.masterPalletService.update(assignedGateLoad.pallet_id, { memo_id: null });
+
+          // Gate-loaded stock is outbound reserved (PENDING + PICKED), not READY inventory.
+          // Prefer PENDING stock line; fall back to READY only if no PENDING line exists.
+          const outboundStatus = await this.resolveGateLoadStockStatus(
+            assignedGateLoad.pallet_id,
+            assignedGateLoad.item_id,
+            assignedGateLoad.uom,
+            assignedGateLoad.week_number ?? undefined,
+            quantityLoaded,
+          );
+
+          await this.masterPalletService.updateQuantity(
+            assignedGateLoad.pallet_id,
+            {
+              item_id: assignedGateLoad.item_id,
+              quantity: quantityLoaded,
+              operation_type: QuantityOperationType.REMOVE,
+              outbound_do_id: assignedGateLoad.outbound_memo_id,
+              notes:
+                `Loaded quantity ${quantityLoaded} to gate ${
+                  assignedGate.gate.name || assignedGate.gate.code
+                } (${outboundStatus})`,
+              uom: assignedGateLoad.uom,
+              week_number: assignedGateLoad.week_number,
+              production_date: assignedGateLoad.production_date,
+              reference_id: assignedGateLoad.id,
+              reference_type: 'ASSIGNED_GATE_LOAD',
+              status_inventory: outboundStatus,
+            },
+            manager,
+          );
+
+          // After removing loaded qty: leftover stock is released back to inventory.
+          // Convert any remaining PENDING lines → READY and set tracking to IN_INVENTORY.
+          const remainingLines = await this.masterPalletService.getPalletItemLatestQuantity(
+            assignedGateLoad.pallet_id,
+          );
+          const remainingQty = remainingLines.reduce(
+            (sum, line) => sum + (line.current_quantity || 0),
+            0,
+          );
+
+          if (remainingQty > 0) {
+            const pendingRemainders = remainingLines.filter(
+              (line) =>
+                line.status_inventory === StatusInventory.PENDING &&
+                (line.current_quantity || 0) > 0 &&
+                line.item_id,
+            );
+
+            for (const line of pendingRemainders) {
+              await this.masterPalletService.convertStockLineStatusInPlace(
+                assignedGateLoad.pallet_id,
+                {
+                  itemId: line.item_id as string,
+                  uom: line.uom,
+                  weekNumber: line.week_number ?? null,
+                  from: StatusInventory.PENDING,
+                  to: StatusInventory.READY,
+                  appendNote:
+                    `[GATE APPROVE] PENDING→READY week=${line.week_number ?? 'n/a'} ` +
+                    `(leftover after load approve; released to inventory)`,
+                },
+              );
+            }
+
+            await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
+              inventory_status: 'IN_INVENTORY',
+              progression_status: ProgressionStatus.COMPLETED,
+              inventory_note: `Loaded done — leftover stock released to READY / IN_INVENTORY`,
+              inventory_date: new Date(),
+            });
+          } else {
+            await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
+              inventory_status: 'IN_INVENTORY',
+              progression_status: ProgressionStatus.COMPLETED,
+              inventory_note: `Loaded is done`,
+              inventory_date: new Date(),
+            });
+          }
+
+          // update assigned gate load status to approved
+          await this.assignedGateLoadRepo.update(assignedGateLoad.id, {
+            status: AssignedGateLoadStatus.APPROVED,
+          });
+        }
+
+        const updated = await this.assignedGateRepo.update(id, {
+          status: AssignedGateStatus.APPROVED,
+        });
+
+        // update outbound do status to approved
+        await this.outboundDoService.updateStatus(
+          assignedGate.outbound_do_id,
+          OutboundDoStatus.APPROVED_LOAD,
+        );
+
+        // update transaction picking status to approved
+        const transactionPickings = await this.transactionPickingService.findByDoId(
+          assignedGate.outbound_do_id,
+        );
+        for (const transactionPicking of transactionPickings) {
+          if (transactionPicking.status === Status.PENDING) {
+            await this.transactionPickingService.updateStatus(
+              transactionPicking.id,
+              Status.COMPLETED,
+            );
+          }
+        }
+
+        if (!updated) {
+          throw new NotFoundException('Assigned gate not found');
+        }
+
+        return updated;
       });
-
-      // update inventory tracking
-      await this.inventoryTrackingService.updateByPalletId(assignedGateLoad.pallet_id, {
-        inventory_status: 'IN_INVENTORY',
-        progression_status: ProgressionStatus.COMPLETED,
-        inventory_note: `Loaded is done`,
-        inventory_date: new Date(),
-      });
-      // update assigned gate load status to approved
-      await this.assignedGateLoadRepo.update(assignedGateLoad.id, { status: AssignedGateLoadStatus.APPROVED });
-    }
-
-    const updated = await this.assignedGateRepo.update(id, { status: AssignedGateStatus.APPROVED });
-    // update outbound do status to approved
-    await this.outboundDoService.updateStatus(assignedGate.outbound_do_id, OutboundDoStatus.APPROVED_LOAD);
-    // update transaction picking status to approved
-    const transactionPickings = await this.transactionPickingService.findByDoId(assignedGate.outbound_do_id);
-    for (const transactionPicking of transactionPickings) {
-      if (transactionPicking.status === Status.PENDING) {
-        await this.transactionPickingService.updateStatus(transactionPicking.id, Status.COMPLETED);
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
       }
+
+      console.error(`Failed to approve assigned gate ${id}:`, error);
+      throw new BadRequestException(
+        `Failed to approve assigned gate: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
-    if (!updated) {
-      throw new NotFoundException('Assigned gate not found');
+  }
+
+  /**
+   * Gate load removes reserved outbound stock (PENDING), not READY leftover.
+   */
+  private async resolveGateLoadStockStatus(
+    palletId: string,
+    itemId: string,
+    uom: string,
+    weekNumber: number | undefined,
+    quantityLoaded: number,
+  ): Promise<StatusInventory> {
+    try {
+      const lines = await this.masterPalletService.getPalletItemLatestQuantity(palletId);
+
+      const matches = lines.filter(
+        (line) =>
+          line.item_id === itemId &&
+          (!uom || !line.uom || line.uom === uom) &&
+          (weekNumber === undefined ||
+            weekNumber === null ||
+            line.week_number === weekNumber),
+      );
+
+      const pending = matches.find(
+        (line) =>
+          line.status_inventory === StatusInventory.PENDING &&
+          (line.current_quantity ?? 0) >= quantityLoaded,
+      );
+      if (pending) {
+        return StatusInventory.PENDING;
+      }
+
+      const ready = matches.find(
+        (line) =>
+          line.status_inventory === StatusInventory.READY &&
+          (line.current_quantity ?? 0) >= quantityLoaded,
+      );
+      if (ready) {
+        return StatusInventory.READY;
+      }
+
+      if (matches.some((line) => line.status_inventory === StatusInventory.PENDING)) {
+        return StatusInventory.PENDING;
+      }
+    } catch {
+      // fall through
     }
-    return updated;
+
+    return StatusInventory.PENDING;
   }
 }
 

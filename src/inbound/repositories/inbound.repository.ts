@@ -2,34 +2,38 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../core/domain/entities/inbound.entity';
-import { ScanInboundStatus } from 'src/core/domain/entities/transaction-scan-inbound.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
+import { IntegrationStatus } from 'src/core/domain/entities/inbound-do.entity';
 
 @Injectable()
 export class InboundRepository {
   constructor(
     @InjectRepository(Inbound)
     private readonly repository: Repository<Inbound>,
-  ) {}
+  ) { }
 
   async create(data: Partial<Inbound>): Promise<Inbound> {
     const entity = this.repository.create(data);
     return await this.repository.save(entity);
   }
 
-  async findAll(status?: string): Promise<Inbound[]> {
+  async findAll(organizationId: string | number | null, status?: string): Promise<Inbound[]> {
     const qb = this.repository.createQueryBuilder('inbound');
     if (status) {
       qb.andWhere('inbound.status = :status', { status });
     }
+    if (organizationId !== null) {
+      qb.andWhere('inbound.organization_id = :organizationId', { organizationId });
+    }
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .getMany();
@@ -43,6 +47,9 @@ export class InboundRepository {
       inbound_type?: string;
       driver_name?: string;
       license_plate?: string;
+      start_date?: string;
+      end_date?: string;
+      organization_id?: string | number | null;
     },
     page: number = 1,
     limit: number = 10,
@@ -56,6 +63,14 @@ export class InboundRepository {
       queryBuilder.andWhere('inbound.status = :status', { status: filters.status });
     }
 
+    if (filters.start_date) {
+      queryBuilder.andWhere('DATE(inbound.createdAt) >= :startDate', { startDate: filters.start_date });
+    }
+
+    if (filters.end_date) {
+      queryBuilder.andWhere('DATE(inbound.createdAt) <= :endDate', { endDate: filters.end_date });
+    }
+
     if (search) {
       queryBuilder.andWhere(
         '(inbound.inbound_number ILIKE :search OR inbound.expedition ILIKE :search OR inbound.origin ILIKE :search OR inbound.license_plate ILIKE :search OR inbound.driver_name ILIKE :search)',
@@ -63,18 +78,28 @@ export class InboundRepository {
       );
     }
 
+    if (filters.organization_id !== null && filters.organization_id !== undefined) {
+      queryBuilder.andWhere('inbound.organization_id = :organizationId', {
+        organizationId: filters.organization_id,
+      });
+    }
+
     const total = await queryBuilder.getCount();
 
     const data = await queryBuilder
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
+      .leftJoinAndSelect('transaction_scan_inbounds.item', 'transaction_scan_inbounds_item')
+      .leftJoinAndSelect('transaction_scan_inbounds.pallet', 'transaction_scan_inbounds_pallet')
       .orderBy(`inbound.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit)
@@ -88,12 +113,13 @@ export class InboundRepository {
     qb.where('inbound.id = :id', { id });
     const entity = await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
@@ -102,6 +128,48 @@ export class InboundRepository {
       return null;
     }
     return entity;
+  }
+
+  /**
+   * Finds one inbound by id where at least one DO has integration_status READY or FAILED.
+   * Loads inbound relations excluding inbound_dos with integration_status CANCELLED.
+   */
+  async findOneForIntegration(id: string): Promise<Inbound | null> {
+    const qb = this.repository.createQueryBuilder('inbound');
+    qb.where('inbound.id = :id', { id });
+    qb.andWhere((sub) => {
+      const sq = sub
+        .subQuery()
+        .select('1')
+        .from('inbound_do', 'd')
+        .where('d.inbound_id = inbound.id')
+        .andWhere('d.integration_status IN (:...statuses)')
+        .andWhere('d.deleted_at IS NULL')
+        .getQuery();
+      return `EXISTS ${sq}`;
+    })
+      .setParameter('statuses', [IntegrationStatus.READY, IntegrationStatus.FAILED])
+      .setParameter('cancelledDoStatus', IntegrationStatus.CANCELLED);
+
+    const entity = await qb
+      .leftJoinAndSelect(
+        'inbound.inbound_dos',
+        'inbound_dos',
+        'inbound_dos.integration_status IS DISTINCT FROM :cancelledDoStatus',
+      )
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
+      .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
+      .leftJoinAndMapOne(
+        'inbound_items.item',
+        MasterItem,
+        'item',
+        'item.id::uuid = inbound_items.item_id',
+      )
+      .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
+      .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')
+      .getOne();
+
+    return entity ?? null;
   }
 
   async update(id: string, data: Partial<Inbound>): Promise<Inbound | null> {
@@ -119,6 +187,29 @@ export class InboundRepository {
       throw new NotFoundException('Inbound not found');
     }
     await this.repository.softDelete(id);
+  }
+
+  /**
+   * Returns a map of inbound id -> inbound_number for the given ids (for populating inbound_reference_number).
+   */
+  async findInboundNumbersByIds(ids: string[]): Promise<Map<string, string>> {
+    if (!ids.length) {
+      return new Map();
+    }
+    const distinctIds = [...new Set(ids)];
+    const rows = await this.repository
+      .createQueryBuilder('inbound')
+      .select('inbound.id', 'id')
+      .addSelect('inbound.inbound_number', 'inbound_number')
+      .where('inbound.id IN (:...ids)', { ids: distinctIds })
+      .getRawMany<{ id: string; inbound_number: string | null }>();
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.inbound_number != null) {
+        map.set(row.id, row.inbound_number);
+      }
+    }
+    return map;
   }
 
   async getNextInboundNumberForDate(date: Date): Promise<string> {
@@ -149,12 +240,13 @@ export class InboundRepository {
     qb.andWhere('assigned_helpers.helper_user_id = :id', { id });
     return await qb
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .getMany();
@@ -164,12 +256,13 @@ export class InboundRepository {
     return await this.repository
       .createQueryBuilder('inbound')
       .leftJoinAndSelect('inbound.inbound_dos', 'inbound_dos')
+      .leftJoinAndSelect('inbound_dos.inbound_integration', 'inbound_integration')
       .leftJoinAndSelect('inbound_dos.inbound_items', 'inbound_items')
       .leftJoinAndMapOne(
         'inbound_items.item',
         MasterItem,
         'item',
-        'item.id::varchar = inbound_items.item_id',
+        'item.id::uuid = inbound_items.item_id',
       )
       .leftJoinAndSelect('inbound.assigned_helpers', 'assigned_helpers')
       .leftJoinAndSelect('inbound.transaction_scan_inbounds', 'transaction_scan_inbounds')

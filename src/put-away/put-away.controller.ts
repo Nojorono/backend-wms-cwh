@@ -7,6 +7,7 @@ import { PutAwayService } from './put-away.service';
 import { PutAwayPaginationDto } from './dto/put-away-pagination.dto';
 import { ApiFlexiblePaginationQuery } from '../core/decorators/flexible-pagination.decorator';
 import { Status } from '../core/domain/entities/transaction-put-away.entity';
+import { OrganizationId } from '../core/decorators/organization-id.decorator';
 
 @ApiTags('Put Away')
 @Controller('put-away')
@@ -51,7 +52,7 @@ export class PutAwayController {
     },
   ])
   @ApiResponse({ status: 200, description: 'OK', type: [PutAwayTransaction] })
-  findAll(@Query() paginationQuery: PutAwayPaginationDto) {
+  findAll(@OrganizationId() organizationId: string, @Query() paginationQuery: PutAwayPaginationDto) {
     const hasPaginationParams =
       paginationQuery.page ||
       paginationQuery.limit ||
@@ -63,10 +64,10 @@ export class PutAwayController {
       paginationQuery.driver_name;
 
     if (hasPaginationParams) {
-      return this.service.findAllPaginated(paginationQuery);
+      return this.service.findAllPaginated(paginationQuery, organizationId);
     }
 
-    return this.service.findAll();
+    return this.service.findAll(organizationId);
   }
 
   @Get(':id')

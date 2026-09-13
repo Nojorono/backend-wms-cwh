@@ -1,13 +1,12 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, QueryFailedError } from 'typeorm';
 import { UserRepository } from './user.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from '../core/domain/entities/user.entity';
 import { UserDetail } from '../core/domain/entities/user-detail.entity';
 import * as bcrypt from 'bcrypt';
-import { MasterWarehouseSub } from 'src/core/domain/entities/master-warehouse-sub.entity';
 
 @Injectable()
 export class UserService {
@@ -18,7 +17,8 @@ export class UserService {
   ) { }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.repository.findByUsername(createUserDto.username);
+    // Check for existing user including soft-deleted ones
+    const existingUser = await this.repository.findByUsername(createUserDto.username, true);
     if (existingUser) {
       throw new ConflictException(`User with username ${createUserDto.username} already exists`);
     }
@@ -26,33 +26,81 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     createUserDto.password = hashedPassword;
 
-    const user = await this.repository.create(createUserDto);
-
-    if (
+    const willCreateUserDetail =
       createUserDto.employeeId ||
       createUserDto.email ||
       createUserDto.phone ||
       createUserDto.organizationId ||
-      createUserDto.warehouseSubId
-    ) {
-      const userDetail = this.userDetailRepository.create({
-        userId: user.id,
-        employee_id: createUserDto.employeeId || `EMP_${user.username}`,
-        email: createUserDto.email || `${user.username}@default.com`,
-        phone: createUserDto.phone || '0000000000',
-        organizationId: createUserDto.organizationId,
-        warehouseSubId: createUserDto.warehouseSubId,
-      });
+      createUserDto.firstName ||
+      createUserDto.lastName ||
+      createUserDto.departementId;
 
-      await this.userDetailRepository.save(userDetail);
+    const resolvedEmployeeId =
+      createUserDto.employeeId?.trim() || `EMP_${createUserDto.username}`;
+
+    if (willCreateUserDetail) {
+      await this.ensureEmployeeIdIsUnique(resolvedEmployeeId);
     }
 
-    // Reload user with relationships
-    return await this.findOne(user.id);
+    try {
+      const user = await this.repository.create(createUserDto);
+
+      if (willCreateUserDetail) {
+        const normalizedWarehouseSubId =
+          createUserDto.warehouseSubId === null ? undefined : createUserDto.warehouseSubId;
+
+        const userDetail = this.userDetailRepository.create({
+          userId: user.id,
+          employee_id: resolvedEmployeeId,
+          email: createUserDto.email || `${user.username}@default.com`,
+          phone: createUserDto.phone || '0000000000',
+          organizationId: createUserDto.organizationId,
+          firstName: createUserDto.firstName,
+          lastName: createUserDto.lastName,
+          warehouse_sub_id: normalizedWarehouseSubId,
+          departementId: createUserDto.departementId,
+        });
+
+        await this.userDetailRepository.save(userDetail);
+      }
+
+      // Reload user with relationships
+      return await this.findOne(user.id);
+    } catch (error) {
+      // Handle database constraint violations (e.g., duplicate username)
+      if (error instanceof QueryFailedError) {
+        const pgError = error as any;
+        if (pgError.code === '23505') {
+          // Unique constraint violation
+          if (pgError.constraint === 'users_username_key' || pgError.detail?.includes('username')) {
+            throw new ConflictException(`User with username ${createUserDto.username} already exists`);
+          }
+          if (pgError.detail?.includes('employee_id')) {
+            throw new ConflictException(`User with employee_id ${resolvedEmployeeId} already exists`);
+          }
+        }
+      }
+      // Re-throw if it's not a constraint violation we can handle
+      throw error;
+    }
   }
 
   async findAll(): Promise<User[]> {
     return await this.repository.findAll();
+  }
+
+  async findAllByOrganizationId(
+    organizationId: string,
+    departementId?: string,
+  ): Promise<User[]> {
+    return await this.repository.findAllByOrganizationId(organizationId, departementId);
+  }
+
+  async findAllByRoleAndOrganizationId(
+    roleName: string,
+    organizationId: string,
+  ): Promise<User[]> {
+    return await this.repository.findAllByRoleAndOrganizationId(roleName, organizationId);
   }
 
   async findAllWithDeleted(): Promise<User[]> {
@@ -109,14 +157,38 @@ export class UserService {
       updateUserDto.email !== undefined ||
       updateUserDto.phone !== undefined ||
       updateUserDto.organizationId !== undefined ||
-      updateUserDto.warehouseSubId !== undefined
+      updateUserDto.firstName !== undefined ||
+      updateUserDto.lastName !== undefined ||
+      updateUserDto.warehouseSubId !== undefined ||
+      updateUserDto.departementId !== undefined
     ) {
       const userDetailUpdateData: Partial<UserDetail> = {};
-      if (updateUserDto.employeeId !== undefined) userDetailUpdateData.employee_id = updateUserDto.employeeId;
+      if (updateUserDto.employeeId !== undefined) {
+        const employeeId = updateUserDto.employeeId?.trim();
+        if (employeeId) {
+          await this.ensureEmployeeIdIsUnique(employeeId, user.id);
+        }
+        userDetailUpdateData.employee_id = updateUserDto.employeeId;
+      }
       if (updateUserDto.email !== undefined) userDetailUpdateData.email = updateUserDto.email;
       if (updateUserDto.phone !== undefined) userDetailUpdateData.phone = updateUserDto.phone;
       if (updateUserDto.organizationId !== undefined) userDetailUpdateData.organizationId = updateUserDto.organizationId;
-      if (updateUserDto.warehouseSubId !== undefined) userDetailUpdateData.warehouseSubId = updateUserDto.warehouseSubId;
+      if (updateUserDto.firstName !== undefined) userDetailUpdateData.firstName = updateUserDto.firstName;
+      if (updateUserDto.lastName !== undefined) userDetailUpdateData.lastName = updateUserDto.lastName;
+      const normalizedWarehouseSubId =
+        updateUserDto.warehouseSubId === '' || updateUserDto.warehouseSubId === null
+          ? undefined
+          : updateUserDto.warehouseSubId;
+      if (updateUserDto.warehouseSubId !== undefined) {
+        userDetailUpdateData.warehouse_sub_id = (normalizedWarehouseSubId ?? null) as any;
+      }
+      if (updateUserDto.departementId !== undefined) {
+        userDetailUpdateData.departementId = (
+          updateUserDto.departementId === '' || updateUserDto.departementId === null
+            ? null
+            : updateUserDto.departementId
+        ) as UserDetail['departementId'];
+      }
 
       let userDetail = await this.userDetailRepository.findOne({ where: { userId: user.id } });
       if (!userDetail) {
@@ -126,7 +198,10 @@ export class UserService {
           email: updateUserDto.email,
           phone: updateUserDto.phone,
           organizationId: updateUserDto.organizationId,
-          warehouseSubId: updateUserDto.warehouseSubId,
+          firstName: updateUserDto.firstName,
+          lastName: updateUserDto.lastName,
+          warehouse_sub_id: normalizedWarehouseSubId,
+          departementId: updateUserDto.departementId,
         });
         await this.userDetailRepository.save(userDetail);
       } else {
@@ -171,5 +246,32 @@ export class UserService {
     }
 
     await this.repository.hardDelete(id);
+  }
+
+  private async ensureEmployeeIdIsUnique(
+    employeeId: string,
+    excludeUserId?: string,
+  ): Promise<void> {
+    const normalizedEmployeeId = employeeId?.trim();
+    if (!normalizedEmployeeId) {
+      return;
+    }
+
+    const queryBuilder = this.userDetailRepository
+      .createQueryBuilder('userDetail')
+      .where('UPPER(TRIM(userDetail.employee_id)) = UPPER(TRIM(:employeeId))', {
+        employeeId: normalizedEmployeeId,
+      });
+
+    if (excludeUserId) {
+      queryBuilder.andWhere('userDetail.userId <> :excludeUserId', { excludeUserId });
+    }
+
+    const existing = await queryBuilder.getOne();
+    if (existing) {
+      throw new ConflictException(
+        `User with employee_id ${normalizedEmployeeId} already exists`,
+      );
+    }
   }
 }

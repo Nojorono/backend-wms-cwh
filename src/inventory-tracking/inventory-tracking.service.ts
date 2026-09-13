@@ -1,4 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InvOnHandMappingIntegrationService } from './integration/inv-on-hand-mapping.integration';
+import {
+  InvOnHandMappingDetailQueryDto,
+  InvOnHandMappingDetailResponseDto,
+} from './dto/inv-on-hand-mapping.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { InventoryTrackingRepository } from './inventory-tracking.repository';
 import { CreateInventoryTrackingDto } from './dto/create-inventory-tracking.dto';
 import { UpdateInventoryTrackingDto } from './dto/update-inventory-tracking.dto';
@@ -7,10 +14,13 @@ import {
   ProgressionStatus,
 } from '../core/domain/entities/inventory-tracking.entity';
 import { InventoryTrackingHistory } from '../core/domain/entities/inventory-tracking-history.entity';
+import { PalletTransactionHistory } from '../core/domain/entities/transaction-pallet-history.entity';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { InventoryTrackingPaginationQueryDto } from './dto/inventory-tracking-pagination.dto';
 import { PaginationService } from '../core/services/pagination.service';
 import { MasterPalletService } from '../master-pallet/master-pallet.service';
+import { CreateInventoryTrackingBadDto } from './dto/create-inventory-bad.dto';
+import { InventoryTrackingBad } from 'src/core/domain/entities/inventory-tracking-bad.entity';
 
 @Injectable()
 export class InventoryTrackingService {
@@ -18,7 +28,10 @@ export class InventoryTrackingService {
     private readonly repository: InventoryTrackingRepository,
     private readonly paginationService: PaginationService,
     private readonly masterPalletService: MasterPalletService,
-  ) {}
+    private readonly invOnHandMappingIntegrationService: InvOnHandMappingIntegrationService,
+    @InjectRepository(PalletTransactionHistory)
+    private readonly palletHistoryRepository: Repository<PalletTransactionHistory>,
+  ) { }
 
   // Validasi status yang diperbolehkan
   private validateInventoryStatus(status: string): void {
@@ -27,8 +40,6 @@ export class InventoryTrackingService {
       'INSPECTION_COMPLETED',
       'IN_INVENTORY',
       'PICKED',
-      'SHIPPED',
-      'RETURNED',
     ];
 
     if (!allowedStatuses.includes(status)) {
@@ -48,25 +59,56 @@ export class InventoryTrackingService {
     }
   }
 
-  // Validasi duplikasi pallet_id
-  private async validatePalletIdUniqueness(pallet_id: string, excludeId?: string): Promise<void> {
+  /**
+   * Validasi dan resolve: jika existing record dengan lokasi null → return existing (untuk di-update).
+   * Jika duplicate (existing dengan lokasi warehouse_sub/bin) → throw.
+   * Lainnya → return null (akan create baru).
+   */
+  private async validatePalletIdUniqueness(
+    pallet_id: string,
+  ): Promise<InventoryTracking | null> {
     const existing = await this.repository.findOneByPalletId(pallet_id);
-    if (existing && existing.id !== excludeId) {
+
+    const hasExistingWithLocation =
+      existing != null &&
+      (existing.warehouse_sub_id != null || existing.warehouse_bin_id != null);
+
+    if (hasExistingWithLocation) {
       throw new BadRequestException(
-        `Pallet dengan ID ${pallet_id} sudah memiliki inventory tracking record. Tidak dapat membuat duplikasi.`,
+        `Pallet dengan ID ${pallet_id} sudah memiliki inventory tracking record di lokasi (warehouse_sub/bin). Tidak dapat membuat duplikasi.`,
       );
     }
+    // Existing dengan warehouse_sub_id & warehouse_bin_id null → pakai update (ignore historyCount)
+    if (
+      existing != null &&
+      existing.warehouse_sub_id == null &&
+      existing.warehouse_bin_id == null
+    ) {
+      return existing;
+    }
+    return null;
   }
 
   async create(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
-    // Validasi status jika ada
     if (dto.inventory_status) {
       this.validateInventoryStatus(dto.inventory_status);
     }
 
-    // Validasi duplikasi pallet_id
     if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id);
+      const existingToUpdate = await this.validatePalletIdUniqueness(dto.pallet_id);
+      if (existingToUpdate != null) {
+        const updatePayload: UpdateInventoryTrackingDto = {};
+        if (dto.warehouse_id !== undefined) updatePayload.warehouse_id = dto.warehouse_id;
+        if (dto.warehouse_sub_id !== undefined) updatePayload.warehouse_sub_id = dto.warehouse_sub_id;
+        if (dto.warehouse_bin_id !== undefined) updatePayload.warehouse_bin_id = dto.warehouse_bin_id;
+        if (dto.inventory_status !== undefined) updatePayload.inventory_status = dto.inventory_status;
+        if (dto.inventory_note !== undefined) updatePayload.inventory_note = dto.inventory_note;
+        if (dto.inventory_date !== undefined) updatePayload.inventory_date = dto.inventory_date;
+        if (dto.progression_status !== undefined) updatePayload.progression_status = dto.progression_status;
+        const updated = await this.update(existingToUpdate.id, updatePayload);
+        const [enriched] = await this.enrichPalletsWithCurrentItems([updated]);
+        return enriched;
+      }
     }
 
     const created = await this.repository.create(dto);
@@ -74,13 +116,14 @@ export class InventoryTrackingService {
     return enriched[0];
   }
 
-  async findAll(): Promise<InventoryTracking[]> {
-    const inventoryTrackings = await this.repository.findAll();
+  async findAll(organizationId: string): Promise<InventoryTracking[]> {
+    const inventoryTrackings = await this.repository.findAll(organizationId);
     return await this.enrichPalletsWithCurrentItems(inventoryTrackings);
   }
 
   async findAllPaginated(
     paginationQuery: InventoryTrackingPaginationQueryDto,
+    organizationId: string,
   ): Promise<PaginatedResponseDto<InventoryTracking>> {
     const filters = {
       inventory_status: paginationQuery.inventory_status,
@@ -99,6 +142,7 @@ export class InventoryTrackingService {
       paginationQuery.search,
       paginationQuery.sortBy,
       paginationQuery.sortOrder,
+      organizationId,
     );
 
     const enrichedData = await this.enrichPalletsWithCurrentItems(data);
@@ -136,8 +180,16 @@ export class InventoryTrackingService {
     return inventoryTrackings;
   }
 
-  async findAllByWarehouse(warehouse_sub_id, warehouse_bin_id): Promise<InventoryTracking[]> {
-    const inventoryTrackings = await this.repository.findAllByWarehouse(warehouse_sub_id, warehouse_bin_id);
+  async findAllByWarehouse(
+    organizationId: string,
+    warehouse_sub_id?: string,
+    warehouse_bin_id?: string,
+  ): Promise<InventoryTracking[]> {
+    const inventoryTrackings = await this.repository.findAllByWarehouse(
+      organizationId,
+      warehouse_sub_id,
+      warehouse_bin_id,
+    );
     return await this.enrichPalletsWithCurrentItems(inventoryTrackings);
   }
 
@@ -179,6 +231,30 @@ export class InventoryTrackingService {
     return this.update(existing.id, dto);
   }
 
+  /**
+   * Update inventory tracking by pallet ID if it exists; otherwise create a new record.
+   * Use when destination pallets (e.g. from split) may not have tracking yet.
+   */
+  async updateByPalletIdOrCreate(
+    palletId: string,
+    dto: UpdateInventoryTrackingDto,
+  ): Promise<InventoryTracking> {
+    const existing = await this.repository.findOneByPalletId(palletId);
+    if (existing) {
+      return this.update(existing.id, dto);
+    }
+    return this.create({
+      pallet_id: palletId,
+      warehouse_id: dto.warehouse_id,
+      warehouse_sub_id: dto.warehouse_sub_id,
+      warehouse_bin_id: dto.warehouse_bin_id,
+      inventory_status: dto.inventory_status,
+      progression_status: dto.progression_status,
+      inventory_note: dto.inventory_note,
+      inventory_date: dto.inventory_date,
+    } as CreateInventoryTrackingDto);
+  }
+
   async update(id: string, dto: UpdateInventoryTrackingDto): Promise<InventoryTracking> {
     // Validasi status jika ada
     if (dto.inventory_status) {
@@ -186,9 +262,9 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id jika ada perubahan
-    if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id, id);
-    }
+    // if (dto.pallet_id) {
+    //   const await this.validatePalletIdUniqueness(dto.pallet_id);
+    // }
 
     const updated = await this.repository.update(id, dto);
     if (!updated) {
@@ -216,34 +292,43 @@ export class InventoryTrackingService {
     return updated;
   }
 
+  /**
+   * Direct update of inventory_status to IN_INVENTORY (e.g. revert on transaction picking cancel).
+   * Bypasses full update/history flow to ensure status is persisted.
+   */
+  async updateStatusToInInventory(id: string, note: string): Promise<InventoryTracking> {
+    const updated = await this.repository.updateStatusToInInventory(id, note);
+    if (!updated) {
+      throw new NotFoundException(`InventoryTracking with ID ${id} not found`);
+    }
+    return updated;
+  }
+
   async createOrUpdateInventoryTracking(
     pallet_id: string,
     warehouse_sub_id: string,
     warehouse_id: string,
     inventory_status: string,
+    progression_status?: ProgressionStatus,
     inbound_id?: string,
-  ): Promise<InventoryTracking> {
+  ): Promise<any> {
     // Validasi status
     this.validateInventoryStatus(inventory_status);
 
-    const existing = await this.repository.findOneByParams(
-      pallet_id,
-      warehouse_sub_id,
-      warehouse_id,
-    );
+    const existing = await this.validatePalletIdUniqueness(pallet_id);
 
     if (existing) {
       // Jika sudah ada di lokasi yang sama, update saja
       return this.update(existing.id, {
+        warehouse_sub_id,
+        warehouse_id,
         inventory_status: inventory_status,
         inventory_note: 'Inventory tracking updated',
         inventory_date: new Date(),
         inbound_id: inbound_id,
+        progression_status: progression_status,
       });
     }
-
-    // Validasi duplikasi pallet_id sebelum create
-    await this.validatePalletIdUniqueness(pallet_id);
 
     // Create new tracking record
     return this.create({
@@ -257,8 +342,8 @@ export class InventoryTrackingService {
     });
   }
 
-  async findByItemId(item_id: string): Promise<any[]> {
-    return this.repository.findByItemId(item_id);
+  async findByItemId(item_id: string, organizationId: string): Promise<any[]> {
+    return this.repository.findByItemId(item_id, organizationId);
   }
 
   // Method untuk mengecek apakah sudah ada history dengan inbound_id yang sama
@@ -279,9 +364,9 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id
-    if (dto.pallet_id) {
-      await this.validatePalletIdUniqueness(dto.pallet_id);
-    }
+    // if (dto.pallet_id) {
+    //   await this.validatePalletIdUniqueness(dto.pallet_id);
+    // }
 
     // Jika ada inbound_id, cek apakah sudah ada history dengan inbound_id yang sama
     if (dto.inbound_id) {
@@ -330,7 +415,7 @@ export class InventoryTrackingService {
     }
 
     // Validasi duplikasi pallet_id sebelum createOrUpdate
-    await this.validatePalletIdUniqueness(pallet_id);
+    // await this.validatePalletIdUniqueness(pallet_id);
 
     // Lanjutkan dengan createOrUpdate normal
     return this.createOrUpdateInventoryTracking(
@@ -338,6 +423,7 @@ export class InventoryTrackingService {
       warehouse_sub_id,
       warehouse_id,
       inventory_status,
+      ProgressionStatus.IN_PROGRESS,
       inbound_id,
     );
   }
@@ -432,17 +518,6 @@ export class InventoryTrackingService {
           reasons.push(
             `Pallet sedang dalam proses picking dengan status: ${existingTracking.inventory_status}`,
           );
-        } else if (existingTracking.inventory_status === 'SHIPPED') {
-          // Cek apakah outbound sudah done
-          const isOutboundDone = await this.checkOutboundStatus(pallet.id);
-          if (isOutboundDone) {
-            // Pallet sudah keluar/outbound done - bisa digunakan kembali
-            isAvailable = true;
-            reasons.push(`Pallet sudah keluar/outbound done - dapat digunakan kembali`);
-          } else {
-            isAvailable = false;
-            reasons.push(`Pallet sudah shipped tapi outbound belum selesai`);
-          }
         }
       }
 
@@ -482,15 +557,164 @@ export class InventoryTrackingService {
     }
   }
 
-  // Method untuk mengecek status outbound
-  private async checkOutboundStatus(pallet_id: string): Promise<boolean> {
-    try {
-      // Cek apakah ada outbound transaction yang sudah done untuk pallet ini
-      // Implementasi ini bisa disesuaikan dengan struktur outbound yang ada
-      // Untuk sementara, kita asumsikan jika status SHIPPED maka outbound sudah done
-      return true;
-    } catch (error) {
-      return false;
+  private toStockQuantity(value: unknown): number {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return 0;
     }
+    return Math.round(num);
+  }
+
+  private normalizeVisibilityDashboardItem(item: Record<string, unknown>): Record<string, unknown> {
+    const palletDetails = Array.isArray(item.pallet_details) ? item.pallet_details : [];
+    const bookingDetails = Array.isArray(item.booking_details) ? item.booking_details : [];
+    const uom = String(item.uom ?? '').trim();
+
+    type PalletQty = { quantity?: unknown; status_inventory?: string };
+    const readyFromPallets = palletDetails.reduce((sum, pallet) => {
+      const row = pallet as PalletQty;
+      return row.status_inventory === 'READY' ? sum + this.toStockQuantity(row.quantity) : sum;
+    }, 0);
+    const pendingFromPallets = palletDetails.reduce((sum, pallet) => {
+      const row = pallet as PalletQty;
+      return row.status_inventory === 'PENDING' ? sum + this.toStockQuantity(row.quantity) : sum;
+    }, 0);
+    const totalFromPallets = readyFromPallets + pendingFromPallets;
+    const bookedFromPickings = bookingDetails.reduce(
+      (sum, booking) => sum + this.toStockQuantity((booking as { quantity?: unknown }).quantity),
+      0,
+    );
+
+    const ready_quantity =
+      readyFromPallets || this.toStockQuantity(item.ready_quantity);
+    const pending_quantity =
+      pendingFromPallets || this.toStockQuantity(item.pending_quantity);
+    const total_quantity =
+      totalFromPallets || this.toStockQuantity(item.total_quantity) || ready_quantity + pending_quantity;
+    const booked_quantity = bookedFromPickings || this.toStockQuantity(item.booked_quantity);
+    // Available = READY stock minus pending outbound bookings (same UOM)
+    const available_quantity = Math.max(0, ready_quantity - booked_quantity);
+
+    return {
+      ...item,
+      uom,
+      total_quantity,
+      ready_quantity,
+      pending_quantity,
+      booked_quantity,
+      available_quantity,
+      pallet_count: this.toStockQuantity(item.pallet_count),
+      booking_count: this.toStockQuantity(item.booking_count),
+    };
+  }
+
+  private buildVisibilitySummaryByUom(items: Record<string, unknown>[]): {
+    total_items: number;
+    total_item_uom_rows: number;
+    items_with_pending_bookings: number;
+    by_uom: Array<{
+      uom: string;
+      item_count: number;
+      total_quantity: number;
+      total_ready_quantity: number;
+      total_pending_quantity: number;
+      total_booked_quantity: number;
+      total_available_quantity: number;
+      items_with_pending_bookings: number;
+    }>;
+  } {
+    const byUomMap = new Map<
+      string,
+      {
+        uom: string;
+        item_count: number;
+        total_quantity: number;
+        total_ready_quantity: number;
+        total_pending_quantity: number;
+        total_booked_quantity: number;
+        total_available_quantity: number;
+        items_with_pending_bookings: number;
+      }
+    >();
+
+    for (const item of items) {
+      const uom = String(item.uom ?? '').trim() || 'UNKNOWN';
+      const current = byUomMap.get(uom) ?? {
+        uom,
+        item_count: 0,
+        total_quantity: 0,
+        total_ready_quantity: 0,
+        total_pending_quantity: 0,
+        total_booked_quantity: 0,
+        total_available_quantity: 0,
+        items_with_pending_bookings: 0,
+      };
+
+      current.item_count += 1;
+      current.total_quantity += this.toStockQuantity(item.total_quantity);
+      current.total_ready_quantity += this.toStockQuantity(item.ready_quantity);
+      current.total_pending_quantity += this.toStockQuantity(item.pending_quantity);
+      current.total_booked_quantity += this.toStockQuantity(item.booked_quantity);
+      current.total_available_quantity += this.toStockQuantity(item.available_quantity);
+      if (item.has_pending_booking) {
+        current.items_with_pending_bookings += 1;
+      }
+
+      byUomMap.set(uom, current);
+    }
+
+    const by_uom = [...byUomMap.values()].sort((a, b) => a.uom.localeCompare(b.uom));
+    const distinctItemIds = new Set(
+      items.map((item) => String(item.item_id ?? '')).filter((id) => id.length > 0),
+    );
+
+    return {
+      total_items: distinctItemIds.size,
+      total_item_uom_rows: items.length,
+      items_with_pending_bookings: items.filter((item) => item.has_pending_booking).length,
+      by_uom,
+    };
+  }
+
+  async getVisibilityInventoryTrackingAllItemInWarehouse(organizationId: string, item_id?: string): Promise<{
+    summary: {
+      total_items: number;
+      total_item_uom_rows: number;
+      items_with_pending_bookings: number;
+      by_uom: Array<{
+        uom: string;
+        item_count: number;
+        total_quantity: number;
+        total_ready_quantity: number;
+        total_pending_quantity: number;
+        total_booked_quantity: number;
+        total_available_quantity: number;
+        items_with_pending_bookings: number;
+      }>;
+    };
+    items: any[];
+  }> {
+    try {
+      const rawItems = await this.repository.getVisibilityDashboard(organizationId, item_id);
+      const items = rawItems.map((item) => this.normalizeVisibilityDashboardItem(item));
+      const summary = this.buildVisibilitySummaryByUom(items);
+
+      return {
+        summary,
+        items,
+      };
+    } catch (error) {
+      throw new BadRequestException(`Error getting visibility dashboard: ${error.message}`);
+    }
+  }
+
+  async createInventoryTrackingBad(dto: CreateInventoryTrackingDto): Promise<InventoryTracking> {
+    return this.repository.createInventoryTrackingBad(dto);
+  }
+
+  async getOnHandMappingDetail(
+    query: InvOnHandMappingDetailQueryDto,
+  ): Promise<InvOnHandMappingDetailResponseDto> {
+    return this.invOnHandMappingIntegrationService.getOnHandMappingDetail(query);
   }
 }

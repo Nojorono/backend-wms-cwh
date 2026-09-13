@@ -4,6 +4,7 @@ import { InventoryTracking } from './inventory-tracking.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
 import { User } from './user.entity';
 import { Inbound } from './inbound.entity';
+import { MasterIO } from './master-io.entity';
 
 export enum Status {
   PENDING = 'PENDING',
@@ -13,6 +14,13 @@ export enum Status {
 
 @Entity('transaction_put_away')
 export class PutAwayTransaction extends BaseEntity {
+  @Column({ nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
   @Column({ nullable: true })
   inventory_tracking_id: string;
 

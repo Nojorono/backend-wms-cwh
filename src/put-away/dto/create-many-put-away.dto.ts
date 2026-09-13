@@ -9,6 +9,7 @@ export class CreateManyPutAwayDto {
     description: 'Array of put away data to create',
     example: [
       {
+        organization_id: 'uuid-organization-1',
         inventory_tracking_id: 'uuid-inventory-1',
         destination_bin_id: 'uuid-bin-1',
         forklift_driver_id: 'uuid-driver-1',

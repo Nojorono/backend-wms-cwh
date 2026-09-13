@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ItemListQueryDto } from '../dto/item-list-query.dto';
+import { MetaItemListDtoByInventoryItemId } from '../dto/meta-item-list-by-inventory-item-id.dto';
 import { MasterItem } from '../../core/domain/entities/master-item.entity';
 import { firstValueFrom, timeout, catchError, of } from 'rxjs';
 
@@ -22,7 +23,7 @@ export class ItemListIntegrationService implements OnModuleInit {
   private readonly MAX_CONNECTION_ATTEMPTS = 5;
   private readonly CONNECTION_RETRY_DELAY = 2000; // 2 seconds
 
-  constructor(@Inject('ITEM_LIST_SERVICE') private readonly itemListClient: ClientProxy) {}
+  constructor(@Inject('ITEM_LIST_SERVICE') private readonly itemListClient: ClientProxy) { }
 
   async onModuleInit() {
     this.logger.log('Initializing connection to RabbitMQ item list service...');
@@ -256,6 +257,55 @@ export class ItemListIntegrationService implements OnModuleInit {
         status: false,
         message: `Error invalidating item list cache: ${error?.message || 'Unknown error'}`,
       };
+    }
+  }
+
+  async findWhereOrgCodeAndInventoryItemId(
+    dto: MetaItemListDtoByInventoryItemId,
+  ): Promise<ItemListResponseDto> {
+    try {
+      this.logger.log(
+        `Sending request to find item by organization_code and inventory_item_id: ${dto.organization_code}, ${dto.inventory_item_id}`,
+      );
+
+      const timeoutMs = 20000;
+      this.logger.log(`Using timeout of ${timeoutMs}ms for RabbitMQ request`);
+
+      const itemResponse = await firstValueFrom(
+        this.itemListClient
+          .send<ItemListResponseDto>('item-list.findByInventoryItemIdAndOrgCode', dto)
+          .pipe(
+            timeout(timeoutMs),
+            catchError((error) => {
+              this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
+              this.connectionEstablished = false;
+              throw error;
+            }),
+          ),
+      );
+
+      this.logger.log('Received response from item list service:', {
+        status: itemResponse?.status,
+        count: itemResponse?.count,
+        dataLength: itemResponse?.data?.length,
+        message: itemResponse?.message,
+      });
+
+      return (
+        itemResponse || {
+          data: [],
+          count: 0,
+          status: false,
+          message: 'Failed to retrieve data from item list service (null response)',
+        }
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error finding item by organization_code ${dto.organization_code} and inventory_item_id ${dto.inventory_item_id} via RabbitMQ:`,
+        error,
+      );
+      this.connectionEstablished = false;
+      throw error;
     }
   }
 }

@@ -1,5 +1,4 @@
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { join } from 'path';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -21,6 +20,7 @@ import { MasterVehicleModule } from './master-vehicle/master-vehicle.module';
 import { MasterWarehouseSubModule } from './master-warehouse-sub/master-warehouse-sub.module';
 import { MasterWarehouseBinModule } from './master-warehouse-bin/master-warehouse-bin.module';
 import { InboundModule } from './inbound/inbound.module';
+import { InboundReturModule } from './inbound-retur/inbound-retur.module';
 import { AssignedHelperModule } from './assigned-helper/assigned-helper.module';
 import { AssignedGateModule } from './assigned-gate/assigned-gate.module';
 import { AssignedGateLoadModule } from './assigned-gate-load/assigned-gate-load.module';
@@ -40,11 +40,28 @@ import { PickingSuggestionModule } from './picking-suggestion/picking-suggestion
 import { NotificationModule } from './notification/notification.module';
 import { InventoryMovementModule } from './inventory-movement/inventory-movement.module';
 import { MoveOrderModule } from './move-order/move-order.module';
-import { ApprovalSetupModule } from './approval-setup/approval-setup.module';
-import { ApprovalModule } from './approval/approval.module';
 import { UsersActivityModule } from './users-activity/users-activity.module';
+import { PalletUpdateModule } from './pallet-update/pallet-update.module';
+import { AdjustmentStockModule } from './adjustment-stock/adjustment-stock.module';
 import { LoggerModule } from './infrastructure/modules/logger.module';
-
+import { ReportModule } from './report/report.module';
+import { ShipmentPlanModule } from './shipment-plan/shipment-plan.module';
+import { InboundIntegrationModule } from './inbound-integration/inbound-integration.module';
+import { OutboundIntegrationIrReqModule } from './outbound-integration-ir-req/outbound-integration-ir-req.module';
+import { OutboundIntegrationDeliveriesModule } from './outbound-integration-deliveries/outbound-integration-deliveries.module';
+import { OpeningBalanceStockModule } from './opening-balance-stock/opening-balance-stock.module';
+import { EmailModule } from './email/email.module';
+import { MasterDepartementModule } from './master-departement/master-departement.module';
+import { ScheduledCallPlanModule } from './scheduled-task/scheduled-call-plan/scheduled-call-plan.module';
+import { ScheduledOnHandAtrModule } from './scheduled-task/scheduled-on-hand-atr/scheduled-on-hand-atr.module';
+import { ScheduledSpbSubmittedModule } from './scheduled-task/scheduled-spb-submitted/scheduled-spb-submitted.module';
+import { DoSuggestionModule } from './do-suggestion/do-suggestion.module';
+import { BtbModule } from './btb/btb.module';
+import { OutboundSalesModule } from './outbound-sales/outbound-sales.module';
+import { MoveOrderIntegrationModule } from './move-order-integration/move-order-integration.module';
+import { WmsAssistantModule } from './wms-assistant/wms-assistant.module';
+import { WorkScheduledModule } from './work-scheduled/work-scheduled.module';
+import { CommonModule } from './common/common.module';
 @Module({
   imports: [
     LoggerModule, // Global logger module - must be imported first
@@ -56,6 +73,7 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
       useFactory: (configService: ConfigService) => getTypeOrmConfig(configService),
       inject: [ConfigService],
     }),
+    CommonModule,
     AuthModule,
     RolePermissionModule,
     MenuModule,
@@ -73,6 +91,7 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     MasterWeekModule,
     MasterClassificationItemModule,
     InboundModule,
+    InboundReturModule,
     AssignedHelperModule,
     AssignedGateModule,
     AssignedGateLoadModule,
@@ -91,9 +110,26 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     NotificationModule,
     InventoryMovementModule,
     MoveOrderModule,
-    ApprovalSetupModule,
-    ApprovalModule,
     UsersActivityModule,
+    PalletUpdateModule,
+    AdjustmentStockModule,
+    ReportModule,
+    ShipmentPlanModule,
+    InboundIntegrationModule,
+    OutboundIntegrationIrReqModule,
+    OutboundIntegrationDeliveriesModule,
+    OpeningBalanceStockModule,
+    EmailModule,
+    MasterDepartementModule,
+    ScheduledCallPlanModule,
+    ScheduledOnHandAtrModule,
+    ScheduledSpbSubmittedModule,
+    DoSuggestionModule,
+    BtbModule,
+    OutboundSalesModule,
+    MoveOrderIntegrationModule,
+    WmsAssistantModule,
+    WorkScheduledModule,
   ],
   providers: [
     {
@@ -102,4 +138,4 @@ import { LoggerModule } from './infrastructure/modules/logger.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

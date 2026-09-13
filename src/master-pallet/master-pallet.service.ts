@@ -5,12 +5,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { MasterPalletRepository } from './master-pallet.repository';
 import { CreateMasterPalletDto } from './dto/create-master-pallet.dto';
+import { GeneratePalletRangeDto } from './dto/generate-pallet-range.dto';
 import { UpdateMasterPalletDto } from './dto/update-master-pallet.dto';
 import {
   UpdatePalletQuantityDto,
+  UpdateProductionDateDto,
+  UpdateUOMDto,
   PalletQuantityHistoryResponseDto,
   PalletCapacityValidationDto,
   PalletItemQuantityDto,
@@ -23,6 +26,10 @@ import {
 } from '../core/domain/entities/transaction-pallet-history.entity';
 import { MasterItem } from 'src/core/domain/entities/master-item.entity';
 import { InventoryTracking } from '../core/domain/entities/inventory-tracking.entity';
+import {
+  InventoryTrackingAction,
+  InventoryTrackingHistory,
+} from '../core/domain/entities/inventory-tracking-history.entity';
 import { MasterWarehouseSub } from '../core/domain/entities/master-warehouse-sub.entity';
 import { MasterWarehouseBin } from '../core/domain/entities/master-warehouse-bin.entity';
 import { PaginationService } from '../core/services/pagination.service';
@@ -58,8 +65,51 @@ export class MasterPalletService {
     return pallet;
   }
 
+  async generateRange(dto: GeneratePalletRangeDto): Promise<MasterPallet[]> {
+    const padding = dto.padding ?? 4;
+    const isAscending = dto.start <= dto.end;
+
+    if (!isAscending) {
+      throw new BadRequestException('start must be less than or equal to end');
+    }
+
+    const total = dto.end - dto.start + 1;
+    if (total > 10000) {
+      throw new BadRequestException('Maximum allowed range is 10000 pallet codes per request');
+    }
+
+    const palletCodes = Array.from({ length: total }, (_, idx) => {
+      const num = dto.start + idx;
+      return `${dto.prefix}${String(num).padStart(padding, '0')}`;
+    });
+
+    const existing = await this.repository.findByPalletCodes(palletCodes);
+    if (existing.length > 0) {
+      const existingCodes = existing.map((item) => item.pallet_code).sort();
+      throw new ConflictException(
+        `Some pallet codes already exist: ${existingCodes.slice(0, 20).join(', ')}${existingCodes.length > 20 ? ' ...' : ''}`,
+      );
+    }
+
+    const payloads: CreateMasterPalletDto[] = palletCodes.map((palletCode) => ({
+      pallet_code: palletCode,
+      organization_id: dto.organization_id,
+      capacity: dto.capacity,
+      isActive: dto.isActive ?? true,
+      isFull: false,
+      currentQuantity: 0,
+      uom: dto.uom,
+    }));
+
+    return this.repository.createMany(payloads);
+  }
+
   async findAll(): Promise<MasterPallet[]> {
     return await this.repository.findAll();
+  }
+
+  async findAllByOrganizationId(organizationId: string): Promise<MasterPallet[]> {
+    return this.repository.findAllByOrganizationId(organizationId);
   }
 
   async findOne(id: string): Promise<MasterPallet> {
@@ -125,202 +175,268 @@ export class MasterPalletService {
   async updateQuantity(
     palletId: string,
     updateQuantityDto: UpdatePalletQuantityDto,
+    _existingManager?: EntityManager,
+    skipEmptyPalletCleanup: boolean = false,
   ): Promise<MasterPallet> {
-    // Use transaction with pessimistic write lock to prevent concurrent updates
-    return await this.dataSource.transaction(async (transactionalEntityManager) => {
-      try {
-        // Lock the pallet row for update to prevent concurrent modifications
-        const pallet = await transactionalEntityManager.findOne(MasterPallet, {
-          where: { id: palletId },
-          lock: { mode: 'pessimistic_write' },
-        });
+    try {
+      const pallet = await this.repository.findOne(palletId);
+      if (!pallet) {
+        throw new NotFoundException(`Pallet with ID ${palletId} not found`);
+      }
 
-        if (!pallet) {
-          throw new NotFoundException(`Pallet with ID ${palletId} not found`);
-        }
+      if (!pallet.capacity || pallet.capacity <= 0) {
+        throw new BadRequestException('Pallet capacity must be set and greater than 0');
+      }
 
-        if (!pallet.capacity || pallet.capacity <= 0) {
-          throw new BadRequestException('Pallet capacity must be set and greater than 0');
-        }
+      // Quantity must be scoped per (item, uom, week, status_inventory).
+      // READY leftover and PENDING outbound on the same pallet are separate stock lines.
+      const weekNumberFilter =
+        updateQuantityDto.week_number !== undefined ? updateQuantityDto.week_number : null;
+      const statusInventoryFilter = updateQuantityDto.status_inventory;
 
-        const currentItemQuantity = await this.getItemQuantityOnPallet(
+      const currentItemQuantity = await this.getItemQuantityOnPallet(
+        palletId,
+        updateQuantityDto.item_id,
+        updateQuantityDto.uom,
+        weekNumberFilter,
+        statusInventoryFilter,
+      );
+      const totalPalletQuantity = pallet.currentQuantity ?? 0;
+
+      // Validate UOM consistency only within the same item + week + status stock line
+      if (currentItemQuantity > 0 && updateQuantityDto.uom) {
+        const existingUomRecord = await this.getLatestHistoryRecord(
           palletId,
           updateQuantityDto.item_id,
-          updateQuantityDto.uom,
+          undefined,
+          weekNumberFilter,
+          statusInventoryFilter,
         );
-        const totalPalletQuantity = pallet.currentQuantity ?? 0;
 
-        // Validate UOM consistency if there's existing quantity for this item
-        if (currentItemQuantity > 0 && updateQuantityDto.uom) {
-          const existingUomRecord = await this.transactionHistoryRepository.findOne({
-            where: {
-              pallet_id: palletId,
-              item_id: updateQuantityDto.item_id,
-            },
-            order: { createdAt: 'DESC' },
-          });
-
-          if (
-            existingUomRecord &&
-            existingUomRecord.uom &&
-            existingUomRecord.uom !== updateQuantityDto.uom
-          ) {
-            throw new BadRequestException(
-              `UOM mismatch. Existing UOM for this item is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`,
-            );
-          }
+        if (
+          existingUomRecord &&
+          existingUomRecord.uom &&
+          existingUomRecord.uom !== updateQuantityDto.uom
+        ) {
+          throw new BadRequestException(
+            `UOM mismatch. Existing UOM for this item (week ${weekNumberFilter ?? 'null'}) is '${existingUomRecord.uom}', but provided UOM is '${updateQuantityDto.uom}'. Please use the same UOM for consistency.`,
+          );
         }
+      }
 
-        if (updateQuantityDto.operation_type === QuantityOperationType.ADD) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Quantity to add must be non-negative');
-          }
+      if (updateQuantityDto.operation_type === QuantityOperationType.ADD) {
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Quantity to add must be non-negative');
         }
-        if (updateQuantityDto.operation_type === QuantityOperationType.PICK) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Quantity to pick must be non-negative');
-          }
+      }
+      if (updateQuantityDto.operation_type === QuantityOperationType.PICK) {
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Quantity to pick must be non-negative');
+        }
+        if (updateQuantityDto.quantity > currentItemQuantity) {
+          throw new BadRequestException(
+            `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+          );
+        }
+      }
+      if (updateQuantityDto.operation_type === QuantityOperationType.REMOVE) {
+        if (currentItemQuantity === 0) {
+          throw new BadRequestException('Cannot remove: pallet is empty');
+        }
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Quantity to remove must be non-negative');
+        }
+        if (updateQuantityDto.quantity > currentItemQuantity) {
+          throw new BadRequestException(
+            `Cannot remove ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+          );
+        }
+      }
+      if (updateQuantityDto.operation_type === QuantityOperationType.ADJUST) {
+        if (updateQuantityDto.quantity < 0) {
+          throw new BadRequestException('Adjusted item quantity cannot be negative');
+        }
+        const projectedTotal =
+          totalPalletQuantity - currentItemQuantity + updateQuantityDto.quantity;
+        if (projectedTotal > pallet.capacity) {
+          throw new BadRequestException(
+            `Adjusted total quantity ${projectedTotal} exceeds pallet capacity ${pallet.capacity}`,
+          );
+        }
+      }
+
+      let newItemQuantity: number;
+      let quantityChange: number;
+
+      switch (updateQuantityDto.operation_type) {
+        case QuantityOperationType.MERGE:
+          newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
+          quantityChange = updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.SPLIT:
+          newItemQuantity = currentItemQuantity - updateQuantityDto.quantity;
+          quantityChange = -updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.ADD:
+          newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
+          quantityChange = updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.PICK:
+          newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
+          quantityChange = -updateQuantityDto.quantity;
           if (updateQuantityDto.quantity > currentItemQuantity) {
             throw new BadRequestException(
               `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
             );
           }
-        }
-        if (updateQuantityDto.operation_type === QuantityOperationType.REMOVE) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Quantity to remove must be non-negative');
-          }
-          if (updateQuantityDto.quantity > currentItemQuantity) {
-            throw new BadRequestException(
-              `Cannot remove ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
+          break;
+        case QuantityOperationType.REMOVE:
+          newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
+          quantityChange = -updateQuantityDto.quantity;
+          break;
+        case QuantityOperationType.ADJUST:
+          newItemQuantity = updateQuantityDto.quantity;
+          quantityChange = newItemQuantity - currentItemQuantity;
+          break;
+        case QuantityOperationType.RESET:
+          newItemQuantity = 0;
+          quantityChange = -currentItemQuantity;
+          break;
+        default:
+          throw new BadRequestException('Invalid operation type');
+      }
+
+      if (newItemQuantity < 0) {
+        throw new BadRequestException('Item quantity cannot be negative');
+      }
+
+      const newTotalQuantity = totalPalletQuantity - currentItemQuantity + newItemQuantity;
+
+      if (newTotalQuantity > pallet.capacity) {
+        throw new BadRequestException(
+          `Total pallet quantity ${newTotalQuantity} exceeds pallet capacity ${pallet.capacity}`,
+        );
+      }
+
+      let updatedWeekNumber = pallet.currentWeekNumber ?? 0;
+
+      const hasWeekInput =
+        updateQuantityDto.week_number !== undefined && updateQuantityDto.week_number !== null;
+
+      if (newTotalQuantity === 0) {
+        updatedWeekNumber = 0;
+      } else if (hasWeekInput) {
+        updatedWeekNumber = updateQuantityDto.week_number as number;
+      }
+
+      // Update pallet
+      await this.repository.update(palletId, {
+        currentQuantity: newTotalQuantity,
+        isFull: newTotalQuantity >= pallet.capacity,
+        currentWeekNumber: updatedWeekNumber,
+      } as any);
+
+      if (updateQuantityDto.reference_type === 'PALLET_UPDATE_UOM') {
+        await this.repository.update(palletId, {
+          uom: updateQuantityDto.uom,
+        } as any);
+      }
+
+      const productionDateStr =
+        typeof updateQuantityDto.production_date === 'string'
+          ? updateQuantityDto.production_date
+          : updateQuantityDto.production_date?.toISOString();
+
+      const historyEntity = this.transactionHistoryRepository.create({
+        pallet_id: palletId,
+        item_id: updateQuantityDto.item_id,
+        previous_quantity: currentItemQuantity,
+        quantity_change: quantityChange,
+        new_quantity: newItemQuantity,
+        operation_type: updateQuantityDto.operation_type,
+        inbound_id: updateQuantityDto.inbound_id,
+        outbound_do_id: updateQuantityDto.outbound_do_id,
+        reference_id: updateQuantityDto.reference_id,
+        reference_type: updateQuantityDto.reference_type,
+        notes: updateQuantityDto.notes,
+        user_id: updateQuantityDto.user_id,
+        uom: updateQuantityDto.uom,
+        production_date: productionDateStr,
+        week_number: updateQuantityDto.week_number,
+        status_inventory: updateQuantityDto.status_inventory,
+      });
+      await this.transactionHistoryRepository.save(historyEntity);
+
+      const updatedPallet = await this.repository.findOne(palletId);
+      if (!updatedPallet) {
+        throw new NotFoundException(`Pallet with ID ${palletId} not found after update`);
+      }
+
+      if (updatedPallet.currentQuantity === 0 && !skipEmptyPalletCleanup) {
+        const inventoryTracking = await this.inventoryTrackingRepository.findOne({
+          where: { pallet_id: palletId },
+          order: { createdAt: 'DESC' },
+        });
+        if (inventoryTracking) {
+          // Snapshot last known location into history BEFORE clearing sub/bin.
+          // Empty cleanup used to null location without history, so delete/revert
+          // of scan-picking could not restore PRELOAD/bin (stayed null).
+          const historyRepo = this.dataSource.getRepository(InventoryTrackingHistory);
+          if (inventoryTracking.warehouse_sub_id || inventoryTracking.warehouse_bin_id) {
+            await historyRepo.save(
+              historyRepo.create({
+                inventory_tracking_id: inventoryTracking.id,
+                pallet_id: palletId,
+                warehouse_id: inventoryTracking.warehouse_id,
+                warehouse_sub_id: inventoryTracking.warehouse_sub_id,
+                warehouse_bin_id: inventoryTracking.warehouse_bin_id,
+                inventory_date: new Date(),
+                inventory_status: inventoryTracking.inventory_status || 'IN_INVENTORY',
+                inventory_note: 'Last location before pallet emptied',
+                action: InventoryTrackingAction.UPDATED,
+              }),
             );
           }
-        }
-        if (updateQuantityDto.operation_type === QuantityOperationType.ADJUST) {
-          if (updateQuantityDto.quantity < 0) {
-            throw new BadRequestException('Adjusted item quantity cannot be negative');
-          }
-          const projectedTotal = totalPalletQuantity - currentItemQuantity + updateQuantityDto.quantity;
-          if (projectedTotal > pallet.capacity) {
-            throw new BadRequestException(
-              `Adjusted total quantity ${projectedTotal} exceeds pallet capacity ${pallet.capacity}`,
-            );
-          }
-        }
-        let newItemQuantity: number;
-        let quantityChange: number;
 
-        switch (updateQuantityDto.operation_type) {
-          case QuantityOperationType.ADD:
-            newItemQuantity = currentItemQuantity + updateQuantityDto.quantity;
-            quantityChange = updateQuantityDto.quantity;
-            break;
-          case QuantityOperationType.PICK:
-            newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
-            quantityChange = -updateQuantityDto.quantity;
-            if (updateQuantityDto.quantity > currentItemQuantity) {
-              throw new BadRequestException(
-                `Cannot pick ${updateQuantityDto.quantity}. Current item quantity on pallet is ${currentItemQuantity}`,
-              );
-            }
-            break;
-          case QuantityOperationType.REMOVE:
-            newItemQuantity = Math.max(0, currentItemQuantity - updateQuantityDto.quantity);
-            quantityChange = -updateQuantityDto.quantity;
-            break;
-          case QuantityOperationType.ADJUST:
-            newItemQuantity = updateQuantityDto.quantity;
-            quantityChange = newItemQuantity - currentItemQuantity;
-            break;
-          case QuantityOperationType.RESET:
-            newItemQuantity = 0;
-            quantityChange = -currentItemQuantity;
-            break;
-          default:
-            throw new BadRequestException('Invalid operation type');
-        }
+          await this.inventoryTrackingRepository.update(inventoryTracking.id, {
+            warehouse_sub_id: null as any,
+            warehouse_bin_id: null as any,
+            inventory_note: 'Pallet is empty',
+          } as any);
 
-        if (newItemQuantity < 0) {
-          throw new BadRequestException('Item quantity cannot be negative');
-        }
-
-        const newTotalQuantity = totalPalletQuantity - currentItemQuantity + newItemQuantity;
-
-        if (newTotalQuantity > pallet.capacity) {
-          throw new BadRequestException(
-            `Total pallet quantity ${newTotalQuantity} exceeds pallet capacity ${pallet.capacity}`,
+          await historyRepo.save(
+            historyRepo.create({
+              inventory_tracking_id: inventoryTracking.id,
+              pallet_id: palletId,
+              warehouse_id: inventoryTracking.warehouse_id,
+              warehouse_sub_id: null as any,
+              warehouse_bin_id: null as any,
+              inventory_date: new Date(),
+              inventory_status: inventoryTracking.inventory_status || 'IN_INVENTORY',
+              inventory_note: 'Pallet is empty',
+              action: InventoryTrackingAction.MOVED,
+            }),
           );
         }
-
-        let updatedWeekNumber = pallet.currentWeekNumber ?? 0;
-
-        const hasWeekInput =
-          updateQuantityDto.week_number !== undefined && updateQuantityDto.week_number !== null;
-
-        if (newTotalQuantity === 0) {
-          updatedWeekNumber = 0;
-        } else if (hasWeekInput) {
-          updatedWeekNumber = updateQuantityDto.week_number as number;
-        }
-
-        // Update pallet using transactional entity manager
-        await transactionalEntityManager.update(MasterPallet, palletId, {
-          currentQuantity: newTotalQuantity,
-          isFull: newTotalQuantity >= pallet.capacity,
-          currentWeekNumber: updatedWeekNumber,
-        });
-
-        const productionDateStr =
-          typeof updateQuantityDto.production_date === 'string'
-            ? updateQuantityDto.production_date
-            : updateQuantityDto.production_date?.toISOString();
-
-        // Create quantity history using transactional entity manager
-        const historyEntity = transactionalEntityManager.create(PalletTransactionHistory, {
-          pallet_id: palletId,
-          item_id: updateQuantityDto.item_id,
-          previous_quantity: currentItemQuantity,
-          quantity_change: quantityChange,
-          new_quantity: newItemQuantity,
-          operation_type: updateQuantityDto.operation_type,
-          inbound_id: updateQuantityDto.inbound_id,
-          outbound_do_id: updateQuantityDto.outbound_do_id,
-          reference_id: updateQuantityDto.reference_id,
-          reference_type: updateQuantityDto.reference_type,
-          notes: updateQuantityDto.notes,
-          user_id: updateQuantityDto.user_id,
-          uom: updateQuantityDto.uom,
-          production_date: productionDateStr,
-          week_number: updateQuantityDto.week_number,
-          status_inventory: updateQuantityDto.status_inventory,
-        });
-        await transactionalEntityManager.save(historyEntity);
-
-        // Return updated pallet
-        const updatedPallet = await transactionalEntityManager.findOne(MasterPallet, {
-          where: { id: palletId },
-        });
-
-        if (!updatedPallet) {
-          throw new NotFoundException(`Pallet with ID ${palletId} not found after update`);
-        }
-
-        return updatedPallet;
-      } catch (error) {
-        // Transaction will automatically rollback on error
-        // Re-throw validation and business logic errors as-is
-        if (
-          error instanceof BadRequestException ||
-          error instanceof NotFoundException
-        ) {
-          throw error;
-        }
-
-        // Wrap other errors with context
-        console.error(`Error updating pallet quantity for ${palletId}:`, error);
-        throw new BadRequestException(`Failed to update pallet quantity: ${error.message}`);
+        await this.transactionHistoryRepository.softDelete({ pallet_id: palletId });
+        await this.repository.update(palletId, {
+          memo_id: null as any,
+          currentWeekNumber: 0,
+          currentQuantity: 0,
+        } as any);
       }
-    });
+
+      return updatedPallet;
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+
+      console.error(`Error updating pallet quantity for ${palletId}:`, error);
+      throw new BadRequestException(
+        `Failed to update pallet quantity: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async updateQuantityByPalletCode(
@@ -333,6 +449,199 @@ export class MasterPalletService {
     }
 
     return this.updateQuantity(pallet.id, updateQuantityDto);
+  }
+
+  /**
+   * Update production date / week for an item line without changing quantity.
+   * Treated as REMOVE from the old (item, uom, week, prod_date) stock line
+   * then ADD the same qty under the new production_date / week — same pattern as updateUOM.
+   * Does NOT use ADJUST (ADJUST scopes by the new week and double-counts against capacity).
+   */
+  async updateProductionDate(
+    palletId: string,
+    dto: UpdateProductionDateDto,
+  ): Promise<MasterPallet> {
+    return await this.dataSource.transaction(async () => {
+      try {
+        await this.findOne(palletId);
+
+        const toDateOnly = (v: string | Date | undefined): string => {
+          if (v == null) return '';
+          const s = typeof v === 'string' ? v : (v as Date).toISOString?.() ?? '';
+          return s.slice(0, 10);
+        };
+        const dateBefore = toDateOnly(dto.production_date_before);
+        const dateAfter = toDateOnly(dto.production_date_after);
+        if (!dateBefore) {
+          throw new BadRequestException(
+            'production_date_before is required to identify which records to update.',
+          );
+        }
+        if (!dateAfter) {
+          throw new BadRequestException(
+            'production_date_after is required for the new production date.',
+          );
+        }
+
+        // Match both date and date+1 day: API may send UTC while DB stores local midnight.
+        const qb = this.transactionHistoryRepository
+          .createQueryBuilder('h')
+          .where('h.pallet_id = :palletId', { palletId })
+          .andWhere('h.item_id = :itemId', { itemId: dto.item_id })
+          .andWhere('h.status_inventory IN (:...statuses)', {
+            statuses: [StatusInventory.READY, StatusInventory.PENDING],
+          })
+          .andWhere('h.new_quantity > 0')
+          .andWhere(
+            `(h.production_date)::date IN (CAST(:dateBefore AS date), (CAST(:dateBefore AS date) + INTERVAL '1 day')::date)`,
+            { dateBefore },
+          )
+          .orderBy('h.createdAt', 'DESC');
+        if (dto.uom) {
+          qb.andWhere('h.uom = :uom', { uom: dto.uom });
+        }
+        const rows = await qb.getMany();
+
+        if (rows.length === 0) {
+          throw new BadRequestException(
+            `No quantity found for item ${dto.item_id}${dto.uom ? ` with UOM ${dto.uom}` : ''} with production date ${dateBefore} on pallet ${palletId}. Cannot update production date.`,
+          );
+        }
+
+        const latest = rows[0];
+        const quantity = latest.new_quantity ?? 0;
+        if (quantity <= 0) {
+          throw new BadRequestException(
+            `Latest record for item ${dto.item_id} with production date ${dateBefore} has zero quantity. Cannot update production date.`,
+          );
+        }
+
+        const oldWeek =
+          latest.week_number !== undefined && latest.week_number !== null
+            ? Number(latest.week_number)
+            : undefined;
+        const newWeekRaw = dto.week_number ?? oldWeek;
+        const newWeek =
+          newWeekRaw !== undefined && newWeekRaw !== null
+            ? Number(newWeekRaw)
+            : undefined;
+        const stockStatus = latest.status_inventory ?? StatusInventory.READY;
+        const uom = latest.uom ?? dto.uom;
+        const notes =
+          dto.notes ??
+          `Production date/week updated from ${dateBefore} (week ${oldWeek ?? 'n/a'}) ` +
+            `to ${dateAfter} (week ${newWeek ?? 'n/a'}) — REMOVE old line + ADD new line`;
+
+        const basePayload = {
+          item_id: dto.item_id,
+          uom,
+          user_id: dto.user_id,
+          notes,
+          reference_id: dto.reference_id,
+          reference_type: dto.reference_type ?? 'PALLET_UPDATE_PROD_DATE',
+          status_inventory: stockStatus,
+        };
+
+        // REMOVE from the old week / production_date stock line (skip empty cleanup mid-op).
+        await this.updateQuantity(
+          palletId,
+          {
+            ...basePayload,
+            operation_type: QuantityOperationType.REMOVE,
+            quantity,
+            week_number: oldWeek,
+            production_date: latest.production_date ?? (dto.production_date_before as Date),
+          },
+          undefined,
+          true,
+        );
+
+        // ADD same qty under the new production_date / week.
+        return await this.updateQuantity(palletId, {
+          ...basePayload,
+          operation_type: QuantityOperationType.ADD,
+          quantity,
+          week_number: newWeek,
+          production_date: dto.production_date_after as Date,
+        });
+      } catch (err) {
+        if (
+          err instanceof BadRequestException ||
+          err instanceof NotFoundException
+        ) {
+          throw err;
+        }
+        throw new BadRequestException(
+          `Failed to update production date: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    });
+  }
+
+  /**
+   * Change UOM for an item line on a pallet: removes quantity from the current UOM
+   * and adds the same quantity under the new UOM, preserving production_date and week_number.
+   */
+  async updateUOM(palletId: string, dto: UpdateUOMDto): Promise<MasterPallet> {
+    return await this.dataSource.transaction(async () => {
+      try {
+        const pallet = await this.findOne(palletId);
+
+        if (pallet.capacity < dto.to_quantity) {
+          throw new BadRequestException(`Pallet capacity ${pallet.capacity} is less than the quantity to change ${dto.to_quantity}.`);
+        }
+
+        if (dto.from_uom === dto.to_uom) {
+          throw new BadRequestException('from_uom and to_uom must be different');
+        }
+
+        const latest = await this.getLatestHistoryRecord(
+          palletId,
+          dto.item_id,
+          dto.from_uom,
+        );
+        if (!latest || (latest.new_quantity ?? 0) === 0) {
+          throw new BadRequestException(
+            `No quantity found for item ${dto.item_id} with UOM ${dto.from_uom} on pallet ${palletId}. Cannot change UOM.`,
+          );
+        }
+
+        const basePayload = {
+          item_id: dto.item_id,
+          user_id: dto.user_id,
+          notes: dto.notes ?? 'UOM updated',
+          reference_id: dto.reference_id,
+          reference_type: dto.reference_type ?? 'PALLET_UPDATE_UOM',
+          production_date: latest.production_date,
+          week_number: latest.week_number ?? undefined,
+          status_inventory: StatusInventory.READY,
+        };
+
+        await this.updateQuantity(palletId, {
+          ...basePayload,
+          operation_type: QuantityOperationType.REMOVE,
+          quantity: dto.from_quantity,
+          uom: dto.from_uom,
+        }, undefined, true);
+
+        return await this.updateQuantity(palletId, {
+          ...basePayload,
+          operation_type: QuantityOperationType.ADD,
+          quantity: dto.to_quantity,
+          uom: dto.to_uom,
+        }, undefined, true);
+      } catch (err) {
+        if (
+          err instanceof BadRequestException ||
+          err instanceof NotFoundException
+        ) {
+          throw err;
+        }
+        throw new BadRequestException(
+          `Failed to update UOM: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    });
   }
 
   async getQuantityHistory(palletId: string): Promise<PalletQuantityHistoryResponseDto[]> {
@@ -438,29 +747,39 @@ export class MasterPalletService {
 
   async getItemQuantityHistory(
     palletId: string,
-    itemId: string,
+    itemId?: string,
     uom?: string,
   ): Promise<PalletQuantityHistoryResponseDto[]> {
     await this.findOne(palletId);
 
     const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
-      .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id')
-      .where('history.pallet_id = :palletId', { palletId })
-      .andWhere('history.item_id = :itemId', { itemId });
+      .leftJoinAndMapOne(
+        'history.item',
+        MasterItem,
+        'item',
+        'item.id = history.item_id::uuid',
+      )
+      .where('history.pallet_id = :palletId', { palletId });
 
-    // Add UOM filtering if provided
+    if (itemId) {
+      qb.andWhere('history.item_id = :itemId', { itemId });
+    }
+
     if (uom) {
       qb.andWhere('history.uom = :uom', { uom });
     }
 
-    const history = await qb.orderBy('history.createdAt', 'DESC').getMany();
+    const history = await qb
+      .orderBy('history.created_at', 'DESC')
+      .addOrderBy('history.id', 'DESC')
+      .getMany();
 
     return history.map((record: any) => ({
       id: record.id,
       pallet_id: record.pallet_id,
       item_id: record.item_id,
-      item_name: record.item.sku,
+      item_name: record.item?.sku,
       previous_quantity: record.previous_quantity,
       quantity_change: record.quantity_change,
       new_quantity: record.new_quantity,
@@ -473,6 +792,7 @@ export class MasterPalletService {
       createdAt: record.createdAt,
       production_date: record.production_date,
       week_number: record.week_number,
+      status_inventory: record.status_inventory,
     }));
   }
 
@@ -506,6 +826,8 @@ export class MasterPalletService {
       }
     }
 
+    // Latest per (item_id, uom) by createdAt only — so after production-date update we show
+    // only the updated row, not the superseded week_number row.
     const qb = this.transactionHistoryRepository
       .createQueryBuilder('history')
       .leftJoinAndMapOne('history.item', MasterItem, 'item', 'item.id = history.item_id::uuid')
@@ -518,11 +840,18 @@ export class MasterPalletService {
           .where('h2.item_id = history.item_id')
           .andWhere('h2.pallet_id = :palletId')
           .andWhere('h2.uom = history.uom') // Add UOM filtering
+          .andWhere('h2.status_inventory IN (:...statusInventories)', {
+            statusInventories: [StatusInventory.READY, StatusInventory.PENDING],
+          })
+          .andWhere(
+            '(h2.status_inventory = history.status_inventory OR (h2.status_inventory IS NULL AND history.status_inventory IS NULL))',
+          )
           .andWhere('(h2.week_number = history.week_number OR (h2.week_number IS NULL AND history.week_number IS NULL))') // Include week_number in grouping
           .getQuery();
         return `history.createdAt = ${subQuery}`;
       })
-      .setParameter('palletId', palletId);
+      .setParameter('palletId', palletId)
+      .setParameter('statusInventories', [StatusInventory.READY, StatusInventory.PENDING]);
 
     const results = await qb.getMany();
 
@@ -542,15 +871,18 @@ export class MasterPalletService {
           item_id: undefined,
           item_name: undefined,
           current_quantity: pallet.currentQuantity ?? 0,
+          capacity: pallet.capacity ?? 0,
           uom: pallet.uom ?? '',
           last_updated: pallet.updatedAt ?? pallet.createdAt ?? new Date(),
           production_date: undefined,
           week_number: pallet.currentWeekNumber || undefined,
           warehouse_sub_id: latestInventory?.warehouse_sub_id,
-          warehouse_sub_name: latestInventory?.warehouseSub?.code,
+          warehouse_sub_code: latestInventory?.warehouseSub?.code,
           warehouse_bin_id: latestInventory?.warehouse_bin_id,
-          warehouse_bin_name: latestInventory?.warehouseBin?.code,
+          warehouse_bin_code: latestInventory?.warehouseBin?.code,
+          inventory_status: latestInventory?.inventory_status,
           memo_id: pallet.memo_id,
+          organization_id: pallet.organization_id,
         },
       ];
     }
@@ -559,17 +891,20 @@ export class MasterPalletService {
       id: palletId,
       item_id: history.item_id,
       item_name: history.item?.sku,
-      current_quantity: history.new_quantity, // use your latest field
+      current_quantity: history.new_quantity,
+      capacity: pallet.capacity ?? 0,
       uom: history.uom,
       last_updated: history.createdAt,
       production_date: history.production_date,
       week_number: history.week_number ?? pallet.currentWeekNumber ?? undefined,
       warehouse_sub_id: latestInventory?.warehouse_sub_id,
-      warehouse_sub_name: latestInventory?.warehouseSub?.code,
+      warehouse_sub_code: latestInventory?.warehouseSub?.code,
       warehouse_bin_id: latestInventory?.warehouse_bin_id,
-      warehouse_bin_name: latestInventory?.warehouseBin?.code,
+      warehouse_bin_code: latestInventory?.warehouseBin?.code,
       memo_id: pallet.memo_id,
+      inventory_status: latestInventory?.inventory_status,
       status_inventory: history.status_inventory,
+      organization_id: pallet.organization_id,
     }));
   }
 
@@ -598,7 +933,7 @@ export class MasterPalletService {
 
   async getItemQuantityHistoryByPalletCode(
     palletCode: string,
-    itemId: string,
+    itemId?: string,
     uom?: string,
   ): Promise<PalletQuantityHistoryResponseDto[]> {
     const pallet = await this.repository.findByPalletCode(palletCode);
@@ -666,53 +1001,116 @@ export class MasterPalletService {
     return capacityInfo.available_capacity >= quantity;
   }
 
+  /**
+   * Flip a stock line's status_inventory IN PLACE (e.g. PENDING → READY) on the existing
+   * history rows for (pallet, item, uom?, week?). Does NOT change quantities and does NOT
+   * create REMOVE/ADD rows — the same physical stock simply changes status.
+   * Returns the number of history rows updated.
+   */
+  async convertStockLineStatusInPlace(
+    palletId: string,
+    params: {
+      itemId: string;
+      uom?: string;
+      weekNumber?: number | null;
+      from: StatusInventory;
+      to: StatusInventory;
+      appendNote?: string;
+    },
+  ): Promise<number> {
+    const { itemId, uom, weekNumber, from, to, appendNote } = params;
+
+    const qb = this.transactionHistoryRepository
+      .createQueryBuilder('history')
+      .where('history.pallet_id = :palletId', { palletId })
+      .andWhere('history.item_id = :itemId', { itemId })
+      .andWhere('history.status_inventory = :from', { from });
+
+    if (uom) {
+      qb.andWhere('history.uom = :uom', { uom });
+    }
+
+    if (weekNumber !== undefined) {
+      if (weekNumber === null) {
+        qb.andWhere('history.week_number IS NULL');
+      } else {
+        qb.andWhere('history.week_number = :weekNumber', { weekNumber });
+      }
+    }
+
+    const rows = await qb.getMany();
+    if (rows.length === 0) {
+      return 0;
+    }
+
+    for (const row of rows) {
+      row.status_inventory = to;
+      if (appendNote) {
+        row.notes = row.notes ? `${row.notes} | ${appendNote}` : appendNote;
+      }
+    }
+
+    await this.transactionHistoryRepository.save(rows);
+    return rows.length;
+  }
+
+  /**
+   * Returns the latest transaction history record for (palletId, itemId, uom?, week?, status?).
+   * When statusInventory is provided, only that status stock line is considered
+   * (READY vs PENDING are separate lines on the same pallet).
+   */
+  private async getLatestHistoryRecord(
+    palletId: string,
+    itemId: string,
+    uom?: string,
+    weekNumber?: number | null,
+    statusInventory?: StatusInventory,
+  ): Promise<PalletTransactionHistory | null> {
+    const qb = this.transactionHistoryRepository
+      .createQueryBuilder('history')
+      .where('history.pallet_id = :palletId', { palletId })
+      .andWhere('history.item_id = :itemId', { itemId });
+
+    if (uom) {
+      qb.andWhere('history.uom = :uom', { uom });
+    }
+
+    if (statusInventory) {
+      qb.andWhere('history.status_inventory = :statusInventory', { statusInventory });
+    } else {
+      // Match visible stock lines only (same filter as getPalletItemLatestQuantity)
+      qb.andWhere('history.status_inventory IN (:...statusInventories)', {
+        statusInventories: [StatusInventory.READY, StatusInventory.PENDING],
+      });
+    }
+
+    // undefined = do not filter by week (backward compatible for updateUOM)
+    // null / number = match that specific week stock line
+    if (weekNumber !== undefined) {
+      if (weekNumber === null) {
+        qb.andWhere('history.week_number IS NULL');
+      } else {
+        qb.andWhere('history.week_number = :weekNumber', { weekNumber });
+      }
+    }
+
+    return qb.orderBy('history.createdAt', 'DESC').getOne();
+  }
+
   private async getItemQuantityOnPallet(
     palletId: string,
     itemId: string,
     uom?: string,
+    weekNumber?: number | null,
+    statusInventory?: StatusInventory,
   ): Promise<number> {
-    const whereCondition: any = {
-      pallet_id: palletId,
-      item_id: itemId,
-    };
-
-    // If UOM is provided, filter by UOM as well
-    if (uom) {
-      whereCondition.uom = uom;
-    }
-
-    const latestRecord = await this.transactionHistoryRepository.findOne({
-      where: whereCondition,
-      order: { createdAt: 'DESC' },
-    });
-
+    const latestRecord = await this.getLatestHistoryRecord(
+      palletId,
+      itemId,
+      uom,
+      weekNumber,
+      statusInventory,
+    );
     return latestRecord ? latestRecord.new_quantity : 0;
-  }
-
-  private async getTotalPalletQuantity(palletId: string): Promise<number> {
-    const pallet = await this.findOne(palletId);
-    return pallet.currentQuantity;
-  }
-
-  private async createQuantityHistory(data: {
-    pallet_id: string;
-    item_id: string;
-    previous_quantity: number;
-    quantity_change: number;
-    new_quantity: number;
-    operation_type: QuantityOperationType;
-    inbound_id?: string;
-    outbound_do_id?: string;
-    reference_id?: string;
-    reference_type?: string;
-    notes?: string;
-    user_id?: string;
-    uom?: string;
-    production_date?: string;
-    week_number?: number;
-    status_inventory?: StatusInventory;
-  }): Promise<PalletTransactionHistory> {
-    const history = this.transactionHistoryRepository.create(data);
-    return await this.transactionHistoryRepository.save(history);
   }
 }

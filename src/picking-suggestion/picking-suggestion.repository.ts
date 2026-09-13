@@ -83,149 +83,158 @@ export class PickingSuggestionRepository {
     itemId: string,
     uom?: string,
     sortMethod: 'FIFO' | 'LIFO' = 'FIFO',
+    organizationId?: string,
   ): Promise<any[]> {
     // Determine sort direction: FIFO = ASC (oldest first), LIFO = DESC (newest first)
     const weekNumberSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
     const dateSort = sortMethod === 'FIFO' ? 'ASC' : 'DESC';
 
-    // Build location priority CASE statement based on sort method
-    // LIFO: Priority 1 = staging INBOUND at warehouseSub level (with or without bin)
-    // FIFO: Priority 1 = staging OUTBOUND (PRELOAD) at warehouseSub level (with or without bin)
-    // Note: Staging areas are checked first, even if they have bins
+    // Secondary location priority within the same week/batch.
+    // LIFO: Prefer staging INBOUND; FIFO: Prefer staging OUTBOUND.
     const locationPriorityCase = sortMethod === 'LIFO'
-      ? `CASE 
-          WHEN it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'INBOUND' THEN 1
-          WHEN it.warehouse_bin_id IS NOT NULL AND (it.warehouse_sub_id IS NULL OR COALESCE(ws.is_staging::text, '') != 'INBOUND') THEN 2
-          WHEN it.warehouse_sub_id IS NOT NULL THEN 3
+      ? `CASE
+          WHEN lit.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'INBOUND' THEN 1
+          WHEN lit.warehouse_bin_id IS NOT NULL AND (lit.warehouse_sub_id IS NULL OR COALESCE(ws.is_staging::text, '') != 'INBOUND') THEN 2
+          WHEN lit.warehouse_sub_id IS NOT NULL THEN 3
           ELSE 4
         END`
-      : `CASE 
-          WHEN it.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'OUTBOUND' THEN 1
-          WHEN it.warehouse_bin_id IS NOT NULL AND (it.warehouse_sub_id IS NULL OR COALESCE(ws.is_staging::text, '') != 'OUTBOUND') THEN 2
-          WHEN it.warehouse_sub_id IS NOT NULL THEN 3
+      : `CASE
+          WHEN lit.warehouse_sub_id IS NOT NULL AND COALESCE(ws.is_staging::text, '') = 'OUTBOUND' THEN 1
+          WHEN lit.warehouse_bin_id IS NOT NULL AND (lit.warehouse_sub_id IS NULL OR COALESCE(ws.is_staging::text, '') != 'OUTBOUND') THEN 2
+          WHEN lit.warehouse_sub_id IS NOT NULL THEN 3
           ELSE 4
         END`;
 
+    // Mirror getVisibilityDashboard stock source exactly:
+    // - latest READY/PENDING history per (pallet, item, uom, week)
+    // - one inventory_tracking row per pallet (DISTINCT ON)
+    // - inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED')
+    // Booking reservations are applied later in the service (by week), not here —
+    // location-level reserved filters were wrongly dropping whole locations (e.g. PRELOAD).
+    const organizationFilter = organizationId
+      ? 'AND w.organization_id = $3::uuid'
+      : '';
 
-    // Use raw SQL to include reserved quantity calculation
     const query = `
-      SELECT 
-        it.id as inventory_tracking_id,
-        it.pallet_id,
-        p.pallet_code,
-        it.warehouse_id,
-        it.warehouse_sub_id,
-        it.warehouse_bin_id,
-        it.inventory_date,
-        it.inventory_status,
-        it.progression_status,
-        pth.week_number,
-        pth.production_date,
-        pth.item_id,
-        pth.new_quantity as quantity,
-        pth.uom,
-        pth.created_at as pallet_history_created_at,
-        w.name as warehouse_name,
-        w.description as warehouse_description,
-        ws.name as warehouse_sub_name,
-        ws.code as warehouse_sub_code,
-        ws.description as warehouse_sub_description,
-        ws.is_staging as warehouse_sub_staging_type,
-        wb.name as bin_name,
-        wb.code as bin_code,
-        wb.description as bin_description,
-        ROUND((pth.new_quantity::numeric / p.capacity::numeric) * 100, 2) as pallet_utilization,
-        CASE 
-          WHEN it.warehouse_bin_id IS NOT NULL THEN 'BIN_LEVEL'
-          WHEN it.warehouse_sub_id IS NOT NULL THEN 'SUB_LEVEL'
-          ELSE 'WAREHOUSE_LEVEL'
-        END as search_level,
-        CASE 
-          WHEN it.warehouse_bin_id IS NOT NULL THEN 'BIN'
-          WHEN it.warehouse_sub_id IS NOT NULL THEN 'WAREHOUSE_SUB'
-          ELSE 'WAREHOUSE'
-        END as location_type,
-        ${locationPriorityCase} as location_priority,
-        EXTRACT(EPOCH FROM (NOW() - it.inventory_date)) as age_seconds,
-        -- Calculate reserved quantity from pending transaction_picking
-        COALESCE((
-          SELECT SUM(tp.quantity)
-          FROM transaction_picking tp
-          WHERE tp.item_id::text = pth.item_id::text
-            AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
-            AND (
-              (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
-              (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
-            )
-            AND tp.status::text = 'PENDING'
-            AND tp.deleted_at IS NULL
-        ), 0) as reserved_quantity,
-        -- Calculate actual available quantity (total - reserved)
-        pth.new_quantity - COALESCE((
-          SELECT SUM(tp.quantity)
-          FROM transaction_picking tp
-          WHERE tp.item_id::text = pth.item_id::text
-            AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
-            AND (
-              (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
-              (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
-            )
-            AND tp.status::text = 'PENDING'
-            AND tp.deleted_at IS NULL
-        ), 0) as available_quantity
-      FROM transaction_pallet_history pth
-      INNER JOIN inventory_tracking it ON it.pallet_id = pth.pallet_id
-      LEFT JOIN m_pallet p ON p.id = pth.pallet_id
-      LEFT JOIN m_warehouse w ON w.id = it.warehouse_id
-      LEFT JOIN m_warehouse_sub ws ON ws.id = it.warehouse_sub_id
-      LEFT JOIN m_warehouse_bin wb ON wb.id = it.warehouse_bin_id
-      WHERE pth.item_id = $1
-        AND ($2::text IS NULL OR pth.uom::text = $2::text)
-        -- For picking suggestions, only include READY items (not PENDING)
-        -- PENDING items are already allocated to another memo/transaction
-        AND pth.status_inventory = 'READY'
-        AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED', 'INSPECTION_APPROVED', 'PICKED')
-        AND it.progression_status NOT IN ('IN_PROGRESS')
-        AND pth.new_quantity > 0
-        AND p.current_quantity > 0
-        AND (it.warehouse_bin_id IS NOT NULL OR it.warehouse_sub_id IS NOT NULL)
-        AND pth.item_id IS NOT NULL
-        AND it.pallet_id IS NOT NULL
-        AND pth.pallet_id IS NOT NULL
-        AND p.id IS NOT NULL
-        AND pth.created_at = (
-          SELECT MAX(pth2.created_at)
-          FROM transaction_pallet_history pth2
-          WHERE pth2.pallet_id = pth.pallet_id
-            AND pth2.item_id = pth.item_id
-            AND (pth2.week_number = pth.week_number OR (pth2.week_number IS NULL AND pth.week_number IS NULL))
-            -- For picking suggestions, only get latest READY records
-            -- PENDING items are already allocated and should not be suggested
-            AND pth2.status_inventory = 'READY'
+      WITH latest_pallet_items AS (
+        -- Pick the TRUE latest row per (pallet, item, uom, week) among READY/PENDING.
+        -- Do NOT filter new_quantity > 0 here: if the latest row is 0 (e.g. after a
+        -- UOM change or full pick), we must see that 0 and drop it below — not fall back
+        -- to a stale older non-zero row.
+        SELECT DISTINCT ON (
+          pth.pallet_id,
+          pth.item_id,
+          COALESCE(pth.uom, ''),
+          COALESCE(pth.week_number, -2147483648)
         )
-        -- Only show locations with available quantity after reservations
-        -- All locations must have available quantity after reservations (since we only show READY items)
-        AND pth.new_quantity > COALESCE((
-          SELECT SUM(tp.quantity)
-          FROM transaction_picking tp
-          WHERE tp.item_id::text = pth.item_id::text
-            AND tp.source_warehouse_sub_id::text = it.warehouse_sub_id::text
-            AND (
-              (tp.source_bin_id IS NULL AND it.warehouse_bin_id IS NULL) OR
-              (tp.source_bin_id IS NOT NULL AND tp.source_bin_id::text = it.warehouse_bin_id::text)
-            )
-            AND tp.status::text = 'PENDING'
-            AND tp.deleted_at IS NULL
-        ), 0)
-      ORDER BY 
+          pth.id,
+          pth.item_id,
+          pth.pallet_id,
+          pth.uom,
+          pth.new_quantity::numeric AS new_quantity,
+          pth.week_number,
+          pth.production_date,
+          pth.status_inventory,
+          pth.created_at
+        FROM transaction_pallet_history pth
+        WHERE pth.deleted_at IS NULL
+          AND pth.status_inventory IN ('READY', 'PENDING')
+          AND pth.item_id::text = $1::text
+          AND ($2::text IS NULL OR COALESCE(pth.uom, '') = $2::text)
+        ORDER BY
+          pth.pallet_id,
+          pth.item_id,
+          COALESCE(pth.uom, ''),
+          COALESCE(pth.week_number, -2147483648),
+          pth.created_at DESC,
+          pth.id DESC
+      ),
+      latest_inventory_tracking AS (
+        SELECT DISTINCT ON (it.pallet_id)
+          it.id,
+          it.pallet_id,
+          it.warehouse_id,
+          it.warehouse_sub_id,
+          it.warehouse_bin_id,
+          it.inventory_status,
+          it.progression_status,
+          it.inventory_date
+        FROM inventory_tracking it
+        INNER JOIN m_warehouse w ON w.id = it.warehouse_id
+        WHERE it.deleted_at IS NULL
+          AND it.pallet_id IS NOT NULL
+          AND it.inventory_status IN ('IN_INVENTORY', 'INSPECTION_COMPLETED')
+          ${organizationId ? 'AND w.organization_id = $3::uuid' : ''}
+        ORDER BY it.pallet_id, it.created_at DESC, it.id DESC
+      )
+      SELECT
+        lit.id AS inventory_tracking_id,
+        lit.pallet_id,
+        p.pallet_code,
+        lit.warehouse_id,
+        lit.warehouse_sub_id,
+        lit.warehouse_bin_id,
+        lit.inventory_date,
+        lit.inventory_status,
+        lit.progression_status,
+        lpi.week_number,
+        lpi.production_date,
+        lpi.item_id,
+        lpi.new_quantity AS quantity,
+        lpi.uom,
+        lpi.created_at AS pallet_history_created_at,
+        w.name AS warehouse_name,
+        w.description AS warehouse_description,
+        ws.name AS warehouse_sub_name,
+        ws.code AS warehouse_sub_code,
+        ws.description AS warehouse_sub_description,
+        ws.is_staging AS warehouse_sub_staging_type,
+        wb.name AS bin_name,
+        wb.code AS bin_code,
+        wb.description AS bin_description,
+        CASE
+          WHEN p.capacity IS NOT NULL AND p.capacity > 0
+            THEN ROUND((lpi.new_quantity::numeric / p.capacity::numeric) * 100, 2)
+          ELSE NULL
+        END AS pallet_utilization,
+        CASE
+          WHEN lit.warehouse_bin_id IS NOT NULL THEN 'BIN_LEVEL'
+          WHEN lit.warehouse_sub_id IS NOT NULL THEN 'SUB_LEVEL'
+          ELSE 'WAREHOUSE_LEVEL'
+        END AS search_level,
+        CASE
+          WHEN lit.warehouse_bin_id IS NOT NULL THEN 'BIN'
+          WHEN lit.warehouse_sub_id IS NOT NULL THEN 'WAREHOUSE_SUB'
+          ELSE 'WAREHOUSE'
+        END AS location_type,
+        ${locationPriorityCase} AS location_priority,
+        EXTRACT(EPOCH FROM (NOW() - lit.inventory_date)) AS age_seconds,
+        lpi.new_quantity AS location_total_quantity,
+        0::numeric AS reserved_quantity,
+        lpi.new_quantity AS available_quantity,
+        lpi.new_quantity AS location_net_available
+      FROM latest_pallet_items lpi
+      INNER JOIN latest_inventory_tracking lit ON lit.pallet_id = lpi.pallet_id
+      LEFT JOIN m_pallet p ON p.id = lpi.pallet_id
+      LEFT JOIN m_warehouse w ON w.id = lit.warehouse_id
+      LEFT JOIN m_warehouse_sub ws ON ws.id = lit.warehouse_sub_id
+      LEFT JOIN m_warehouse_bin wb ON wb.id = lit.warehouse_bin_id
+      WHERE (lit.warehouse_bin_id IS NOT NULL OR lit.warehouse_sub_id IS NOT NULL)
+        -- Only pickable READY stock whose LATEST line is still positive.
+        AND lpi.status_inventory = 'READY'
+        AND lpi.new_quantity > 0
+        ${organizationFilter}
+      ORDER BY
+        lpi.week_number ${weekNumberSort} NULLS LAST,
+        lpi.production_date ${dateSort} NULLS LAST,
         location_priority ASC,
-        pth.week_number ${weekNumberSort},
-        pth.production_date ${dateSort},
-        it.inventory_date ${dateSort},
-        pth.new_quantity DESC
+        lpi.new_quantity DESC
     `;
 
-    return await this.inventoryTrackingRepository.query(query, [itemId, uom ?? null]);
+    const params = organizationId
+      ? [itemId, uom ?? null, organizationId]
+      : [itemId, uom ?? null];
+    return await this.inventoryTrackingRepository.query(query, params);
   }
 
   async debugInventorySimpleQuery(): Promise<any[]> {
@@ -285,18 +294,110 @@ export class PickingSuggestionRepository {
     return await this.itemRepository.findOne({ where: { id: itemId } });
   }
 
-  async getAlreadyPickedQuantityForMemoItem(memoId: string, itemId: string): Promise<number> {
+  async getAlreadyPickedQuantityForMemoItem(itemId: string, memoId?: string): Promise<number> {
+    const memoFilter = memoId ? `AND tp.memo_id::text = $2` : '';
+    const params: string[] = memoId ? [itemId, memoId] : [itemId];
+
     const query = `
       SELECT COALESCE(SUM(tp.quantity), 0) as total_picked
       FROM transaction_picking tp
-      WHERE tp.memo_id::text = $1
-        AND tp.item_id::text = $2
-        AND tp.status IN ('PENDING')
+      WHERE
+        tp.item_id::text = $1
+        ${memoFilter}
+        AND tp.status IN ('PENDING', 'COMPLETED')
         AND tp.deleted_at IS NULL
     `;
 
-    const result = await this.outboundDoRepository.query(query, [memoId, itemId]);
+    const result = await this.outboundDoRepository.query(query, params);
     return parseInt(result[0]?.total_picked || '0', 10);
+  }
+
+  /**
+   * Pending transaction_picking booked qty with source location (aligned with visibility).
+   * Uses remaining unpicked qty: PENDING quantity minus scanned quantity_picked.
+   * Bookings without week_number are unscoped.
+   */
+  async getPendingBookedByWeek(
+    itemId: string,
+    uom: string | undefined,
+    organizationId: string,
+  ): Promise<{
+    byWeek: Array<{
+      week_number: number;
+      booked_quantity: number;
+      source_warehouse_sub_id?: string | null;
+      source_bin_id?: string | null;
+    }>;
+    unscoped: number;
+  }> {
+    const query = `
+      SELECT
+        tp.week_number,
+        tp.source_warehouse_sub_id,
+        tp.source_bin_id,
+        COALESCE(SUM(
+          GREATEST(
+            0::numeric,
+            COALESCE(tp.quantity::numeric, 0)
+              - COALESCE(scanned.scanned_quantity, 0)
+          )
+        ), 0)::numeric AS booked_quantity
+      FROM transaction_picking tp
+      INNER JOIN outbound_do od ON od.id = tp.do_id
+      LEFT JOIN (
+        SELECT
+          tsp.transaction_picking_id,
+          COALESCE(SUM(tsp.quantity_picked::numeric), 0)::numeric AS scanned_quantity
+        FROM transaction_scan_picking tsp
+        WHERE tsp.deleted_at IS NULL
+        GROUP BY tsp.transaction_picking_id
+      ) scanned ON scanned.transaction_picking_id = tp.id
+      WHERE tp.item_id::text = $1
+        AND tp.status::text = 'PENDING'
+        AND tp.deleted_at IS NULL
+        AND od.organization_id = $3::uuid
+        AND ($2::text IS NULL OR COALESCE(tp.uom, '') = $2::text)
+        AND GREATEST(
+          0::numeric,
+          COALESCE(tp.quantity::numeric, 0) - COALESCE(scanned.scanned_quantity, 0)
+        ) > 0
+      GROUP BY tp.week_number, tp.source_warehouse_sub_id, tp.source_bin_id
+    `;
+
+    const rows = (await this.outboundDoRepository.query(query, [
+      itemId,
+      uom ?? null,
+      organizationId,
+    ])) as Array<{
+      week_number: number | null;
+      booked_quantity: string | number;
+      source_warehouse_sub_id?: string | null;
+      source_bin_id?: string | null;
+    }>;
+
+    const byWeek: Array<{
+      week_number: number;
+      booked_quantity: number;
+      source_warehouse_sub_id?: string | null;
+      source_bin_id?: string | null;
+    }> = [];
+    let unscoped = 0;
+
+    for (const row of rows) {
+      const qty = parseFloat(String(row.booked_quantity ?? 0)) || 0;
+      if (row.week_number == null) {
+        unscoped += qty;
+      } else {
+        byWeek.push({
+          week_number: Number(row.week_number),
+          booked_quantity: qty,
+          source_warehouse_sub_id: row.source_warehouse_sub_id ?? null,
+          source_bin_id: row.source_bin_id ?? null,
+        });
+      }
+    }
+
+    return { byWeek, unscoped };
   }
 }
 

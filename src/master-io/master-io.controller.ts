@@ -1,15 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterIOService } from './master-io.service';
 import { CreateMasterIODto } from './dto/create-master-io.dto';
 import { UpdateMasterIODto } from './dto/update-master-io.dto';
+import { MasterIOFilterQueryDto } from './dto/master-io-filter-query.dto';
 import { MasterIO } from '../core/domain/entities/master-io.entity';
 
 @ApiTags('Master IO')
 @Controller('master-io')
 @ApiBearerAuth('JWT-auth')
 export class MasterIOController {
-  constructor(private readonly masterIOService: MasterIOService) {}
+  constructor(private readonly masterIOService: MasterIOService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new IO' })
@@ -26,15 +27,35 @@ export class MasterIOController {
     return this.masterIOService.create(createMasterIODto);
   }
 
+  @Get('sync')
+  @ApiOperation({ summary: 'Sync IOs from integration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync IOs from integration.',
+  })
+  sync() {
+    return this.masterIOService.sync();
+  }
+
+  @Get('find-oracle')
+  @ApiOperation({ summary: 'Find IOs from integration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync IOs from integration.',
+  })
+  findOracle() {
+    return this.masterIOService.findOracle();
+  }
+
   @Get()
-  @ApiOperation({ summary: 'Get all UOMs' })
+  @ApiOperation({ summary: 'Get all IOs with optional filters' })
   @ApiResponse({
     status: 200,
     description: 'Return all IOs.',
     type: [MasterIO],
   })
-  findAll() {
-    return this.masterIOService.findAll();
+  findAll(@Query() query: MasterIOFilterQueryDto) {
+    return this.masterIOService.findAll(query);
   }
 
   @Get(':id')

@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
 
 export class CreateInventoryTrackingDto {
+  // if inventory-tracking-bad no need pallet_id
   @ApiProperty({ example: 'pallet-uuid', required: false })
   @IsString()
   @IsOptional()

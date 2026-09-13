@@ -8,14 +8,20 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including devDependencies for build)
-RUN npm ci
+# Verify package-lock.json exists and install dependencies
+# Fallback to npm install if npm ci fails (e.g., lockfileVersion compatibility issues)
+RUN if [ ! -f package-lock.json ]; then \
+      echo "Warning: package-lock.json not found, generating it..." && \
+      npm install --package-lock-only; \
+    fi && \
+    (npm ci --prefer-offline --no-audit || (echo "npm ci failed, falling back to npm install..." && npm install --no-audit))
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application (nest-cli.json copies email template assets into dist)
+RUN npm run build && \
+    test -f dist/email/template-email/layouts/email-base.layout.html
 
 # Stage 2: Production stage
 FROM node:20-alpine AS production
@@ -33,8 +39,13 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production && \
+# Verify package-lock.json exists and install only production dependencies
+# Fallback to npm install if npm ci fails
+RUN if [ ! -f package-lock.json ]; then \
+      echo "Warning: package-lock.json not found, generating it..." && \
+      npm install --package-lock-only --only=production; \
+    fi && \
+    (npm ci --only=production --prefer-offline --no-audit || (echo "npm ci failed, falling back to npm install..." && npm install --only=production --no-audit)) && \
     npm cache clean --force
 
 # Copy built application from builder stage
@@ -47,12 +58,12 @@ RUN mkdir -p /app/logs && \
 # Switch to non-root user
 USER nestjs
 
-# Expose port
+# Expose port (default 3000, but can be overridden via PORT env var)
 EXPOSE 3000
 
-# Health check
+# Health check - uses PORT env var or defaults to 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD sh -c "node -e \"const port = process.env.PORT || '3000'; require('http').get('http://localhost:' + port + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))\""
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

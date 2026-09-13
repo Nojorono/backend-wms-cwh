@@ -17,6 +17,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InboundStatus } from '../../core/domain/entities/inbound.entity';
+import { InspectionStatus } from 'src/core/domain/entities/inbound-item.entity';
 
 export class CreateInboundItemDto {
   @ApiPropertyOptional({ example: 'uuid-inbound-123' })
@@ -51,6 +52,17 @@ export class CreateInboundItemDto {
   @MinLength(1, { message: 'uom must be at least 1 character' })
   @MaxLength(10, { message: 'uom must not exceed 10 characters' })
   uom?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber({}, { message: 'line_number must be a number' })
+  @IsPositive({ message: 'line_number must be a positive number' })
+  line_number?: number;
+
+  @ApiPropertyOptional({ example: 'EDITED' })
+  @IsOptional()
+  @IsEnum(InspectionStatus, { message: 'inspection_status must be a valid InspectionStatus' })
+  inspection_status?: InspectionStatus;
 }
 
 export class CreateInboundDoDto {
@@ -58,6 +70,31 @@ export class CreateInboundDoDto {
   @IsOptional()
   @IsUUID(4, { message: 'inbound_id must be a valid UUID' })
   inbound_id?: string;
+
+  @ApiPropertyOptional({ example: 'Principal 1' })
+  @IsOptional()
+  @IsString({ message: 'principal must be a string' })
+  @MinLength(1, { message: 'principal must be at least 1 character' })
+  @MaxLength(100, { message: 'principal must not exceed 100 characters' })
+  principal?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber({}, { message: 'vendor_id must be a number' })
+  @IsPositive({ message: 'vendor_id must be a positive number' })
+  vendor_id?: number;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber({}, { message: 'vendor_site_id must be a number' })
+  @IsPositive({ message: 'vendor_site_id must be a positive number' })
+  vendor_site_id?: number;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsNumber({}, { message: 'total_line_items must be a number' })
+  @IsPositive({ message: 'total_line_items must be a positive number' })
+  total_line_items?: number;
 
   @ApiPropertyOptional({ example: false })
   @IsNotEmpty({ message: 'validation_surat_jalan is required' })
@@ -99,20 +136,34 @@ export class CreateInboundDoDto {
   flag_validated?: boolean;
 
   @ApiPropertyOptional({
-    type: () => [CreateInboundItemDto],
-    example: [
-      { item_id: 'uuid-item-1', quantity: 10, uom: 'PCS' },
-      { item_id: 'uuid-item-2', quantity: 5, uom: 'BOX' },
-    ],
+    type: () => CreateInboundItemDto,
+    isArray: true,
   })
   @IsOptional()
   @IsArray({ message: 'inbound_items must be an array' })
   @ValidateNested({ each: true })
   @Type(() => CreateInboundItemDto)
   inbound_items?: CreateInboundItemDto[];
+
+  @ApiPropertyOptional({ example: 'ADD-001' })
+  @IsOptional()
+  @IsString({ message: 'add_to_receipt_number must be a string' })
+  @MinLength(1, { message: 'add_to_receipt_number must be at least 1 character' })
+  @MaxLength(50, { message: 'add_to_receipt_number must not exceed 50 characters' })
+  add_to_receipt_number?: string;
 }
 
 export class CreateInboundDto {
+  @ApiPropertyOptional({ example: 'uuid-organization-123' })
+  @IsOptional()
+  @IsUUID(4, { message: 'organization_id must be a valid UUID' })
+  organization_id?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-inventory-movement-123' })
+  @IsOptional()
+  @IsString({ message: 'inbound_id_reference must be a string' })
+  inbound_id_reference?: string;
+
   @ApiPropertyOptional({ example: 'Carrier A' })
   @IsOptional()
   @IsString({ message: 'expedition must be a string' })
@@ -168,22 +219,8 @@ export class CreateInboundDto {
   arrival_date?: string;
 
   @ApiPropertyOptional({
-    type: () => [CreateInboundDoDto],
-    example: [
-      {
-        inbound_do_number: 'DO-001',
-        inbound_do_date: '2025-09-01T10:00:00.000Z',
-        attachment: 's3://bucket/path/to/attachment.pdf',
-        inbound_po_number: 'PO-123',
-        inbound_po_date: '2025-08-31T00:00:00.000Z',
-        flag_validated: false,
-        validation_surat_jalan: false,
-        inbound_items: [
-          { item_id: 'uuid-item-1', quantity: 10, uom: 'DUS' },
-          { item_id: 'uuid-item-2', quantity: 5, uom: 'DUS' },
-        ],
-      },
-    ],
+    type: () => CreateInboundDoDto,
+    isArray: true,
   })
   @IsOptional()
   @IsArray({ message: 'inbound_dos must be an array' })

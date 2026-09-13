@@ -1,8 +1,9 @@
 import { Entity, Column, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { MasterIO } from './master-io.entity';
-import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { User } from './user.entity';
+import { MasterWarehouseSub } from './master-warehouse-sub.entity';
+import { MasterDepartement } from './matser-departement.entity';
 
 @Entity('user_details')
 @Index(['userId'], { unique: true })
@@ -14,6 +15,13 @@ export class UserDetail extends BaseEntity {
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
   user: User;
 
+  @ManyToOne(() => MasterDepartement, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'departement_id' })
+  departement: MasterDepartement;
+
+  @Column({ name: 'departement_id', nullable: true })
+  departementId: string;
+
   @Column({ nullable: true })
   employee_id: string;
 
@@ -23,6 +31,12 @@ export class UserDetail extends BaseEntity {
   @Column({ nullable: true })
   phone: string;
 
+  @Column({ nullable: true })
+  firstName: string;
+
+  @Column({ nullable: true })
+  lastName: string;
+
   @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'organization_id' })
   organization: MasterIO;
@@ -30,8 +44,8 @@ export class UserDetail extends BaseEntity {
   @Column({ name: 'organization_id', nullable: true })
   organizationId: string;
 
-  @Column({ name: 'warehouse_sub_id', nullable: true })
-  warehouseSubId: string;
+  @Column({ nullable: true })
+  warehouse_sub_id: string;
 
   @ManyToOne(() => MasterWarehouseSub, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'warehouse_sub_id' })

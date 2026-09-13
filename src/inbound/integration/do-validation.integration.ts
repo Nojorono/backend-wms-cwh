@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { DoValidationDto, DoValidationQueryDto } from '../dto/do-validation.dto';
-import { firstValueFrom, timeout, catchError, of } from 'rxjs';
+import { firstValueFrom, timeout, catchError } from 'rxjs';
+import { ensureRmqConnection } from 'src/core/helpers/rmq-connection.helper';
 
 export interface DoValidationResponseDto {
   data: DoValidationDto[];
@@ -21,7 +22,7 @@ export class DoValidationIntegrationService implements OnModuleInit {
   private readonly MAX_CONNECTION_ATTEMPTS = 5;
   private readonly CONNECTION_RETRY_DELAY = 2000; // 2 seconds
 
-  constructor(@Inject('DO_VALIDATION_SERVICE') private readonly doValidationClient: ClientProxy) {}
+  constructor(@Inject('DO_VALIDATION_SERVICE') private readonly doValidationClient: ClientProxy) { }
 
   async onModuleInit() {
     this.logger.log('Initializing connection to RabbitMQ do validation service...');
@@ -30,39 +31,24 @@ export class DoValidationIntegrationService implements OnModuleInit {
   }
 
   private async ensureConnection(): Promise<void> {
-    if (this.connectionEstablished) {
-      return;
-    }
+    const state = {
+      connectionEstablished: this.connectionEstablished,
+      connectionAttempts: this.connectionAttempts,
+    };
 
-    this.connectionAttempts++;
+    await ensureRmqConnection(
+      this.doValidationClient,
+      this.logger,
+      state,
+      {
+        maxAttempts: this.MAX_CONNECTION_ATTEMPTS,
+        baseRetryDelayMs: this.CONNECTION_RETRY_DELAY,
+        serviceName: 'do_validation',
+      },
+    );
 
-    try {
-      this.logger.log(
-        `Connection attempt ${this.connectionAttempts}/${this.MAX_CONNECTION_ATTEMPTS} to RabbitMQ do validation service...`,
-      );
-
-      await this.doValidationClient.connect();
-
-      this.logger.log('RabbitMQ connection established successfully');
-      this.connectionEstablished = true;
-    } catch (error) {
-      this.logger.error(
-        `Failed to establish connection to RabbitMQ: ${error?.message || 'Unknown error'}`,
-      );
-
-      if (this.connectionAttempts < this.MAX_CONNECTION_ATTEMPTS) {
-        const delay = this.CONNECTION_RETRY_DELAY * Math.pow(1.5, this.connectionAttempts - 1);
-        this.logger.log(`Retrying connection in ${delay}ms...`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        return this.ensureConnection();
-      } else {
-        this.logger.error(
-          `Maximum connection attempts (${this.MAX_CONNECTION_ATTEMPTS}) reached. Service will work in fallback mode.`,
-        );
-        this.connectionAttempts = 0;
-        // Don't throw error, allow service to work in fallback mode
-      }
-    }
+    this.connectionEstablished = state.connectionEstablished;
+    this.connectionAttempts = state.connectionAttempts;
   }
 
   async getItemLists(params?: DoValidationQueryDto): Promise<DoValidationResponseDto> {
@@ -127,6 +113,25 @@ export class DoValidationIntegrationService implements OnModuleInit {
     }
   }
 
+  async getDoValidation(
+    suratJalan: string,
+    type: string,
+  ): Promise<{ data_so: DoValidationDto[]; data_po: DoValidationDto[] }> {
+    if (type === 'SO') {
+      const response = await this.getDoValidationBySuratJalanSO(suratJalan);
+      return {
+        data_so: response.data || [],
+        data_po: [],
+      };
+    }
+
+    const response = await this.getDoValidationBySuratJalan(suratJalan);
+    return {
+      data_so: [],
+      data_po: response.data || [],
+    };
+  }
+
   async getDoValidationBySuratJalan(suratJalan: string): Promise<DoValidationResponseDto> {
     try {
       this.logger.log(
@@ -139,6 +144,49 @@ export class DoValidationIntegrationService implements OnModuleInit {
       const doValidationResponse = await firstValueFrom(
         this.doValidationClient
           .send<DoValidationResponseDto>('do_validation_find_by_no_surat_jalan', {
+            noSuratJalan: suratJalan,
+          })
+          .pipe(
+            timeout(timeoutMs),
+            catchError((error) => {
+              this.logger.error(`RabbitMQ request failed: ${error.message || 'Unknown error'}`);
+              this.connectionEstablished = false;
+              throw error; // Let the catch block handle fallback
+            }),
+          ),
+      );
+
+      return (
+        doValidationResponse || {
+          data: [],
+          count: 0,
+          status: false,
+          message: 'Failed to retrieve data from do validation integration service (null response)',
+        }
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error getting do validation integration by surat jalan ${suratJalan} via RabbitMQ, falling back to local integration service:`,
+        error,
+      );
+      this.connectionEstablished = false;
+      throw error;
+    }
+  }
+
+
+  async getDoValidationBySuratJalanSO(suratJalan: string): Promise<any> {
+    try {
+      this.logger.log(
+        `Sending request to get do validation integration by surat jalan: ${suratJalan}`,
+      );
+
+      const timeoutMs = 20000;
+      this.logger.log(`Using timeout of ${timeoutMs}ms for RabbitMQ request`);
+
+      const doValidationResponse = await firstValueFrom(
+        this.doValidationClient
+          .send<any>('do_validation_find_by_surat_jalan_so', {
             noSuratJalan: suratJalan,
           })
           .pipe(

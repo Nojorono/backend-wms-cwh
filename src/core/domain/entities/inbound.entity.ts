@@ -1,20 +1,33 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, JoinColumn, ManyToOne } from 'typeorm';
 import { InboundDo } from './inbound-do.entity';
 import { BaseEntity } from './base.entity';
 import { AssignedHelper } from './assigned-helper.entity';
 import { TransactionScanInbound } from './transaction-scan-inbound.entity';
+import { MasterIO } from './master-io.entity';
 
 export enum InboundStatus {
   CREATED = 'CREATED',
   UNLOADING = 'UNLOADING',
   INSPECTION = 'INSPECTION',
   READY_INTEGRATION = 'READY_INTEGRATION',
+  PROCESSING = 'PROCESSING',
   INTEGRATED = 'INTEGRATED',
   FAILED = 'FAILED',
+  TIMEOUT = 'TIMEOUT',
+  CANCELLED = 'CANCELLED',
 }
 
 @Entity('inbound')
 export class Inbound extends BaseEntity {
+  @Column({ nullable: true })
+  organization_id: string;
+
+  @ManyToOne(() => MasterIO, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'organization_id' })
+  organization: MasterIO;
+
+  @Column({ nullable: true })
+  inbound_id_reference: string;
 
   @Column({ nullable: true })
   photo_license_plate: string;

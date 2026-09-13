@@ -16,6 +16,7 @@ import { QuantityOperationType } from 'src/core/domain/entities/transaction-pall
 import { InventoryTrackingService } from 'src/inventory-tracking/inventory-tracking.service';
 import { NotificationService } from 'src/notification/notification.service';
 import { UpdateResult } from 'typeorm';
+import { ProgressionStatus } from 'src/core/domain/entities/inventory-tracking.entity';
 
 @Injectable()
 export class TransactionScanInboundService {
@@ -26,7 +27,7 @@ export class TransactionScanInboundService {
     private readonly warehouseSubService: MasterWarehouseSubService,
     private readonly inventoryTrackingService: InventoryTrackingService,
     private readonly notificationService: NotificationService,
-  ) {}
+  ) { }
 
   async create(data: CreateTransactionScanInboundDto): Promise<TransactionScanInbound> {
     const item = await this.itemService.findOne(data.item_id);
@@ -105,11 +106,6 @@ export class TransactionScanInboundService {
   ): Promise<TransactionScanInbound> {
     const existing = await this.findOne(id);
     if (!existing) throw new NotFoundException('Transaction scan inbound not found');
-    const updated = await this.repository.update(id, {
-      ...existing,
-      status: status,
-      inspection_by: inspection_by,
-    });
     // if status is COMPLETED, create or update inventory tracking
     if (status === ScanInboundStatus.COMPLETED) {
       const warehouseSub = await this.warehouseSubService.findOne(existing.m_warehouse_sub_id);
@@ -121,6 +117,7 @@ export class TransactionScanInboundService {
         existing.m_warehouse_sub_id,
         warehouseSub.warehouse_id,
         'INSPECTION_COMPLETED',
+        ProgressionStatus.NOT_STARTED,
         existing.inbound_id,
       );
 
@@ -143,6 +140,13 @@ export class TransactionScanInboundService {
         rooms,
       });
     }
+
+    const updated = await this.repository.update(id, {
+      ...existing,
+      status: status,
+      inspection_by: inspection_by,
+    });
+
     return updated;
   }
 
@@ -388,6 +392,7 @@ export class TransactionScanInboundService {
           existing.m_warehouse_sub_id,
           warehouseSub.warehouse_id,
           'INSPECTION_COMPLETED',
+          ProgressionStatus.IN_PROGRESS,
           existing.inbound_id,
         );
       }

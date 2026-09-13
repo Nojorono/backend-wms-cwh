@@ -1,15 +1,26 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterSupplierService } from './master-supplier.service';
 import { CreateMasterSupplierDto } from './dto/create-master-supplier.dto';
 import { UpdateMasterSupplierDto } from './dto/update-master-supplier.dto';
+import { SupplierQueryDto } from './dto/supplier-query.dto';
+import { PoLineQueryDto } from './dto/po-line-query.dto';
+import { TruckUtilQueryDto } from './dto/truck-util-query.dto';
 import { MasterSupplier } from '../core/domain/entities/master-supplier.entity';
+import { SupplierIntegrationService } from './integration/supplier-integration.service';
+import { PoLineIntegrationService } from './integration/po-line-integration.service';
+import { TruckUtilIntegrationService } from './integration/truck-util-integration.service';
 
 @ApiTags('Master Supplier')
 @Controller('master-supplier')
 @ApiBearerAuth('JWT-auth')
 export class MasterSupplierController {
-  constructor(private readonly masterSupplierService: MasterSupplierService) {}
+  constructor(
+    private readonly masterSupplierService: MasterSupplierService,
+    private readonly supplierIntegrationService: SupplierIntegrationService,
+    private readonly poLineIntegrationService: PoLineIntegrationService,
+    private readonly truckUtilIntegrationService: TruckUtilIntegrationService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new Supplier' })
@@ -35,6 +46,37 @@ export class MasterSupplierController {
   })
   findAll() {
     return this.masterSupplierService.findAll();
+  }
+
+  @Get('attribute7')
+  @ApiOperation({ summary: 'Get Suppliers by attribute7 value (FREIGHT/FRG) with pagination and search' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return all Suppliers with pagination and search filtered by attribute7.',
+  })
+  @ApiResponse({ status: 404, description: 'Supplier not found.' })
+  findAllByAttribute7(@Query() query: SupplierQueryDto) {
+    return this.supplierIntegrationService.getAllSuppliersByAttribute7(query);
+  }
+
+  @Get('po-lines')
+  @ApiOperation({ summary: 'Get PO lines from Oracle microservice via RabbitMQ' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return PO lines filtered by vendor and optional criteria.',
+  })
+  findAllPoLines(@Query() query: PoLineQueryDto) {
+    return this.poLineIntegrationService.findAllPoLines(query);
+  }
+
+  @Get('truck-util')
+  @ApiOperation({ summary: 'Get truck utilitas list from Oracle microservice via RabbitMQ' })
+  @ApiResponse({
+    status: 200,
+    description: 'Return truck utilitas records with optional search and pagination.',
+  })
+  findAllTruckUtil(@Query() query: TruckUtilQueryDto) {
+    return this.truckUtilIntegrationService.findAllTruckUtils(query);
   }
 
   @Get(':id')

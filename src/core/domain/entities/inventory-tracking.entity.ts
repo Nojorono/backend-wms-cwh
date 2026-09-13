@@ -1,10 +1,10 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { MasterWarehouse } from './master-warehouse.entity';
 import { MasterPallet } from './master-pallet.entity';
 import { MasterWarehouseSub } from './master-warehouse-sub.entity';
 import { MasterWarehouseBin } from './master-warehouse-bin.entity';
-
+import { InventoryTrackingBad } from './inventory-tracking-bad.entity'; 
 export enum ProgressionStatus {
   NOT_STARTED = 'NOT_STARTED',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -52,4 +52,7 @@ export class InventoryTracking extends BaseEntity {
 
   @Column({ nullable: true })
   inventory_note: string;
+
+  @OneToMany(() => InventoryTrackingBad, (trackingBad) => trackingBad.inventoryTracking)
+  inventoryTrackingBad: InventoryTrackingBad[];
 }
