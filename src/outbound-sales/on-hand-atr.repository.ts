@@ -75,6 +75,7 @@ export class OnHandAtrRepository {
         date: string,
         organizationCode?: string,
         subinventoryCodes?: string[],
+        status?: string,
     ): Promise<OnHandAtr[]> {
         const normalizedDate = date.trim().split('T')[0];
         const qb = this.repo
@@ -97,6 +98,10 @@ export class OnHandAtrRepository {
             qb.andWhere('onHandAtr.subinventory_code IN (:...subinventoryCodes)', {
                 subinventoryCodes,
             });
+        }
+
+        if (status?.trim()) {
+            qb.andWhere('onHandAtr.status = :status', { status });
         }
 
         return await qb.orderBy('onHandAtr.created_at', 'DESC').getMany();

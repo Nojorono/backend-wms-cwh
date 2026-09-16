@@ -61,6 +61,13 @@ export interface DoSuggestionItemCallplanSumRow {
   total_qty_submitted: number;
 }
 
+export interface DoSuggestionFinalSubmittedSumRow {
+  organization_id: string;
+  item_code: string;
+  total_qty_final: number;
+  total_qty_submitted: number;
+}
+
 export interface DoSuggestionPendingSubmissionFilters {
   callplanDateStart?: Date;
 }
@@ -391,6 +398,54 @@ export class DoSuggestionRepository {
     return rows.map((row) => ({
       organization_id: row.organization_id,
       item_code: row.item_code,
+      total_qty_submitted: Number(row.total_qty_submitted) || 0,
+    }));
+  }
+
+  async sumFinalAndSubmittedByOrganizationAndDate(
+    organizationId: string,
+    date: string,
+    statuses: DoSuggestionStatus[],
+  ): Promise<DoSuggestionFinalSubmittedSumRow[]> {
+    const updatedDate = new Date(date.trim().split('T')[0]);
+    const qb = this.headerRepository
+      .createQueryBuilder('ds')
+      .innerJoin('ds.details', 'details', 'details.deleted_at IS NULL')
+      .select('ds.organization_id', 'organization_id')
+      .addSelect('details.item_code', 'item_code')
+      .addSelect(
+        'COALESCE(SUM(COALESCE(details.item_qty_final, 0)), 0)',
+        'total_qty_final',
+      )
+      .addSelect(
+        'COALESCE(SUM(COALESCE(details.item_qty_submitted, 0)), 0)',
+        'total_qty_submitted',
+      )
+      .where('ds.organization_id = :organizationId', { organizationId })
+      .andWhere('ds.deleted_at IS NULL')
+      .andWhere('ds.updated_at = :updatedDate', { updatedDate })
+      .andWhere('details.item_code IS NOT NULL')
+      .andWhere("TRIM(details.item_code) <> ''")
+      .groupBy('ds.organization_id')
+      .addGroupBy('details.item_code');
+
+    if (statuses.length) {
+      qb.andWhere('ds.status IN (:...statuses)', { statuses });
+    }
+
+    const rows = await qb
+      .orderBy('details.item_code', 'ASC')
+      .getRawMany<{
+        organization_id: string;
+        item_code: string;
+        total_qty_final: string;
+        total_qty_submitted: string;
+      }>();
+
+    return rows.map((row) => ({
+      organization_id: row.organization_id,
+      item_code: row.item_code,
+      total_qty_final: Number(row.total_qty_final) || 0,
       total_qty_submitted: Number(row.total_qty_submitted) || 0,
     }));
   }

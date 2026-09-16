@@ -7,7 +7,6 @@ import {
 } from '@nestjs/swagger';
 import { OutboundSalesService } from './outbound-sales.service';
 import {
-  InvOnHandQtyWithAtrDto,
   InvOnHandQtyWithAtrItemDto,
   InvOnHandQtyWithAtrParamsDto,
   onHandAtrDateNowExample,
@@ -21,6 +20,10 @@ import {
   LocatorSalesResponseDto,
 } from './dto/locator-sales.dto';
 import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-organization.dto';
+import {
+  LhsReportQueryDto,
+  LHSReportResponseDto,
+} from './dto/lhs-report.dto';
 
 @ApiTags('Outbound Sales')
 @ApiBearerAuth('JWT-auth')
@@ -93,5 +96,23 @@ export class OutboundSalesController {
     @Param('organizationId') organizationId: string,
   ): Promise<DistinctLocatorByOrganizationDto[]> {
     return this.service.getDistinctLocatorsByOrganizationId(organizationId);
+  }
+
+  @Get('report/lhs')
+  @ApiOperation({
+    summary: 'Get LHS report',
+    description:
+      'Per-item LHS for JWT organization and date H. ' +
+      'stock_awal = on_hand_atr qty on H-1; stock_meta = on_hand_atr qty on H; ' +
+      'outgoing = max(qty_final - qty_submitted, 0); ' +
+      'incoming = abs(qty_final - qty_submitted) when negative + BTB qty on H. ' +
+      `Example: GET /outbound-sales/report/lhs?date=${onHandAtrDateNowExample()}`,
+  })
+  @ApiResponse({ status: 200, description: 'OK', type: LHSReportResponseDto })
+  getLHSReport(
+    @Query() query: LhsReportQueryDto,
+    @OrganizationId() organizationId: string | number | null,
+  ): Promise<LHSReportResponseDto> {
+    return this.service.getLHSReport(organizationId, query.date);
   }
 }

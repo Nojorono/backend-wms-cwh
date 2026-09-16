@@ -81,4 +81,9 @@ export class CreateOnHandAtrDto {
   @IsOptional()
   @IsString()
   updated_by?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

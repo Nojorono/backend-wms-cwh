@@ -148,6 +148,37 @@ export class BtbRepository {
     return { data, total };
   }
 
+  async sumQtyByOrganizationAndDate(
+    organizationId: string,
+    date: string,
+  ): Promise<Array<{ item_code: string; total_btb_qty: number; item_name?: string }>> {
+    const normalizedDate = date.trim().split('T')[0];
+    const rows = await this.btbRepo
+      .createQueryBuilder('btb')
+      .innerJoin('btb.details', 'details', 'details.deletedAt IS NULL')
+      .select('details.item_code', 'item_code')
+      .addSelect('MAX(details.item_name)', 'item_name')
+      .addSelect('COALESCE(SUM(COALESCE(details.btb_qty, 0)), 0)', 'total_btb_qty')
+      .where('btb.deletedAt IS NULL')
+      .andWhere('btb.organization_id = :organizationId', { organizationId })
+      .andWhere('btb.btb_date = :btbDate', { btbDate: normalizedDate })
+      .andWhere('details.item_code IS NOT NULL')
+      .andWhere("TRIM(details.item_code) <> ''")
+      .groupBy('details.item_code')
+      .orderBy('details.item_code', 'ASC')
+      .getRawMany<{
+        item_code: string;
+        item_name: string | null;
+        total_btb_qty: string;
+      }>();
+
+    return rows.map((row) => ({
+      item_code: row.item_code,
+      item_name: row.item_name ?? undefined,
+      total_btb_qty: Number(row.total_btb_qty) || 0,
+    }));
+  }
+
   async findById(id: string, repo?: Repository<Btb>): Promise<Btb | null> {
     const headerRepo = repo ?? this.btbRepo;
     return await headerRepo.findOne({
