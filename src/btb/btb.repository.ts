@@ -75,6 +75,7 @@ export class BtbRepository {
       .andWhere('btb.organization_id = :organizationId', { organizationId })
       .andWhere('btb.createdAt >= :startOfDay', { startOfDay })
       .andWhere('btb.createdAt <= :endOfDay', { endOfDay })
+      .andWhere('btb.type = :type', { type: 'GS' })
       .orderBy('btb.createdAt', 'DESC')
       .getMany();
   }
