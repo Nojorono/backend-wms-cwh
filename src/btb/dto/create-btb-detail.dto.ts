@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -9,6 +10,9 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
+
+export const BTB_DETAIL_TYPE_VALUES = ['GS', 'BS'] as const;
+export type BtbDetailType = (typeof BTB_DETAIL_TYPE_VALUES)[number];
 
 export class CreateBtbDetailDto {
   @ApiPropertyOptional({ description: 'Detail row ID — include to update an existing line' })
@@ -33,6 +37,41 @@ export class CreateBtbDetailDto {
   @IsString()
   @MaxLength(255)
   item_name?: string;
+
+  @ApiPropertyOptional({ example: 'RK.ABC.122025' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  item_number?: string;
+
+  @ApiPropertyOptional({
+    example: 'GS',
+    enum: BTB_DETAIL_TYPE_VALUES,
+    default: 'GS',
+    description: 'Item type: GS or BS (default GS)',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(BTB_DETAIL_TYPE_VALUES, { message: 'type must be GS or BS' })
+  type?: BtbDetailType;
+
+  @ApiPropertyOptional({ example: 2025 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  year?: number;
+
+  @ApiPropertyOptional({ example: 18000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  bandrol_price?: number;
+
+  @ApiPropertyOptional({ example: 16400 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  bs_price?: number;
 
   @ApiProperty({ example: 10 })
   @Type(() => Number)

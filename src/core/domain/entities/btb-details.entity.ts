@@ -23,6 +23,21 @@ export class BtbDetails extends BaseEntity {
   @Column({ name: 'item_name', type: 'varchar', length: 255, nullable: true })
   item_name: string;
 
+  @Column({ name: 'item_number', type: 'varchar', length: 100, nullable: true })
+  item_number: string;
+
+  @Column({ name: 'type', type: 'varchar', length: 50, nullable: true, default: 'GS' })
+  type: string;
+
+  @Column({ name: 'year', type: 'int', nullable: true })
+  year: number;
+
+  @Column({ name: 'bandrol_price', type: 'int', nullable: true })
+  bandrol_price: number;
+
+  @Column({ name: 'bs_price', type: 'int', nullable: true })
+  bs_price: number;
+
   @Column({ name: 'btb_qty', type: 'int', nullable: true })
   btb_qty: number;
 
