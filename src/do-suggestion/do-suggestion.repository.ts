@@ -407,7 +407,7 @@ export class DoSuggestionRepository {
     date: string,
     statuses: DoSuggestionStatus[],
   ): Promise<DoSuggestionFinalSubmittedSumRow[]> {
-    const updatedDate = new Date(date.trim().split('T')[0]);
+    const callplanDateStart = date.trim().split('T')[0];
     const qb = this.headerRepository
       .createQueryBuilder('ds')
       .innerJoin('ds.details', 'details', 'details.deleted_at IS NULL')
@@ -423,7 +423,7 @@ export class DoSuggestionRepository {
       )
       .where('ds.organization_id = :organizationId', { organizationId })
       .andWhere('ds.deleted_at IS NULL')
-      .andWhere('ds.updated_at = :updatedDate', { updatedDate })
+      .andWhere('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
       .andWhere('details.item_code IS NOT NULL')
       .andWhere("TRIM(details.item_code) <> ''")
       .groupBy('ds.organization_id')
