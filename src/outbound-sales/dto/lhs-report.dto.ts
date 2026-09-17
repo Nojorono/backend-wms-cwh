@@ -58,6 +58,9 @@ export class LHSReportResponseDto {
   @ApiProperty({ example: 'uuid-organization-id' })
   organization_id: string;
 
+  @ApiProperty({ example: 'Organization Name' })
+  organization_name: string;
+
   @ApiProperty({ example: '2026-06-19' })
   date: string;
 

@@ -26,7 +26,7 @@ import { MasterIORepository } from '../master-io/master-io.repository';
 
 const LHS_DO_STATUSES: DoSuggestionStatus[] = [
   DoSuggestionStatus.FINAL,
-  DoSuggestionStatus.REVISED,
+  // need status completed
   DoSuggestionStatus.VOID,
   DoSuggestionStatus.VOID_NEED_ACTION,
 ];
@@ -257,18 +257,31 @@ export class OutboundSalesService {
       'LHS',
     );
 
-
     const reportDate = this.resolveSavedDate(date);
-    const previousDate = this.shiftDateByDays(reportDate, -1);
+    const dates =
+      await this.onHandAtrRepository.findByOrganizationIdDistinctCreatedAtDate(
+        resolvedOrganizationId,
+        2,
+      );
+    console.log('dates', dates);
+    const previousDate =
+      dates.find((entry) => entry.date < reportDate)?.date ??
+      this.shiftDateByDays(reportDate, -1);
 
     const [onHandToday, onHandPrevious, doRows, btbRows] = await Promise.all([
       this.onHandAtrRepository.findByOrganizationIdAndDate(
         resolvedOrganizationId,
         reportDate,
+        findOrganizationData.organization_name,
+        ['KECIL'],
+        'LHS',
       ),
       this.onHandAtrRepository.findByOrganizationIdAndDate(
         resolvedOrganizationId,
         previousDate,
+        findOrganizationData.organization_name,
+        ['KECIL'],
+        'LHS',
       ),
       this.doSuggestionRepository.sumFinalAndSubmittedByOrganizationAndDate(
         resolvedOrganizationId,
@@ -342,6 +355,7 @@ export class OutboundSalesService {
 
     return {
       organization_id: resolvedOrganizationId,
+      organization_name: findOrganizationData.organization_name,
       date: reportDate,
       previous_date: previousDate,
       items,

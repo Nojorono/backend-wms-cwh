@@ -73,9 +73,12 @@ export class BtbRepository {
       .leftJoinAndSelect('btb.organization', 'organization')
       .where('btb.deletedAt IS NULL')
       .andWhere('btb.organization_id = :organizationId', { organizationId })
+      .andWhere('btb.status = :status', { status: 'APPLIED' })
       .andWhere('btb.createdAt >= :startOfDay', { startOfDay })
       .andWhere('btb.createdAt <= :endOfDay', { endOfDay })
-      .andWhere('btb.type = :type', { type: 'GS' })
+      .andWhere('(details.id IS NULL OR details.type IS NULL OR details.type = :type)', {
+        type: 'GS',
+      })
       .orderBy('btb.createdAt', 'DESC')
       .getMany();
   }
@@ -151,33 +154,52 @@ export class BtbRepository {
 
   async sumQtyByOrganizationAndDate(
     organizationId: string,
-    date: string,
+    _date?: string,
   ): Promise<Array<{ item_code: string; total_btb_qty: number; item_name?: string }>> {
-    const normalizedDate = date.trim().split('T')[0];
-    const rows = await this.btbRepo
-      .createQueryBuilder('btb')
-      .innerJoin('btb.details', 'details', 'details.deletedAt IS NULL')
-      .select('details.item_code', 'item_code')
-      .addSelect('MAX(details.item_name)', 'item_name')
-      .addSelect('COALESCE(SUM(COALESCE(details.btb_qty, 0)), 0)', 'total_btb_qty')
-      .where('btb.deletedAt IS NULL')
-      .andWhere('btb.organization_id = :organizationId', { organizationId })
-      .andWhere('btb.btb_date = :btbDate', { btbDate: normalizedDate })
-      .andWhere('details.item_code IS NOT NULL')
-      .andWhere("TRIM(details.item_code) <> ''")
-      .groupBy('details.item_code')
-      .orderBy('details.item_code', 'ASC')
-      .getRawMany<{
-        item_code: string;
-        item_name: string | null;
-        total_btb_qty: string;
-      }>();
+    // Use latest APPLIED BTB insert day (same source as getAllLastDateInsert).
+    const btbs = await this.getAllLastDateInsert(organizationId);
+    const byItem = new Map<string, { total_btb_qty: number; item_name?: string }>();
 
-    return rows.map((row) => ({
-      item_code: row.item_code,
-      item_name: row.item_name ?? undefined,
-      total_btb_qty: Number(row.total_btb_qty) || 0,
-    }));
+    for (const btb of btbs) {
+      for (const detail of btb.details ?? []) {
+        if (detail.deletedAt) {
+          continue;
+        }
+
+        const itemCode = detail.item_code?.trim();
+        if (!itemCode) {
+          continue;
+        }
+
+        // Detail type defaults to GS; only GS lines count for LHS incoming.
+        const detailType = (detail.type?.trim() || 'GS').toUpperCase();
+        if (detailType !== 'GS') {
+          continue;
+        }
+
+        const qty = Number(detail.btb_qty) || 0;
+        const existing = byItem.get(itemCode);
+        if (existing) {
+          existing.total_btb_qty += qty;
+          if (!existing.item_name && detail.item_name) {
+            existing.item_name = detail.item_name;
+          }
+        } else {
+          byItem.set(itemCode, {
+            total_btb_qty: qty,
+            item_name: detail.item_name ?? undefined,
+          });
+        }
+      }
+    }
+
+    return [...byItem.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([item_code, value]) => ({
+        item_code,
+        item_name: value.item_name,
+        total_btb_qty: value.total_btb_qty,
+      }));
   }
 
   async findById(id: string, repo?: Repository<Btb>): Promise<Btb | null> {

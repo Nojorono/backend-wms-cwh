@@ -70,6 +70,31 @@ export class OnHandAtrRepository {
         await this.repo.softDelete(id);
     }
 
+    // Latest distinct snapshot dates (WIB) for this org — used for stock_awal prior day.
+    async findByOrganizationIdDistinctCreatedAtDate(
+        organizationId: string,
+        limit = 2,
+    ): Promise<Array<{ date: string }>> {
+        const rows = await this.repo
+            .createQueryBuilder('onHandAtr')
+            .select(
+                `DATE(onHandAtr.created_at AT TIME ZONE '${INDONESIA_TIMEZONE}')`,
+                'snapshot_date',
+            )
+            .where('onHandAtr.organization_id = :organizationId', { organizationId })
+            .distinct(true)
+            .orderBy('snapshot_date', 'DESC')
+            .limit(limit)
+            .getRawMany<{ snapshot_date: string | Date }>();
+
+        return rows.map((row) => {
+            if (row.snapshot_date instanceof Date) {
+                return { date: row.snapshot_date.toISOString().slice(0, 10) };
+            }
+            return { date: String(row.snapshot_date).slice(0, 10) };
+        });
+    }
+
     async findByOrganizationIdAndDate(
         organizationId: string,
         date: string,
