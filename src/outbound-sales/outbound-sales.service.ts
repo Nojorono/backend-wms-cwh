@@ -16,6 +16,8 @@ import {
 } from './dto/locator-sales.dto';
 import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-organization.dto';
 import {
+  LHSReportDetailResponseDto,
+  LHSReportDetailRowDto,
   LHSReportItemDto,
   LHSReportResponseDto,
 } from './dto/lhs-report.dto';
@@ -27,6 +29,12 @@ import { MasterIORepository } from '../master-io/master-io.repository';
 const LHS_DO_STATUSES: DoSuggestionStatus[] = [
   DoSuggestionStatus.FINAL,
   // need status completed
+  DoSuggestionStatus.VOID,
+  DoSuggestionStatus.VOID_NEED_ACTION,
+];
+
+const LHS_DETAIL_OUTGOING_STATUSES: DoSuggestionStatus[] = [
+  DoSuggestionStatus.FINAL,
   DoSuggestionStatus.VOID,
   DoSuggestionStatus.VOID_NEED_ACTION,
 ];
@@ -50,15 +58,34 @@ export class OutboundSalesService {
     const resolvedOrganizationId = this.resolveOrganizationId(organizationId);
     const savedDate = this.resolveSavedDate(query.date);
     const subinventoryCodes = this.resolveSubinventoryCodes(query.subinventory_code);
+    const isLhs = status?.trim().toUpperCase() === 'LHS';
+
+    // Regular on-hand only reuses rows with status IS NULL.
+    // LHS rows must not block a fresh Oracle fetch / create.
+    // LHS upgrade loads any same-day rows (status filter omitted).
+    const existStatusFilter: string | null | undefined = isLhs
+      ? undefined
+      : status?.trim()
+        ? status.trim()
+        : null;
 
     const existData = await this.onHandAtrRepository.findByOrganizationIdAndDate(
       resolvedOrganizationId,
       savedDate,
       query.organization_code,
       subinventoryCodes,
-      status,
+      existStatusFilter,
     );
+
     if (existData.length > 0) {
+      if (isLhs) {
+        return await this.refreshExistingOnHandForLhs(
+          query,
+          resolvedOrganizationId,
+          savedDate,
+          existData,
+        );
+      }
       return existData;
     }
 
@@ -85,6 +112,130 @@ export class OutboundSalesService {
 
     return [];
   }
+
+  /**
+   * Refresh existing on-hand rows for LHS: set status=LHS, and when date is today
+   * also replace qty/attrs from Oracle (match by item_code+subinventory+locator).
+   */
+  private async refreshExistingOnHandForLhs(
+    query: InvOnHandQtyWithAtrParamsDto,
+    organizationId: string,
+    savedDate: string,
+    existing: OnHandAtr[],
+  ): Promise<OnHandAtr[]> {
+    const createdBy = query.created_by ?? 'SYSTEM';
+    const status = 'LHS';
+
+    if (!this.isTodayInWib(savedDate)) {
+      return await this.stampOnHandStatus(existing, status, createdBy);
+    }
+
+    const response =
+      await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
+    const oracleRows = response.data ?? [];
+    if (!oracleRows.length) {
+      return await this.stampOnHandStatus(existing, status, createdBy);
+    }
+
+    const dtos = await this.mapOracleRowsToCreateDtos(
+      oracleRows,
+      organizationId,
+      createdBy,
+      status,
+    );
+
+    return await this.dataSource.transaction(async () => {
+      const existingByKey = new Map(
+        existing.map((row) => [this.onHandMatchKey(row), row]),
+      );
+      const result: OnHandAtr[] = [];
+      const matchedIds = new Set<string>();
+
+      for (const dto of dtos) {
+        const key = this.onHandMatchKey(dto);
+        const found = existingByKey.get(key);
+        if (found) {
+          matchedIds.add(found.id);
+          const updated = await this.onHandAtrRepository.update(found.id, {
+            item_number: dto.item_number,
+            item_description: dto.item_description,
+            inventory_item_id: dto.inventory_item_id,
+            oracle_organization_id: dto.oracle_organization_id,
+            organization_code: dto.organization_code,
+            organization_name: dto.organization_name,
+            subinventory_code: dto.subinventory_code,
+            locator_id: dto.locator_id,
+            locator: dto.locator,
+            locator_name: dto.locator_name,
+            quantity: dto.quantity,
+            avail_to_reserve: dto.avail_to_reserve,
+            status,
+            updated_by: createdBy,
+          });
+          result.push(updated);
+        } else {
+          result.push(await this.onHandAtrRepository.create(dto));
+        }
+      }
+
+      for (const row of existing) {
+        if (matchedIds.has(row.id)) {
+          continue;
+        }
+        if (row.status !== status) {
+          result.push(
+            await this.onHandAtrRepository.update(row.id, {
+              status,
+              updated_by: createdBy,
+            }),
+          );
+        } else {
+          result.push(row);
+        }
+      }
+
+      return result;
+    });
+  }
+
+  private async stampOnHandStatus(
+    existing: OnHandAtr[],
+    status: string,
+    updatedBy: string,
+  ): Promise<OnHandAtr[]> {
+    return await this.dataSource.transaction(async () => {
+      const result: OnHandAtr[] = [];
+      for (const row of existing) {
+        if (row.status === status) {
+          result.push(row);
+          continue;
+        }
+        result.push(
+          await this.onHandAtrRepository.update(row.id, {
+            status,
+            updated_by: updatedBy,
+          }),
+        );
+      }
+      return result;
+    });
+  }
+
+  private onHandMatchKey(row: {
+    item_code?: string | null;
+    subinventory_code?: string | null;
+    locator_id?: number | null;
+    locator?: string | null;
+  }): string {
+    const itemCode = row.item_code?.trim() ?? '';
+    const subinventory = row.subinventory_code?.trim() ?? '';
+    const locator =
+      row.locator_id != null
+        ? String(row.locator_id)
+        : (row.locator?.trim() ?? '');
+    return `${itemCode}|${subinventory}|${locator}`;
+  }
+
   async createManyOnHandAtr(dtos: CreateOnHandAtrDto[]): Promise<OnHandAtr[]> {
     if (!dtos.length) {
       return [];
@@ -263,7 +414,6 @@ export class OutboundSalesService {
         resolvedOrganizationId,
         2,
       );
-    console.log('dates', dates);
     const previousDate =
       dates.find((entry) => entry.date < reportDate)?.date ??
       this.shiftDateByDays(reportDate, -1);
@@ -360,6 +510,233 @@ export class OutboundSalesService {
       previous_date: previousDate,
       items,
     };
+  }
+
+  /**
+   * LHS detail matrix: SKU columns × rows (Stock Awal, Incoming/BTB per sales,
+   * Outgoing/SPB Submitted per sales, Stock Meta).
+   */
+  async getLHSReportDetail(
+    organizationId: string | number | null,
+    date: string,
+  ): Promise<LHSReportDetailResponseDto> {
+    const resolvedOrganizationId = this.resolveOrganizationId(organizationId);
+    const findOrganizationData = await this.masterIO.findOne(resolvedOrganizationId);
+    if (!findOrganizationData) {
+      throw new BadRequestException('Organization not found');
+    }
+
+    const findOnHandAtrData = await this.findOnHand(
+      {
+        organization_code: findOrganizationData.organization_name,
+        subinventory_code: 'KECIL',
+        date: date,
+        created_by: 'SYSTEM',
+      },
+      resolvedOrganizationId,
+      'LHS',
+    );
+
+    const reportDate = this.resolveSavedDate(date);
+    const dates =
+      await this.onHandAtrRepository.findByOrganizationIdDistinctCreatedAtDate(
+        resolvedOrganizationId,
+        10,
+      );
+    const previousDate =
+      dates.find((entry) => entry.date < reportDate)?.date ??
+      this.shiftDateByDays(reportDate, -1);
+
+    const [onHandToday, onHandPrevious, salesDoRows, btbHeaders] =
+      await Promise.all([
+        this.onHandAtrRepository.findByOrganizationIdAndDate(
+          resolvedOrganizationId,
+          reportDate,
+          findOrganizationData.organization_name,
+          ['KECIL'],
+          'LHS',
+        ),
+        this.onHandAtrRepository.findByOrganizationIdAndDate(
+          resolvedOrganizationId,
+          previousDate,
+          findOrganizationData.organization_name,
+          ['KECIL'],
+          'LHS',
+        ),
+        this.doSuggestionRepository.sumQtyBySalesAndItemByOrganizationAndDate(
+          resolvedOrganizationId,
+          reportDate,
+          LHS_DETAIL_OUTGOING_STATUSES,
+        ),
+        this.btbRepository.getAllLastDateInsert(resolvedOrganizationId),
+      ]);
+
+    const stockAwalByItem = this.aggregateOnHandByItemCode(onHandPrevious);
+    const stockMetaByItem = this.aggregateOnHandByItemCode(onHandToday);
+    const btbBySalesItem = this.aggregateBtbBySalesAndItem(btbHeaders);
+
+    const itemCodes = [
+      ...new Set<string>([
+        ...stockAwalByItem.keys(),
+        ...stockMetaByItem.keys(),
+        ...salesDoRows.map((row) => row.item_code),
+        ...btbBySalesItem.flatMap((row) => Object.keys(row.quantities)),
+      ]),
+    ].sort((a, b) => a.localeCompare(b));
+
+    const emptyQuantities = (): Record<string, number> =>
+      Object.fromEntries(itemCodes.map((code) => [code, 0]));
+
+    const rows: LHSReportDetailRowDto[] = [];
+
+    // Stock Awal — one summary row
+    const stockAwalQty = emptyQuantities();
+    for (const [itemCode, data] of stockAwalByItem) {
+      stockAwalQty[itemCode] = data.quantity;
+    }
+    rows.push({
+      ket1: 'Stock Awal',
+      quantities: stockAwalQty,
+    });
+
+    // Incoming — BTB per sales (GS)
+    for (const btbRow of btbBySalesItem) {
+      const quantities = emptyQuantities();
+      for (const [itemCode, qty] of Object.entries(btbRow.quantities)) {
+        quantities[itemCode] = qty;
+      }
+      rows.push({
+        ket1: 'Incoming',
+        ket2: 'BTB',
+        sales_nik: btbRow.sales_nik,
+        sales_name: btbRow.sales_name,
+        channel: btbRow.channel,
+        quantities,
+      });
+    }
+
+    // Outgoing — SPB Submitted per sales
+    const outgoingBySales = new Map<
+      string,
+      {
+        sales_nik: string;
+        sales_name: string;
+        channel?: string;
+        quantities: Record<string, number>;
+      }
+    >();
+
+    for (const row of salesDoRows) {
+      const key = row.sales_nik;
+      let entry = outgoingBySales.get(key);
+      if (!entry) {
+        entry = {
+          sales_nik: row.sales_nik,
+          sales_name: row.sales_name,
+          channel: row.channel,
+          quantities: emptyQuantities(),
+        };
+        outgoingBySales.set(key, entry);
+      }
+      // SPB Submitted matrix uses submitted qty (fallback to final if submitted empty).
+      const qty =
+        row.qty_submitted !== 0 ? row.qty_submitted : row.qty_final;
+      entry.quantities[row.item_code] =
+        (entry.quantities[row.item_code] ?? 0) + qty;
+    }
+
+    for (const entry of [...outgoingBySales.values()].sort((a, b) =>
+      a.sales_nik.localeCompare(b.sales_nik),
+    )) {
+      rows.push({
+        ket1: 'Outgoing',
+        ket2: 'SPB Submitted',
+        sales_nik: entry.sales_nik,
+        sales_name: entry.sales_name,
+        channel: entry.channel,
+        quantities: entry.quantities,
+      });
+    }
+
+    // Stock Meta — end of day
+    const stockMetaQty = emptyQuantities();
+    for (const [itemCode, data] of stockMetaByItem) {
+      stockMetaQty[itemCode] = data.quantity;
+    }
+    rows.push({
+      ket1: 'Stock Meta',
+      quantities: stockMetaQty,
+    });
+
+    return {
+      organization_id: resolvedOrganizationId,
+      organization_name: findOrganizationData.organization_name,
+      date: reportDate,
+      previous_date: previousDate,
+      item_codes: itemCodes,
+      rows,
+    };
+  }
+
+  private aggregateBtbBySalesAndItem(
+    btbs: Array<{
+      sales_nik?: string;
+      sales_name?: string;
+      details?: Array<{
+        item_code?: string;
+        item_name?: string;
+        btb_qty?: number;
+        type?: string;
+        deletedAt?: Date;
+      }>;
+    }>,
+  ): Array<{
+    sales_nik: string;
+    sales_name: string;
+    channel?: string;
+    quantities: Record<string, number>;
+  }> {
+    const bySales = new Map<
+      string,
+      {
+        sales_nik: string;
+        sales_name: string;
+        quantities: Record<string, number>;
+      }
+    >();
+
+    for (const btb of btbs) {
+      const salesNik = btb.sales_nik?.trim() || 'UNKNOWN';
+      let entry = bySales.get(salesNik);
+      if (!entry) {
+        entry = {
+          sales_nik: salesNik,
+          sales_name: btb.sales_name?.trim() || salesNik,
+          quantities: {},
+        };
+        bySales.set(salesNik, entry);
+      }
+
+      for (const detail of btb.details ?? []) {
+        if (detail.deletedAt) {
+          continue;
+        }
+        const detailType = (detail.type?.trim() || 'GS').toUpperCase();
+        if (detailType !== 'GS') {
+          continue;
+        }
+        const itemCode = detail.item_code?.trim();
+        if (!itemCode) {
+          continue;
+        }
+        entry.quantities[itemCode] =
+          (entry.quantities[itemCode] ?? 0) + (Number(detail.btb_qty) || 0);
+      }
+    }
+
+    return [...bySales.values()]
+      .filter((row) => Object.keys(row.quantities).length > 0)
+      .sort((a, b) => a.sales_nik.localeCompare(b.sales_nik));
   }
 
   private shiftDateByDays(date: string, days: number): string {

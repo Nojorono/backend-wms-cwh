@@ -68,6 +68,15 @@ export interface DoSuggestionFinalSubmittedSumRow {
   total_qty_submitted: number;
 }
 
+export interface DoSuggestionSalesItemQtyRow {
+  sales_nik: string;
+  sales_name: string;
+  channel?: string;
+  item_code: string;
+  qty_submitted: number;
+  qty_final: number;
+}
+
 export interface DoSuggestionPendingSubmissionFilters {
   callplanDateStart?: Date;
 }
@@ -447,6 +456,66 @@ export class DoSuggestionRepository {
       item_code: row.item_code,
       total_qty_final: Number(row.total_qty_final) || 0,
       total_qty_submitted: Number(row.total_qty_submitted) || 0,
+    }));
+  }
+
+  /**
+   * Per-sales × item qty for LHS detail matrix (Outgoing / SPB Submitted).
+   */
+  async sumQtyBySalesAndItemByOrganizationAndDate(
+    organizationId: string,
+    date: string,
+    statuses: DoSuggestionStatus[],
+  ): Promise<DoSuggestionSalesItemQtyRow[]> {
+    const callplanDateStart = date.trim().split('T')[0];
+    const qb = this.headerRepository
+      .createQueryBuilder('ds')
+      .innerJoin('ds.details', 'details', 'details.deleted_at IS NULL')
+      .select('ds.sales_nik', 'sales_nik')
+      .addSelect('MAX(ds.sales_name)', 'sales_name')
+      .addSelect('MAX(ds.trip_type)', 'channel')
+      .addSelect('details.item_code', 'item_code')
+      .addSelect(
+        'COALESCE(SUM(COALESCE(details.item_qty_submitted, 0)), 0)',
+        'qty_submitted',
+      )
+      .addSelect(
+        'COALESCE(SUM(COALESCE(details.item_qty_final, 0)), 0)',
+        'qty_final',
+      )
+      .where('ds.organization_id = :organizationId', { organizationId })
+      .andWhere('ds.deleted_at IS NULL')
+      .andWhere('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
+      .andWhere('ds.sales_nik IS NOT NULL')
+      .andWhere("TRIM(ds.sales_nik) <> ''")
+      .andWhere('details.item_code IS NOT NULL')
+      .andWhere("TRIM(details.item_code) <> ''")
+      .groupBy('ds.sales_nik')
+      .addGroupBy('details.item_code');
+
+    if (statuses.length) {
+      qb.andWhere('ds.status IN (:...statuses)', { statuses });
+    }
+
+    const rows = await qb
+      .orderBy('ds.sales_nik', 'ASC')
+      .addOrderBy('details.item_code', 'ASC')
+      .getRawMany<{
+        sales_nik: string;
+        sales_name: string | null;
+        channel: string | null;
+        item_code: string;
+        qty_submitted: string;
+        qty_final: string;
+      }>();
+
+    return rows.map((row) => ({
+      sales_nik: row.sales_nik,
+      sales_name: row.sales_name?.trim() || row.sales_nik,
+      channel: row.channel?.trim() || undefined,
+      item_code: row.item_code,
+      qty_submitted: Number(row.qty_submitted) || 0,
+      qty_final: Number(row.qty_final) || 0,
     }));
   }
 

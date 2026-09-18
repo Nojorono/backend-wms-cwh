@@ -100,7 +100,12 @@ export class OnHandAtrRepository {
         date: string,
         organizationCode?: string,
         subinventoryCodes?: string[],
-        status?: string,
+        /**
+         * - `undefined`: no status filter (used by LHS upgrade to load any same-day rows)
+         * - `null`: only rows with status IS NULL (regular on-hand snapshot)
+         * - string: exact status match (e.g. 'LHS')
+         */
+        status?: string | null,
     ): Promise<OnHandAtr[]> {
         const normalizedDate = date.trim().split('T')[0];
         const qb = this.repo
@@ -125,8 +130,10 @@ export class OnHandAtrRepository {
             });
         }
 
-        if (status?.trim()) {
-            qb.andWhere('onHandAtr.status = :status', { status });
+        if (status === null) {
+            qb.andWhere('(onHandAtr.status IS NULL OR TRIM(onHandAtr.status) = \'\')');
+        } else if (typeof status === 'string' && status.trim() !== '') {
+            qb.andWhere('onHandAtr.status = :status', { status: status.trim() });
         }
 
         return await qb.orderBy('onHandAtr.created_at', 'DESC').getMany();

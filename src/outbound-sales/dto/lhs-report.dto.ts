@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsDateString, IsNotEmpty } from 'class-validator';
 import { onHandAtrDateNowExample } from './inv-on-hand-qty-with-atr.dto';
 
@@ -69,4 +69,56 @@ export class LHSReportResponseDto {
 
   @ApiProperty({ type: [LHSReportItemDto] })
   items: LHSReportItemDto[];
+}
+
+export class LHSReportDetailRowDto {
+  @ApiProperty({
+    example: 'Outgoing',
+    description: 'Section: Stock Awal | Incoming | Outgoing | Stock Meta',
+  })
+  ket1: string;
+
+  @ApiPropertyOptional({
+    example: 'SPB Submitted',
+    description: 'Sub-section e.g. SPB Submitted, BTB',
+  })
+  ket2?: string;
+
+  @ApiPropertyOptional({ example: '07052300162DC' })
+  sales_nik?: string;
+
+  @ApiPropertyOptional({ example: 'ARDIAN SAPUTRA' })
+  sales_name?: string;
+
+  @ApiPropertyOptional({ example: 'SD', description: 'Channel / trip_type' })
+  channel?: string;
+
+  @ApiProperty({
+    example: { ABC12: 61, AMB16: 60 },
+    description: 'Qty keyed by item_code (matrix columns)',
+  })
+  quantities: Record<string, number>;
+}
+
+export class LHSReportDetailResponseDto {
+  @ApiProperty({ example: 'uuid-organization-id' })
+  organization_id: string;
+
+  @ApiProperty({ example: 'SMG' })
+  organization_name: string;
+
+  @ApiProperty({ example: '2026-06-19' })
+  date: string;
+
+  @ApiProperty({ example: '2026-06-18' })
+  previous_date: string;
+
+  @ApiProperty({
+    example: ['ABC12', 'AMB16', 'AMJ16'],
+    description: 'SKU column headers for the matrix',
+  })
+  item_codes: string[];
+
+  @ApiProperty({ type: [LHSReportDetailRowDto] })
+  rows: LHSReportDetailRowDto[];
 }
