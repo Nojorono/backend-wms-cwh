@@ -22,6 +22,7 @@ import {
 import { DistinctLocatorByOrganizationDto } from './dto/distinct-locator-by-organization.dto';
 import {
   LhsReportQueryDto,
+  LHSReportDetailResponseDto,
   LHSReportResponseDto,
 } from './dto/lhs-report.dto';
 
@@ -114,5 +115,21 @@ export class OutboundSalesController {
     @OrganizationId() organizationId: string | number | null,
   ): Promise<LHSReportResponseDto> {
     return this.service.getLHSReport(organizationId, query.date);
+  }
+
+  @Get('report/lhs/detail')
+  @ApiOperation({
+    summary: 'Get LHS report detail (SKU matrix per sales)',
+    description:
+      'Matrix like spreadsheet: item_codes as columns; rows = Stock Awal, ' +
+      'Incoming/BTB per sales, Outgoing/SPB Submitted per sales, Stock Meta. ' +
+      `Example: GET /outbound-sales/report/lhs/detail?date=${onHandAtrDateNowExample()}`,
+  })
+  @ApiResponse({ status: 200, description: 'OK', type: LHSReportDetailResponseDto })
+  getLHSReportDetail(
+    @Query() query: LhsReportQueryDto,
+    @OrganizationId() organizationId: string | number | null,
+  ): Promise<LHSReportDetailResponseDto> {
+    return this.service.getLHSReportDetail(organizationId, query.date);
   }
 }
