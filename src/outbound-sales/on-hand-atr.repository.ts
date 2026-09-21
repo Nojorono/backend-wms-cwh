@@ -70,29 +70,78 @@ export class OnHandAtrRepository {
         await this.repo.softDelete(id);
     }
 
-    // Latest distinct snapshot dates (WIB) for this org — used for stock_awal prior day.
+    // Latest distinct LHS snapshot dates (WIB) — same filters as findByOrganizationIdAndDate.
     async findByOrganizationIdDistinctCreatedAtDate(
         organizationId: string,
         limit = 2,
+        organizationCode?: string,
+        subinventoryCodes?: string[],
+        status: string | null | undefined = 'LHS',
     ): Promise<Array<{ date: string }>> {
-        const rows = await this.repo
+        const qb = this.repo
             .createQueryBuilder('onHandAtr')
+            // TO_CHAR → string so node-pg never Date-parses and shifts the calendar day.
             .select(
-                `DATE(onHandAtr.created_at AT TIME ZONE '${INDONESIA_TIMEZONE}')`,
+                `TO_CHAR(DATE(onHandAtr.created_at AT TIME ZONE '${INDONESIA_TIMEZONE}'), 'YYYY-MM-DD')`,
                 'snapshot_date',
             )
             .where('onHandAtr.organization_id = :organizationId', { organizationId })
+            .andWhere('onHandAtr.deleted_at IS NULL');
+
+        if (organizationCode?.trim()) {
+            qb.andWhere('onHandAtr.organization_code = :organizationCode', {
+                organizationCode: organizationCode.trim(),
+            });
+        }
+
+        if (subinventoryCodes?.length) {
+            qb.andWhere('onHandAtr.subinventory_code IN (:...subinventoryCodes)', {
+                subinventoryCodes,
+            });
+        }
+
+        if (status === null) {
+            qb.andWhere('(onHandAtr.status IS NULL OR TRIM(onHandAtr.status) = \'\')');
+        } else if (typeof status === 'string' && status.trim() !== '') {
+            qb.andWhere('UPPER(TRIM(onHandAtr.status)) = :status', {
+                status: status.trim().toUpperCase(),
+            });
+        }
+
+        const rows = await qb
             .distinct(true)
             .orderBy('snapshot_date', 'DESC')
             .limit(limit)
             .getRawMany<{ snapshot_date: string | Date }>();
 
-        return rows.map((row) => {
-            if (row.snapshot_date instanceof Date) {
-                return { date: row.snapshot_date.toISOString().slice(0, 10) };
+        return rows.map((row) => ({
+            date: this.formatSnapshotDate(row.snapshot_date),
+        }));
+    }
+
+    /**
+     * Normalize snapshot date to YYYY-MM-DD in WIB.
+     * Never use getUTC* / toISOString on PG dates — local midnight (+07)
+     * becomes the previous UTC calendar day (e.g. 21 → 20).
+     */
+    private formatSnapshotDate(value: string | Date): string {
+        if (typeof value === 'string') {
+            const matched = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+            if (matched) {
+                return matched[1];
             }
-            return { date: String(row.snapshot_date).slice(0, 10) };
-        });
+        }
+
+        if (value instanceof Date && !Number.isNaN(value.getTime())) {
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone: INDONESIA_TIMEZONE,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }).format(value);
+        }
+
+        return String(value).slice(0, 10);
     }
 
     async findByOrganizationIdAndDate(
@@ -133,7 +182,9 @@ export class OnHandAtrRepository {
         if (status === null) {
             qb.andWhere('(onHandAtr.status IS NULL OR TRIM(onHandAtr.status) = \'\')');
         } else if (typeof status === 'string' && status.trim() !== '') {
-            qb.andWhere('onHandAtr.status = :status', { status: status.trim() });
+            qb.andWhere('UPPER(TRIM(onHandAtr.status)) = :status', {
+                status: status.trim().toUpperCase(),
+            });
         }
 
         return await qb.orderBy('onHandAtr.created_at', 'DESC').getMany();
