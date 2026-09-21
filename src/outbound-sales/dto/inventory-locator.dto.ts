@@ -4,14 +4,6 @@ import { IsOptional, IsString } from 'class-validator';
 
 export class InventoryLocatorParamsDto {
   @ApiPropertyOptional({
-    description: 'Item code to filter',
-    example: 'CLM16',
-  })
-  @IsString()
-  @IsOptional()
-  item_code?: string;
-
-  @ApiPropertyOptional({
     description:
       'Subinventory code(s) to filter. Single value, comma-separated, or repeated query param',
     example: 'GOOD-RK-1',

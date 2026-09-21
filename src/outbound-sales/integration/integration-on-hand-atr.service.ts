@@ -63,7 +63,7 @@ export class IntegrationOnHandAtrService implements OnModuleInit {
    * RMQ `get_inv_on_hand_qty_with_atr` — inventory on-hand quantity with Oracle attributes.
    */
   async getInvOnHandQtyWithAtr(
-    params: InvOnHandQtyWithAtrParamsDto,
+    params: InvOnHandQtyWithAtrParamsDto | InventoryLocatorParamsDto,
   ): Promise<InvOnHandQtyWithAtrResponseDto> {
     try {
       await this.ensureConnection();

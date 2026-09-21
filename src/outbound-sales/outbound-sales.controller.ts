@@ -25,6 +25,10 @@ import {
   LHSReportDetailResponseDto,
   LHSReportResponseDto,
 } from './dto/lhs-report.dto';
+import {
+  InventoryLocatorItemDto,
+  InventoryLocatorParamsDto,
+} from './dto/inventory-locator.dto';
 
 @ApiTags('Outbound Sales')
 @ApiBearerAuth('JWT-auth')
@@ -43,6 +47,19 @@ export class OutboundSalesController {
     @Query() query: InvOnHandQtyWithAtrParamsDto,
   ): Promise<any> {
     return this.service.findOnHandMeta(query);
+  }
+
+  @Get('on-hand-locator')
+  @ApiOperation({
+    summary: 'Find Oracle inventory locator by organization_code and subinventory_code',
+    description:
+      'Calls get_inv_locator. Returns locator rows directly (no nested data wrapper).',
+  })
+  @ApiResponse({ status: 200, description: 'OK', type: [InventoryLocatorItemDto] })
+  findOnHandLocator(
+    @Query() query: InventoryLocatorParamsDto,
+  ): Promise<InventoryLocatorItemDto[]> {
+    return this.service.findOnHandLocator(query);
   }
 
   @Get('on-hand')

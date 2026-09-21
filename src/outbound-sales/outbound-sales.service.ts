@@ -11,6 +11,10 @@ import {
   InvOnHandQtyWithAtrParamsDto,
 } from './dto/inv-on-hand-qty-with-atr.dto';
 import {
+  InventoryLocatorItemDto,
+  InventoryLocatorParamsDto,
+} from './dto/inventory-locator.dto';
+import {
   LocatorSalesParamsDto,
   LocatorSalesResponseDto,
 } from './dto/locator-sales.dto';
@@ -370,6 +374,14 @@ export class OutboundSalesService {
     query: InvOnHandQtyWithAtrParamsDto,
   ): Promise<any> {
     return await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
+  }
+
+  async findOnHandLocator(
+    query: InventoryLocatorParamsDto,
+  ): Promise<InventoryLocatorItemDto[]> {
+    const response =
+      await this.integrationOnHandAtrService.getInventoryLocator(query);
+    return response.data ?? [];
   }
 
   async getLocatorSales(params: LocatorSalesParamsDto): Promise<LocatorSalesResponseDto> {
