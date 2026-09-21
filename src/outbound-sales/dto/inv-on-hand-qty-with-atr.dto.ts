@@ -24,6 +24,40 @@ export class InvOnHandQtyWithAtrDto {
   subinventory_code: string | string[];
 }
 
+export class InventoryLocatorParamsDto {
+  @ApiProperty({
+    description: 'Organization code (inventory org) to filter',
+    example: 'CWH',
+  })
+  @IsString()
+  @IsNotEmpty()
+  organization_code: string;
+
+  @ApiProperty({
+    description:
+      'Subinventory code(s) to filter. Single value, comma-separated, or repeated query param',
+    example: 'GOOD-RK-1',
+    isArray: true,
+    type: String,
+  })
+  @IsNotEmpty()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value.map(String);
+    }
+    return String(value);
+  })
+  subinventory_code: string | string[];
+
+  @ApiPropertyOptional({ example: 'KECIL' })
+  @IsOptional()
+  @IsString()
+  locator?: string;
+}
+
 export class InvOnHandQtyWithAtrParamsDto {
   @ApiProperty({
     description: 'Organization code (inventory org) to filter',

@@ -11,6 +11,10 @@ import {
   InvOnHandQtyWithAtrParamsDto,
 } from './dto/inv-on-hand-qty-with-atr.dto';
 import {
+  InventoryLocatorItemDto,
+  InventoryLocatorParamsDto,
+} from './dto/inventory-locator.dto';
+import {
   LocatorSalesParamsDto,
   LocatorSalesResponseDto,
 } from './dto/locator-sales.dto';
@@ -60,11 +64,10 @@ export class OutboundSalesService {
     const subinventoryCodes = this.resolveSubinventoryCodes(query.subinventory_code);
     const isLhs = status?.trim().toUpperCase() === 'LHS';
 
-    // Regular on-hand only reuses rows with status IS NULL.
-    // LHS rows must not block a fresh Oracle fetch / create.
-    // LHS upgrade loads any same-day rows (status filter omitted).
-    const existStatusFilter: string | null | undefined = isLhs
-      ? undefined
+    // Regular on-hand → status IS NULL only.
+    // LHS → status = 'LHS' only (never upgrade null-status rows into LHS).
+    const existStatusFilter: string | null = isLhs
+      ? 'LHS'
       : status?.trim()
         ? status.trim()
         : null;
@@ -89,8 +92,7 @@ export class OutboundSalesService {
       return existData;
     }
 
-    // Only fetch from Oracle when requesting today's data (not yet saved).
-    // Historical dates must already exist in DB from when they were saved.
+    // No matching snapshot yet — fetch Oracle and create (today only).
     if (!this.isTodayInWib(savedDate)) {
       return [];
     }
@@ -104,18 +106,16 @@ export class OutboundSalesService {
         rows,
         resolvedOrganizationId,
         createdBy,
-        status,
+        isLhs ? 'LHS' : status,
       );
-      const createdData = await this.createManyOnHandAtr(dtos);
-      return createdData;
+      return await this.createManyOnHandAtr(dtos);
     }
 
     return [];
   }
 
   /**
-   * Refresh existing on-hand rows for LHS: set status=LHS, and when date is today
-   * also replace qty/attrs from Oracle (match by item_code+subinventory+locator).
+   * Refresh existing status=LHS rows from Oracle (today). Does not touch status-null rows.
    */
   private async refreshExistingOnHandForLhs(
     query: InvOnHandQtyWithAtrParamsDto,
@@ -127,14 +127,14 @@ export class OutboundSalesService {
     const status = 'LHS';
 
     if (!this.isTodayInWib(savedDate)) {
-      return await this.stampOnHandStatus(existing, status, createdBy);
+      return existing;
     }
 
     const response =
       await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
     const oracleRows = response.data ?? [];
     if (!oracleRows.length) {
-      return await this.stampOnHandStatus(existing, status, createdBy);
+      return existing;
     }
 
     const dtos = await this.mapOracleRowsToCreateDtos(
@@ -156,67 +156,35 @@ export class OutboundSalesService {
         const found = existingByKey.get(key);
         if (found) {
           matchedIds.add(found.id);
-          const updated = await this.onHandAtrRepository.update(found.id, {
-            item_number: dto.item_number,
-            item_description: dto.item_description,
-            inventory_item_id: dto.inventory_item_id,
-            oracle_organization_id: dto.oracle_organization_id,
-            organization_code: dto.organization_code,
-            organization_name: dto.organization_name,
-            subinventory_code: dto.subinventory_code,
-            locator_id: dto.locator_id,
-            locator: dto.locator,
-            locator_name: dto.locator_name,
-            quantity: dto.quantity,
-            avail_to_reserve: dto.avail_to_reserve,
-            status,
-            updated_by: createdBy,
-          });
-          result.push(updated);
+          result.push(
+            await this.onHandAtrRepository.update(found.id, {
+              item_number: dto.item_number,
+              item_description: dto.item_description,
+              inventory_item_id: dto.inventory_item_id,
+              oracle_organization_id: dto.oracle_organization_id,
+              organization_code: dto.organization_code,
+              organization_name: dto.organization_name,
+              subinventory_code: dto.subinventory_code,
+              locator_id: dto.locator_id,
+              locator: dto.locator,
+              locator_name: dto.locator_name,
+              quantity: dto.quantity,
+              avail_to_reserve: dto.avail_to_reserve,
+              status,
+              updated_by: createdBy,
+            }),
+          );
         } else {
           result.push(await this.onHandAtrRepository.create(dto));
         }
       }
 
       for (const row of existing) {
-        if (matchedIds.has(row.id)) {
-          continue;
-        }
-        if (row.status !== status) {
-          result.push(
-            await this.onHandAtrRepository.update(row.id, {
-              status,
-              updated_by: createdBy,
-            }),
-          );
-        } else {
+        if (!matchedIds.has(row.id)) {
           result.push(row);
         }
       }
 
-      return result;
-    });
-  }
-
-  private async stampOnHandStatus(
-    existing: OnHandAtr[],
-    status: string,
-    updatedBy: string,
-  ): Promise<OnHandAtr[]> {
-    return await this.dataSource.transaction(async () => {
-      const result: OnHandAtr[] = [];
-      for (const row of existing) {
-        if (row.status === status) {
-          result.push(row);
-          continue;
-        }
-        result.push(
-          await this.onHandAtrRepository.update(row.id, {
-            status,
-            updated_by: updatedBy,
-          }),
-        );
-      }
       return result;
     });
   }
@@ -372,6 +340,14 @@ export class OutboundSalesService {
     return await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
   }
 
+  async findOnHandLocator(
+    query: InventoryLocatorParamsDto,
+  ): Promise<any[]> {
+    const response =
+      await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
+    return response.data ?? [];
+  }
+
   async getLocatorSales(params: LocatorSalesParamsDto): Promise<LocatorSalesResponseDto> {
     return await this.integrationOnHandAtrService.getLocatorSales(params);
   }
@@ -409,27 +385,35 @@ export class OutboundSalesService {
     );
 
     const reportDate = this.resolveSavedDate(date);
+    const organizationCode = findOrganizationData.organization_name;
     const dates =
       await this.onHandAtrRepository.findByOrganizationIdDistinctCreatedAtDate(
         resolvedOrganizationId,
-        2,
+        10,
+        organizationCode,
+        ['KECIL'],
+        'LHS',
       );
     const previousDate =
       dates.find((entry) => entry.date < reportDate)?.date ??
       this.shiftDateByDays(reportDate, -1);
 
+    console.log('previousDate', previousDate);
+    console.log('reportDate', reportDate);
+    console.log('datesQuery', dates);
+
     const [onHandToday, onHandPrevious, doRows, btbRows] = await Promise.all([
       this.onHandAtrRepository.findByOrganizationIdAndDate(
         resolvedOrganizationId,
         reportDate,
-        findOrganizationData.organization_name,
+        organizationCode,
         ['KECIL'],
         'LHS',
       ),
       this.onHandAtrRepository.findByOrganizationIdAndDate(
         resolvedOrganizationId,
         previousDate,
-        findOrganizationData.organization_name,
+        organizationCode,
         ['KECIL'],
         'LHS',
       ),
@@ -538,10 +522,14 @@ export class OutboundSalesService {
     );
 
     const reportDate = this.resolveSavedDate(date);
+    const organizationCode = findOrganizationData.organization_name;
     const dates =
       await this.onHandAtrRepository.findByOrganizationIdDistinctCreatedAtDate(
         resolvedOrganizationId,
         10,
+        organizationCode,
+        ['KECIL'],
+        'LHS',
       );
     const previousDate =
       dates.find((entry) => entry.date < reportDate)?.date ??
@@ -552,14 +540,14 @@ export class OutboundSalesService {
         this.onHandAtrRepository.findByOrganizationIdAndDate(
           resolvedOrganizationId,
           reportDate,
-          findOrganizationData.organization_name,
+          organizationCode,
           ['KECIL'],
           'LHS',
         ),
         this.onHandAtrRepository.findByOrganizationIdAndDate(
           resolvedOrganizationId,
           previousDate,
-          findOrganizationData.organization_name,
+          organizationCode,
           ['KECIL'],
           'LHS',
         ),
