@@ -378,9 +378,9 @@ export class OutboundSalesService {
 
   async findOnHandLocator(
     query: InventoryLocatorParamsDto,
-  ): Promise<InventoryLocatorItemDto[]> {
+  ): Promise<any[]> {
     const response =
-      await this.integrationOnHandAtrService.getInventoryLocator(query);
+      await this.integrationOnHandAtrService.getInvOnHandQtyWithAtr(query);
     return response.data ?? [];
   }
 
