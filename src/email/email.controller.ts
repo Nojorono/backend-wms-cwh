@@ -1,6 +1,9 @@
-import { Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiProduces,
   ApiResponse,
@@ -15,6 +18,8 @@ import { PreviewCallPlanReminderEmailDto } from './dto/preview-call-plan-reminde
 import { SendCallPlanNullAhomEmailDto } from './dto/send-call-plan-null-ahom-email.dto';
 import { SendCallPlanReminderEmailDto } from './dto/send-call-plan-reminder-email.dto';
 import { SendEmailDto } from './dto/send-email.dto';
+import { SendEmailMultipartDto } from './dto/send-email-multipart.dto';
+import type { EmailUploadFile } from './dto/send-email-multipart.dto';
 import { SendEmailResponseDto } from './dto/send-email-response.dto';
 import { SmtpConfigDto } from './dto/smtp-config.dto';
 import { EmailService } from './email.service';
@@ -29,14 +34,59 @@ export class EmailController {
 
   @Post('send')
   @ApiOperation({
-    summary: 'Send email',
+    summary: 'Send email (JSON)',
     description:
-      'Send email with dynamic SMTP config in body, or omit smtp to use SMTP_* environment variables.',
+      'Send email with JSON body. Optional attachments[] use base64 content. ' +
+      'For Swagger file upload UI use POST /email/send-upload instead.',
   })
   @ApiResponse({ status: 201, description: 'Email sent.', type: SendEmailResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid payload or SMTP failure.' })
   sendEmail(@Body() dto: SendEmailDto): Promise<SendEmailResponseDto> {
     return this.emailService.sendEmail(dto);
+  }
+
+  @Post('send-upload')
+  @ApiOperation({
+    summary: 'Send email with file upload',
+    description:
+      'Multipart form-data. Use the file picker in Swagger for attachments (field name: files). ' +
+      'to/cc/bcc are comma-separated emails. SMTP uses SMTP_* env defaults.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['to', 'subject'],
+      properties: {
+        to: {
+          type: 'string',
+          example: 'user@example.com,other@example.com',
+          description: 'Comma-separated recipient emails',
+        },
+        cc: { type: 'string', example: 'cc@example.com' },
+        bcc: { type: 'string', example: 'bcc@example.com' },
+        subject: { type: 'string', example: 'Opening balance confirmed' },
+        text: { type: 'string', example: 'Your opening balance has been confirmed.' },
+        html: {
+          type: 'string',
+          example: '<p>Your opening balance has been <b>confirmed</b>.</p>',
+        },
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Attachment files (max 10)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Email sent.', type: SendEmailResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid payload or SMTP failure.' })
+  @UseInterceptors(FilesInterceptor('files', 10))
+  sendEmailWithUpload(
+    @UploadedFiles() files: EmailUploadFile[],
+    @Body() body: SendEmailMultipartDto,
+  ): Promise<SendEmailResponseDto> {
+    return this.emailService.sendEmailWithUpload(body, files ?? []);
   }
 
   @Public()

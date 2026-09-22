@@ -398,10 +398,6 @@ export class OutboundSalesService {
       dates.find((entry) => entry.date < reportDate)?.date ??
       this.shiftDateByDays(reportDate, -1);
 
-    console.log('previousDate', previousDate);
-    console.log('reportDate', reportDate);
-    console.log('datesQuery', dates);
-
     const [onHandToday, onHandPrevious, doRows, btbRows] = await Promise.all([
       this.onHandAtrRepository.findByOrganizationIdAndDate(
         resolvedOrganizationId,
