@@ -299,6 +299,25 @@ export class InventoryMovementRepository {
     });
   }
 
+  /**
+   * Find an open movement (PENDING/APPROVED) that already includes this pallet
+   * and the pallet line is not yet completed.
+   */
+  async findActiveMovementByPalletId(palletId: string): Promise<InventoryMovement | null> {
+    return this.repository
+      .createQueryBuilder('movement')
+      .innerJoin('movement.pallets', 'pallets')
+      .where('pallets.pallet_id = :palletId', { palletId })
+      .andWhere('pallets.is_completed = :isCompleted', { isCompleted: false })
+      .andWhere('pallets.deletedAt IS NULL')
+      .andWhere('movement.deletedAt IS NULL')
+      .andWhere('movement.status IN (:...statuses)', {
+        statuses: [MovementStatus.PENDING, MovementStatus.APPROVED],
+      })
+      .orderBy('movement.createdAt', 'DESC')
+      .getOne();
+  }
+
   async updateStatusPallet(inventoryMovementId: string, palletId: string, inventoryTrackingId: string): Promise<void> {
     await this.palletMovementRepository.update(
       {
