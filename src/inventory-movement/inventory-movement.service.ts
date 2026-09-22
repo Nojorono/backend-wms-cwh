@@ -56,6 +56,15 @@ export class InventoryMovementService {
       if (inventoryTracking.warehouse_bin_id !== data.source_bin_id) {
         throw new BadRequestException('Inventory tracking not found in the source bin');
       }
+
+      const existingPalletMovement = await this.repository.findActiveMovementByPalletId(
+        pallet.pallet_id,
+      );
+      if (existingPalletMovement) {
+        throw new ConflictException(
+          `Pallet ${pallet.pallet_id} already exists in active movement ${existingPalletMovement.movement_number}`,
+        );
+      }
     }
 
     return await this.repository.create(data);
