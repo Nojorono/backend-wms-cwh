@@ -62,6 +62,7 @@ import { MoveOrderIntegrationModule } from './move-order-integration/move-order-
 import { WmsAssistantModule } from './wms-assistant/wms-assistant.module';
 import { WorkScheduledModule } from './work-scheduled/work-scheduled.module';
 import { CommonModule } from './common/common.module';
+import { ManagementUserFasModule } from './management-user-fas/management-user-fas.module';
 @Module({
   imports: [
     LoggerModule, // Global logger module - must be imported first
@@ -130,6 +131,7 @@ import { CommonModule } from './common/common.module';
     MoveOrderIntegrationModule,
     WmsAssistantModule,
     WorkScheduledModule,
+    ManagementUserFasModule,
   ],
   providers: [
     {
