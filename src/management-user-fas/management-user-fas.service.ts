@@ -8,10 +8,10 @@ import { ManagementUserFasGroupedByOrgDto } from './dto/management-user-fas-grou
 
 @Injectable()
 export class ManagementUserFasService {
-  constructor(private readonly repository: ManagementUserFasRepository) {}
+  constructor(private readonly repository: ManagementUserFasRepository) { }
 
   async create(dto: CreateManagementUserFasDto): Promise<ManagementUserFas> {
-    await this.assertUniqueNameAndEmail(dto.name, dto.email);
+    await this.assertUniqueEmailPerOrganization(dto.email, dto.organization_id);
     return await this.repository.create(dto);
   }
 
@@ -55,8 +55,10 @@ export class ManagementUserFasService {
   }
 
   async update(id: string, dto: UpdateManagementUserFasDto): Promise<ManagementUserFas> {
-    await this.findOne(id);
-    await this.assertUniqueNameAndEmail(dto.name, dto.email, id);
+    const existing = await this.findOne(id);
+    const organizationId = dto.organization_id ?? existing.organizationId;
+    const email = dto.email ?? existing.email;
+    await this.assertUniqueEmailPerOrganization(email, organizationId, id);
     return await this.repository.update(id, dto);
   }
 
@@ -65,23 +67,20 @@ export class ManagementUserFasService {
     return { success: true, message: 'Management user FAS deleted' };
   }
 
-  private async assertUniqueNameAndEmail(
-    name?: string,
+  private async assertUniqueEmailPerOrganization(
     email?: string,
+    organizationId?: string,
     excludeId?: string,
   ): Promise<void> {
-    if (name?.trim()) {
-      const byName = await this.repository.findByName(name);
-      if (byName && byName.id !== excludeId) {
-        throw new ConflictException(`Name "${name}" already exists`);
-      }
+    if (!email?.trim()) {
+      return;
     }
 
-    if (email?.trim()) {
-      const byEmail = await this.repository.findByEmail(email);
-      if (byEmail && byEmail.id !== excludeId) {
-        throw new ConflictException(`Email "${email}" already exists`);
-      }
+    const byEmail = await this.repository.findByEmail(email, organizationId);
+    if (byEmail && byEmail.id !== excludeId) {
+      throw new ConflictException(
+        `Email "${email}" already exists for this organization`,
+      );
     }
   }
 }

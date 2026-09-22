@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { ManagementUserFas } from '../core/domain/entities/management-user-fas.entity';
 import { CreateManagementUserFasDto } from './dto/create-management-user-fas.dto';
 import { UpdateManagementUserFasDto } from './dto/update-management-user-fas.dto';
@@ -32,9 +32,20 @@ export class ManagementUserFasRepository {
     });
   }
 
-  async findByEmail(email: string): Promise<ManagementUserFas | null> {
+  async findByEmail(
+    email: string,
+    organizationId?: string | null,
+  ): Promise<ManagementUserFas | null> {
+    const where: FindOptionsWhere<ManagementUserFas> = {
+      email: email.trim(),
+    };
+
+    if (organizationId !== undefined) {
+      where.organizationId = organizationId === null ? IsNull() : organizationId;
+    }
+
     return await this.repo.findOne({
-      where: { email: email.trim() },
+      where,
       relations: [...RELATIONS],
     });
   }

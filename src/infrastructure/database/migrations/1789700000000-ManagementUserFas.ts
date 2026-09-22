@@ -32,13 +32,17 @@ export class ManagementUserFas1789700000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_management_user_fas_email_active"
-      ON "management_user_fas" ("email")
+      DROP INDEX IF EXISTS "UQ_management_user_fas_email_active"
+    `);
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_management_user_fas_org_email_active"
+      ON "management_user_fas" ("organization_id", "email")
       WHERE "deleted_at" IS NULL
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX IF EXISTS "UQ_management_user_fas_org_email_active"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "UQ_management_user_fas_email_active"`);
     await queryRunner.query(`
       ALTER TABLE "management_user_fas"
