@@ -8,6 +8,8 @@ import { SendCallPlanNullAhomEmailDto } from './dto/send-call-plan-null-ahom-ema
 import { SendCallPlanReminderEmailDto } from './dto/send-call-plan-reminder-email.dto';
 import { SmtpConfigDto } from './dto/smtp-config.dto';
 import { SendEmailDto } from './dto/send-email.dto';
+import { SendEmailMultipartDto } from './dto/send-email-multipart.dto';
+import type { EmailUploadFile } from './dto/send-email-multipart.dto';
 import { SendEmailResponseDto } from './dto/send-email-response.dto';
 import { EmailTemplateService } from './email-template.service';
 import { CallPlanNullAhomTemplateContext } from './template-email/types/call-plan-null-ahom-template.interface';
@@ -54,6 +56,13 @@ export class EmailService {
         subject: dto.subject,
         text: dto.text,
         html: dto.html,
+        attachments: dto.attachments?.map((attachment) => ({
+          filename: attachment.filename,
+          content: attachment.content,
+          encoding: attachment.encoding ?? 'base64',
+          contentType: attachment.contentType,
+          cid: attachment.cid,
+        })),
       });
 
       this.logger.log(
@@ -74,6 +83,27 @@ export class EmailService {
     } finally {
       transporter.close();
     }
+  }
+
+  /** Send email from multipart form (Swagger file upload). */
+  async sendEmailWithUpload(
+    body: SendEmailMultipartDto,
+    files: EmailUploadFile[],
+  ): Promise<SendEmailResponseDto> {
+    return this.sendEmail({
+      to: body.to,
+      cc: body.cc,
+      bcc: body.bcc,
+      subject: body.subject,
+      text: body.text,
+      html: body.html,
+      attachments: (files ?? []).map((file) => ({
+        filename: file.originalname,
+        content: file.buffer.toString('base64'),
+        encoding: 'base64' as const,
+        contentType: file.mimetype,
+      })),
+    });
   }
 
   renderCallPlanReminderPreview(body: CallPlanReminderTemplateDto) {
