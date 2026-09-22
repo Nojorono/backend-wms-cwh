@@ -183,6 +183,8 @@ export class OutboundDoRepository {
     return this.outboundDoRepository
       .createQueryBuilder('outbound_do')
       .leftJoinAndSelect('outbound_do.outbound_memos', 'outbound_memos')
+      .leftJoinAndSelect('outbound_memos.organization', 'organization_memo')
+      .leftJoinAndSelect('outbound_memos.destination_io', 'destination_io')
       .leftJoinAndSelect('outbound_memos.outbound_memo_items', 'outbound_memo_items')
       .leftJoinAndSelect('outbound_memo_items.item', 'memo_item')
       .leftJoinAndSelect(
