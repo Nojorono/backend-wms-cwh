@@ -9,6 +9,7 @@ import { OutboundDo } from '../core/domain/entities/outbound-do.entity';
 import { OutboundMemo } from '../core/domain/entities/outbound-memo.entity';
 import { OutboundMemoItem } from '../core/domain/entities/outbound-memo-item.entity';
 import { TransactionPickingModule } from '../transaction-picking/transaction-picking.module';
+import { MasterPalletModule } from '../master-pallet/master-pallet.module';
 import { OutboundIntegrationIrReqModule } from '../outbound-integration-ir-req/outbound-integration-ir-req.module';
 import { OutboundIntegrationDeliveriesModule } from '../outbound-integration-deliveries/outbound-integration-deliveries.module';
 import { IrRequestIntegrationService } from './integration/ir-request.integration';
@@ -26,6 +27,7 @@ import { OutboundIntegrationIrReq } from 'src/core/domain/entities/outbound-inte
     ConfigModule,
     TypeOrmModule.forFeature([OutboundDo, OutboundMemo, OutboundMemoItem, OutboundIntegrationIrReq  ]),
     TransactionPickingModule,
+    MasterPalletModule,
     forwardRef(() => OutboundIntegrationIrReqModule),
     forwardRef(() => OutboundIntegrationDeliveriesModule),
     ClientsModule.registerAsync([

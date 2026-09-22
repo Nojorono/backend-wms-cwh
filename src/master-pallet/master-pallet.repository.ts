@@ -53,6 +53,10 @@ export class MasterPalletRepository {
     return pallet;
   }
 
+  async clearMemoIdByMemoId(memoId: string): Promise<void> {
+    await this.repository.update({ memo_id: memoId }, { memo_id: null } as any);
+  }
+
   async update(
     id: string,
     updateMasterPalletDto: UpdateMasterPalletDto,

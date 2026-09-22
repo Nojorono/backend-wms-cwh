@@ -15,6 +15,7 @@ import { PaginationService } from '../core/services/pagination.service';
 import { OutboundDoPaginationDto } from './dto/outbound-do-pagination.dto';
 import { PaginatedResponseDto } from '../core/dto/pagination.dto';
 import { TransactionPickingService } from '../transaction-picking/transaction-picking.service';
+import { MasterPalletService } from '../master-pallet/master-pallet.service';
 import {
   OutboundIntegrationIrReqService,
   OutboundIntegrationIrReqAggregateResult,
@@ -79,6 +80,7 @@ export class OutboundDoService {
     private readonly repository: OutboundDoRepository,
     private readonly paginationService: PaginationService,
     private readonly transactionPickingService: TransactionPickingService,
+    private readonly masterPalletService: MasterPalletService,
     private readonly outboundIntegrationIrReqService: OutboundIntegrationIrReqService,
     private readonly irRequestIntegrationService: IrRequestIntegrationService,
     private readonly shipConfirmIntegrationService: ShipConfirmIntegrationService,
@@ -224,9 +226,10 @@ export class OutboundDoService {
     // If memoId is not provided, remove all memos
     if (!memoId) {
       const memoIds = await this.repository.removeAllMemosFromOutboundDo(id);
-      // Cancel all transaction pickings for all memos
+      // Cancel all transaction pickings for all memos and clear pallet.memo_id
       for (const memoIdToCancel of memoIds) {
         await this.cancelTransactionPickingsByMemoId(memoIdToCancel);
+        await this.masterPalletService.clearMemoIdByMemoId(memoIdToCancel);
       }
 
       await this.repository.updateMultipleMemosHasDo(memoIds, false);
@@ -244,6 +247,9 @@ export class OutboundDoService {
 
     // Cancel all transaction pickings for this memo
     await this.cancelTransactionPickingsByMemoId(memoId);
+
+    // Clear memo_id on all pallets bound to this memo
+    await this.masterPalletService.clearMemoIdByMemoId(memoId);
 
     // Remove memo from outbound DO
     const updatedOutboundDo = await this.repository.removeMemoFromOutboundDo(id, memoId);

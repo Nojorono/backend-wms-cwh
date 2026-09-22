@@ -128,6 +128,10 @@ export class MasterPalletService {
     return pallet;
   }
 
+  async clearMemoIdByMemoId(memoId: string): Promise<void> {
+    await this.repository.clearMemoIdByMemoId(memoId);
+  }
+
   async findByPalletCode(palletCode: string): Promise<MasterPallet> {
     const pallet = await this.repository.findByPalletCode(palletCode);
     if (!pallet) {
