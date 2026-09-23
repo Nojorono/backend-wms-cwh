@@ -93,6 +93,13 @@ export class LHSReportDetailRowDto {
   @ApiPropertyOptional({ example: 'SD', description: 'Channel / trip_type' })
   channel?: string;
 
+  @ApiPropertyOptional({
+    example: 'FINAL',
+    description: 'DO suggestion status (Outgoing SPB rows)',
+    enum: ['DRAFT', 'REVISED', 'SUBMITTED', 'FINAL', 'VOID', 'VOID_NEED_ACTION', 'COMPLETED'],
+  })
+  status?: string;
+
   @ApiProperty({
     example: { ABC12: 61, AMB16: 60 },
     description: 'Qty keyed by item_code (matrix columns)',
