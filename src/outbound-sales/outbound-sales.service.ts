@@ -32,13 +32,7 @@ import { MasterIORepository } from '../master-io/master-io.repository';
 
 const LHS_DO_STATUSES: DoSuggestionStatus[] = [
   DoSuggestionStatus.FINAL,
-  // need status completed
-  DoSuggestionStatus.VOID,
-  DoSuggestionStatus.VOID_NEED_ACTION,
-];
-
-const LHS_DETAIL_OUTGOING_STATUSES: DoSuggestionStatus[] = [
-  DoSuggestionStatus.FINAL,
+  DoSuggestionStatus.COMPLETED,
   DoSuggestionStatus.VOID,
   DoSuggestionStatus.VOID_NEED_ACTION,
 ];
@@ -550,7 +544,7 @@ export class OutboundSalesService {
         this.doSuggestionRepository.sumQtyBySalesAndItemByOrganizationAndDate(
           resolvedOrganizationId,
           reportDate,
-          LHS_DETAIL_OUTGOING_STATUSES,
+          LHS_DO_STATUSES,
         ),
         this.btbRepository.getAllLastDateInsert(resolvedOrganizationId),
       ]);
@@ -599,25 +593,27 @@ export class OutboundSalesService {
       });
     }
 
-    // Outgoing — SPB Submitted per sales
+    // Outgoing — SPB Submitted per sales (and status)
     const outgoingBySales = new Map<
       string,
       {
         sales_nik: string;
         sales_name: string;
         channel?: string;
+        status?: string;
         quantities: Record<string, number>;
       }
     >();
 
     for (const row of salesDoRows) {
-      const key = row.sales_nik;
+      const key = `${row.sales_nik}|${row.status ?? ''}`;
       let entry = outgoingBySales.get(key);
       if (!entry) {
         entry = {
           sales_nik: row.sales_nik,
           sales_name: row.sales_name,
           channel: row.channel,
+          status: row.status,
           quantities: emptyQuantities(),
         };
         outgoingBySales.set(key, entry);
@@ -629,15 +625,20 @@ export class OutboundSalesService {
         (entry.quantities[row.item_code] ?? 0) + qty;
     }
 
-    for (const entry of [...outgoingBySales.values()].sort((a, b) =>
-      a.sales_nik.localeCompare(b.sales_nik),
-    )) {
+    for (const entry of [...outgoingBySales.values()].sort((a, b) => {
+      const byNik = a.sales_nik.localeCompare(b.sales_nik);
+      if (byNik !== 0) {
+        return byNik;
+      }
+      return (a.status ?? '').localeCompare(b.status ?? '');
+    })) {
       rows.push({
         ket1: 'Outgoing',
         ket2: 'SPB Submitted',
         sales_nik: entry.sales_nik,
         sales_name: entry.sales_name,
         channel: entry.channel,
+        status: entry.status,
         quantities: entry.quantities,
       });
     }

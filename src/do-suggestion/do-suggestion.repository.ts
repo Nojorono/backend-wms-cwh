@@ -72,6 +72,7 @@ export interface DoSuggestionSalesItemQtyRow {
   sales_nik: string;
   sales_name: string;
   channel?: string;
+  status?: DoSuggestionStatus;
   item_code: string;
   qty_submitted: number;
   qty_final: number;
@@ -474,6 +475,7 @@ export class DoSuggestionRepository {
       .select('ds.sales_nik', 'sales_nik')
       .addSelect('MAX(ds.sales_name)', 'sales_name')
       .addSelect('MAX(ds.trip_type)', 'channel')
+      .addSelect('ds.status', 'status')
       .addSelect('details.item_code', 'item_code')
       .addSelect(
         'COALESCE(SUM(COALESCE(details.item_qty_submitted, 0)), 0)',
@@ -491,6 +493,7 @@ export class DoSuggestionRepository {
       .andWhere('details.item_code IS NOT NULL')
       .andWhere("TRIM(details.item_code) <> ''")
       .groupBy('ds.sales_nik')
+      .addGroupBy('ds.status')
       .addGroupBy('details.item_code');
 
     if (statuses.length) {
@@ -504,6 +507,7 @@ export class DoSuggestionRepository {
         sales_nik: string;
         sales_name: string | null;
         channel: string | null;
+        status: DoSuggestionStatus | null;
         item_code: string;
         qty_submitted: string;
         qty_final: string;
@@ -513,6 +517,7 @@ export class DoSuggestionRepository {
       sales_nik: row.sales_nik,
       sales_name: row.sales_name?.trim() || row.sales_nik,
       channel: row.channel?.trim() || undefined,
+      status: row.status ?? undefined,
       item_code: row.item_code,
       qty_submitted: Number(row.qty_submitted) || 0,
       qty_final: Number(row.qty_final) || 0,
