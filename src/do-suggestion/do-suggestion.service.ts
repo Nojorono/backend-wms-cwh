@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
 import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
+import { UpdateStatusOnlyDto } from './dto/update-status-only.dto';
 import { DoSuggestionDetailDto } from './dto/do-suggestion-detail.dto';
 import { MoveOrderIntegrationService } from '../move-order-integration/move-order-integration.service';
 import { CreateMoveOrderIntegrationPayloadDto } from '../move-order-integration/dto/create-move-order-integration-payload.dto';
@@ -106,6 +107,10 @@ export class DoSuggestionService {
       throw new NotFoundException(`DO suggestion with ID ${id} not found`);
     }
     return row;
+  }
+
+  async updateStatusOnly(dto: UpdateStatusOnlyDto): Promise<DoSuggestion> {
+    return await this.repository.updateStatus(dto.id, dto.status, dto.updated_by);
   }
 
   async remove(id: string): Promise<{ success: boolean; message: string }> {

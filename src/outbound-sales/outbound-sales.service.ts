@@ -109,7 +109,8 @@ export class OutboundSalesService {
   }
 
   /**
-   * Refresh existing status=LHS rows from Oracle (today). Does not touch status-null rows.
+   * Refresh existing status=LHS rows from Oracle (today).
+   * Uses hard delete + create (faster than per-row update). Does not touch status-null rows.
    */
   private async refreshExistingOnHandForLhs(
     query: InvOnHandQtyWithAtrParamsDto,
@@ -139,63 +140,9 @@ export class OutboundSalesService {
     );
 
     return await this.dataSource.transaction(async () => {
-      const existingByKey = new Map(
-        existing.map((row) => [this.onHandMatchKey(row), row]),
-      );
-      const result: OnHandAtr[] = [];
-      const matchedIds = new Set<string>();
-
-      for (const dto of dtos) {
-        const key = this.onHandMatchKey(dto);
-        const found = existingByKey.get(key);
-        if (found) {
-          matchedIds.add(found.id);
-          result.push(
-            await this.onHandAtrRepository.update(found.id, {
-              item_number: dto.item_number,
-              item_description: dto.item_description,
-              inventory_item_id: dto.inventory_item_id,
-              oracle_organization_id: dto.oracle_organization_id,
-              organization_code: dto.organization_code,
-              organization_name: dto.organization_name,
-              subinventory_code: dto.subinventory_code,
-              locator_id: dto.locator_id,
-              locator: dto.locator,
-              locator_name: dto.locator_name,
-              quantity: dto.quantity,
-              avail_to_reserve: dto.avail_to_reserve,
-              status,
-              updated_by: createdBy,
-            }),
-          );
-        } else {
-          result.push(await this.onHandAtrRepository.create(dto));
-        }
-      }
-
-      for (const row of existing) {
-        if (!matchedIds.has(row.id)) {
-          result.push(row);
-        }
-      }
-
-      return result;
+      await this.onHandAtrRepository.hardDeleteByIds(existing.map((row) => row.id));
+      return await this.onHandAtrRepository.createMany(dtos);
     });
-  }
-
-  private onHandMatchKey(row: {
-    item_code?: string | null;
-    subinventory_code?: string | null;
-    locator_id?: number | null;
-    locator?: string | null;
-  }): string {
-    const itemCode = row.item_code?.trim() ?? '';
-    const subinventory = row.subinventory_code?.trim() ?? '';
-    const locator =
-      row.locator_id != null
-        ? String(row.locator_id)
-        : (row.locator?.trim() ?? '');
-    return `${itemCode}|${subinventory}|${locator}`;
   }
 
   async createManyOnHandAtr(dtos: CreateOnHandAtrDto[]): Promise<OnHandAtr[]> {

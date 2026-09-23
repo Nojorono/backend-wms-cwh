@@ -70,6 +70,13 @@ export class OnHandAtrRepository {
         await this.repo.softDelete(id);
     }
 
+    async hardDeleteByIds(ids: string[]): Promise<void> {
+        if (!ids.length) {
+            return;
+        }
+        await this.repo.delete(ids);
+    }
+
     // Latest distinct LHS snapshot dates (WIB) — same filters as findByOrganizationIdAndDate.
     async findByOrganizationIdDistinctCreatedAtDate(
         organizationId: string,
