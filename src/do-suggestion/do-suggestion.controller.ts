@@ -14,6 +14,7 @@ import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionService } from './do-suggestion.service';
 import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
+import { UpdateStatusOnlyDto } from './dto/update-status-only.dto';
 import { FindDoSuggestionByCallplanDto } from './dto/find-do-suggestion-by-callplan.dto';
 import {
   DoSuggestionCallplanFilterQueryDto,
@@ -45,6 +46,15 @@ export class DoSuggestionController {
   @ApiResponse({ status: 200, type: DoSuggestion })
   createOrUpdate(@Body() dto: CreateOrUpdateDoSuggestionDto): Promise<DoSuggestion> {
     return this.doSuggestionService.createOrUpdate(dto);
+  }
+
+  // update status only 
+  @Post('update-status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update status only' })
+  @ApiResponse({ status: 200, type: DoSuggestion })
+  updateStatusOnly(@Body() dto: UpdateStatusOnlyDto): Promise<DoSuggestion> {
+    return this.doSuggestionService.updateStatusOnly(dto);
   }
 
   @Post('batch')
