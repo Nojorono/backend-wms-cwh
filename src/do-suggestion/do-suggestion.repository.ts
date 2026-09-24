@@ -278,6 +278,7 @@ export class DoSuggestionRepository {
     organizationId: string,
     salesSpvNik?: string,
     status?: DoSuggestionStatus,
+    moType?: string,
   ): Promise<DoSuggestion[]> {
     const qb = this.headerRepository
       .createQueryBuilder('ds')
@@ -298,6 +299,10 @@ export class DoSuggestionRepository {
 
     if (status) {
       qb.andWhere('ds.status = :status', { status });
+    }
+
+    if (moType) {
+      qb.andWhere('ds.mo_type = :moType', { moType });
     }
 
     return await qb.orderBy('ds.createdAt', 'DESC').getMany();

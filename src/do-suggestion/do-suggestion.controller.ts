@@ -101,7 +101,7 @@ export class DoSuggestionController {
   @ApiOperation({
     summary: 'Get DO suggestions by callplan date start and organization ID',
     description:
-      'Optional query: sales_spv_nik, status (DRAFT | REVISED | SUBMITTED | FINAL | VOID).',
+      'Optional query: sales_spv_nik, status (DRAFT | REVISED | SUBMITTED | FINAL | VOID), mo_type (FPPR Awal | FPPR Tambahan).',
   })
   @ApiResponse({ status: 200, type: [DoSuggestion] })
   findByCallplanDateStart(
@@ -114,6 +114,7 @@ export class DoSuggestionController {
       organizationId,
       query.sales_spv_nik,
       query.status,
+      query.mo_type,
     );
   }
 
