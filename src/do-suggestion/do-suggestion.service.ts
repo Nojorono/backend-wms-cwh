@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DoSuggestion, DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { BatchCreateOrUpdateDoSuggestionDto } from './dto/batch-create-or-update-do-suggestion.dto';
 import { OnHandAtr } from '../core/domain/entities/on-hand-atr.entity';
+import { MasterItem } from '../core/domain/entities/master-item.entity';
 import { CreateOrUpdateDoSuggestionDto } from './dto/create-or-update-do-suggestion.dto';
 import { UpdateStatusOnlyDto } from './dto/update-status-only.dto';
 import { DoSuggestionDetailDto } from './dto/do-suggestion-detail.dto';
@@ -43,6 +44,8 @@ export class DoSuggestionService {
     private readonly integrationOnHandAtrService: IntegrationOnHandAtrService,
     @InjectRepository(OnHandAtr)
     private readonly onHandAtrRepository: Repository<OnHandAtr>,
+    @InjectRepository(MasterItem)
+    private readonly masterItemRepository: Repository<MasterItem>,
     @InjectRepository(MasterIO)
     private readonly masterIORepository: Repository<MasterIO>,
     private readonly userService: UserService,
@@ -170,6 +173,7 @@ export class DoSuggestionService {
     organizationId: string,
     salesSpvNik?: string,
     status?: DoSuggestionStatus,
+    moType?: DoSuggestionMoType,
   ): Promise<DoSuggestion[]> {
     if (!callplanDateStart?.trim()) {
       throw new BadRequestException('callplanDateStart is required');
@@ -188,6 +192,7 @@ export class DoSuggestionService {
       organizationId.trim(),
       salesSpvNik?.trim() || undefined,
       status,
+      moType,
     );
   }
 
@@ -214,10 +219,10 @@ export class DoSuggestionService {
       );
     }
 
-    const onHandItems = await this.fetchDummyOnHandItems(normalizedOrganizationId);
-    if (!onHandItems.length) {
+    const masterItems = await this.fetchDummyMasterItems();
+    if (!masterItems.length) {
       throw new BadRequestException(
-        `No on-hand items found for organization ${normalizedOrganizationId}`,
+        `No master items found`,
       );
     }
 
@@ -275,8 +280,8 @@ export class DoSuggestionService {
         continue;
       }
 
-      const lineCount = Math.min(5, onHandItems.length);
-      const selectedItems = this.pickRandomItems(onHandItems, lineCount);
+      const lineCount = Math.min(50, masterItems.length);
+      const selectedItems = this.pickRandomItems(masterItems, lineCount);
 
       const lines: DoSuggestionDetailData[] = selectedItems.map((item, lineIndex) => {
         const quantity = Math.floor(Math.random() * 10) + 1;
@@ -324,22 +329,22 @@ export class DoSuggestionService {
     };
   }
 
-  private async fetchDummyOnHandItems(
-    organizationId: string,
+  private async fetchDummyMasterItems(
   ): Promise<Array<{ item_code: string; inventory_item_id: number }>> {
-    const rows = await this.onHandAtrRepository
-      .createQueryBuilder('onHandAtr')
-      .select('onHandAtr.item_code', 'item_code')
-      .addSelect('onHandAtr.inventory_item_id', 'inventory_item_id')
-      .where('onHandAtr.organization_id = :organizationId', { organizationId })
-      .andWhere('onHandAtr.item_code IS NOT NULL')
-      .andWhere("TRIM(onHandAtr.item_code) <> ''")
-      .andWhere('onHandAtr.inventory_item_id IS NOT NULL')
-      .andWhere('onHandAtr.deleted_at IS NULL')
-      .groupBy('onHandAtr.item_code')
-      .addGroupBy('onHandAtr.inventory_item_id')
-      .orderBy('onHandAtr.item_code', 'ASC')
-      .limit(50)
+
+    const rows = await this.masterItemRepository
+      .createQueryBuilder('item')
+      .select('COALESCE(NULLIF(TRIM(item.sku), \'\'), NULLIF(TRIM(item.item_number), \'\'))', 'item_code')
+      .addSelect('item.inventory_item_id', 'inventory_item_id')
+      .where('item.deleted_at IS NULL')
+      .andWhere('item.inventory_item_id IS NOT NULL')
+      .andWhere("TRIM(item.inventory_item_id) <> ''")
+      .andWhere(
+        `(NULLIF(TRIM(item.sku), '') IS NOT NULL OR NULLIF(TRIM(item.item_number), '') IS NOT NULL)`,
+      )
+      .orderBy('item.sku', 'ASC')
+      .addOrderBy('item.item_number', 'ASC')
+      .limit(200)
       .getRawMany<{ item_code: string; inventory_item_id: string | number }>();
 
     return rows
