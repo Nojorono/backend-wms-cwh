@@ -89,6 +89,50 @@ export class EmailController {
     return this.emailService.sendEmailWithUpload(body, files ?? []);
   }
 
+  @Post('send-upload-resend')
+  @ApiOperation({
+    summary: 'Send email with file upload via Resend',
+    description:
+      'Multipart form-data (same fields as /email/send-upload). Uses Resend API ' +
+      '(RESEND_API_KEY, RESEND_FROM). Field name for attachments: files.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['to', 'subject'],
+      properties: {
+        to: {
+          type: 'string',
+          example: 'user@example.com,other@example.com',
+          description: 'Comma-separated recipient emails',
+        },
+        cc: { type: 'string', example: 'cc@example.com' },
+        bcc: { type: 'string', example: 'bcc@example.com' },
+        subject: { type: 'string', example: 'Opening balance confirmed' },
+        text: { type: 'string', example: 'Your opening balance has been confirmed.' },
+        html: {
+          type: 'string',
+          example: '<p>Your opening balance has been <b>confirmed</b>.</p>',
+        },
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Attachment files (max 10)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Email sent.', type: SendEmailResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid payload or Resend failure.' })
+  @UseInterceptors(FilesInterceptor('files', 10))
+  sendEmailWithUploadResend(
+    @UploadedFiles() files: EmailUploadFile[],
+    @Body() body: SendEmailMultipartDto,
+  ): Promise<SendEmailResponseDto> {
+    return this.emailService.sendEmailWithUploadResend(body, files ?? []);
+  }
+
   @Public()
   @Get('call-plan-null-ahom/preview/html')
   @ApiOperation({
