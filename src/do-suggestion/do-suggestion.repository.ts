@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { DataSource, EntityManager, Repository } from 'typeorm'; import { DoSuggestion } from '../core/domain/entities/do-suggestion.entity';
 import { DoSuggestionStatus } from '../core/domain/entities/do-suggestion.entity'; import { DoSuggestionDetail } from '../core/domain/entities/do-suggestion-detail.entity';
 import { MoveOrderIntegration } from '../core/domain/entities/move-order-integration.entity';
+import { INDONESIA_TIMEZONE } from '../core/utils/date-transformer.util';
 import { formatSpbNumber, parseSpbSequence, formatOrganizationCallplanNumber, buildOrganizationCallplanPrefix, parseOrganizationCallplanSequence } from './do-suggestion-spb.util';
 import {
   DO_SUGGESTION_VOID_BACK_TO_KECIL_SUFFIX,
@@ -73,6 +74,9 @@ export interface DoSuggestionSalesItemQtyRow {
   sales_name: string;
   channel?: string;
   status?: DoSuggestionStatus;
+  callplan_start_date?: string;
+  callplan_number?: string;
+  spb_number?: string;
   item_code: string;
   qty_submitted: number;
   qty_final: number;
@@ -422,7 +426,7 @@ export class DoSuggestionRepository {
     date: string,
     statuses: DoSuggestionStatus[],
   ): Promise<DoSuggestionFinalSubmittedSumRow[]> {
-    const callplanDateStart = date.trim().split('T')[0];
+    const updatedDate = date.trim().split('T')[0];
     const qb = this.headerRepository
       .createQueryBuilder('ds')
       .innerJoin('ds.details', 'details', 'details.deleted_at IS NULL')
@@ -438,7 +442,10 @@ export class DoSuggestionRepository {
       )
       .where('ds.organization_id = :organizationId', { organizationId })
       .andWhere('ds.deleted_at IS NULL')
-      .andWhere('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
+      .andWhere(
+        `DATE(ds.updated_at AT TIME ZONE '${INDONESIA_TIMEZONE}') = :updatedDate`,
+        { updatedDate },
+      )
       .andWhere('details.item_code IS NOT NULL')
       .andWhere("TRIM(details.item_code) <> ''")
       .groupBy('ds.organization_id')
@@ -467,13 +474,14 @@ export class DoSuggestionRepository {
 
   /**
    * Per-sales × item qty for LHS detail matrix (Outgoing / SPB Submitted).
+   * Filters SPB by updated_at date (WIB), not callplan_date_start.
    */
   async sumQtyBySalesAndItemByOrganizationAndDate(
     organizationId: string,
     date: string,
     statuses: DoSuggestionStatus[],
   ): Promise<DoSuggestionSalesItemQtyRow[]> {
-    const callplanDateStart = date.trim().split('T')[0];
+    const updatedDate = date.trim().split('T')[0];
     const qb = this.headerRepository
       .createQueryBuilder('ds')
       .innerJoin('ds.details', 'details', 'details.deleted_at IS NULL')
@@ -481,6 +489,12 @@ export class DoSuggestionRepository {
       .addSelect('MAX(ds.sales_name)', 'sales_name')
       .addSelect('MAX(ds.trip_type)', 'channel')
       .addSelect('ds.status', 'status')
+      .addSelect(
+        "TO_CHAR(ds.callplan_date_start, 'YYYY-MM-DD')",
+        'callplan_start_date',
+      )
+      .addSelect('ds.callplan_number', 'callplan_number')
+      .addSelect('ds.spb_number', 'spb_number')
       .addSelect('details.item_code', 'item_code')
       .addSelect(
         'COALESCE(SUM(COALESCE(details.item_qty_submitted, 0)), 0)',
@@ -492,13 +506,19 @@ export class DoSuggestionRepository {
       )
       .where('ds.organization_id = :organizationId', { organizationId })
       .andWhere('ds.deleted_at IS NULL')
-      .andWhere('ds.callplan_date_start = :callplanDateStart', { callplanDateStart })
+      .andWhere(
+        `DATE(ds.updated_at AT TIME ZONE '${INDONESIA_TIMEZONE}') = :updatedDate`,
+        { updatedDate },
+      )
       .andWhere('ds.sales_nik IS NOT NULL')
       .andWhere("TRIM(ds.sales_nik) <> ''")
       .andWhere('details.item_code IS NOT NULL')
       .andWhere("TRIM(details.item_code) <> ''")
       .groupBy('ds.sales_nik')
       .addGroupBy('ds.status')
+      .addGroupBy('ds.callplan_date_start')
+      .addGroupBy('ds.callplan_number')
+      .addGroupBy('ds.spb_number')
       .addGroupBy('details.item_code');
 
     if (statuses.length) {
@@ -513,6 +533,9 @@ export class DoSuggestionRepository {
         sales_name: string | null;
         channel: string | null;
         status: DoSuggestionStatus | null;
+        callplan_start_date: string | Date | null;
+        callplan_number: string | null;
+        spb_number: string | null;
         item_code: string;
         qty_submitted: string;
         qty_final: string;
@@ -523,10 +546,36 @@ export class DoSuggestionRepository {
       sales_name: row.sales_name?.trim() || row.sales_nik,
       channel: row.channel?.trim() || undefined,
       status: row.status ?? undefined,
+      callplan_start_date: this.toDateOnlyString(row.callplan_start_date),
+      callplan_number: row.callplan_number?.trim() || undefined,
+      spb_number: row.spb_number?.trim() || undefined,
       item_code: row.item_code,
       qty_submitted: Number(row.qty_submitted) || 0,
       qty_final: Number(row.qty_final) || 0,
     }));
+  }
+
+  private toDateOnlyString(value: string | Date | null | undefined): string | undefined {
+    if (value == null) {
+      return undefined;
+    }
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        return undefined;
+      }
+      // Avoid toISOString() — DATE at WIB midnight becomes previous UTC day.
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: INDONESIA_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(value);
+    }
+    const trimmed = String(value).trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    return trimmed.split('T')[0];
   }
 
   private async updateDetailLine(

@@ -540,7 +540,7 @@ export class OutboundSalesService {
       });
     }
 
-    // Outgoing — SPB Submitted per sales (and status)
+    // Outgoing — SPB Submitted per sales (and status / callplan / spb)
     const outgoingBySales = new Map<
       string,
       {
@@ -548,12 +548,21 @@ export class OutboundSalesService {
         sales_name: string;
         channel?: string;
         status?: string;
+        callplan_start_date?: string;
+        callplan_number?: string;
+        spb_number?: string;
         quantities: Record<string, number>;
       }
     >();
 
     for (const row of salesDoRows) {
-      const key = `${row.sales_nik}|${row.status ?? ''}`;
+      const key = [
+        row.sales_nik,
+        row.status ?? '',
+        row.callplan_number ?? '',
+        row.spb_number ?? '',
+        row.callplan_start_date ?? '',
+      ].join('|');
       let entry = outgoingBySales.get(key);
       if (!entry) {
         entry = {
@@ -561,6 +570,9 @@ export class OutboundSalesService {
           sales_name: row.sales_name,
           channel: row.channel,
           status: row.status,
+          callplan_start_date: row.callplan_start_date,
+          callplan_number: row.callplan_number,
+          spb_number: row.spb_number,
           quantities: emptyQuantities(),
         };
         outgoingBySales.set(key, entry);
@@ -577,6 +589,10 @@ export class OutboundSalesService {
       if (byNik !== 0) {
         return byNik;
       }
+      const bySpb = (a.spb_number ?? '').localeCompare(b.spb_number ?? '');
+      if (bySpb !== 0) {
+        return bySpb;
+      }
       return (a.status ?? '').localeCompare(b.status ?? '');
     })) {
       rows.push({
@@ -586,6 +602,9 @@ export class OutboundSalesService {
         sales_name: entry.sales_name,
         channel: entry.channel,
         status: entry.status,
+        callplan_start_date: entry.callplan_start_date,
+        callplan_number: entry.callplan_number,
+        spb_number: entry.spb_number,
         quantities: entry.quantities,
       });
     }

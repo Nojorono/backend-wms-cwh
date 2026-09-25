@@ -4,12 +4,14 @@ import { onHandAtrDateNowExample } from './inv-on-hand-qty-with-atr.dto';
 
 export class LhsReportQueryDto {
   @ApiProperty({
-    description: 'Report date H (YYYY-MM-DD, WIB). Stock Awal uses H-1; Stock Meta / DO / BTB use H.',
+    description:
+      'Report date H (YYYY-MM-DD, WIB). Stock Awal uses H-1; Stock Meta / BTB use H. ' +
+      'DO/SPB rows filter by do_suggestion.updated_at on H.',
     example: onHandAtrDateNowExample(),
   })
   @IsDateString()
   @IsNotEmpty()
-  date: string; //  updated_at for dosugestion spb
+  date: string;
 }
 
 export class LHSReportItemDto {
@@ -99,6 +101,24 @@ export class LHSReportDetailRowDto {
     enum: ['DRAFT', 'REVISED', 'SUBMITTED', 'FINAL', 'VOID', 'VOID_NEED_ACTION', 'COMPLETED'],
   })
   status?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-06-19',
+    description: 'Call plan start date (Outgoing SPB rows)',
+  })
+  callplan_start_date?: string;
+
+  @ApiPropertyOptional({
+    example: 'SMG/2026/6/000001.1',
+    description: 'Call plan number (Outgoing SPB rows)',
+  })
+  callplan_number?: string;
+
+  @ApiPropertyOptional({
+    example: 'SPB/SMG/2026/6/000001.1/5001',
+    description: 'SPB number (Outgoing SPB rows)',
+  })
+  spb_number?: string;
 
   @ApiProperty({
     example: { ABC12: 61, AMB16: 60 },
