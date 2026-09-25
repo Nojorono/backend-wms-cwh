@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import axios, { AxiosError } from 'axios';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { CallPlanNullAhomTemplateDto } from './dto/call-plan-null-ahom-template.dto';
@@ -104,6 +105,128 @@ export class EmailService {
         contentType: file.mimetype,
       })),
     });
+  }
+
+  /** Send email from multipart form via Resend API (RESEND_API_KEY, RESEND_FROM). */
+  async sendEmailWithUploadResend(
+    body: SendEmailMultipartDto,
+    files: EmailUploadFile[],
+  ): Promise<SendEmailResponseDto> {
+    if (!body.text?.trim() && !body.html?.trim()) {
+      throw new BadRequestException('Either text or html body is required');
+    }
+
+    const apiKey = this.configService.get<string>('RESEND_API_KEY')?.trim() || '';
+    const from = this.configService.get<string>('RESEND_FROM')?.trim() || '';
+
+    if (!apiKey) {
+      throw new BadRequestException('RESEND_API_KEY is required');
+    }
+    if (!from) {
+      throw new BadRequestException('RESEND_FROM is required');
+    }
+
+    const attachments = (files ?? []).map((file) => ({
+      filename: file.originalname,
+      content: file.buffer.toString('base64'),
+    }));
+
+    return this.sendEmailViaResend({
+      apiKey,
+      from,
+      to: body.to,
+      cc: body.cc,
+      bcc: body.bcc,
+      subject: body.subject,
+      text: body.text,
+      html: body.html,
+      attachments: attachments.length ? attachments : undefined,
+    });
+  }
+
+  private async sendEmailViaResend(params: {
+    apiKey: string;
+    from: string;
+    to: string[];
+    cc?: string[];
+    bcc?: string[];
+    subject: string;
+    text?: string;
+    html?: string;
+    attachments?: Array<{ filename: string; content: string }>;
+  }): Promise<SendEmailResponseDto> {
+    const payload: Record<string, unknown> = {
+      from: params.from,
+      to: params.to,
+      subject: params.subject,
+    };
+
+    if (params.cc?.length) {
+      payload.cc = params.cc;
+    }
+    if (params.bcc?.length) {
+      payload.bcc = params.bcc;
+    }
+    if (params.text?.trim()) {
+      payload.text = params.text;
+    }
+    if (params.html?.trim()) {
+      payload.html = params.html;
+    }
+    if (params.attachments?.length) {
+      payload.attachments = params.attachments;
+    }
+
+    try {
+      const response = await axios.post<{ id?: string }>(
+        'https://api.resend.com/emails',
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${params.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30_000,
+        },
+      );
+
+      const messageId = response.data?.id;
+
+      this.logger.log(
+        `Email sent via Resend to=${params.to.join(',')} subject="${params.subject}" id=${messageId ?? 'N/A'}`,
+      );
+
+      return {
+        success: true,
+        message: 'Email sent successfully via Resend',
+        message_id: messageId,
+      };
+    } catch (error) {
+      const message = this.extractResendErrorMessage(error);
+      this.logger.error(`Failed to send email via Resend: ${message}`);
+      throw new BadRequestException(`Failed to send email via Resend: ${message}`);
+    }
+  }
+
+  private extractResendErrorMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<{ message?: string; name?: string }>;
+      const data = axiosError.response?.data;
+      if (data && typeof data === 'object') {
+        const apiMessage =
+          typeof data.message === 'string'
+            ? data.message
+            : typeof (data as { name?: string }).name === 'string'
+              ? (data as { name: string }).name
+              : null;
+        if (apiMessage) {
+          return apiMessage;
+        }
+      }
+      return axiosError.message;
+    }
+
+    return error instanceof Error ? error.message : String(error);
   }
 
   renderCallPlanReminderPreview(body: CallPlanReminderTemplateDto) {
